@@ -44,8 +44,8 @@ Design Knowledge as Constraints*, IEEE VIS 2018), which encodes established visu
 as rules: a category axis becomes crowded past 12 values, a color or stacking channel saturates
 past 10 series, and no axis reads past 30 values.
 
-One number is Cube's own rather than Draco's: a mean label length past **16 characters** counts as
-long.
+Two numbers are Cube's own rather than Draco's, which has no pie: a mean label length past **16
+characters** counts as long, and a pie takes at most **6** slices.
 
 No threshold is applied to the number of rows. A few rules read the row count directly — a KPI
 needs exactly one row, a heatmap needs its grid at least half filled — but none of them treats "too
@@ -86,8 +86,8 @@ type, not separate ones.
 A [pie](/docs/explore-analyze/charts/chart-types/pie) is recommended only when its slices add up
 to a meaningful whole: the measure is a count or a sum, there are 2 to 6 slices, and none of them
 is negative. A distinct count is not recommended as a pie, because its slices can overlap. To compare
-shares across a second category or over time, use a
-[percentage stacked bar](/docs/explore-analyze/charts/chart-types/bar) instead.
+shares across a second category or over time, use a bar chart with
+[**Stack %**](/docs/explore-analyze/charts/chart-types/bar#stacking) stacking instead.
 
 Funnel, sankey, area, boxplot and HTML are never recommended, so pick them yourself. A funnel claims
 that its stages are steps of one process, which the shape of a query doesn't reveal. All of them

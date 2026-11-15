@@ -62,6 +62,13 @@ tooltips. The charts are line, area, bar
 and funnel charts. The agent then runs the app and fixes the errors that it
 finds. Continue prompting the agent to adjust the layout, behavior, or styling.
 
+To let viewers filter the app by date, ask the agent for a date range picker,
+for example "add a date range picker that filters all reports". Viewers pick a
+preset, such as _Last 7 days_ or _Last quarter_, or pick a custom range on a
+calendar. The app then filters its reports to that range. Presets mean the same
+as Cube's [relative date ranges][ref-relative-date-range]: _Last 7 days_ is the
+seven days that ended yesterday, and _This month_ is the whole calendar month.
+
 ### How the agent picks charts
 
 The agent picks each chart from the question it answers and the shape of the
@@ -82,13 +89,6 @@ The agent never draws a line over categories that have no order. When several
 chart types fit a question equally well, it picks one that the page doesn't use
 yet, and it doesn't show the same report twice. Ask for a specific chart type to
 override its choice.
-
-To let viewers filter the app by date, ask the agent for a date range picker,
-for example "add a date range picker that filters all reports". Viewers pick a
-preset, such as _Last 7 days_ or _Last quarter_, or pick a custom range on a
-calendar. The app then filters its reports to that range. Presets mean the same
-as Cube's [relative date ranges][ref-relative-date-range]: _Last 7 days_ is the
-seven days that ended yesterday, and _This month_ is the whole calendar month.
 
 ### Periods that are still running
 
