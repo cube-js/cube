@@ -16,6 +16,9 @@ cubes:
             type: number
             sql: id
             primary_key: true
+          - name: brand_id
+            type: number
+            sql: brand_id
       measures:
           - name: amount
             type: sum
@@ -47,6 +50,18 @@ cubes:
             type: number
             sql: id
             primary_key: true
+      measures:
+          - name: count
+            type: count
+      pre_aggregations:
+          # Its join is rooted at `sp_sales`, the many side of the edge.
+          - name: by_sp_brand
+            type: rollup
+            external: false
+            measures:
+                - count
+            dimensions:
+                - sp_sales.brand_id
 
     - name: gross_sales
       sql: "SELECT * FROM gross_sales"

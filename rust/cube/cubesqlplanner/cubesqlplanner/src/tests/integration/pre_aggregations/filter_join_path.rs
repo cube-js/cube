@@ -174,3 +174,27 @@ async fn test_multiplied_rollup_serves_its_own_grouping() -> Result<(), CubeErro
     }
     Ok(())
 }
+
+// Hcp 1 has sales of brands 1 and 2, so the rollup counts it under each.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_rollup_rooted_at_many_side_is_not_rolled_up_over_filter_member(
+) -> Result<(), CubeError> {
+    let ctx = context()?;
+    let query = indoc! {"
+        measures:
+          - hcps.count
+        filters:
+          - dimension: sp_sales.brand_id
+            operator: equals
+            values:
+              - '1'
+              - '2'
+    "};
+
+    assert!(used_names(&ctx, query)?.is_empty());
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+    Ok(())
+}
