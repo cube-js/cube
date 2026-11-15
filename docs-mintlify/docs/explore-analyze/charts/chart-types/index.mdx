@@ -33,8 +33,9 @@ picker appears, and choosing a type is always your action.
 ### What Cube looks at
 
 The recommendation reads the shape of your query and its result: how many measures, dimensions and
-time dimensions you selected, how many distinct values each dimension has, and how long the
-category labels are. It is computed in your browser and is not saved — the suggestion lasts for the
+time dimensions you selected, how many distinct values each dimension has, how long the category
+labels are, and, for a single measure, whether it is a count or a sum and whether any of its values
+are negative. It is computed in your browser and is not saved — the suggestion lasts for the
 current session only.
 
 Where a threshold is involved, it comes from
@@ -75,7 +76,7 @@ Otherwise Cube checks these in order and takes the first that matches:
 | **Scatter** | Two or more measures with no time dimension, across one category or several rows — the shape for correlating them |
 | **Bar (stacked)** | One measure split by two categories, the first up to 12 values and the second up to 10 |
 | **Heatmap** | One measure split by two categories, both past those bounds — the first past 12 values and the second past 10 — whose combinations fill at least half the grid |
-| **Pie** | One count or sum measure split into 2 to 6 categories, with no negative values |
+| **Pie** | One count or sum measure across one category of 2 to 6 values, with no negative values |
 | **Bar** | One measure across up to 12 categories whose labels average 16 characters or fewer |
 | **Bar (horizontal)** | The same, where the labels are longer or the categories run past 12 |
 
