@@ -28,6 +28,13 @@ cubes:
                 - amount
             dimensions:
                 - brands.name
+          - name: by_gross_sale
+            type: rollup
+            external: false
+            measures:
+                - amount
+            dimensions:
+                - gross_sales.id
 
     - name: hcps
       sql: "SELECT * FROM hcps"

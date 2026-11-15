@@ -27,7 +27,7 @@ CREATE TABLE sp_sales (
 
 INSERT INTO brands VALUES (1, 'A'), (2, 'B');
 INSERT INTO hcps VALUES (1), (2);
-INSERT INTO gross_sales VALUES (1, 1, 2), (2, 2, 1);
+INSERT INTO gross_sales VALUES (1, 1, 2), (2, 2, 1), (3, 2, 2);
 INSERT INTO sp_sales VALUES
     (1, 1, 1, 10.00),
     (2, 1, 2, 20.00),

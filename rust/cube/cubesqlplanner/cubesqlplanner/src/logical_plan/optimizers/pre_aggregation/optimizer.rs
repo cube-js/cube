@@ -917,21 +917,6 @@ impl PreAggregationOptimizer {
             }
         }
 
-        // The query is planned with its filters, whose members' join hints can
-        // change the path to a cube and multiply the measures.
-        let has_filters = !filters.dimensions_filters.is_empty()
-            || !filters.time_dimensions_filters.is_empty()
-            || !filters.segments.is_empty();
-        let filtered_groups = if has_filters {
-            Some(MultiFactJoinGroups::try_new(
-                self.query_tools.clone(),
-                self.filtered_join_hints(schema, filters, &all_measures)?,
-            )?)
-        } else {
-            None
-        };
-        let planned_groups = filtered_groups.as_ref().unwrap_or(&query_groups);
-
         // Even when the query itself has no multiplied measures, a measure that
         // is multiplied in the pre-aggregation (because the pre-agg groups by a
         // multiplier dimension) stores a different value than the query expects,
@@ -949,7 +934,10 @@ impl PreAggregationOptimizer {
                     .try_fold(false, |acc, m| -> Result<bool, CubeError> {
                         Ok(acc || has_multi_stage_members(m, false)?)
                     })?;
-            if !query_has_multi_stage && !planned_groups.has_multiplied_measures()? {
+            if !query_has_multi_stage
+                && (!query_groups.has_multiplied_measures()?
+                    || Self::has_fanned_out_filter_only_members(schema, filters, &query_groups))
+            {
                 return Ok(None);
             }
         }
@@ -958,7 +946,7 @@ impl PreAggregationOptimizer {
             schema,
             filters,
             &all_measures,
-            planned_groups,
+            &query_groups,
             pre_aggregation,
         )? {
             return Ok(None);
@@ -1175,36 +1163,59 @@ impl PreAggregationOptimizer {
         filters: &Rc<LogicalFilter>,
         measures: &[Rc<MemberSymbol>],
     ) -> Result<MultiFactJoinGroups, CubeError> {
+        // The query is planned with its filters: their members' join hints pick
+        // the path to a cube, can multiply measures, or be the only link between cubes.
         let hints = MeasuresJoinHints::builder(&self.query_join_hints)
-            .add_dimensions(&schema.dimensions)
-            .add_dimensions(&schema.time_dimensions)
-            .build(measures)?;
-        if let Ok(groups) =
-            MultiFactJoinGroups::try_new_if_joinable(self.query_tools.clone(), hints)?
-        {
-            return Ok(groups);
-        }
-        // A filtered member can be the only link between the cubes the query
-        // selects from, and the query itself is planned with its filters.
-        MultiFactJoinGroups::try_new(
-            self.query_tools.clone(),
-            self.filtered_join_hints(schema, filters, measures)?,
-        )
-    }
-
-    fn filtered_join_hints(
-        &self,
-        schema: &Rc<LogicalSchema>,
-        filters: &Rc<LogicalFilter>,
-        measures: &[Rc<MemberSymbol>],
-    ) -> Result<MeasuresJoinHints, CubeError> {
-        MeasuresJoinHints::builder(&self.query_join_hints)
             .add_dimensions(&schema.dimensions)
             .add_dimensions(&schema.time_dimensions)
             .add_filters(&filters.dimensions_filters)
             .add_filters(&filters.time_dimensions_filters)
             .add_filters(&filters.segments)
-            .build(measures)
+            .build(measures)?;
+        MultiFactJoinGroups::try_new(self.query_tools.clone(), hints)
+    }
+
+    fn filter_members(filters: &[FilterItem]) -> Vec<Rc<MemberSymbol>> {
+        let mut members = Vec::new();
+        for item in filters.iter() {
+            item.find_all_member_evaluators(&mut members);
+        }
+        members
+    }
+
+    // The rollup is summed across the stored values of a filter-only member.
+    // Below a one_to_many edge one fact row carries several of those values,
+    // so its multiplied measure would be counted once per value. A segment
+    // selects one stored value and never sums rows together.
+    fn has_fanned_out_filter_only_members(
+        schema: &LogicalSchema,
+        filters: &LogicalFilter,
+        query_groups: &MultiFactJoinGroups,
+    ) -> bool {
+        let mut fanned_out: HashSet<CubeId> = HashSet::new();
+        for (join, _) in query_groups.groups() {
+            for item in join.joins() {
+                if item.splits_rows() || fanned_out.contains(item.original_from()) {
+                    fanned_out.insert(item.cube().cube_id().clone());
+                }
+            }
+        }
+        let grouped: HashSet<MemberId> = schema
+            .dimensions
+            .iter()
+            .chain(schema.time_dimensions.iter())
+            .map(|d| {
+                resolve_base_symbol(d)
+                    .resolve_reference_chain()
+                    .id()
+                    .clone()
+            })
+            .collect();
+        Self::filter_members(&filters.dimensions_filters)
+            .into_iter()
+            .chain(Self::filter_members(&filters.time_dimensions_filters))
+            .map(|m| m.resolve_reference_chain())
+            .any(|m| !grouped.contains(m.id()) && fanned_out.contains(&m.cube_id()))
     }
 
     fn are_join_paths_matching(
@@ -1219,15 +1230,14 @@ impl PreAggregationOptimizer {
 
         // A filter member stored over another path than the query's is another
         // column under the same name.
-        let mut filter_members = Vec::new();
-        for item in filters
-            .dimensions_filters
-            .iter()
-            .chain(filters.time_dimensions_filters.iter())
-            .chain(filters.segments.iter())
-        {
-            item.find_all_member_evaluators(&mut filter_members);
-        }
+        let filter_members: Vec<_> = [
+            &filters.dimensions_filters,
+            &filters.time_dimensions_filters,
+            &filters.segments,
+        ]
+        .into_iter()
+        .flat_map(|items| Self::filter_members(items))
+        .collect();
 
         for dim in schema
             .dimensions

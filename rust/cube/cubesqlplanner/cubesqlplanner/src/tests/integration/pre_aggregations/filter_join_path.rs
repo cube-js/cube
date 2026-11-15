@@ -102,3 +102,75 @@ async fn test_cube_filter_on_default_path_matches() -> Result<(), CubeError> {
     assert_eq!(used_names(&ctx, query)?, vec!["sp_sales.by_brand"]);
     Ok(())
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_in_or_group_over_other_path_does_not_match() -> Result<(), CubeError> {
+    let ctx = context()?;
+    let query = indoc! {"
+        measures:
+          - sales_by_gross_brand.amount
+        filters:
+          - or:
+              - dimension: sales_by_gross_brand.name
+                operator: equals
+                values:
+                  - A
+              - dimension: sales_by_gross_brand.name
+                operator: equals
+                values:
+                  - C
+    "};
+
+    assert!(used_names(&ctx, query)?.is_empty());
+    Ok(())
+}
+
+// Hcp 2 has gross sales 2 and 3, so the rollup stores its sale under both;
+// summing the two rows would count it twice.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_rollup_is_not_rolled_up_over_filter_member() -> Result<(), CubeError> {
+    let ctx = context()?;
+    let query = indoc! {"
+        measures:
+          - sp_sales.amount
+        filters:
+          - dimension: gross_sales.id
+            operator: equals
+            values:
+              - '2'
+              - '3'
+    "};
+
+    assert!(used_names(&ctx, query)?.is_empty());
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_rollup_serves_its_own_grouping() -> Result<(), CubeError> {
+    let ctx = context()?;
+    let query = indoc! {"
+        measures:
+          - sp_sales.amount
+        dimensions:
+          - gross_sales.id
+        filters:
+          - dimension: gross_sales.id
+            operator: equals
+            values:
+              - '2'
+              - '3'
+        order:
+          - id: gross_sales.id
+    "};
+
+    assert_eq!(used_names(&ctx, query)?, vec!["sp_sales.by_gross_sale"]);
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+    Ok(())
+}

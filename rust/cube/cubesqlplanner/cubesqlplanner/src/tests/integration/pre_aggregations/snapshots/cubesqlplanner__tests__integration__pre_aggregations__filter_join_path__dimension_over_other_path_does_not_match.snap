@@ -5,4 +5,4 @@ expression: result
 sales_by_gross_brand__name | sales_by_gross_brand__amount
 ---------------------------+-----------------------------
 A                          | 40.00                       
-B                          | 30.00
+B                          | 70.00

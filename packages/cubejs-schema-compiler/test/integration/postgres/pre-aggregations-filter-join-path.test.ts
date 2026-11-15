@@ -34,6 +34,11 @@ cubes:
           - amount
         dimensions:
           - brands.name
+      - name: by_gross_sale
+        measures:
+          - amount
+        dimensions:
+          - gross_sales.id
 
   - name: hcps
     sql: SELECT 1 AS id UNION ALL SELECT 2
@@ -48,7 +53,7 @@ cubes:
         primary_key: true
 
   - name: gross_sales
-    sql: SELECT 1 AS id, 1 AS hcp_id, 2 AS brand_id UNION ALL SELECT 2, 2, 1
+    sql: SELECT 1 AS id, 1 AS hcp_id, 2 AS brand_id UNION ALL SELECT 2, 2, 1 UNION ALL SELECT 3, 2, 2
     joins:
       - name: brands
         relationship: many_to_one
@@ -131,7 +136,7 @@ describe('PreAggregations and the join path of filter members', () => {
     expect(usedTables(query)).toEqual([]);
     expect(await dbRunner.testQuery(query.buildSqlAndParams())).toEqual([
       { sales_by_gross_brand__name: 'A', sales_by_gross_brand__amount: '40' },
-      { sales_by_gross_brand__name: 'B', sales_by_gross_brand__amount: '30' },
+      { sales_by_gross_brand__name: 'B', sales_by_gross_brand__amount: '70' },
     ]);
   });
 
@@ -145,6 +150,19 @@ describe('PreAggregations and the join path of filter members', () => {
     const description: any = query.preAggregations?.preAggregationsDescription();
     expect(await testWithPreAggregation(description[0], query)).toEqual([
       { sales_by_own_brand__amount: '50' },
+    ]);
+  });
+
+  // Hcp 2 has gross sales 2 and 3, so `by_gross_sale` stores its sale under both.
+  it.each(PLANNERS)('does not roll a multiplied rollup up over a filter member (%s)', async (_label, useNativeSqlPlanner) => {
+    const query = newQuery(useNativeSqlPlanner, {
+      measures: ['sp_sales.amount'],
+      filters: [{ member: 'gross_sales.id', operator: 'equals', values: ['2', '3'] }],
+    });
+
+    expect(usedTables(query)).toEqual([]);
+    expect(await dbRunner.testQuery(query.buildSqlAndParams())).toEqual([
+      { sp_sales__amount: '40' },
     ]);
   });
 });
