@@ -24,7 +24,8 @@ workflows your data team authors for Analytics Chat.
 <Note>
 
 The MCP server is available on [all plans](https://cube.dev/pricing). <br />Users need the [Viewer][ref-roles] role or higher to interact with the MCP server. Which tools a
-user sees depends on their role — see [Available actions](#available-actions).
+user sees depends on their role — see [Available actions](#available-actions) — and on
+the tools an admin has [disabled](#3-disable-tools).
 
 </Note>
 
@@ -124,8 +125,8 @@ breaks the views that call it.
 <Warning>
 
 **Disabling a tool doesn't limit the agent behind `chat`.** The agent uses its own tools,
-not the MCP ones. For example, with `deleteDataModelFile` disabled, the agent can still edit
-the data model through [`chat`](#deployments-and-chat). To block that too, disable `chat`.
+not the MCP ones. For example, with `runQuery` disabled, the agent can still query your
+data through [`chat`](#deployments-and-chat). To block that too, disable `chat`.
 
 </Warning>
 
