@@ -77,21 +77,118 @@ In Cube, go to **Admin → Integrations → OAuth apps** and click
 
 <Step title="Fill out the OAuth app details">
 
-Provide the OAuth app metadata from your data source: **Name**,
-**Auth URL**, **Token URL**, **Client ID**, **Client secret**, and any
-required **Scopes**. Copy the **Redirect URI** shown in this form and
-register it with your data source's OAuth provider, then click
-**Create**.
+Enter a **Name** for the OAuth app and pick a **Provider**: **Snowflake**
+or **Databricks** fill in the OAuth endpoints and scopes for you, and
+**Custom** works with any other OAuth provider. For Snowflake and
+Databricks, the derived **Auth URL**, **Token URL** and **Scopes** are
+shown as read-only fields, so you can see what Cube saves.
 
-Request a refresh token so users don't have to authorize again each time
-the access token expires. For Databricks, add `offline_access` to
-**Scopes** and to the Databricks OAuth app, and set
-`token_access_policy.refresh_token_ttl_in_minutes` on the Databricks
-OAuth app to how long a user can go before authorizing again.
+Copy the **Redirect URI** shown in the form; your data source needs it to
+send users back to Cube after they authorize.
+
+<Tabs>
+
+<Tab title="Snowflake">
+
+Enter the **Account identifier**, as `<org>-<account>`, or paste the
+account URL; Cube strips the scheme and the `.snowflakecomputing.com`
+suffix. Enter the **Role** that users connect with, exactly as it is named
+in Snowflake, case included. Snowflake doesn't accept `ACCOUNTADMIN` or
+other admin roles as the session role.
+
+Cube derives:
+
+| Field | Value |
+|---|---|
+| **Auth URL** | `https://<org>-<account>.snowflakecomputing.com/oauth/authorize` |
+| **Token URL** | `https://<org>-<account>.snowflakecomputing.com/oauth/token-request` |
+| **Scopes** | `refresh_token`, `session:role:<ROLE>` |
+
+The `refresh_token` scope lets Cube refresh the access token, so users
+don't have to authorize again each time it expires.
+
+The form also shows the statements to run in Snowflake as `ACCOUNTADMIN`,
+with the redirect URI filled in. Copy and run them: the first one creates
+the security integration, and the second one returns the client ID and
+client secret.
+
+```sql
+CREATE SECURITY INTEGRATION CUBE_<NAME>
+  TYPE = OAUTH
+  OAUTH_CLIENT = CUSTOM
+  OAUTH_CLIENT_TYPE = 'CONFIDENTIAL'
+  OAUTH_REDIRECT_URI = '<redirect-uri>'
+  OAUTH_ISSUE_REFRESH_TOKENS = TRUE
+  ENABLED = TRUE;
+
+SELECT SYSTEM$SHOW_OAUTH_CLIENT_SECRETS('CUBE_<NAME>');
+```
+
+Users have to authorize again once their refresh token expires, after 90
+days by default. To change that, add
+`OAUTH_REFRESH_TOKEN_VALIDITY = <seconds>` to the
+`CREATE SECURITY INTEGRATION` statement.
+
+Enter the returned values as **Client ID** and **Client secret**.
 
 <Frame>
-  <img src="/images/admin/connect-to-data/oauth-fill-fields.png" alt="New OAuth app form with fields for Name, Auth URL, Token URL, Client ID, Client Secret, Scopes, and Redirect URI" />
+  <img src="https://static.cube.dev/docs/admin/connect-to-data/oauth-authentication/oauth-app-form-snowflake-v2.png" alt="New OAuth app form with the Snowflake provider: Account identifier and Role fields, the Snowflake setup statements, and the derived Auth URL, Token URL, and Scopes" />
 </Frame>
+
+</Tab>
+
+<Tab title="Databricks">
+
+Enter the **Workspace URL**, for example
+`https://dbc-XXXXXXX-XXXX.cloud.databricks.com`. Cube keeps only the
+origin, so you can paste the URL from your browser as is.
+
+Cube derives:
+
+| Field | Value |
+|---|---|
+| **Auth URL** | `https://<workspace>/oidc/v1/authorize` |
+| **Token URL** | `https://<workspace>/oidc/v1/token` |
+| **Scopes** | `all-apis`, `offline_access` |
+
+In your Databricks account, create an OAuth app connection with the
+**Redirect URI** from the form, and enable the `all-apis` and
+`offline_access` scopes on it. `offline_access` lets Cube refresh the
+access token, so users don't have to authorize again each time it
+expires. Set `token_access_policy.refresh_token_ttl_in_minutes` on the
+app connection to how long a user can go before authorizing again.
+
+Enter the app connection's client ID and secret as **Client ID** and
+**Client secret**.
+
+<Frame>
+  <img src="https://static.cube.dev/docs/admin/connect-to-data/oauth-authentication/oauth-app-form-databricks-v2.png" alt="New OAuth app form with the Databricks provider: Workspace URL field and the derived Auth URL, Token URL, and Scopes" />
+</Frame>
+
+</Tab>
+
+<Tab title="Custom">
+
+Enter the **Auth URL**, **Token URL**, **Client ID** and **Client
+secret** from your data source's OAuth provider, and any required
+**Scopes**, comma-separated. Register the **Redirect URI** with the
+provider.
+
+Request a refresh token, if the provider supports it, so users don't
+have to authorize again each time the access token expires.
+
+</Tab>
+
+</Tabs>
+
+To keep idle users connected, turn on **Keep users signed in**. Cube
+then renews each user's access token in the background, so it doesn't
+expire while the user is away. This works only when the provider issues
+a refresh token. The setting is off by default: Cube renews a token only
+when it's used, and users who stay idle longer than the provider allows
+have to authorize again.
+
+Click **Create**.
 
 </Step>
 
@@ -284,6 +381,27 @@ module.exports = {
 </Tab>
 
 </Tabs>
+
+For Snowflake, return `authenticator: "OAUTH"` with the user's token as
+`oauthToken`. The Snowflake driver ignores a `token` option, so without
+these two options it connects as the service account and reports no
+error. Options that `driver_factory` doesn't return, such as the account,
+warehouse and role, come from the environment variables. Set
+`CUBEJS_DB_SNOWFLAKE_ROLE` to the **Role** of the OAuth app: Snowflake
+rejects the connection when the role differs from the one in the token.
+
+```python cube.py
+# "snowflake" is the Name of the OAuth app
+if snowflake_creds.get("status") == "active":
+    return {
+        "type": "snowflake",
+        "authenticator": "OAUTH",
+        "oauthToken": snowflake_creds["accessToken"],
+    }
+
+# Fall back to the service account
+return {"type": "snowflake"}
+```
 
 ## How it works
 
