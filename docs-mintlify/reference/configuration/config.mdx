@@ -498,6 +498,51 @@ Store routers are available on Multi-cluster deployments with
 [Multi-router Cube Store][ref-multi-router-cube-store] enabled, and the number
 of distinct ids should stay at or below **Number of clusters**.
 
+### `context_to_pre_aggregation_orchestrator_id`
+
+`context_to_pre_aggregation_orchestrator_id` is a function used to determine the
+id that keys an orchestrator's pre-aggregation build queues. Orchestrators that
+resolve to the same id share those queues, so any of them can run a
+pre-aggregation build that another one queued, and they share its concurrency.
+
+When this function is not set, the id comes from
+[`context_to_orchestrator_id`][self-orchestrator-id], and each orchestrator has
+its own queues. If
+[`CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER`](/reference/configuration/environment-variables#cubejs_pre_aggregations_orchestrator_id_from_router)
+is `true`, the id comes from
+[`context_to_cube_store_router_id`](#context_to_cube_store_router_id) instead,
+when that function is set.
+
+<Warning>
+
+A build runs with the [`driver_factory`](#driver_factory) of the orchestrator
+that picks it up. Return the same id only for orchestrators that build
+pre-aggregations from the same data sources.
+
+</Warning>
+
+Called once per orchestrator, when it is created.
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+@config('context_to_pre_aggregation_orchestrator_id')
+def context_to_pre_aggregation_orchestrator_id(ctx: dict) -> str:
+  return f"CUBE_REGION_{ctx['securityContext']['region']}"
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  contextToPreAggregationOrchestratorId: ({ securityContext }) => {
+    return `CUBE_REGION_${securityContext.region}`
+  }
+}
+```
+
+</CodeGroup>
+
 ### `driver_factory`
 
 A function to provide a custom configuration for the data source driver.
