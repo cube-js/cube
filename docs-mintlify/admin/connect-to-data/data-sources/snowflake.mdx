@@ -227,6 +227,12 @@ Cube Cloud also supports connecting to data sources within private VPCs
 if [single-tenant infrastructure][ref-dedicated-infra] is used. Check out the
 [VPC connectivity guide][ref-cloud-conf-vpc] for details.
 
+#### Per-user OAuth
+
+To run each user's queries under their own Snowflake identity, register an
+OAuth app with the **Snowflake** provider and route its tokens through
+`driver_factory`. See [Set up per-user OAuth][ref-per-user-oauth].
+
 ### Query tagging
 
 Set a [query tag][snowflake-docs-query-tag] on the connection so that queries
@@ -421,6 +427,7 @@ connections are made over HTTPS.
 [ref-oidc-overview]: /admin/deployment/oidc
 [ref-multiple-data-sources]: /admin/connect-to-data/multiple-data-sources
 [ref-driver-factory]: /reference/configuration/config#driver_factory
+[ref-per-user-oauth]: /admin/connect-to-data/oauth-authentication
 [self-preaggs-batching]: #batching
 [snowflake]: https://www.snowflake.com/
 [snowflake-docs-account-id]:
