@@ -2683,7 +2683,7 @@ impl ChunkStore {
         index: &IdRow<Index>,
         table: &IdRow<Table>,
         preset_partitions: Option<Vec<IdRow<Partition>>>,
-        mut columns: Vec<ArrayRef>,
+        columns: Vec<ArrayRef>,
         in_memory: bool,
     ) -> Result<Vec<JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>>, CubeError> {
         let index_id = index.get_id();
@@ -2719,26 +2719,25 @@ impl ChunkStore {
             return Err(CubeError::corrupt_data(error_message));
         }
 
-        let mut remaining_rows: Vec<u64> = (0..columns[0].len() as u64).collect_vec();
-        {
-            let (columns_again, remaining_rows_again) =
-                cube_ext::spawn_blocking(move || -> Result<_, ArrowError> {
-                    let sort_key = &columns[0..sort_key_size];
-                    let converter = RowConverter::new(
-                        (0..sort_key_size)
-                            .map(|i| SortField::new(columns[i].data_type().clone()))
-                            .into_iter()
-                            .collect(),
-                    )?;
-                    let rows = converter.convert_columns(sort_key)?;
-                    remaining_rows
-                        .sort_unstable_by(|a, b| rows.row(*a as usize).cmp(&rows.row(*b as usize)));
-                    Ok((columns, remaining_rows))
-                })
-                .await??;
+        // Sorting, assigning rows to partitions and copying them out are CPU-bound and allocate a
+        // full copy of the input; on the async runtime they would starve every other task of
+        // this worker, memory limit checks included.
+        let (partition_columns, unassigned_rows) =
+            cube_ext::spawn_blocking(move || -> Result<_, ArrowError> {
+                let rows_order = sort_rows(&columns, sort_key_size)?;
+                split_rows_by_partition(&columns, sort_key_size, partitions, rows_order)
+            })
+            .await??;
 
-            columns = columns_again;
-            remaining_rows = remaining_rows_again;
+        if unassigned_rows > 0 {
+            let error_message = format!("Error while insert data into index {:?}. {} rows of incoming data can't be assigned to any partitions. Probably paritition metadata is lost", index, unassigned_rows);
+            deactivate_table_due_to_corrupt_data(
+                self.meta_store.clone(),
+                index.get_row().table_id(),
+                error_message.clone(),
+            )
+            .await?;
+            return Err(CubeError::internal(error_message));
         }
 
         let mut futures = Vec::new();
@@ -2747,62 +2746,23 @@ impl ChunkStore {
         // limit is disabled (the common case) skip the node-name/dedup work entirely.
         let disk_check_enabled = !in_memory && self.config.max_disk_space_per_worker() != 0;
         let mut checked_nodes: HashSet<String> = HashSet::new();
-        for partition in partitions.into_iter() {
-            let min = partition.get_row().get_min_val().as_ref();
-            let max = partition.get_row().get_max_val().as_ref();
-            let (to_write, next) = remaining_rows.into_iter().partition::<Vec<_>, _>(|&r| {
-                let r = r as usize;
-                (min.is_none()
-                    || cmp_partition_key(
-                        sort_key_size,
-                        min.unwrap().values().as_slice(),
-                        columns.as_slice(),
-                        r,
-                    ) <= Ordering::Equal)
-                    && (max.is_none()
-                        || cmp_partition_key(
-                            sort_key_size,
-                            max.unwrap().values().as_slice(),
-                            columns.as_slice(),
-                            r,
-                        ) > Ordering::Equal)
-            });
-            if to_write.len() > 0 {
-                if disk_check_enabled
-                    && checked_nodes
-                        .insert(node_name_by_partition(self.config.as_ref(), &partition))
-                {
-                    self.check_node_disk_space(&partition).await?;
-                }
-                let to_write = UInt64Array::from(to_write);
-                let columns = columns
-                    .iter()
-                    .map(|c| datafusion::arrow::compute::take(c.as_ref(), &to_write, None))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let columns = self
-                    .post_process_columns(index.clone(), table, columns)
-                    .await?;
-
-                futures.push(self.add_chunk_columns(
-                    index.clone(),
-                    table,
-                    partition.clone(),
-                    columns,
-                    in_memory,
-                ));
+        for (partition, columns) in partition_columns {
+            if disk_check_enabled
+                && checked_nodes.insert(node_name_by_partition(self.config.as_ref(), &partition))
+            {
+                self.check_node_disk_space(&partition).await?;
             }
-            remaining_rows = next;
-        }
+            let columns = self
+                .post_process_columns(index.clone(), table, columns)
+                .await?;
 
-        if !remaining_rows.is_empty() {
-            let error_message = format!("Error while insert data into index {:?}. {} rows of incoming data can't be assigned to any partitions. Probably paritition metadata is lost", index, remaining_rows.len());
-            deactivate_table_due_to_corrupt_data(
-                self.meta_store.clone(),
-                index.get_row().table_id(),
-                error_message.clone(),
-            )
-            .await?;
-            return Err(CubeError::internal(error_message));
+            futures.push(self.add_chunk_columns(
+                index.clone(),
+                table,
+                partition,
+                columns,
+                in_memory,
+            ));
         }
 
         let new_chunks = join_all(futures)
@@ -3084,6 +3044,58 @@ fn min_max_values_from_data(data: &[ArrayRef], key_size: usize) -> (Option<Row>,
             ))),
         )
     }
+}
+
+fn sort_rows(columns: &[ArrayRef], sort_key_size: usize) -> Result<Vec<u64>, ArrowError> {
+    let converter = RowConverter::new(
+        columns[0..sort_key_size]
+            .iter()
+            .map(|c| SortField::new(c.data_type().clone()))
+            .collect(),
+    )?;
+    let rows = converter.convert_columns(&columns[0..sort_key_size])?;
+    let mut order = (0..columns[0].len() as u64).collect_vec();
+    order.sort_unstable_by(|a, b| rows.row(*a as usize).cmp(&rows.row(*b as usize)));
+    Ok(order)
+}
+
+// Also returns how many rows fit no partition.
+fn split_rows_by_partition(
+    columns: &[ArrayRef],
+    sort_key_size: usize,
+    partitions: Vec<IdRow<Partition>>,
+    rows_order: Vec<u64>,
+) -> Result<(Vec<(IdRow<Partition>, Vec<ArrayRef>)>, usize), ArrowError> {
+    let mut remaining_rows = rows_order;
+    let mut result = Vec::new();
+    for partition in partitions {
+        let min = partition.get_row().get_min_val().as_ref();
+        let max = partition.get_row().get_max_val().as_ref();
+        let (to_write, next) = remaining_rows.into_iter().partition::<Vec<_>, _>(|&r| {
+            let r = r as usize;
+            (min.is_none()
+                || cmp_partition_key(sort_key_size, min.unwrap().values().as_slice(), columns, r)
+                    <= Ordering::Equal)
+                && (max.is_none()
+                    || cmp_partition_key(
+                        sort_key_size,
+                        max.unwrap().values().as_slice(),
+                        columns,
+                        r,
+                    ) > Ordering::Equal)
+        });
+        remaining_rows = next;
+        if to_write.is_empty() {
+            continue;
+        }
+        let to_write = UInt64Array::from(to_write);
+        let partition_columns = columns
+            .iter()
+            .map(|c| datafusion::arrow::compute::take(c.as_ref(), &to_write, None))
+            .collect::<Result<Vec<_>, _>>()?;
+        result.push((partition, partition_columns));
+    }
+    Ok((result, remaining_rows.len()))
 }
 
 fn remap_columns(
