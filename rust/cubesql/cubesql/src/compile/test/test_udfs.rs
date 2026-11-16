@@ -816,6 +816,38 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
         );
     }
 
+    for (name, sql) in [
+        (
+            "generate_series_null_start",
+            "SELECT generate_series(NULL::bigint, 5);",
+        ),
+        (
+            "generate_series_null_step",
+            "SELECT generate_series(1.0, 5.0, NULL::double precision);",
+        ),
+        (
+            "generate_series_null_date",
+            "SELECT generate_series('2024-07-23'::date, NULL::date);",
+        ),
+        (
+            "generate_series_null_rows",
+            "SELECT x, generate_series(x, 3) FROM (VALUES (1), (NULL), (2)) t(x);",
+        ),
+        (
+            "generate_series_null_date_rows",
+            "SELECT x, generate_series(x, '2024-07-25'::date) FROM ( \
+                SELECT '2024-07-23'::date AS x UNION ALL \
+                SELECT NULL::date AS x UNION ALL \
+                SELECT '2024-07-24'::date AS x \
+            ) t;",
+        ),
+    ] {
+        insta::assert_snapshot!(
+            name,
+            execute_query(sql.to_string(), DatabaseProtocol::PostgreSQL).await?
+        );
+    }
+
     insta::assert_snapshot!(
         "generate_series_date32_2_args",
         execute_query(

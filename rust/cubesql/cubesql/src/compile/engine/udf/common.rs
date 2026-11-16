@@ -2479,14 +2479,14 @@ macro_rules! generate_series_udtf {
 
             let mut builder = PrimitiveBuilder::<$TYPE>::with_capacity(1);
             for (i, (start, end)) in l_arr.iter().zip(r_arr.iter()).enumerate() {
-                let step = if step_arr.len() > i {
-                    step_arr.value(i)
-                } else {
-                    step_arr.value(0)
+                let step_idx = if step_arr.len() > i { i } else { 0 };
+                // generate_series is strict: a NULL argument yields no rows, as in Postgres.
+                let (Some(start), Some(end), false) = (start, end, step_arr.is_null(step_idx))
+                else {
+                    section_sizes.push(0);
+                    continue;
                 };
-
-                let start = start.unwrap();
-                let end = end.unwrap();
+                let step = step_arr.value(step_idx);
                 $VALIDATE(start, end, step)?;
 
                 let mut section_size: i64 = 0;
@@ -2564,28 +2564,29 @@ macro_rules! generate_series_non_primitive_udtf {
 
             let mut builder = PrimitiveBuilder::<$TYPE>::with_capacity(1);
             for (i, (start, end)) in l_arr.iter().zip(r_arr.iter()).enumerate() {
-                let step = if step_arr.len() > i {
-                    step_arr.value(i)
-                } else {
-                    step_arr.value(0)
+                let step_idx = if step_arr.len() > i { i } else { 0 };
+                // generate_series is strict: a NULL argument yields no rows, as in Postgres.
+                let (Some(start), Some(end), false) = (start, end, step_arr.is_null(step_idx))
+                else {
+                    section_sizes.push(0);
+                    continue;
                 };
+                let step = step_arr.value(step_idx);
 
-                if let (Some(start), Some(end)) = (start, end) {
-                    let mut section_size: i64 = 0;
-                    if start <= end && step > IntervalMonthDayNanoType::make_value(0, 0, 0) {
-                        let mut current = start;
-                        loop {
-                            if current > end {
-                                break;
-                            }
-                            builder.append_value(current);
-
-                            section_size += 1;
-                            $HANDLE_MACRO!(current, step, $PRIMITIVE_TYPE);
+                let mut section_size: i64 = 0;
+                if start <= end && step > IntervalMonthDayNanoType::make_value(0, 0, 0) {
+                    let mut current = start;
+                    loop {
+                        if current > end {
+                            break;
                         }
+                        builder.append_value(current);
+
+                        section_size += 1;
+                        $HANDLE_MACRO!(current, step, $PRIMITIVE_TYPE);
                     }
-                    section_sizes.push(section_size as usize);
                 }
+                section_sizes.push(section_size as usize);
             }
 
             return Ok((Arc::new(builder.finish()) as ArrayRef, section_sizes));
