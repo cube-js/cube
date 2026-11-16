@@ -15,6 +15,7 @@ use crate::cluster::{Cluster, ClusterImpl, ClusterMetaStoreClient};
 use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
+use crate::import::host_filter::LocationHostFilter;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl, LocationsValidator, LocationsValidatorImpl};
 use crate::metastore::{
@@ -467,6 +468,10 @@ pub trait ConfigObj: DIService {
     /// `temp://` import locations are always allowed regardless of this setting.
     fn location_allow_local_fs(&self) -> bool;
 
+    /// Hosts `http(s)://` import locations may point to: `host`, `host:port` or a pattern
+    /// like `*.example.com`. Empty means every host is allowed.
+    fn location_allow_hosts(&self) -> &Vec<String>;
+
     fn meta_store_snapshot_interval(&self) -> u64;
 
     fn meta_store_log_upload_interval(&self) -> u64;
@@ -797,6 +802,7 @@ pub struct ConfigObjImpl {
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
     pub location_allow_local_fs: bool,
+    pub location_allow_hosts: Vec<String>,
     pub enable_topk: bool,
     pub load_aware_import_placement_enabled: bool,
     pub repartition_chunks_time_budget_secs: u64,
@@ -989,6 +995,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn location_allow_local_fs(&self) -> bool {
         self.location_allow_local_fs
+    }
+
+    fn location_allow_hosts(&self) -> &Vec<String> {
+        &self.location_allow_hosts
     }
 
     fn meta_store_snapshot_interval(&self) -> u64 {
@@ -2109,6 +2119,11 @@ impl Config {
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 location_allow_local_fs: env_flag("CUBESTORE_LOCATION_ALLOW_LOCAL_FS", false),
+                location_allow_hosts: env_parse_list(
+                    "CUBESTORE_LOCATION_ALLOW_HOSTS",
+                    Vec::new(),
+                    |h| LocationHostFilter::validate_entry(h).map_err(|e| e.message),
+                ),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 load_aware_import_placement_enabled: env_flag(
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
@@ -2413,6 +2428,7 @@ impl Config {
                 upload_to_remote: true,
                 // Tests import CSV files straight from disk.
                 location_allow_local_fs: true,
+                location_allow_hosts: Vec::new(),
                 enable_topk: true,
                 load_aware_import_placement_enabled: true,
                 repartition_chunks_time_budget_secs: 60,
@@ -2978,7 +2994,10 @@ impl Config {
         self.injector
             .register_typed::<dyn LocationsValidator, _, _, _>(async move |i| {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
-                LocationsValidatorImpl::new(config.location_allow_local_fs())
+                let host_filter = LocationHostFilter::new(config.location_allow_hosts())
+                    .expect("Invalid import location host allowlist");
+                LocationsValidatorImpl::new(config.location_allow_local_fs(), host_filter)
+                    .expect("Unable to create import HTTP client")
             })
             .await;
 

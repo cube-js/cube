@@ -2405,6 +2405,28 @@ the file location, and does not examine the load.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `true`                 | `true`                |
 
+## `CUBESTORE_LOCATION_ALLOW_HOSTS`
+
+A comma-separated list of hosts that `http://` and `https://` locations in
+`CREATE TABLE ... LOCATION` may point to, similar to `remote_url_allow_hosts` in
+ClickHouse. If it's not set, every host is allowed.
+
+- `files.example.com` matches that host on any port.
+- `files.example.com:8443` matches that port only.
+- `*` stands for one domain label: `*.example.com` matches `a.example.com`, but neither
+  `a.b.example.com` nor `example.com`.
+- `10.0.0.0/8` or `fd00::/8` matches IP addresses in that subnet on any port. Subnets
+  apply to locations with an IP address in the URL only; hostnames aren't resolved.
+
+Redirects are checked against the same list.
+
+| Possible Values                                            | Default in Development | Default in Production |
+| ---------------------------------------------------------- | ---------------------- | --------------------- |
+| A comma-separated list of hosts, host patterns, or subnets | N/A                    | N/A                   |
+
+Set it on the router and every worker; imports are re-checked on the node that runs
+them.
+
 ## `CUBESTORE_LOCATION_ALLOW_LOCAL_FS`
 
 Whether `CREATE TABLE ... LOCATION` may use a local filesystem path as the import
