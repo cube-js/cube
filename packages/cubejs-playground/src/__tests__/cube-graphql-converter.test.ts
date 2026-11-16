@@ -1,4 +1,7 @@
+import { parse } from 'graphql';
+
 import { CubeGraphQLConverter } from '../components/GraphQL/CubeGraphQLConverter';
+import { CubeGraphQLConverter as QueryBuilderV2Converter } from '../QueryBuilderV2/utils/graphql-converters';
 
 const types = {
   'Orders.count': 'number',
@@ -166,4 +169,31 @@ test('Cube GraphQL converter', () => {
     const converter = new CubeGraphQLConverter(query, types);
     expect(converter.convert()).toMatchSnapshot(JSON.stringify(query));
   });
+});
+
+test.each([
+  ['CubeGraphQLConverter', CubeGraphQLConverter],
+  ['QueryBuilderV2 converter', QueryBuilderV2Converter],
+])('%s produces parsable GraphQL', (_, Converter) => {
+  queries.forEach((query) => {
+    expect(() => parse(new Converter(query, types).convert())).not.toThrow();
+  });
+});
+
+test('wraps a repeated member inside a boolean group in an object', () => {
+  const query = {
+    measures: ['Orders.count'],
+    filters: [
+      {
+        or: [
+          { member: 'Users.country', operator: 'notSet' },
+          { member: 'Users.country', operator: 'equals', values: ['US'] },
+        ],
+      },
+    ],
+  };
+
+  expect(new CubeGraphQLConverter(query, types).convert()).toContain(
+    'where: {OR: [{users: {OR: [{country: {set: false}}, {country: {equals: "US"}}]}}]}'
+  );
 });
