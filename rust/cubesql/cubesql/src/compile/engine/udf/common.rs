@@ -2429,7 +2429,7 @@ impl Accumulator for StringAggAccumulator {
 }
 
 macro_rules! generate_series_udtf {
-    ($ARGS:expr, $TYPE: ident, $PRIMITIVE_TYPE: ident) => {{
+    ($ARGS:expr, $TYPE: ident, $PRIMITIVE_TYPE: ident, $CHECKED_ADD:expr) => {{
         let mut section_sizes: Vec<usize> = Vec::new();
         let l_arr = &$ARGS[0].as_any().downcast_ref::<PrimitiveArray<$TYPE>>();
         if l_arr.is_some() {
@@ -2462,7 +2462,11 @@ macro_rules! generate_series_udtf {
                         builder.append_value(current);
 
                         section_size += 1;
-                        current += step;
+                        // A step past the type's range is also past `end`: stop.
+                        let Some(next) = $CHECKED_ADD(current, step) else {
+                            break;
+                        };
+                        current = next;
                     }
                 }
                 section_sizes.push(section_size as usize);
@@ -2564,9 +2568,9 @@ pub fn create_generate_series_udtf() -> TableUDF {
         assert!(args.len() == 2 || args.len() == 3);
 
         if args[0].as_any().downcast_ref::<Int64Array>().is_some() {
-            generate_series_udtf!(args, Int64Type, i64)
+            generate_series_udtf!(args, Int64Type, i64, i64::checked_add)
         } else if args[0].as_any().downcast_ref::<Float64Array>().is_some() {
-            generate_series_udtf!(args, Float64Type, f64)
+            generate_series_udtf!(args, Float64Type, f64, |a: f64, b: f64| Some(a + b))
         } else if args[0].as_any().downcast_ref::<Date32Array>().is_some() {
             generate_series_non_primitive_udtf!(
                 args,

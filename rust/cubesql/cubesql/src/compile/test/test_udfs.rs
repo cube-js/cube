@@ -756,6 +756,24 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
     );
 
     insta::assert_snapshot!(
+        "generate_series_i64_overflow",
+        execute_query(
+            "SELECT generate_series(9223372036854775806, 9223372036854775807);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    insta::assert_snapshot!(
+        "generate_series_i64_overflow_step",
+        execute_query(
+            "SELECT generate_series(0, 9223372036854775807, 5000000000000000000);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    insta::assert_snapshot!(
         "generate_series_date32_2_args",
         execute_query(
             "SELECT generate_series('2024-07-23'::date, '2024-07-28'::date);".to_string(),
