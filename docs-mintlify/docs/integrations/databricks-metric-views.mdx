@@ -341,6 +341,13 @@ Resolve the collision or drift with the owner of the Databricks object, or conta
 not manage. A failed conversion, validation, or write leaves that view's previous
 Databricks definition in place. Other views in the same run may still publish.
 
+You can request cancellation of an active run. It prevents further writes but does not undo
+views already published. To roll back a bad definition, restore the desired Cube model,
+deploy it, preview, and sync again. Inspect run history and the Databricks target afterward.
+If publication is unavailable, contact [Cube support](/admin/account-billing/support) with
+the deployment, data source, run ID, and per-view issue codes. Do not send credentials or
+sensitive source data.
+
 ### Removed views
 
 A view leaves the scope when you remove it from the data model, rename it, or deselect it. By
@@ -373,10 +380,3 @@ A failed drop is labeled **Obsolete, kept** with its failure code, and the next 
 data model file that fails to load stops the sync before anything is written or dropped. Disabling
 publication, or Cube support deactivating the preview for your account, drops nothing. Dropping
 needs the same Databricks privileges on the target schema as replacing a view.
-
-You can request cancellation of an active run. It prevents further writes but does not undo
-views already published. To roll back a bad definition, restore the desired Cube model,
-deploy it, preview, and sync again. Inspect run history and the Databricks target afterward.
-If publication is unavailable, contact [Cube support](/admin/account-billing/support) with
-the deployment, data source, run ID, and per-view issue codes. Do not send credentials or
-sensitive source data.
