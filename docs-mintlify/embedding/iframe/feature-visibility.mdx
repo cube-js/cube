@@ -88,7 +88,7 @@ session value there is an override of what the account already says;
 | `allowAi` | **Master switch** over every AI surface in the embed. Enforced on the server: a session with `allowAi: false` cannot obtain AI Chat credentials at all, so it cannot spend AI tokens. Outranks every key below — `false` here disables a surface whose own key is `true`. | Account setting, then allowed |
 | `showDashboardChat` | The AI chat on embedded published dashboards — agent panel and launcher bubble. | Account setting, then shown |
 | `showWorkbookChat` | The [Creator Mode](/embedding/iframe/creator-mode) workbook's AI entry points: the chat side panel and its toggle, the launchpad's **Ask Cube Agent** button, and **Fix in chat** on a failed report. | Account setting, then shown |
-| `showAiWidgets` | Authoring and refreshing AI summary widgets: the **AI widget** entry in the dashboard editor's Add widgets menu, and a widget's prompt input plus Generate/Regenerate. An already-generated summary keeps rendering, so switching this off never blanks a published dashboard — it only stops it being regenerated. | Account setting, then enabled |
+| `showAiWidgets` | Authoring and refreshing AI summary widgets: the **Analysis** entry in the dashboard builder's **Other** menu, and a widget's prompt input plus Generate/Regenerate. An already-generated summary keeps rendering, so switching this off never blanks a published dashboard — it only stops it being regenerated. | Account setting, then enabled |
 | `allowChatWorkspaceAuthoring` | Whether AI Chat authenticated with this session may create or modify persistent workspace content. `false` keeps ad-hoc analysis and inline tables/charts, but the agent cannot save or update explorations and reports, create or modify workbooks, create or publish dashboards, or point users at those surfaces — for headless chat integrations that render answers in their own UI. `true` never grants authoring the user's role does not already allow. For an `externalId` session, authoring also requires `creatorMode: true`. | Allowed; for `externalId`, only in [Creator Mode](/embedding/iframe/creator-mode) |
 
 ### Language and time zone
@@ -135,8 +135,8 @@ they are ignored outside `/embed/*`.
 
 | Parameter | Effect | Surface |
 | --- | --- | --- |
-| `allowExport=true` | The grant for export: per chart widget **Download as CSV / PNG / PDF**, the whole-dashboard download menu, and **Download as CSV** in the Creator Mode report builder, where a workbook's queries are authored before publishing. | Dashboards, Creator Mode |
-| `showDashboardExportMenu=false` | Hides the whole-dashboard download menu (in the Creator Mode dashboard header; floating over a published-dashboard embed). A hide switch, not the grant — `allowExport=true` is still what hands out export at all. | Dashboards, Creator Mode |
+| `allowExport=true` | The grant for export: per chart widget **Download as CSV / PNG / PDF**, the whole-dashboard **Download** button and its **Download settings** dialog, and **Download as CSV** in the Creator Mode report builder, where a workbook's queries are authored before publishing. | Dashboards, Creator Mode |
+| `showDashboardExportMenu=false` | Hides the whole-dashboard **Download** button (in the Creator Mode dashboard header; floating over a published-dashboard embed). A hide switch, not the grant — `allowExport=true` is still what hands out export at all. | Dashboards, Creator Mode |
 | `showDashboardHeader=false` | Hides the entire dashboard header bar. | Dashboards, Creator Mode |
 | `showDashboardBackButton=false` | Hides the dashboard header's back button. | Dashboards, Creator Mode |
 | `showDashboardTitle=false` | Hides the dashboard title. | Dashboards, Creator Mode |

@@ -1,6 +1,6 @@
 ---
 title: Inbox
-description: Get in-app notifications about mentions, alerts, scheduled task runs, failed builds and refreshes, shared content, access requests, model syncs, and more.
+description: Get in-app notifications about mentions, alerts, scheduled task runs, failed builds and dashboard schedules, shared content, access requests, model syncs, and more.
 ---
 
 The inbox collects notifications about events in Cube that concern you: a
@@ -20,8 +20,8 @@ account.
 
 <Info>
 
-To send a dashboard by email or Slack after a scheduled refresh, see
-[Notifications][ref-notifications].
+To send a dashboard by email or Slack on a schedule, see [Refreshes,
+deliveries and alerts][ref-dashboard-deliveries].
 
 </Info>
 
@@ -56,7 +56,7 @@ New notifications appear as they arrive. You don't need to reload the page.
 | End of support | A deployment runs a Cube version that is about to reach end of support. You get one notification with each end-of-support email. | Admins | The deployment's **Settings** page |
 | Production build failed | A build of a deployment's production branch fails | The user who started the build. If no user started it, for example a Git push, or that user is deactivated: admins | The build and its logs |
 | Dashboard review | Someone requests a [review][ref-reviews] of a dashboard or a new revision of it, comments on the review, approves, requests changes, or publishes the review | Everyone taking part in the review, except the person who acted: the requester, the reviewers, and anyone who commented. Only those who can still view the dashboard. | The review page. For a published review, the published dashboard. |
-| Scheduled refresh failed | A [scheduled refresh][ref-scheduled-refreshes] of a dashboard fails, or its [notifications][ref-notifications] don't reach some or all recipients | The user who created the schedule | The dashboard |
+| Dashboard schedule failed | A [refresh, dashboard delivery, or alert][ref-dashboard-deliveries] of a dashboard fails, or its notification doesn't reach some or all of its recipients or Slack channels | The schedule's owner, the user who created it | The dashboard |
 | Access request | Someone [requests access][ref-request-access] to a workbook, a dashboard, a folder, or a chat | The owner and up to 9 users with direct **Full access**, 10 at most. For a chat, only its owner | The item, with its **Share** dialog open on the request |
 | Access request declined | Someone declines your [access request][ref-request-access] | The requester | The item's no-access page, where you can request access again |
 | Shared with you | Someone shares a workbook, a folder, or a chat with you, or gives you more access to one, directly or through a group | The user, or each member of the group, except the person who shared it | The workbook, or its dashboard if it is published. The folder or the chat. |
@@ -75,6 +75,15 @@ long it took. For a failed run, it shows the error. For a run that a
 **Daily signups: condition met**, and it shows the change the check found
 instead of the answer. Only the creator's notification shows the figures;
 everyone else's says that the condition started to hold.
+
+A dashboard schedule failed notification names the schedule's kind in its
+title. For a dashboard delivery on a dashboard called Sales, it reads **Sales
+delivery failed**, **Sales delivery was not delivered**, **Sales: 2 of 5
+recipients did not get the delivery**, or, when a Slack channel got nothing,
+**Sales: #finance did not get the delivery**. For an alert, it reads **Sales:
+alert check failed** when the run itself failed, **Sales: alert was not
+delivered**, or the same partial titles ending in "did not get the alert". For
+a refresh, it reads **Sales refresh failed**.
 
 Mentions and replies in comments, shared items, and access requests also arrive
 by email, unless you turn that off under [Notifications][ref-preferences-notifications]
@@ -112,7 +121,6 @@ To delete many notifications at once, open the `⋯` menu in the header:
 
 Cube asks you to confirm both actions. You can't undo a delete.
 
-[ref-notifications]: /docs/explore-analyze/notifications
 [ref-preferences-notifications]: /docs/preferences#notifications
 [ref-comments]: /docs/explore-analyze/dashboards/comments#mentions
 [ref-comment-replies]: /docs/explore-analyze/dashboards/comments#reply-notifications
@@ -122,7 +130,7 @@ Cube asks you to confirm both actions. You can't undo a delete.
 [ref-scheduled-task-notifications]: /docs/explore-analyze/scheduled-tasks#notifying-people-when-a-run-finishes
 [ref-conditional-tasks]: /docs/explore-analyze/scheduled-tasks#conditional-tasks
 [ref-update-channels]: /admin/deployment#update-channels
-[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
+[ref-dashboard-deliveries]: /docs/explore-analyze/dashboard-deliveries
 [ref-dbt]: /docs/integrations/dbt
 [ref-snowflake]: /docs/integrations/snowflake-semantic-views
 [ref-databricks]: /docs/integrations/databricks-metric-views

@@ -28,6 +28,12 @@ pub struct FoldedUsages {
 }
 
 impl FoldedUsages {
+    /// `absorbed` is no longer read; `kept` reads its rollup as `pre_aggregation`.
+    pub fn fold(&mut self, absorbed: usize, kept: usize, pre_aggregation: Rc<PreAggregation>) {
+        self.retired.insert(absorbed);
+        self.widened.insert(kept, pre_aggregation);
+    }
+
     pub fn apply(&self, usages: Vec<PreAggregationUsage>) -> Vec<PreAggregationUsage> {
         usages
             .into_iter()

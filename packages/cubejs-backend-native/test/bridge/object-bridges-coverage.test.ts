@@ -56,6 +56,7 @@ const BRIDGES: BridgeSpec[] = [
       'measures',
       'member_to_alias',
       'multi_stage_leaf_merge',
+      'multi_stage_scan_sharing',
       'offset',
       'order',
       'pre_aggregation_id',

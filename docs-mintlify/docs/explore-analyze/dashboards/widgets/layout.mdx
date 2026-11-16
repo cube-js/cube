@@ -78,7 +78,7 @@ A **tabs container** shows one widget at a time behind a row of tabs across the 
 
 Each tab holds **one** widget — a chart or a container — which fills the tab body: resize the container and the widget resizes with it, and there are no separate resize handles inside a tab. A container in a tab is re-laid-out rather than stretched, so growing a tabs container by two columns gives a grid inside its tab two more columns of cells rather than wider ones.
 
-- **Add a chart or container** — drag one in from the canvas, the toolbar's **Charts** picker or **Add containers** menu, or another container.
+- **Add a chart or container** — drag one in from the canvas, the toolbar's **Charts** picker or **Containers** menu, or another container.
 - **Empty tab** — shows a **Drag a chart or container here** placeholder.
 - **Second drop** — a tab that already holds a chart or container takes no other. One dropped on it, whether dragged from the toolbar or moved from elsewhere, is [added to the dashboard below instead](#when-a-container-refuses-a-widget), with the warning *This tab already holds a widget.*
 - **Anything else** — a tab takes no text, AI summary, control, spacer, or divider. That rule is about the widget rather than the tab, so such a widget is [added to the dashboard below instead](#when-a-container-refuses-a-widget), with the warning *Only a chart or a container can be placed in a tab.*, whether the tab is empty or already full.
@@ -108,7 +108,7 @@ A tab you haven't opened yet isn't rendered at all, so its charts never query. O
 
 On a published dashboard — including [embedded views](/embedding/iframe/dashboards) — the strip still switches tabs by click or arrow keys, but the editing affordances are gone: no **+**, no per-tab menu, no rename or reorder. The container opens on the tab that was selected in the dashboard builder when you published, unless the URL names a tab. Selecting a tab in the builder is an edit like any other: it is saved to the dashboard, and you can undo it. A tab you add becomes the selected one, so it is also the one viewers land on. Reordering the strip doesn't change it. If you delete that tab, the tab after it takes over, or the one before it when it was the last.
 
-Switching a tab writes it into the page URL as `?tab_<widget_id>=<tab_id>`, so a link you copy reopens on the tab you were reading; only the containers you actually switched are written into that link. You can also [set that parameter by hand](/embedding/iframe/dashboards#pre-set-dashboard-filters-via-url) to open a published or embedded dashboard on a particular tab. Exporting the dashboard with **Download as PNG** or **Download as PDF** captures the tab each container is currently showing; the [print version](/docs/explore-analyze/dashboards#print-version) prints every tab's widgets instead.
+Switching a tab writes it into the page URL as `?tab_<widget_id>=<tab_id>`, so a link you copy reopens on the tab you were reading; only the containers you actually switched are written into that link. You can also [set that parameter by hand](/embedding/iframe/dashboards#pre-set-dashboard-filters-via-url) to open a published or embedded dashboard on a particular tab. [Downloading the dashboard](/docs/explore-analyze/dashboards#download-as-png-or-pdf) with the **Snapshot** layout captures the tab each container is currently showing; the [print version](/docs/explore-analyze/dashboards#print-version) prints every tab's widgets instead.
 
 ## Nesting containers
 
@@ -150,7 +150,7 @@ This holds for every container — stack, grid, and tabs — and for every way o
 
 ## Adding a layout widget
 
-In the [dashboard builder][ref-workbooks], containers come from the toolbar's **Add containers** menu — **Tabs**, **Horizontal stack**, **Vertical stack**, or **Grid** — and **Spacer** and **Divider** from the **Add other widgets** menu beside it. The widget is added to the canvas, where you can drag it into place and resize it (a divider resizes horizontally only). Every one of them is also in the menu that opens when you click or drag across empty cells on the canvas — see [Adding a widget at a spot on the canvas](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas).
+In the [dashboard builder][ref-workbooks], containers come from the **Containers** menu in the toolbar's **Add:** group — **Tabs**, **Horizontal stack**, **Vertical stack**, or **Grid** — and **Spacer** and **Divider** from the **Other** menu beside it. The widget is added to the canvas, where you can drag it into place and resize it (a divider resizes horizontally only). Every one of them is also in the menu that opens when you click or drag across empty cells on the canvas — see [Adding a widget at a spot on the canvas](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas).
 
 ## Styling
 
