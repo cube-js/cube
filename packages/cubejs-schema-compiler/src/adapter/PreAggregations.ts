@@ -233,7 +233,7 @@ export class PreAggregations {
   }
 
   private preAggregationDescriptionsForUsageInfos(usageInfos: PreAggregationUsageInfo[]): FullPreAggregationDescription[] {
-    return usageInfos.flatMap(usageInfo => {
+    const usageDescriptions = usageInfos.flatMap(usageInfo => {
       const preAggObj = this.getRollupPreAggregationByName(usageInfo.cubeName, usageInfo.preAggregationName);
       if (!preAggObj || !('preAggregationName' in preAggObj)) {
         return [];
@@ -261,6 +261,33 @@ export class PreAggregations {
         };
       });
     });
+
+    return PreAggregations.mergeDescriptionsByTable(usageDescriptions);
+  }
+
+  // A rollup read both on its own and as a rollupJoin leg gets a description from each usage;
+  // they are later deduplicated by table, so one has to carry the usages of all of them.
+  protected static mergeDescriptionsByTable(descriptions: FullPreAggregationDescription[]): FullPreAggregationDescription[] {
+    const byTable = new Map<string, FullPreAggregationDescription>();
+
+    for (const desc of descriptions) {
+      const known = byTable.get(desc.tableName);
+      if (!known) {
+        byTable.set(desc.tableName, desc);
+      } else {
+        const knownRange = known.matchedTimeDimensionDateRange;
+        const range = desc.matchedTimeDimensionDateRange;
+        byTable.set(desc.tableName, {
+          ...known,
+          usageMapping: { ...known.usageMapping, ...desc.usageMapping },
+          matchedTimeDimensionDateRange: knownRange && range
+            ? PreAggregations.mergeUsageDateRanges({ known: { dateRange: knownRange }, desc: { dateRange: range } })
+            : undefined,
+        });
+      }
+    }
+
+    return [...byTable.values()];
   }
 
   private static mergeUsageDateRanges(usages: Record<string, UsageDateRangeInfo>): [string, string] | null {
