@@ -165,7 +165,9 @@ Store a [Platform API key](/api-reference/authentication) with deployment `Schem
 a CI secret. The recipe reads the saved settings, starts a run with their `configurationVersion`,
 then polls the returned `statusUrl`. The start endpoint returns `202` with a `runId`, `buildJobId`,
 optional `commit`, and root-relative `statusUrl`. It accepts an optional UUID `idempotencyKey` for
-safe retries; another start while a run is active returns `409`.
+safe retries. A start returns `409` while another run is active and, for a data model with
+[Jinja templates](#jinja-templates), while the deployment is still rolling out the new build. The
+recipe retries a `409` for up to `MAX_START_ATTEMPTS` attempts, 10 seconds apart (default: 30).
 Run statuses are `QUEUED`, `RUNNING`, `CANCELLING`, `COMPLETED`, `PARTIAL`, `FAILED`, and `CANCELLED`.
 
 To reject incompatible changes before writing, CI can [preview](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview)
@@ -196,10 +198,21 @@ if ! jq -e '.configuration.enabled == true and .configuration.selectionMode == "
 fi
 version=$(jq -r '.configurationVersion' <<<"$settings")
 
-start=$(jq -n --argjson version "$version" --arg key "$SYNC_IDEMPOTENCY_KEY" \
-    '{configurationVersion: $version, idempotencyKey: $key}' |
-  curl --fail --silent --show-error --connect-timeout 10 --max-time 30 -X POST -H "$auth_header" \
-    -H 'Content-Type: application/json' --data-binary @- "$integration/syncs")
+request=$(jq -n --argjson version "$version" --arg key "$SYNC_IDEMPOTENCY_KEY" \
+  '{configurationVersion: $version, idempotencyKey: $key}')
+max_start_attempts=${MAX_START_ATTEMPTS:-30}
+[[ "$max_start_attempts" =~ ^[1-9][0-9]*$ ]] || { echo 'MAX_START_ATTEMPTS must be a positive integer.' >&2; exit 1; }
+for ((attempt=1; ; attempt++)); do
+  response=$(curl --silent --show-error --connect-timeout 10 --max-time 30 \
+    --write-out '\n%{http_code}' -X POST -H "$auth_header" \
+    -H 'Content-Type: application/json' --data-binary "$request" "$integration/syncs") || response=$'\n000'
+  http_code=${response##*$'\n'}
+  start=${response%$'\n'*}
+  [[ "$http_code" == 202 ]] && break
+  echo "Starting the run returned HTTP $http_code: $start" >&2
+  [[ "$http_code" == 409 ]] && ((attempt < max_start_attempts)) || exit 1
+  sleep 10
+done
 status_url=$(jq -r '.statusUrl' <<<"$start")
 if [[ -n "${EXPECTED_BUILD_JOB_ID:-}" ]]; then
   if ! jq -e --argjson expected "$EXPECTED_BUILD_JOB_ID" '.buildJobId == $expected' <<<"$start" >/dev/null; then
@@ -266,7 +279,7 @@ older runs with
 `GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs`
 and request cancellation of an active run with `DELETE {statusUrl}`. Cancellation stops further
 writes but does not undo completed ones. `curl --fail` exits with code 22 and omits the response
-body on HTTP errors; on `409`, inspect run history before retrying.
+body on HTTP errors.
 
 ## What can be published
 
@@ -326,6 +339,11 @@ context or `COMPILE_CONTEXT` publishes only one variant.
 
 If a file fails to render, the preview or sync fails with `400` and names the file. A rendered file
 can be up to 2 MiB, the rendered data model up to 20 MiB, and rendering can take up to 2 minutes.
+
+For a few minutes after a build succeeds, the deployment's Cube runtime can still serve the
+previous build while it rolls out the new one. Until the rollout finishes, starting a preview or
+sync that renders templates fails with `409` and names both builds, so that a view is never
+converted from a mix of the two. Try again once the rollout finishes.
 
 ## Ownership, failures, and rollback
 
