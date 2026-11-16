@@ -796,10 +796,12 @@ describe('Cube RBAC Engine', () => {
       }
     });
 
-    // Skipped: the shift moves the date filter with it, so the measure sums
-    // January and February rows and is not masked.
-    test.skip('a time-shifted measure stays masked under the policy date range', async () => {
-      expectMasked(await measureValues(inRangeClient, 'total_price_prev_month', dateFilter('inDateRange', POLICY_RANGE)));
+    // The shift moves the date filter with it, so the measure sums January and
+    // February rows: the query filter doesn't keep it inside the policy.
+    test('a time-shifted measure stays masked under the policy date range', async () => {
+      const values = await measureValues(inRangeClient, 'total_price_prev_month', dateFilter('inDateRange', POLICY_RANGE));
+      expect(values.length).toBeGreaterThan(0);
+      expectMasked(values);
     });
   });
 

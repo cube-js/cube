@@ -14,12 +14,20 @@ class CompilerApiTestable extends CompilerApi {
     return this.queryFactory;
   }
 
-  public leafFilterImplies(queryLeaf: any, targetLeaf: any): boolean {
-    return super.leafFilterImplies(queryLeaf, targetLeaf);
+  public leafFilterImplies(
+    queryLeaf: any,
+    targetLeaf: any,
+    isNumberDimension: (member: string) => boolean = () => true,
+  ): boolean {
+    return super.leafFilterImplies(queryLeaf, targetLeaf, isNumberDimension);
   }
 
-  public queryFiltersImplyFilter(queryFilters: any[], maskFilter: any): boolean {
-    return super.queryFiltersImplyFilter(queryFilters, maskFilter);
+  public queryFiltersImplyFilter(
+    queryFilters: any[],
+    maskFilter: any,
+    isNumberDimension: (member: string) => boolean = () => true,
+  ): boolean {
+    return super.queryFiltersImplyFilter(queryFilters, maskFilter, isNumberDimension);
   }
 }
 
@@ -1085,6 +1093,13 @@ describe('CompilerApi leafFilterImplies', () => {
     expect(compilerApi.leafFilterImplies(leaf('gt', ['50']), leaf('gt', ['100']))).toBe(false);
   });
 
+  test('numeric bounds only compare on number dimensions', () => {
+    // As text '1000' passes `gt '100'` and fails `gt '20'`.
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['100']), leaf('gt', ['20']), () => false)).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('lte', ['-3']), leaf('lt', ['-2.5']), () => false)).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['20']), leaf('gt', ['20']), () => false)).toBe(true);
+  });
+
   test('an empty policy group does not unmask', () => {
     const queryFilters = [leaf('equals', ['a'])];
     expect(compilerApi.queryFiltersImplyFilter(queryFilters, { and: [] })).toBe(false);
@@ -1206,5 +1221,109 @@ views:
     } finally {
       compilerApi.dispose();
     }
+  });
+});
+
+describe('CompilerApi conditional mask lifting', () => {
+  const model = `
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: created_at
+        sql: created_at
+        type: time
+      - name: code
+        sql: code
+        type: string
+      - name: amount
+        sql: amount
+        type: number
+    measures:
+      - name: total
+        sql: amount
+        type: sum
+      - name: total_prev_month
+        multi_stage: true
+        sql: "{total}"
+        type: number
+        time_shift:
+          - time_dimension: created_at
+            interval: 1 month
+            type: prior
+      - name: total_prev_month_doubled
+        multi_stage: true
+        sql: "{total_prev_month} * 2"
+        type: number
+    access_policy:
+      - group: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+      - group: dates
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: created_at
+              operator: inDateRange
+              values: ["2025-02-01", "2025-03-31"]
+      - group: codes
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: code
+              operator: gt
+              values: ["20"]
+      - group: amounts
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: amount
+              operator: gt
+              values: ["20"]
+`;
+  const repository: SchemaFileRepository = {
+    localPath: () => '/mock/path',
+    dataSchemaFiles: () => Promise.resolve([{ fileName: 'model.yml', content: model }]),
+  };
+  const compilerApi = new CompilerApi(repository, async () => 'postgres', {
+    logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+    contextToGroups: async (context: any) => context.securityContext.groups,
+  });
+
+  afterAll(() => compilerApi.dispose());
+
+  const maskedMembers = async (group: string, measure: string, filter: any) => {
+    const query: any = { timezone: 'UTC', measures: [`orders.${measure}`], filters: [filter] };
+    const context: any = { securityContext: { groups: [group] }, requestId: 'test' };
+    const result = await compilerApi.applyRowLevelSecurity(query, query, context);
+    return ((result.query as any).maskedMembers || []).map((m: any) => m.member);
+  };
+
+  const policyRange = { member: 'orders.created_at', operator: 'inDateRange', values: ['2025-02-01', '2025-03-31'] };
+
+  test('the policy filter unmasks a measure that reads the filtered rows', async () => {
+    expect(await maskedMembers('dates', 'total', policyRange)).toEqual([]);
+  });
+
+  test('a time-shifted measure stays masked, also behind another measure', async () => {
+    expect(await maskedMembers('dates', 'total_prev_month', policyRange)).toContain('orders.total_prev_month');
+    expect(await maskedMembers('dates', 'total_prev_month_doubled', policyRange))
+      .toContain('orders.total_prev_month_doubled');
+  });
+
+  test('a narrower bound unmasks on a number dimension only', async () => {
+    const narrower = (member: string) => ({ member: `orders.${member}`, operator: 'gt', values: ['100'] });
+
+    expect(await maskedMembers('amounts', 'total', narrower('amount'))).toEqual([]);
+    expect(await maskedMembers('codes', 'total', narrower('code'))).toContain('orders.total');
   });
 });

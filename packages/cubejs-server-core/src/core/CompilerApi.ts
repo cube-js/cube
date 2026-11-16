@@ -926,9 +926,20 @@ export class CompilerApi {
     // also lets a conditionally-masked aggregate measure render its real value
     // (instead of being fully masked) when the query is already scoped to the
     // filter's rows.
-    for (const member of Array.from(maskedMembersSet)) {
+    const isNumberDimension = (member: string) => {
+      const path = cubeEvaluator.resolveMemberPath(member)?.targetPath || member;
+      return cubeEvaluator.isDimension(path) && cubeEvaluator.dimensionByPath(path).type === 'number';
+    };
+    // A time-shifted measure moves the time filters with it, so the query also reads
+    // rows its own filters exclude and the filters prove nothing about those.
+    const readsShiftedRows = memberNames.some((member) => {
+      const path = cubeEvaluator.resolveMemberPath(member)?.targetPath || member;
+      return cubeEvaluator.isMeasure(path) && !!cubeEvaluator.measureByPath(path).timeShift?.length;
+    });
+
+    for (const member of readsShiftedRows ? [] : Array.from(maskedMembersSet)) {
       const maskFilter = memberMaskFiltersMap[member];
-      if (maskFilter && this.queryFiltersImplyFilter(query.filters || [], maskFilter)) {
+      if (maskFilter && this.queryFiltersImplyFilter(query.filters || [], maskFilter, isNumberDimension)) {
         maskedMembersSet.delete(member);
         delete memberMaskFiltersMap[member];
       }
@@ -1030,7 +1041,11 @@ export class CompilerApi {
    * Intentionally conservative: when implication can't be proven soundly, returns
    * false so masking is preserved.
    */
-  protected leafFilterImplies(queryLeaf: any, targetLeaf: any): boolean {
+  protected leafFilterImplies(
+    queryLeaf: any,
+    targetLeaf: any,
+    isNumberDimension: (member: string) => boolean,
+  ): boolean {
     if (this.filterMemberName(queryLeaf) !== this.filterMemberName(targetLeaf)) {
       return false;
     }
@@ -1060,8 +1075,9 @@ export class CompilerApi {
       return qVals.length > 0 && qVals.every((v: string) => tVals.includes(v));
     }
 
-    // Numeric range bounds in the same direction.
-    if (qVals.length === 1 && tVals.length === 1) {
+    // Numeric range bounds in the same direction. The database orders the bounds of
+    // any other member type as text, where '1000' sorts below '20'.
+    if (qVals.length === 1 && tVals.length === 1 && isNumberDimension(this.filterMemberName(queryLeaf)!)) {
       const q = this.parseFilterNumber(qVals[0]);
       const t = this.parseFilterNumber(tVals[0]);
       if (q !== null && t !== null) {
@@ -1087,20 +1103,24 @@ export class CompilerApi {
     return false;
   }
 
-  protected filterConditionImplied(guaranteedLeaves: any[], condition: any): boolean {
+  protected filterConditionImplied(
+    guaranteedLeaves: any[],
+    condition: any,
+    isNumberDimension: (member: string) => boolean,
+  ): boolean {
     if (!condition) {
       return false;
     }
     if (condition.and) {
       // An empty group proves nothing; `every` on it would unmask unconditionally.
       return condition.and.length > 0 &&
-        condition.and.every((c: any) => this.filterConditionImplied(guaranteedLeaves, c));
+        condition.and.every((c: any) => this.filterConditionImplied(guaranteedLeaves, c, isNumberDimension));
     }
     if (condition.or) {
-      return condition.or.some((c: any) => this.filterConditionImplied(guaranteedLeaves, c));
+      return condition.or.some((c: any) => this.filterConditionImplied(guaranteedLeaves, c, isNumberDimension));
     }
     if (this.filterMemberName(condition) && condition.operator) {
-      return guaranteedLeaves.some(leaf => this.leafFilterImplies(leaf, condition));
+      return guaranteedLeaves.some(leaf => this.leafFilterImplies(leaf, condition, isNumberDimension));
     }
     return false;
   }
@@ -1110,12 +1130,16 @@ export class CompilerApi {
    * subset of the rows allowed by `maskFilter` — i.e. the query is already at
    * least as restrictive as the (row-security) mask filter.
    */
-  protected queryFiltersImplyFilter(queryFilters: any[], maskFilter: any): boolean {
+  protected queryFiltersImplyFilter(
+    queryFilters: any[],
+    maskFilter: any,
+    isNumberDimension: (member: string) => boolean,
+  ): boolean {
     const guaranteedLeaves = this.collectGuaranteedFilterLeaves(queryFilters);
     if (guaranteedLeaves.length === 0) {
       return false;
     }
-    return this.filterConditionImplied(guaranteedLeaves, maskFilter);
+    return this.filterConditionImplied(guaranteedLeaves, maskFilter, isNumberDimension);
   }
 
   protected removeEmptyFilters(filter: any): any {
