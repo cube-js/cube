@@ -803,10 +803,22 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
             "SELECT generate_series(1.0, 2.0, 1e-300);",
             "step size too small",
         ),
+        (
+            "SELECT generate_series('2024-01-01'::date, '2024-01-02'::date, '1 hour'::interval);",
+            "step size does not advance the series",
+        ),
+        (
+            "SELECT generate_series('2024-01-01'::date, '2024-02-01'::date, '1 month -40 days'::interval);",
+            "step size does not advance the series",
+        ),
+        (
+            "SELECT generate_series('2024-01-01'::timestamp, '2024-02-01'::timestamp, '1 month -40 days'::interval);",
+            "step size does not advance the series",
+        ),
     ] {
         let err = execute_query(sql.to_string(), DatabaseProtocol::PostgreSQL)
             .await
-            .expect_err("an invalid float argument must fail");
+            .expect_err("an invalid argument must fail");
         assert!(
             err.to_string().contains(expected),
             "{} failed with an unexpected error: {}",

@@ -2590,7 +2590,15 @@ macro_rules! generate_series_non_primitive_udtf {
                         builder.append_value(current);
 
                         section_size += 1;
+                        let previous = current;
                         $HANDLE_MACRO!(current, step, $PRIMITIVE_TYPE);
+                        // A sub-day step on a date rounds back to the same day, and a
+                        // mixed-sign interval can pass the sign check yet move backwards.
+                        if current <= previous {
+                            return Err(DataFusionError::Execution(
+                                "step size does not advance the series".to_string(),
+                            ));
+                        }
                     }
                 }
                 section_sizes.push(section_size as usize);
