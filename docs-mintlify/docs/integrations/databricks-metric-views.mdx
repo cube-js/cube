@@ -104,7 +104,8 @@ Scope rules:
   the request; narrow the scope and try again.
 - A newly deployed view enters an **all** or matching **pattern** scope on the next manual sync.
   A **selected** scope changes only when you edit it.
-- Renaming a view or target creates a new target and leaves the old one retained.
+- Renaming a view or target creates a new target. The old one is kept, or dropped when the data
+  source drops removed views (see [Removed views](#removed-views)).
 - Per-view target-name and root-source overrides are available through the configuration API,
   but are not editable in the card.
 
@@ -120,9 +121,9 @@ The same API supports [starting a publication run](/api-reference/databricks-met
 and [cancelling a run](/api-reference/databricks-metric-view-integration/cancel-a-databricks-metric-view-publication-run).
 Contact [Cube support](/admin/account-billing/support) for help with access.
 
-When saving settings through the API, set `deletionPolicy` to `retain`; omitting it also defaults
-to `retain`. The older `delete-managed` value is deprecated but remains accepted for existing API
-clients. It does not delete obsolete Metric Views; it currently behaves like `retain`.
+When saving settings through the API, `deletionPolicy` is `retain`, the default, or
+`delete-managed`, which drops the Metric Views of removed views as
+[Removed views](#removed-views) describes.
 
 ## Data sources served by `driver_factory` {#data-sources-served-by-driver_factory}
 
@@ -157,7 +158,7 @@ Omit it to keep the stored credential, or pass `null` to remove it.
 ## Trigger publication from CI
 
 Run publication from CI after a successful Cube deployment. First, configure **All views**, a
-dedicated target catalog and schema, `retain`, and publication enabled in **Settings → Data
+dedicated target catalog and schema, and publication enabled in **Settings → Data
 Sources**. Run **Preview** and **Test access** before the first write. CI uses these saved settings;
 the API call does not override the scope or destination.
 
@@ -190,8 +191,8 @@ auth_header="Authorization: Bearer $CUBE_API_TOKEN"
 : "${SYNC_IDEMPOTENCY_KEY:?Set a unique UUID for this publication attempt}"
 settings=$(curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
   -H "$auth_header" "$integration")
-if ! jq -e '.configuration.enabled == true and .configuration.selectionMode == "all" and .configuration.deletionPolicy == "retain"' <<<"$settings" >/dev/null; then
-  echo 'Enable publication with All views and retain before running CI.' >&2
+if ! jq -e '.configuration.enabled == true and .configuration.selectionMode == "all"' <<<"$settings" >/dev/null; then
+  echo 'Enable publication with All views before running CI.' >&2
   exit 1
 fi
 version=$(jq -r '.configurationVersion' <<<"$settings")
@@ -245,7 +246,8 @@ if ! jq -e '.status == "COMPLETED" and .incompleteViewCount == 0 and
   (.viewNames | length > 0) and
   (.views | length > 0) and
   all(.views[]; .outcome == "created" or .outcome == "updated" or
-    .outcome == "unchanged" or .outcome == "retained_obsolete")' \
+    .outcome == "unchanged" or .outcome == "deleted_obsolete" or
+    (.outcome == "retained_obsolete" and .detail == null))' \
   <<<"$run" >/dev/null; then
   jq '{status, buildJobId, commit, incompleteViewCount, viewNames, views}' <<<"$run" >&2
   exit 1
@@ -253,11 +255,11 @@ fi
 ```
 
 The expected-build check runs **after** publication starts; a mismatch cannot prevent or undo a
-write. The recipe requires `retain` so future `delete-managed` behavior cannot silently change the
-CI policy. `viewNames` lists planned views; `retained_obsolete` means an obsolete target was left
-in place. Publication-run `views[].outcome` values are `unchanged`, `created`, `updated`, `blocked`,
+write. `viewNames` lists planned views; `retained_obsolete` means an obsolete target was left in
+place, and `deleted_obsolete` that Cube dropped it. A `retained_obsolete` target with a `detail` is
+a drop that was held or failed, so the recipe rejects it. Publication-run `views[].outcome` values are `unchanged`, `created`, `updated`, `blocked`,
 `validation_failed`, `publish_failed`, `retained_obsolete`, and `deleted_obsolete`; these differ
-from preview outcomes. The recipe accepts only the successful, retain-safe outcomes.
+from preview outcomes. The recipe accepts only the successful outcomes.
 `incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
 zero rejects definitions missing measures.
 
@@ -336,10 +338,38 @@ Resolve the collision or drift with the owner of the Databricks object, or conta
 not manage. A failed conversion, validation, or write leaves that view's previous
 Databricks definition in place. Other views in the same run may still publish.
 
-Removing a view from scope, disabling publication, or Cube support deactivating the preview for
-your account **does not delete** its Databricks Metric View. If you remove a view from scope and
-sync again, run history labels the obsolete target **Obsolete, kept**. If you need to remove one,
-have the target owner review and drop it manually in Databricks.
+### Removed views
+
+A view leaves the scope when you remove it from the data model, rename it, or deselect it. By
+default its Metric View stays in Databricks, and run history labels it **Obsolete, kept**. To have
+syncs drop such Metric Views, choose **Delete the Metric View Cube created** under **When a view
+leaves the scope**, or save `deletionPolicy: delete-managed` through the API. The next sync drops
+each one and labels it **Obsolete, deleted**.
+
+Cube drops a Metric View only when all of these hold:
+
+- Cube created it and still records it as its own, in the catalog and schema the data source
+  publishes to now, in the same Unity Catalog metastore.
+- Its Cube view left the scope. A view still in scope whose conversion or write failed keeps its
+  Metric View.
+- The object at that name is still a view, owned by the Databricks principal Cube publishes with.
+  Cube checks this just before it drops it. If you transfer ownership of Cube's Metric Views,
+  Cube no longer drops them.
+
+A sync drops nothing, and labels each Metric View it would have dropped **Obsolete, kept** with the
+reason, when:
+
+- `no-views`: no view in the sync converted to a Metric View definition;
+- `create-failed`: Databricks rejected or failed the creation of a new view's Metric View, so a
+  renamed view would otherwise lose both names;
+- `deletion-cap-exceeded`: it would drop more than 20 Metric Views. Remove views in smaller
+  batches. A target-name prefix change that renames more than 20 views is held on every sync
+  until you revert it.
+
+A failed drop is labeled **Obsolete, kept** with its failure code, and the next sync tries again. A
+data model file that fails to load stops the sync before anything is written or dropped. Disabling
+publication, or Cube support deactivating the preview for your account, drops nothing. Dropping
+needs the same Databricks privileges on the target schema as replacing a view.
 
 You can request cancellation of an active run. It prevents further writes but does not undo
 views already published. To roll back a bad definition, restore the desired Cube model,
