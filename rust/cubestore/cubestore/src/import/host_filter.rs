@@ -208,6 +208,18 @@ impl LocationHostFilter {
         if !entry.contains('*') {
             return Ok(HostPattern::Exact(entry));
         }
+        // As a host pattern `10.0.0.*` would also match the domain `10.0.0.com`, and it would
+        // not count as a listed address for `deny_private_ips`.
+        let is_ip_shaped = host.contains(|c: char| c.is_ascii_digit())
+            && host
+                .chars()
+                .all(|c| c.is_ascii_digit() || matches!(c, '.' | '*'));
+        if is_ip_shaped {
+            return Err(CubeError::user(format!(
+                "Invalid allowed host {:?}: `*` cannot stand for part of an IP address, use a subnet like `10.0.0.0/24` instead",
+                entry
+            )));
+        }
         let pattern = entry
             .split('*')
             .map(regex::escape)
@@ -787,6 +799,10 @@ mod tests {
             "::1:x",
             "fd00::1::2",
             "a:b:c",
+            "10.0.0.*",
+            "192.168.*.*",
+            "10.0.0.*:9000",
+            "1*.0.0.1",
         ] {
             assert!(
                 LocationHostFilter::validate_entry(entry).is_err(),
@@ -798,6 +814,13 @@ mod tests {
             LocationHostFilter::validate_entry(" *.MyHost.ru ").unwrap(),
             "*.myhost.ru"
         );
+        for entry in ["*.*", "*:8080", "10-*.example.com", "*.s3.amazonaws.com"] {
+            assert!(
+                LocationHostFilter::validate_entry(entry).is_ok(),
+                "{:?} should be accepted",
+                entry
+            );
+        }
     }
 }
 
