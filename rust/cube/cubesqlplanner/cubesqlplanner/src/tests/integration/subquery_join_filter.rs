@@ -254,3 +254,46 @@ async fn test_multi_stage_sub_query_keeps_filter_off_cyclic_edge() {
     )
     .await;
 }
+
+// The `Orders.label` filter makes the sub-query need `Orders.total`, so filters
+// are re-added one by one. `Customers` alone has no join path from `Orders`; it
+// is kept on a later pass, once `Shipments` links them.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_needing_another_filter_kept_after_cycle() {
+    let query = indoc! {r#"
+        dimensions:
+          - Orders.id
+          - Orders.total
+        filters:
+          - member: Customers.name
+            operator: equals
+            values:
+              - alice
+          - member: Orders.label
+            operator: set
+          - member: Shipments.status
+            operator: equals
+            values:
+              - sent
+        order:
+          - id: Orders.id
+    "#};
+
+    let sql = create_context().build_sql(query).unwrap();
+    // Everything up to the sub-query's alias: its CTE and the joins before it.
+    let sub_query = sql.split("AS \"Orders_total_subquery\"").next().unwrap();
+    assert!(
+        sub_query.contains("sq_customers") && !sub_query.contains("sq_labels"),
+        "Expected the customers filter but not the label one in the sub-query:\n{sql}"
+    );
+
+    assert_matches_oracle(
+        query,
+        "SELECT o.id, o.amount FROM sq_orders o \
+         JOIN sq_labels l ON l.amount = o.amount \
+         JOIN sq_shipments s ON s.order_id = o.id \
+         JOIN sq_customers c ON c.id = s.customer_id \
+         WHERE c.name = 'alice' AND s.status = 'sent' ORDER BY o.id",
+    )
+    .await;
+}

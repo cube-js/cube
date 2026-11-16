@@ -153,6 +153,8 @@ impl PlanningScope {
         self.sub_query_dimensions.push(id.clone());
         let result = plan(self);
         self.sub_query_dimensions.pop();
+        // A cycle an inner planner recovered from must not outlive this planning.
+        self.cyclic_sub_query_dimensions.remove(id);
         result
     }
 
