@@ -2449,8 +2449,7 @@ fn generate_series_validate_f64(start: f64, end: f64, step: f64) -> Result<()> {
 /// The `n`-th element of the series, or `None` when it is past the type's range (and so past
 /// any `end`).
 fn generate_series_nth_i64(start: i64, step: i64, n: i64) -> Option<i64> {
-    step.checked_mul(n)
-        .and_then(|offset| start.checked_add(offset))
+    std::convert::TryFrom::try_from(start as i128 + step as i128 * n as i128).ok()
 }
 
 /// The `n`-th element of the series. Computed from `start` instead of accumulating `step`, so
@@ -2533,8 +2532,8 @@ macro_rules! generate_series_helper_date32 {
 macro_rules! generate_series_helper_timestamp {
     ($CURRENT:ident, $STEP:ident, $PRIMITIVE_TYPE: ident) => {
         let current_dt = ::chrono::DateTime::from_timestamp(
-            ($CURRENT as i64) / 1_000_000_000,
-            ($CURRENT % 1_000_000_000) as u32,
+            ($CURRENT as i64).div_euclid(1_000_000_000),
+            $CURRENT.rem_euclid(1_000_000_000) as u32,
         )
         .map(|dt| dt.naive_utc())
         .ok_or_else(|| {
@@ -2550,6 +2549,13 @@ macro_rules! generate_series_helper_timestamp {
         };
         $CURRENT = next as $PRIMITIVE_TYPE;
     };
+}
+
+/// Postgres compares intervals with a month counted as 30 days, so `1 month -40 days` is
+/// negative even though its month part is positive.
+fn generate_series_interval_is_positive(step: IntervalMonthDayNano) -> bool {
+    let (months, days, nanos) = IntervalMonthDayNanoType::to_parts(step);
+    (months as i128 * 30 + days as i128) * 86_400_000_000_000 + nanos as i128 > 0
 }
 
 macro_rules! generate_series_non_primitive_udtf {
@@ -2582,7 +2588,7 @@ macro_rules! generate_series_non_primitive_udtf {
                 let step = step_arr.value(step_idx);
 
                 let mut section_size: usize = 0;
-                if step > IntervalMonthDayNanoType::make_value(0, 0, 0) {
+                if generate_series_interval_is_positive(step) {
                     let mut current = start;
                     while current <= end {
                         builder.append_value(current);
@@ -2591,7 +2597,8 @@ macro_rules! generate_series_non_primitive_udtf {
                         let previous = current;
                         $HANDLE_MACRO!(current, step, $PRIMITIVE_TYPE);
                         // A sub-day step on a date rounds back to the same day, and a
-                        // mixed-sign interval can pass the sign check yet move backwards.
+                        // mixed-sign interval can be positive yet not move a given date
+                        // forward (Jan 31 + `1 month -29 days`).
                         if current <= previous {
                             return Err(DataFusionError::Execution(
                                 "step size does not advance the series".to_string(),

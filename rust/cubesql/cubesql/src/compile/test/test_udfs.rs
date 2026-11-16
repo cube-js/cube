@@ -812,11 +812,11 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
             "step size does not advance the series",
         ),
         (
-            "SELECT generate_series('2024-01-01'::date, '2024-02-01'::date, '1 month -40 days'::interval);",
+            "SELECT generate_series('2024-01-31'::date, '2024-03-01'::date, '1 month -29 days'::interval);",
             "step size does not advance the series",
         ),
         (
-            "SELECT generate_series('2024-01-01'::timestamp, '2024-02-01'::timestamp, '1 month -40 days'::interval);",
+            "SELECT generate_series('2024-01-31'::timestamp, '2024-03-01'::timestamp, '1 month -29 days'::interval);",
             "step size does not advance the series",
         ),
     ] {
@@ -834,6 +834,22 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
     // The `_rows` cases keep the input row with a NULL series value, while Postgres drops it:
     // TableFunExec pads an empty series to one row whenever another column is selected.
     for (name, sql) in [
+        (
+            "generate_series_i64_negative_start_large_step",
+            "SELECT generate_series(-9000000000000000000, 9000000000000000000, 5000000000000000000);",
+        ),
+        (
+            "generate_series_timestamp_before_1970_fraction",
+            "SELECT generate_series('1969-12-31 23:59:58.5'::timestamp, '1970-01-01 00:00:00.5'::timestamp, '1 second'::interval);",
+        ),
+        (
+            "generate_series_interval_negative_as_30_day_months",
+            "SELECT generate_series('2024-01-01'::date, '2024-02-01'::date, '1 month -40 days'::interval);",
+        ),
+        (
+            "generate_series_interval_positive_as_30_day_months",
+            "SELECT generate_series('2024-01-01'::timestamp, '2024-02-01'::timestamp, '-1 month 40 days'::interval);",
+        ),
         (
             "generate_series_null_start",
             "SELECT generate_series(NULL::bigint, 5);",
