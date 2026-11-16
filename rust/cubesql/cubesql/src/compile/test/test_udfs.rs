@@ -694,6 +694,117 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
         .await?
     );
 
+    for (sql, expected) in [
+        (
+            "SELECT generate_series('NaN'::double precision, 5.0);",
+            "start value cannot be NaN",
+        ),
+        (
+            "SELECT generate_series(1.0, 'Infinity'::double precision);",
+            "stop value cannot be infinity",
+        ),
+        (
+            "SELECT generate_series(1.0, 5.0, '-Infinity'::double precision);",
+            "step size cannot be infinity",
+        ),
+        (
+            "SELECT generate_series(10000000000000000.0, 10000000000000004.0, 1.0);",
+            "step size is below the float precision",
+        ),
+        (
+            "SELECT generate_series(1.0, 2.0, 1e-300);",
+            "step size is below the float precision",
+        ),
+        (
+            "SELECT generate_series('2024-01-01'::date, '2024-01-02'::date, '1 hour'::interval);",
+            "step size does not advance the series",
+        ),
+        (
+            "SELECT generate_series('1969-12-01'::date, '1969-12-31'::date, '1 hour'::interval);",
+            "step size does not advance the series",
+        ),
+        (
+            "SELECT generate_series('2024-01-31'::date, '2024-03-01'::date, '1 month -29 days'::interval);",
+            "step size does not advance the series",
+        ),
+        (
+            "SELECT generate_series('2024-01-31 00:00:00'::timestamp, '2024-03-01 00:00:00'::timestamp, '1 month -29 days'::interval);",
+            "step size does not advance the series",
+        ),
+    ] {
+        let err = execute_query(sql.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .expect_err("an invalid argument must fail");
+        assert!(
+            err.to_string().contains(expected),
+            "{} failed with an unexpected error: {}",
+            sql,
+            err
+        );
+    }
+
+    for (name, sql) in [
+        (
+            "generate_series_i64_overflow",
+            "SELECT generate_series(9223372036854775806, 9223372036854775807);",
+        ),
+        (
+            "generate_series_i64_overflow_step",
+            "SELECT generate_series(0, 9223372036854775807, 5000000000000000000);",
+        ),
+        (
+            "generate_series_f64_no_drift",
+            "SELECT generate_series(0, 1, 0.1);",
+        ),
+        (
+            "generate_series_i64_negative_start_large_step",
+            "SELECT generate_series(-9000000000000000000, 9000000000000000000, 5000000000000000000);",
+        ),
+        (
+            "generate_series_timestamp_before_1970_fraction",
+            "SELECT generate_series('1969-12-31 23:59:58.5'::timestamp, '1970-01-01 00:00:00.5'::timestamp, '1 second'::interval);",
+        ),
+        (
+            "generate_series_interval_negative_as_30_day_months",
+            "SELECT generate_series('2024-01-01'::date, '2024-02-01'::date, '1 month -40 days'::interval);",
+        ),
+        (
+            "generate_series_interval_positive_as_30_day_months",
+            "SELECT generate_series('2024-01-01 00:00:00'::timestamp, '2024-02-01 00:00:00'::timestamp, '-1 month 40 days'::interval);",
+        ),
+        (
+            "generate_series_null_start",
+            "SELECT generate_series(NULL::bigint, 5);",
+        ),
+        (
+            "generate_series_null_step",
+            "SELECT generate_series(1.0, 5.0, NULL::double precision);",
+        ),
+        (
+            "generate_series_null_date",
+            "SELECT generate_series('2024-07-23'::date, NULL::date);",
+        ),
+        // The `_rows` cases keep the input row with a NULL series value, while Postgres drops
+        // it: TableFunExec pads an empty series to one row whenever another column is selected.
+        (
+            "generate_series_null_rows",
+            "SELECT x, generate_series(x, 3) FROM (VALUES (1), (NULL), (2)) t(x);",
+        ),
+        (
+            "generate_series_null_date_rows",
+            "SELECT x, generate_series(x, '2024-07-25'::date) FROM ( \
+                SELECT '2024-07-23'::date AS x UNION ALL \
+                SELECT NULL::date AS x UNION ALL \
+                SELECT '2024-07-24'::date AS x \
+            ) t;",
+        ),
+    ] {
+        insta::assert_snapshot!(
+            name,
+            execute_query(sql.to_string(), DatabaseProtocol::PostgreSQL).await?
+        );
+    }
+
     insta::assert_snapshot!(
         "generate_series_date32_2_args",
         execute_query(

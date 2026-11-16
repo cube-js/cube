@@ -2233,8 +2233,47 @@ pub fn create_patch_measure_udaf() -> AggregateUDF {
     )
 }
 
+fn generate_series_validate_f64(start: f64, end: f64, step: f64) -> Result<()> {
+    for (name, value) in [
+        ("start value", start),
+        ("stop value", end),
+        ("step size", step),
+    ] {
+        if value.is_nan() {
+            return Err(DataFusionError::Execution(format!("{name} cannot be NaN")));
+        }
+        if value.is_infinite() {
+            return Err(DataFusionError::Execution(format!(
+                "{name} cannot be infinity"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// The `n`-th element of the series, or `None` when it is past the type's range (and so past
+/// any `end`).
+fn generate_series_nth_i64(start: i64, step: i64, n: i64) -> Option<i64> {
+    (start as i128 + step as i128 * n as i128).try_into().ok()
+}
+
+/// The `n`-th element of the series. Computed from `start` instead of accumulating `step`, so
+/// rounding does not drift.
+fn generate_series_nth_f64(start: f64, step: f64, n: i64) -> Option<f64> {
+    Some(start + (n as f64) * step)
+}
+
+/// The step for `row`, a scalar step being shared by every row. `None` when it is NULL.
+fn generate_series_step<T: ArrowPrimitiveType>(
+    step_arr: &PrimitiveArray<T>,
+    row: usize,
+) -> Option<T::Native> {
+    let idx = if step_arr.len() > row { row } else { 0 };
+    step_arr.is_valid(idx).then(|| step_arr.value(idx))
+}
+
 macro_rules! generate_series_udtf {
-    ($ARGS:expr, $TYPE: ident, $PRIMITIVE_TYPE: ident) => {{
+    ($ARGS:expr, $TYPE: ident, $PRIMITIVE_TYPE: ident, $VALIDATE:expr, $NTH:expr) => {{
         let mut section_sizes: Vec<usize> = Vec::new();
         let l_arr = &$ARGS[0].as_any().downcast_ref::<PrimitiveArray<$TYPE>>();
         if l_arr.is_some() {
@@ -2249,28 +2288,36 @@ macro_rules! generate_series_udtf {
 
             let mut builder = PrimitiveBuilder::<$TYPE>::new(1);
             for (i, (start, end)) in l_arr.iter().zip(r_arr.iter()).enumerate() {
-                let step = if step_arr.len() > i {
-                    step_arr.value(i)
-                } else {
-                    step_arr.value(0)
+                // generate_series is strict: a NULL argument yields no rows, as in Postgres.
+                let (Some(start), Some(end), Some(step)) =
+                    (start, end, generate_series_step(step_arr, i))
+                else {
+                    section_sizes.push(0);
+                    continue;
                 };
+                $VALIDATE(start, end, step)?;
 
-                let start = start.unwrap();
-                let end = end.unwrap();
-                let mut section_size: i64 = 0;
+                let mut n: i64 = 0;
                 if start <= end && step > 0 as $PRIMITIVE_TYPE {
-                    let mut current = start;
-                    loop {
+                    let mut last = None;
+                    while let Some(current) = $NTH(start, step, n) {
                         if current > end {
                             break;
                         }
+                        // A float step below the precision of `current` rounds to the previous
+                        // value: the series would repeat it, or never reach `end`.
+                        if last.is_some_and(|last| current <= last) {
+                            return Err(DataFusionError::Execution(
+                                "step size is below the float precision of the series values"
+                                    .to_string(),
+                            ));
+                        }
                         builder.append_value(current).unwrap();
-
-                        section_size += 1;
-                        current += step;
+                        last = Some(current);
+                        n += 1;
                     }
                 }
-                section_sizes.push(section_size as usize);
+                section_sizes.push(n as usize);
             }
 
             return Ok((Arc::new(builder.finish()) as ArrayRef, section_sizes));
@@ -2289,15 +2336,17 @@ macro_rules! generate_series_helper_date32 {
                 ))
             })?;
         let res = date_addsub_month_day_nano(current_dt, $STEP, true)?;
-        $CURRENT = (res.and_utc().timestamp() / 86400) as $PRIMITIVE_TYPE;
+        // Euclidean division rounds down to the day before 1970 as well.
+        $CURRENT = res.and_utc().timestamp().div_euclid(86400) as $PRIMITIVE_TYPE;
     };
 }
 
 macro_rules! generate_series_helper_timestamp {
     ($CURRENT:ident, $STEP:ident, $PRIMITIVE_TYPE: ident) => {
+        // Euclidean division keeps the sub-second part non-negative before 1970.
         let current_dt = ::chrono::DateTime::from_timestamp(
-            ($CURRENT as i64) / 1_000_000_000,
-            ($CURRENT % 1_000_000_000) as u32,
+            ($CURRENT as i64).div_euclid(1_000_000_000),
+            ($CURRENT as i64).rem_euclid(1_000_000_000) as u32,
         )
         .map(|dt| dt.naive_utc())
         .ok_or_else(|| {
@@ -2307,8 +2356,19 @@ macro_rules! generate_series_helper_timestamp {
             ))
         })?;
         let res = date_addsub_month_day_nano(current_dt, $STEP, true)?;
-        $CURRENT = res.and_utc().timestamp_nanos_opt().unwrap() as $PRIMITIVE_TYPE;
+        // A step past 2262-04-11 has no nanosecond timestamp, so it is also past `end`: stop.
+        let Some(next) = res.and_utc().timestamp_nanos_opt() else {
+            break;
+        };
+        $CURRENT = next as $PRIMITIVE_TYPE;
     };
+}
+
+/// Postgres compares intervals with a month counted as 30 days, so `1 month -40 days` is
+/// negative even though its month part is positive.
+fn generate_series_interval_is_positive(step: IntervalMonthDayNano) -> bool {
+    let (months, days, nanos) = IntervalMonthDayNanoType::to_parts(step);
+    (months as i128 * 30 + days as i128) * 86_400_000_000_000 + nanos as i128 > 0
 }
 
 macro_rules! generate_series_non_primitive_udtf {
@@ -2331,28 +2391,34 @@ macro_rules! generate_series_non_primitive_udtf {
 
             let mut builder = PrimitiveBuilder::<$TYPE>::new(1);
             for (i, (start, end)) in l_arr.iter().zip(r_arr.iter()).enumerate() {
-                let step = if step_arr.len() > i {
-                    step_arr.value(i)
-                } else {
-                    step_arr.value(0)
+                // generate_series is strict: a NULL argument yields no rows, as in Postgres.
+                let (Some(start), Some(end), Some(step)) =
+                    (start, end, generate_series_step(step_arr, i))
+                else {
+                    section_sizes.push(0);
+                    continue;
                 };
 
-                if let (Some(start), Some(end)) = (start, end) {
-                    let mut section_size: i64 = 0;
-                    if start <= end && step > 0 {
-                        let mut current = start;
-                        loop {
-                            if current > end {
-                                break;
-                            }
-                            builder.append_value(current).unwrap();
+                let mut section_size: usize = 0;
+                if generate_series_interval_is_positive(step) {
+                    let mut current = start;
+                    while current <= end {
+                        builder.append_value(current).unwrap();
 
-                            section_size += 1;
-                            $HANDLE_MACRO!(current, step, $PRIMITIVE_TYPE);
+                        section_size += 1;
+                        let previous = current;
+                        $HANDLE_MACRO!(current, step, $PRIMITIVE_TYPE);
+                        // A sub-day step on a date rounds back to the same day, and a
+                        // mixed-sign interval can be positive yet not move a given date
+                        // forward (Jan 31 + `1 month -29 days`).
+                        if current <= previous {
+                            return Err(DataFusionError::Execution(
+                                "step size does not advance the series".to_string(),
+                            ));
                         }
                     }
-                    section_sizes.push(section_size as usize);
                 }
+                section_sizes.push(section_size);
             }
 
             return Ok((Arc::new(builder.finish()) as ArrayRef, section_sizes));
@@ -2365,9 +2431,21 @@ pub fn create_generate_series_udtf() -> TableUDF {
         assert!(args.len() == 2 || args.len() == 3);
 
         if args[0].as_any().downcast_ref::<Int64Array>().is_some() {
-            generate_series_udtf!(args, Int64Type, i64)
+            generate_series_udtf!(
+                args,
+                Int64Type,
+                i64,
+                |_: i64, _: i64, _: i64| -> Result<()> { Ok(()) },
+                generate_series_nth_i64
+            )
         } else if args[0].as_any().downcast_ref::<Float64Array>().is_some() {
-            generate_series_udtf!(args, Float64Type, f64)
+            generate_series_udtf!(
+                args,
+                Float64Type,
+                f64,
+                generate_series_validate_f64,
+                generate_series_nth_f64
+            )
         } else if args[0].as_any().downcast_ref::<Date32Array>().is_some() {
             generate_series_non_primitive_udtf!(
                 args,
