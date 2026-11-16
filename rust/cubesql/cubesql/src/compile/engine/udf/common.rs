@@ -2581,13 +2581,10 @@ macro_rules! generate_series_non_primitive_udtf {
                 };
                 let step = step_arr.value(step_idx);
 
-                let mut section_size: i64 = 0;
-                if start <= end && step > IntervalMonthDayNanoType::make_value(0, 0, 0) {
+                let mut section_size: usize = 0;
+                if step > IntervalMonthDayNanoType::make_value(0, 0, 0) {
                     let mut current = start;
-                    loop {
-                        if current > end {
-                            break;
-                        }
+                    while current <= end {
                         builder.append_value(current);
 
                         section_size += 1;
@@ -2602,7 +2599,7 @@ macro_rules! generate_series_non_primitive_udtf {
                         }
                     }
                 }
-                section_sizes.push(section_size as usize);
+                section_sizes.push(section_size);
             }
 
             return Ok((Arc::new(builder.finish()) as ArrayRef, section_sizes));
