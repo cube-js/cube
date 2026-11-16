@@ -396,6 +396,13 @@ the math.
 On a dashboard, a chart with a comparison keeps its granularity: [time
 granularity switchers][ref-time-granularity-period-comparisons] don't change it.
 
+You can also ask the agent for a comparison in chat, e.g., *"Revenue by month
+compared with the previous year"*. The answer has the same derived columns,
+values, titles, and formats as a report in a workbook. In the comparison
+period, a bucket with no rows reads `0` for additive measures, such as sums
+and counts, and is empty for other measures. The [Chat API][ref-chat-api-sql]
+and the [MCP server][ref-mcp-period-comparisons] return these columns too.
+
 ## Inspecting queries
 
 Every query in the Semantic Query tab can be inspected as code. Open the SQL panel via the **SQL** button in the toolbar, next to the Results and Chart tabs, to see the query that the workbook generates, switch between representations, and copy it for use elsewhere.
@@ -595,6 +602,8 @@ behaves as intended.
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-access-control]: /docs/data-modeling/access-control
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-chat-api-sql]: /reference/embed-apis/chat-api#cubesqlapi
+[ref-mcp-period-comparisons]: /docs/integrations/mcp-server#period-comparisons
 [ref-time-granularity-period-comparisons]: /docs/explore-analyze/dashboards/widgets/controls#time-granularity-period-comparisons
 [ref-explore]: /docs/explore-analyze/explore
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
