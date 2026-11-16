@@ -9,7 +9,10 @@ import {
   VariableNode,
   ValueNode,
   GraphQLSchema,
+  DocumentNode,
+  parse,
 } from 'graphql';
+import { LRUCache } from 'lru-cache';
 
 import {
   objectType,
@@ -30,7 +33,6 @@ import {
   DateTimeResolver,
 } from 'graphql-scalars';
 
-import gql from 'graphql-tag';
 import { QueryType, MemberType } from './types/enums';
 
 const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
@@ -466,8 +468,39 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
   };
 }
 
-export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, variableValues: Record<string, any> = {}) {
-  const ast = gql(query);
+// A location-free AST takes about 45 bytes of heap per character of a typical query,
+// but up to about 157 for the densest one (`a{a}a{a}...`). Sizing by the worst case
+// keeps `maxSize` a real bound on retained heap.
+const PARSED_DOCUMENT_BYTES_PER_CHAR = 160;
+
+const parsedDocuments = new LRUCache<string, DocumentNode>({
+  max: 1000,
+  maxSize: 32 * 1024 * 1024,
+  maxEntrySize: 2 * 1024 * 1024,
+  sizeCalculation: (_document, query) => (query.length * PARSED_DOCUMENT_BYTES_PER_CHAR) || 1,
+  ttl: 60 * 60 * 1000,
+  updateAgeOnGet: true,
+});
+
+export function parseDocument(query: string): DocumentNode {
+  const cached = parsedDocuments.get(query);
+  if (cached) {
+    return cached;
+  }
+
+  const document = parse(query, { noLocation: true });
+  parsedDocuments.set(query, document);
+
+  return document;
+}
+
+export function getJsonQueryFromGraphQLQuery(
+  query: string | readonly string[],
+  metaConfig: any,
+  variableValues: Record<string, any> = {}
+) {
+  // `graphql-tag`, which parsed this before, also took the query wrapped in an array.
+  const ast = parseDocument(typeof query === 'string' ? query : query[0]);
 
   const operation: any = ast.definitions.find(
     ({ kind }) => kind === 'OperationDefinition'
