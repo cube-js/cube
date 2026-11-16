@@ -1,3 +1,7 @@
+DROP TABLE IF EXISTS sq_purchases CASCADE;
+DROP TABLE IF EXISTS sq_users CASCADE;
+DROP TABLE IF EXISTS sq_regions CASCADE;
+DROP TABLE IF EXISTS sq_channels CASCADE;
 DROP TABLE IF EXISTS sq_hub CASCADE;
 DROP TABLE IF EXISTS sq_spoke CASCADE;
 DROP TABLE IF EXISTS sq_tag CASCADE;
@@ -74,3 +78,42 @@ INSERT INTO sq_hub (id, spoke_id, tag_id, kind, amount) VALUES
     (1, 1, 1, 'k1', 10),
     (2, 1, 2, 'k1', 100),
     (3, 2, 1, 'k2', 5);
+
+CREATE TABLE sq_regions (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE sq_channels (
+    id INTEGER PRIMARY KEY,
+    code INTEGER NOT NULL
+);
+
+CREATE TABLE sq_users (
+    id INTEGER PRIMARY KEY,
+    region_id INTEGER NOT NULL
+);
+
+CREATE TABLE sq_purchases (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    region_id INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL
+);
+
+INSERT INTO sq_regions (id, name) VALUES
+    (1, 'a'),
+    (2, 'b');
+
+INSERT INTO sq_channels (id, code) VALUES
+    (1, 1),
+    (2, 2);
+
+INSERT INTO sq_users (id, region_id) VALUES
+    (1, 2),
+    (2, 1);
+
+INSERT INTO sq_purchases (id, user_id, region_id, channel_id) VALUES
+    (1, 1, 2, 1),
+    (2, 1, 2, 2),
+    (3, 2, 1, 2);

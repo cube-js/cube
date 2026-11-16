@@ -191,3 +191,37 @@ async fn test_filter_joined_through_measure_cube_propagates() {
     )
     .await;
 }
+
+// `Purchases → Regions` reads `Users.purchases_count`, but the sub-query's own
+// join is rooted at `Users` and reaches `Regions` directly, so the filter group
+// still reaches the sub-query and counts only matching purchases.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_kept_when_sub_query_join_avoids_cyclic_edge() {
+    let query = indoc! {r#"
+        dimensions:
+          - Users.id
+          - Users.purchases_count
+        filters:
+          - or:
+              - member: Regions.name
+                operator: equals
+                values:
+                  - a
+              - member: Channels.code
+                operator: equals
+                values:
+                  - "1"
+        order:
+          - id: Users.id
+    "#};
+
+    assert_matches_oracle(
+        query,
+        "SELECT u.id, count(p.id) FROM sq_users u \
+         JOIN sq_regions r ON r.id = u.region_id \
+         LEFT JOIN sq_purchases p ON p.user_id = u.id \
+         LEFT JOIN sq_channels c ON c.id = p.channel_id \
+         WHERE r.name = 'a' OR c.code = 1 GROUP BY 1 ORDER BY 1",
+    )
+    .await;
+}

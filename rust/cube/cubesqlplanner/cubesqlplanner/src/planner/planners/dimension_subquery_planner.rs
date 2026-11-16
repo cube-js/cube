@@ -1,12 +1,10 @@
-use super::{CommonUtils, JoinTreeBuilder, QueryPlanner};
+use super::{CommonUtils, QueryPlanner};
 use crate::logical_plan::{DimensionInput, LogicalSchema};
-use crate::planner::collectors::{
-    collect_cube_names, collect_join_hints, collect_sub_query_dimensions,
-};
+use crate::planner::collectors::{collect_cube_names, collect_sub_query_dimensions};
 use crate::planner::filter::FilterItem;
 use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::state::State;
-use crate::planner::{CubeId, QueryProperties};
+use crate::planner::{CubeId, JoinTree, QueryAnalysis, QueryProperties};
 use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol, MemberSymbol};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
@@ -77,25 +75,50 @@ impl DimensionSubqueryPlanner {
         )?;
         let measure = MemberSymbol::new_member_expression(member_expression_symbol);
 
-        let (dimensions_filters, time_dimensions_filters) =
-            if dimension_symbol.propagate_filters_to_sub_query() {
-                self.propagated_filters(&subquery_dimension, &measure, &primary_keys_dimensions)?
-            } else {
-                (vec![], vec![])
-            };
+        let (mut dimensions_filters, mut time_dimensions_filters) = if dimension_symbol
+            .propagate_filters_to_sub_query()
+        {
+            (
+                self.filters_without_subqueries(self.query_properties.dimensions_filters())?,
+                self.filters_without_subqueries(self.query_properties.time_dimensions_filters())?,
+            )
+        } else {
+            (vec![], vec![])
+        };
 
-        let sub_query_properties = QueryProperties::builder()
-            .query_tools(self.query_tools.clone())
-            .measures(vec![measure])
-            .dimensions(primary_keys_dimensions.clone())
-            .time_dimensions_filters(time_dimensions_filters)
-            .dimensions_filters(dimensions_filters)
-            // Aggregated per primary key and joined back by it — order is
-            // meaningless and a default one breaks targets that require
-            // OFFSET/FETCH (e.g. MSSQL) when this subquery sits in a derived table.
-            .order_by(vec![])
-            .ignore_cumulative(true)
-            .build()?;
+        // Drop filters the sub-query reaches only through a join that reads this
+        // very dimension: planning them would plan this sub-query again.
+        let sub_query_properties = loop {
+            let properties = QueryProperties::builder()
+                .query_tools(self.query_tools.clone())
+                .measures(vec![measure.clone()])
+                .dimensions(primary_keys_dimensions.clone())
+                .time_dimensions_filters(time_dimensions_filters.clone())
+                .dimensions_filters(dimensions_filters.clone())
+                // Aggregated per primary key and joined back by it — order is
+                // meaningless and a default one breaks targets that require
+                // OFFSET/FETCH (e.g. MSSQL) when this subquery sits in a derived table.
+                .order_by(vec![])
+                .ignore_cumulative(true)
+                .build()?;
+            let count = dimensions_filters.len() + time_dimensions_filters.len();
+            if count == 0 {
+                break properties;
+            }
+            // A sub-query without a single join of its own (e.g. over a
+            // multi-stage measure) has no join edge to check.
+            let cyclic_cubes = match QueryAnalysis::try_new(properties.clone())?.simple_query_join()
+            {
+                Ok(Some(join)) => Self::cubes_joined_through(&subquery_dimension, &join)?,
+                _ => HashSet::new(),
+            };
+            dimensions_filters = Self::filters_outside(dimensions_filters, &cyclic_cubes)?;
+            time_dimensions_filters =
+                Self::filters_outside(time_dimensions_filters, &cyclic_cubes)?;
+            if dimensions_filters.len() + time_dimensions_filters.len() == count {
+                break properties;
+            }
+        };
         let query_planner = QueryPlanner::new(sub_query_properties, self.query_tools.clone());
         let sub_query = query_planner.plan(scope)?;
 
@@ -108,41 +131,6 @@ impl DimensionSubqueryPlanner {
             subquery: scope.add_inline(name, sub_query, schema)?,
             keys: primary_keys_dimensions,
         })
-    }
-
-    // Filters the sub-query can evaluate: none reads a sub-query dimension, and
-    // none needs a join whose condition reads this very dimension.
-    fn propagated_filters(
-        &self,
-        subquery_dimension: &Rc<MemberSymbol>,
-        measure: &Rc<MemberSymbol>,
-        primary_keys: &[Rc<MemberSymbol>],
-    ) -> Result<(Vec<FilterItem>, Vec<FilterItem>), CubeError> {
-        let mut dimensions_filters =
-            self.filters_without_subqueries(self.query_properties.dimensions_filters())?;
-        let mut time_dimensions_filters =
-            self.filters_without_subqueries(self.query_properties.time_dimensions_filters())?;
-        loop {
-            let cyclic_cubes = self.cubes_joined_through(
-                subquery_dimension,
-                measure,
-                primary_keys,
-                dimensions_filters
-                    .iter()
-                    .chain(time_dimensions_filters.iter()),
-            )?;
-            if cyclic_cubes.is_empty() {
-                break;
-            }
-            let count = dimensions_filters.len() + time_dimensions_filters.len();
-            dimensions_filters = Self::filters_outside(dimensions_filters, &cyclic_cubes)?;
-            time_dimensions_filters =
-                Self::filters_outside(time_dimensions_filters, &cyclic_cubes)?;
-            if dimensions_filters.len() + time_dimensions_filters.len() == count {
-                break;
-            }
-        }
-        Ok((dimensions_filters, time_dimensions_filters))
     }
 
     fn filters_without_subqueries(
@@ -181,26 +169,12 @@ impl DimensionSubqueryPlanner {
         Ok(result)
     }
 
-    // Cubes the sub-query's join reaches only through an edge whose condition
-    // reads `subquery_dimension`.
-    fn cubes_joined_through<'a>(
-        &self,
+    // Cubes `join` reaches only through an edge whose condition reads
+    // `subquery_dimension`.
+    fn cubes_joined_through(
         subquery_dimension: &Rc<MemberSymbol>,
-        measure: &Rc<MemberSymbol>,
-        primary_keys: &[Rc<MemberSymbol>],
-        filters: impl Iterator<Item = &'a FilterItem>,
+        join: &JoinTree,
     ) -> Result<HashSet<CubeId>, CubeError> {
-        let mut hints = collect_join_hints(measure)?;
-        for key in primary_keys {
-            hints.extend(&collect_join_hints(key)?);
-        }
-        for item in filters {
-            for member in Self::filter_members(item) {
-                hints.extend(&collect_join_hints(&member)?);
-            }
-        }
-        let (_, join) = JoinTreeBuilder::new(self.query_tools.clone()).build_for_hints(&hints)?;
-
         let mut cubes = HashSet::new();
         for item in join.joins() {
             for dep in item.on_sql().get_dependencies() {

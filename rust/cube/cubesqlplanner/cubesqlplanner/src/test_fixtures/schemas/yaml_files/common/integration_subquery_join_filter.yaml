@@ -108,3 +108,66 @@ cubes:
           - name: name
             type: string
             sql: name
+
+    - name: Users
+      sql: "SELECT * FROM sq_users"
+      joins:
+          - name: Purchases
+            relationship: one_to_many
+            sql: "{Users}.id = {Purchases}.user_id"
+          - name: Regions
+            relationship: many_to_one
+            sql: "{Users}.region_id = {Regions}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: purchases_count
+            type: number
+            sql: "{Purchases.count}"
+            sub_query: true
+            propagate_filters_to_sub_query: true
+
+    - name: Purchases
+      sql: "SELECT * FROM sq_purchases"
+      joins:
+          - name: Users
+            relationship: many_to_one
+            sql: "{Purchases}.user_id = {Users}.id"
+          - name: Regions
+            relationship: many_to_one
+            sql: "{Purchases}.region_id = {Regions}.id AND {Users.purchases_count} IS NOT NULL"
+          - name: Channels
+            relationship: many_to_one
+            sql: "{Purchases}.channel_id = {Channels}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: count
+            type: count
+
+    - name: Regions
+      sql: "SELECT * FROM sq_regions"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+
+    - name: Channels
+      sql: "SELECT * FROM sq_channels"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: code
+            type: number
+            sql: code
