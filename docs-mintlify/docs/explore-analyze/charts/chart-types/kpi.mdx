@@ -29,6 +29,7 @@ Displays a single value from your query result.
 | **Row** | Which row of the result to read from |
 | **Format** | Number formatting (currency, percent, etc.) |
 | **Font size / color** | Text appearance |
+| **Background** | Background color for the block |
 | **Alignment** | Left, center, or right |
 
 {/* TODO screenshot: Number block (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
@@ -42,7 +43,7 @@ Displays a current value alongside a previous value with a calculated difference
 | **Current field / row** | The primary value |
 | **Previous field / row** | The value to compare against — can be a different column or a different row from the same column |
 | **Difference format** | Absolute, percentage, or both |
-| **Positive color / Negative color** | Colors applied based on whether the change is positive or negative |
+| **Positive / negative / neutral color** | Colors applied based on whether the change is positive, negative, or unchanged |
 
 To compare to a static goal, add a column to your query that always returns the same number (e.g. a calculated field with a constant), then select it as the **Previous** field.
 
@@ -58,6 +59,8 @@ Shows a value relative to a target as a progress bar or circle. Useful for goal 
 | **Target field / row** | The goal or maximum value |
 | **Style** | Bar or circle |
 | **Color** | Fill color for the progress indicator |
+| **Format** | Number formatting for the displayed value |
+| **Background** | Background color for the block |
 
 <Tip>
 To compare against a static number like a quarterly goal, add a calculated field that always returns that number and use it as the **Target** field.
@@ -77,6 +80,8 @@ Renders a compact trend chart — either a bar or line — within the KPI tile. 
 | **Height / Width** | Dimensions of the sparkline in the tile |
 | **Max points** | Limits the number of data points rendered |
 | **Colors** | Line/fill colors |
+| **Format** | Number formatting for the displayed value |
+| **Background** | Background color for the block |
 
 {/* TODO screenshot: Sparkline block showing a trend line (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -90,7 +95,7 @@ Use text blocks for short labels and headings inside the KPI. For complex layout
 
 ### HTML
 
-A free-form HTML block rendered inside the KPI tile. Use this for advanced custom layouts that go beyond what the other block types support.
+A free-form HTML block rendered inside the KPI tile. Use this for advanced custom layouts that go beyond what the other block types support. Like the other block types, it accepts a background color.
 
 {/* TODO screenshot: HTML block with custom content (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
