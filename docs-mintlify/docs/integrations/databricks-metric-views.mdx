@@ -122,9 +122,9 @@ The same API supports [starting a publication run](/api-reference/databricks-met
 and [cancelling a run](/api-reference/databricks-metric-view-integration/cancel-a-databricks-metric-view-publication-run).
 Contact [Cube support](/admin/account-billing/support) for help with access.
 
-When saving settings through the API, `deletionPolicy` is `retain`, the default and what an
-omitted value saves, or `delete-managed`, which drops obsolete Metric Views as
-[Removed views](#removed-views) describes.
+When saving settings through the API, `deletionPolicy` is `retain`, the default, or
+`delete-managed`, which drops obsolete Metric Views as [Removed views](#removed-views) describes.
+A save that omits it stores `retain`, even when `delete-managed` was stored before.
 
 ## Data sources served by `driver_factory` {#data-sources-served-by-driver_factory}
 
@@ -261,7 +261,7 @@ The expected-build check runs **after** publication starts; a mismatch cannot pr
 write. `viewNames` lists planned views; `retained_obsolete` means an obsolete target was left in
 place, and `deleted_obsolete` that Cube dropped it. A `retained_obsolete` target with a `detail` is
 a drop that was held or failed, so the recipe rejects it. A hold that repeats keeps CI failing
-until you clear it: for `deletion-cap-exceeded`, restore views or revert the prefix change as
+until you clear it: for `deletion-cap-exceeded`, restore views or revert the target-name change as
 [Removed views](#removed-views) describes; drop a `precondition-failed` Metric View in Databricks
 yourself; or switch **When a view leaves the scope** to **Keep its Metric View in Databricks**,
 which reports obsolete targets without a `detail`. Publication-run `views[].outcome` values are
@@ -356,8 +356,8 @@ sensitive source data.
 ### Removed views
 
 A Metric View becomes obsolete when its view leaves the scope (you remove the view from the data
-model, rename it, or deselect it) or the view's target name changes (a target-name override or
-prefix change). By default an obsolete Metric View stays in Databricks, and run history labels it
+model, rename it, deselect it, or edit the pattern so it no longer matches) or the view's target
+name changes (a target-name override or prefix change). By default an obsolete Metric View stays in Databricks, and run history labels it
 **Obsolete, kept**. To have syncs drop obsolete Metric Views, choose **Delete the Metric View Cube
 created** under **When a view leaves the scope**, or save `deletionPolicy: delete-managed` through
 the API. The next sync drops each one and labels it **Obsolete, deleted**. A dropped Metric View
