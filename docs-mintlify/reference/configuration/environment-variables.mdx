@@ -2386,6 +2386,18 @@ The port for Cube Store to listen to HTTP connections on. Ignored when
 | ------------------- | ---------------------- | --------------------- |
 | A valid port number | `3030`                 | `3030`                |
 
+## `CUBESTORE_IMPORT_INDEX_MEMORY_BUDGET`
+
+The memory that a Cube Store process may spend at once on building index chunks
+during data insertion. Each index of an inserted batch gets a share of the budget
+sized by the batch's data and column count; the rest wait. This bounds the memory of
+inserts into tables with many indexes or many columns, at the cost of building fewer
+indexes in parallel. `0` disables the budget.
+
+| Possible Values                     | Default in Development                                | Default in Production                                 |
+| ----------------------------------- | ----------------------------------------------------- | ----------------------------------------------------- |
+| A size in bytes, e.g., `512MB`, `2GB` | A quarter of the container memory limit, else `1GB` | A quarter of the container memory limit, else `1GB` |
+
 ## `CUBESTORE_JOB_RUNNERS`
 
 The number of parallel tasks that process non-interactive jobs like data

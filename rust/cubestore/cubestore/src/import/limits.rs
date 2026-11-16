@@ -42,10 +42,8 @@ impl ConcurrencyLimits {
 
 const MIB: usize = 1024 * 1024;
 
-/// Node-wide memory budget that bounds how many index pipelines build chunks at once during
-/// import. Each pipeline acquires permits proportional to its estimated working memory; when the
-/// budget is exhausted further pipelines wait, so large chunks serialize while small ones still
-/// run in parallel. Permits are counted in MiB to stay within the `u32` semaphore range.
+/// Node-wide memory budget for index builds during import; each build acquires permits for its
+/// estimated working memory. Permits are MiB so the total fits the `u32` semaphore range.
 #[derive(Clone)]
 pub struct IndexMemoryBudget {
     // `None` when the budget is disabled.

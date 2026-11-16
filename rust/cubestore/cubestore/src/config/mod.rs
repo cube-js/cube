@@ -1617,14 +1617,9 @@ where
     n
 }
 
-// Index builds share the ingestion process with the frames being imported, so they get half of
-// its limit. Otherwise a quarter of the container limit: the budget is one per process, shared by
-// every job runner in it.
+// A quarter of the container limit: the budget is one per process, shared by every job runner in
+// it, next to the frames being imported and everything else the process does.
 fn default_import_index_memory_budget() -> usize {
-    let ingestion_limit = env_parse_size_lenient("CUBESTORE_INGESTION_WORKER_MEMORY_LIMIT", 0);
-    if ingestion_limit > 0 {
-        return ingestion_limit / 2;
-    }
     crate::util::memory::cgroup_memory_limit()
         .map(|limit| (limit / 4) as usize)
         .unwrap_or(1024 * 1024 * 1024)
