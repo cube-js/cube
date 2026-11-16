@@ -307,3 +307,31 @@ cubes:
           - name: name
             type: string
             sql: name
+
+    - name: SelfJoined
+      sql: "SELECT * FROM sq_orders"
+      joins:
+          - name: SelfJoinedTarget
+            relationship: one_to_many
+            sql: "{SelfJoined}.id = {SelfJoinedTarget}.id AND {SelfJoined.total} IS NOT NULL"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: total
+            type: number
+            sql: "{SelfJoinedTarget.amount_sum}"
+            sub_query: true
+
+    - name: SelfJoinedTarget
+      sql: "SELECT * FROM sq_orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: amount_sum
+            type: sum
+            sql: amount

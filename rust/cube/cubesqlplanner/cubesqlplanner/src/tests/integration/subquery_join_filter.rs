@@ -333,3 +333,21 @@ async fn test_sub_query_dimension_reentered_with_other_filters_keeps_them() {
     )
     .await;
 }
+
+// `SelfJoined.total` reads a measure joined in only on `total` itself, so its
+// sub-query needs it with no filters at all: a clear error, not a stack overflow.
+#[test]
+fn test_sub_query_dimension_needing_itself_is_a_user_error() {
+    let query = indoc! {r#"
+        dimensions:
+          - SelfJoined.id
+          - SelfJoined.total
+    "#};
+
+    let error = create_context().build_sql(query).unwrap_err();
+    assert!(
+        error.message.contains("can't be computed"),
+        "Unexpected error: {}",
+        error.message
+    );
+}

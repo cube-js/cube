@@ -136,10 +136,9 @@ impl PlanningScope {
         self.subquery_state = checkpoint.0;
     }
 
-    /// Runs `plan` as the planning of the `sub_query` dimension `id` under
-    /// `filters`, a key of the filters its sub-query gets. Planning the same
-    /// pair again inside `plan` can only repeat forever, so that inner attempt
-    /// fails instead; the returned flag tells whether that happened.
+    /// Runs `plan` as the planning of `sub_query` dimension `id` with the
+    /// filters keyed by `filters`. The same pair planned again inside `plan`
+    /// would repeat forever, so it fails; the flag tells whether it did.
     pub fn with_sub_query_dimension<T>(
         &mut self,
         id: &MemberId,
