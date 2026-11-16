@@ -194,7 +194,7 @@ export class CubeGraphQLConverter {
 
     const groupedFilters: any[] = plainFilters.concat(booleanFilters);
 
-    return groupedFilters.map((item) => {
+    return groupedFilters.flatMap((item) => {
       if (item.kind !== FilterKind.PLAIN) {
         if (parent) {
           return this.objectValue([
@@ -221,7 +221,7 @@ export class CubeGraphQLConverter {
 
         return this.objectFieldFilter(item.filters, unCapitalize(item.cubeName));
       } else {
-        return this.objectField(
+        const cubeField = this.objectField(
           this.booleanFilter(
             parent?.kind || 'AND',
             item.filters.map((f: any) => {
@@ -234,6 +234,9 @@ export class CubeGraphQLConverter {
           ),
           unCapitalize(item.cubeName)
         );
+
+        // Inside AND/OR every list item must be an object, like the branches above
+        return parent ? this.objectValue(cubeField) : cubeField;
       }
     });
   }
@@ -301,7 +304,7 @@ export class CubeGraphQLConverter {
         kind: t.Kind.LIST,
         values: f.values.map((v: any) => ({
           kind,
-          value: v,
+          value: String(v),
         })),
       };
     };
@@ -492,7 +495,7 @@ export class CubeGraphQLConverter {
           },
           value: {
             kind: <typeof t.Kind.STRING | typeof t.Kind.INT>kind,
-            value: this.cubeQuery[key],
+            value: String(this.cubeQuery[key]),
           },
         });
       }

@@ -108,7 +108,7 @@ exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Or
 exports[`Cube GraphQL converter > {"measures":["Orders.count"],"dimensions":["Orders.status"],"filters":[{"member":"Orders.status","operator":"equals","values":["canceled","active"]},{"or":[{"member":"Users.country","operator":"notSet"},{"member":"Users.country","operator":"equals","values":["US"]}]}]} 1`] = `
 "query CubeQuery {
   cube(
-    where: {orders: {status: {in: ["canceled", "active"]}}, OR: [users: {OR: [{country: {set: false}}, {country: {equals: "US"}}]}]}
+    where: {orders: {status: {in: ["canceled", "active"]}}, OR: [{users: {OR: [{country: {set: false}}, {country: {equals: "US"}}]}}]}
   ) {
     orders {
       count
