@@ -52,30 +52,62 @@ describe('OrchestratorApi', () => {
 
     // A driver test that never settles (BigQuery's getDatasets() has no timeout) used to
     // hang /livez, and with it every probe queued behind cachedHandler's lock.
-    test('rejects after the driver\'s testConnectionTimeout when the test never settles', async () => {
+    // BaseDriver's 10 s default is raised to 45 s so slow warehouses aren't reported DOWN.
+    test('rejects after 45 s, not BaseDriver\'s 10 s, when the test never settles', async () => {
+      jest.useFakeTimers();
       const api = makeApi();
-      const driver = fakeDriver(() => new Promise<void>(() => undefined), 50);
+      const driver = fakeDriver(() => new Promise<void>(() => undefined), 10000);
 
-      const error = await api.testDriverConnection(async () => driver, DriverType.Internal, 'bq')
-        .catch((e) => e);
+      let settled = false;
+      const result = api.testDriverConnection(async () => driver, DriverType.Internal, 'bq')
+        .catch((e) => e)
+        .finally(() => {
+          settled = true;
+        });
+
+      await jest.advanceTimersByTimeAsync(44999);
+      expect(settled).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(1);
+      const error = await result;
 
       expect(error).toBeInstanceOf(Error);
-      expect(error.message).toBe('Connection test for data source \'bq\' timed out after 50ms');
+      expect(error.message).toBe('Connection test for data source \'bq\' timed out after 45000ms');
       expect(error.driverType).toBe(DriverType.Internal);
       expect((api as any).logger).not.toHaveBeenCalled();
     });
 
-    test('falls back to 10 s for a driver without testConnectionTimeout', async () => {
+    test('uses 45 s for a driver without testConnectionTimeout', async () => {
       jest.useFakeTimers();
       const api = makeApi();
       const driver = fakeDriver(() => new Promise<void>(() => undefined));
 
       const result = api.testDriverConnection(async () => driver, DriverType.External).catch((e) => e);
-      await jest.advanceTimersByTimeAsync(10000);
+      await jest.advanceTimersByTimeAsync(45000);
 
       const error = await result;
-      expect(error.message).toBe('Connection test for data source \'default\' timed out after 10000ms');
+      expect(error.message).toBe('Connection test for data source \'default\' timed out after 45000ms');
       expect(error.driverType).toBe(DriverType.External);
+    });
+
+    test('keeps a driver\'s own timeout when it is longer than 45 s', async () => {
+      jest.useFakeTimers();
+      const api = makeApi();
+      const driver = fakeDriver(() => new Promise<void>(() => undefined), 60000);
+
+      let settled = false;
+      const result = api.testDriverConnection(async () => driver, DriverType.Internal, 'jdbc')
+        .catch((e) => e)
+        .finally(() => {
+          settled = true;
+        });
+
+      await jest.advanceTimersByTimeAsync(45000);
+      expect(settled).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(15000);
+      const error = await result;
+      expect(error.message).toBe('Connection test for data source \'jdbc\' timed out after 60000ms');
     });
 
     test('passes the driver\'s own error through', async () => {
