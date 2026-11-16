@@ -1,6 +1,7 @@
 use crate::CubeError;
 use regex::Regex;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 use url::{Host, Url};
 
 /// Restricts the hosts `http(s)://` import locations may point to, modeled on ClickHouse's
@@ -8,14 +9,31 @@ use url::{Host, Url};
 /// matches that port only. `*` stands for one domain label, so `*.example.com` matches
 /// `a.example.com` but neither `a.b.example.com` nor `example.com`. A CIDR entry such as
 /// `10.0.0.0/8` matches IP literals in that subnet on any port; hostnames are not resolved.
-/// With no entries every host is allowed, so existing deployments keep working.
-#[derive(Debug, Clone, Default)]
+/// A lone `*` allows every host and is the default, so existing deployments keep working;
+/// with no entries at all no host is allowed, like an empty `remote_url_allow_hosts`.
+///
+/// With `deny_private_ips` loopback, private, link-local and other non-public addresses are
+/// refused unless a subnet or IP entry covers them. Hostnames are checked after resolution,
+/// and the HTTP client connects only to the addresses that passed, so DNS rebinding cannot
+/// swap them in between.
+#[derive(Debug, Clone)]
 pub struct LocationHostFilter {
     patterns: Vec<HostPattern>,
+    deny_private_ips: bool,
+}
+
+impl Default for LocationHostFilter {
+    fn default() -> Self {
+        Self {
+            patterns: vec![HostPattern::Any],
+            deny_private_ips: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 enum HostPattern {
+    Any,
     Exact(String),
     Wildcard(Regex),
     Subnet(IpSubnet),
@@ -24,6 +42,7 @@ enum HostPattern {
 impl HostPattern {
     fn matches(&self, candidate: &str) -> bool {
         match self {
+            HostPattern::Any => true,
             HostPattern::Exact(host) => host == candidate,
             HostPattern::Wildcard(regex) => regex.is_match(candidate),
             HostPattern::Subnet(_) => false,
@@ -79,13 +98,62 @@ impl IpSubnet {
     }
 }
 
+/// Addresses that are not publicly routable: loopback, RFC 1918, CGNAT, link-local (cloud
+/// metadata endpoints), benchmarking, multicast, reserved, unique local IPv6.
+fn is_non_public_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => is_non_public_ipv4(ip),
+        IpAddr::V6(ip) => {
+            if let Some(v4) = ip.to_ipv4_mapped() {
+                return is_non_public_ipv4(v4);
+            }
+            let segments = ip.segments();
+            // NAT64 (64:ff9b::/96) reaches the embedded IPv4 address.
+            if segments[..6] == [0x64, 0xff9b, 0, 0, 0, 0] {
+                let [.., hi, lo] = segments;
+                return is_non_public_ipv4(Ipv4Addr::from(((hi as u32) << 16) | lo as u32));
+            }
+            ip.is_unspecified()
+                || ip.is_loopback()
+                || ip.is_multicast()
+                // fc00::/7 unique local, fe80::/10 link-local.
+                || (segments[0] & 0xfe00) == 0xfc00
+                || (segments[0] & 0xffc0) == 0xfe80
+                // ::/96 deprecated IPv4-compatible addresses.
+                || ip.octets()[..12] == [0u8; 12]
+        }
+    }
+}
+
+fn is_non_public_ipv4(ip: Ipv4Addr) -> bool {
+    let [a, b, c, _] = ip.octets();
+    ip.is_unspecified()
+        || a == 0
+        || ip.is_loopback()
+        || ip.is_private()
+        || ip.is_link_local()
+        || ip.is_multicast()
+        || ip.is_broadcast()
+        // 100.64.0.0/10 carrier-grade NAT.
+        || (a == 100 && (b & 0xc0) == 64)
+        // 192.0.0.0/24 IETF protocol assignments.
+        || (a == 192 && b == 0 && c == 0)
+        // 198.18.0.0/15 benchmarking.
+        || (a == 198 && (b & 0xfe) == 18)
+        // 240.0.0.0/4 reserved.
+        || a >= 240
+}
+
 impl LocationHostFilter {
-    pub fn new(entries: &[String]) -> Result<Self, CubeError> {
+    pub fn new(entries: &[String], deny_private_ips: bool) -> Result<Self, CubeError> {
         let patterns = entries
             .iter()
             .map(|e| Self::parse_entry(e))
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Self { patterns })
+        Ok(Self {
+            patterns,
+            deny_private_ips,
+        })
     }
 
     /// Validates one allowlist entry, e.g. `files.example.com`, `*.example.com:8443`, `10.0.0.0/8`.
@@ -109,6 +177,9 @@ impl LocationHostFilter {
                 entry
             )));
         }
+        if entry == "*" {
+            return Ok(HostPattern::Any);
+        }
         if !entry.contains('*') {
             return Ok(HostPattern::Exact(entry));
         }
@@ -124,17 +195,62 @@ impl LocationHostFilter {
     }
 
     pub fn is_unrestricted(&self) -> bool {
-        self.patterns.is_empty()
+        !self.deny_private_ips && self.allows_any_host()
+    }
+
+    fn allows_any_host(&self) -> bool {
+        self.patterns.iter().any(|p| matches!(p, HostPattern::Any))
+    }
+
+    /// Whether the connection may go to `ip`, whichever host name led there.
+    pub fn is_ip_permitted(&self, ip: IpAddr) -> bool {
+        !self.deny_private_ips || !is_non_public_ip(ip) || self.ip_is_listed(ip)
+    }
+
+    /// Covered by a subnet entry, or by an exact entry that is this IP (on any port).
+    fn ip_is_listed(&self, ip: IpAddr) -> bool {
+        let ip = Self::unmap(ip);
+        self.patterns.iter().any(|p| match p {
+            HostPattern::Subnet(subnet) => subnet.contains(ip),
+            HostPattern::Exact(entry) => Self::entry_ip(entry) == Some(ip),
+            HostPattern::Wildcard(_) | HostPattern::Any => false,
+        })
+    }
+
+    fn entry_ip(entry: &str) -> Option<IpAddr> {
+        if let Ok(ip) = entry.trim_start_matches('[').trim_end_matches(']').parse() {
+            return Some(Self::unmap(ip));
+        }
+        let (host, port) = entry.rsplit_once(':')?;
+        port.parse::<u16>().ok()?;
+        host.trim_start_matches('[')
+            .trim_end_matches(']')
+            .parse()
+            .ok()
+            .map(Self::unmap)
+    }
+
+    fn unmap(ip: IpAddr) -> IpAddr {
+        match ip {
+            IpAddr::V6(v6) => v6.to_ipv4_mapped().map(IpAddr::V4).unwrap_or(ip),
+            v4 => v4,
+        }
     }
 
     pub fn is_allowed(&self, url: &Url) -> bool {
-        if self.is_unrestricted() {
+        let ip = Self::ip_of(url);
+        if let Some(ip) = ip {
+            if !self.is_ip_permitted(ip) {
+                return false;
+            }
+        }
+        if self.allows_any_host() {
             return true;
         }
         let Some(host) = url.host_str() else {
             return false;
         };
-        if let Some(ip) = Self::ip_of(url) {
+        if let Some(ip) = ip {
             if self.patterns.iter().any(|p| match p {
                 HostPattern::Subnet(subnet) => subnet.contains(ip),
                 _ => false,
@@ -171,6 +287,14 @@ impl LocationHostFilter {
                 location, e
             ))
         })?;
+        if let Some(ip) = Self::ip_of(&url) {
+            if !self.is_ip_permitted(ip) {
+                return Err(CubeError::user(format!(
+                    "Import location '{}' points to a non-public IP address, which CUBESTORE_LOCATION_DENY_PRIVATE_IPS forbids. Add its subnet to CUBESTORE_LOCATION_ALLOW_HOSTS to allow it.",
+                    location
+                )));
+            }
+        }
         if self.is_allowed(&url) {
             Ok(())
         } else {
@@ -200,7 +324,51 @@ impl LocationHostFilter {
                 }
             }));
         }
+        if self.deny_private_ips {
+            builder = builder
+                .dns_resolver(Arc::new(PermittedIpResolver {
+                    filter: self.clone(),
+                }))
+                // A proxy would resolve the host itself, out of the resolver's reach.
+                .no_proxy();
+        }
         Ok(builder.build()?)
+    }
+}
+
+/// Resolves host names and keeps only the addresses `LocationHostFilter` permits, so the
+/// connection is made to an address that was actually checked.
+struct PermittedIpResolver {
+    filter: LocationHostFilter,
+}
+
+impl reqwest::dns::Resolve for PermittedIpResolver {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let filter = self.filter.clone();
+        let host = name.as_str().to_string();
+        Box::pin(async move {
+            let resolved: Vec<SocketAddr> =
+                tokio::net::lookup_host((host.as_str(), 0)).await?.collect();
+            let permitted: Vec<SocketAddr> = resolved
+                .iter()
+                .copied()
+                .filter(|addr| filter.is_ip_permitted(addr.ip()))
+                .collect();
+            if permitted.is_empty() {
+                let denied = resolved
+                    .iter()
+                    .map(|a| a.ip().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                return Err(format!(
+                    "{} resolves only to non-public IP addresses ({}), which CUBESTORE_LOCATION_DENY_PRIVATE_IPS forbids",
+                    host, denied
+                )
+                .into());
+            }
+            let addrs: reqwest::dns::Addrs = Box::new(permitted.into_iter());
+            Ok(addrs)
+        })
     }
 }
 
@@ -209,14 +377,28 @@ mod tests {
     use super::LocationHostFilter;
 
     fn filter(entries: &[&str]) -> LocationHostFilter {
-        LocationHostFilter::new(&entries.iter().map(|s| s.to_string()).collect::<Vec<_>>()).unwrap()
+        LocationHostFilter::new(
+            &entries.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            false,
+        )
+        .unwrap()
     }
 
     #[test]
-    fn empty_filter_allows_everything() {
+    fn lone_star_allows_everything() {
+        for f in [filter(&["*"]), LocationHostFilter::default()] {
+            assert!(f.is_unrestricted());
+            assert!(f.check("http://127.0.0.1:8080/data.csv").is_ok());
+            assert!(f.check("https://a.b.anything.example/data.csv").is_ok());
+        }
+    }
+
+    #[test]
+    fn empty_list_allows_nothing() {
         let f = filter(&[]);
-        assert!(f.check("http://127.0.0.1:8080/data.csv").is_ok());
-        assert!(f.check("https://anything.example/data.csv").is_ok());
+        assert!(!f.is_unrestricted());
+        assert!(f.check("http://127.0.0.1:8080/data.csv").is_err());
+        assert!(f.check("https://anything.example/data.csv").is_err());
     }
 
     #[test]
@@ -330,6 +512,70 @@ mod tests {
         }
     }
 
+    fn deny_private(entries: &[&str]) -> LocationHostFilter {
+        LocationHostFilter::new(
+            &entries.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            true,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn deny_private_ips_rejects_non_public_literals() {
+        let f = deny_private(&["*"]);
+        assert!(f.check("https://example.com/a.csv").is_ok());
+        assert!(f.check("http://8.8.8.8/a.csv").is_ok());
+        assert!(f.check("http://[2606:4700::1111]/a.csv").is_ok());
+        for location in [
+            "http://127.0.0.1/a.csv",
+            "http://0.0.0.0/a.csv",
+            "http://10.1.2.3/a.csv",
+            "http://172.16.0.1/a.csv",
+            "http://192.168.0.1/a.csv",
+            "http://169.254.169.254/latest/meta-data",
+            "http://100.64.0.1/a.csv",
+            "http://198.18.0.1/a.csv",
+            "http://255.255.255.255/a.csv",
+            "http://0x7f000001/a.csv",
+            "http://[::1]/a.csv",
+            "http://[::]/a.csv",
+            "http://[fd00::1]/a.csv",
+            "http://[fe80::1]/a.csv",
+            "http://[::ffff:127.0.0.1]/a.csv",
+            "http://[::ffff:169.254.169.254]/a.csv",
+            "http://[64:ff9b::a9fe:a9fe]/a.csv",
+        ] {
+            let err = f.check(location).unwrap_err().message;
+            assert!(
+                err.contains("CUBESTORE_LOCATION_DENY_PRIVATE_IPS"),
+                "{}: {}",
+                location,
+                err
+            );
+        }
+    }
+
+    #[test]
+    fn deny_private_ips_keeps_listed_subnets_and_ips() {
+        let f = deny_private(&["10.0.0.0/8", "127.0.0.1:9000", "*.example.com"]);
+        assert!(f.check("http://10.1.2.3/a.csv").is_ok());
+        assert!(f.check("http://127.0.0.1:9000/a.csv").is_ok());
+        // The IP is listed, but only on port 9000.
+        assert!(f.check("http://127.0.0.1:9001/a.csv").is_err());
+        assert!(f.check("http://192.168.0.1/a.csv").is_err());
+        assert!(f.is_ip_permitted("10.0.0.5".parse().unwrap()));
+        assert!(f.is_ip_permitted("127.0.0.1".parse().unwrap()));
+        assert!(f.is_ip_permitted("::ffff:10.0.0.5".parse().unwrap()));
+        assert!(!f.is_ip_permitted("192.168.0.1".parse().unwrap()));
+        assert!(f.is_ip_permitted("93.184.215.14".parse().unwrap()));
+    }
+
+    #[test]
+    fn deny_private_ips_off_by_default() {
+        let f = filter(&["10.0.0.0/8"]);
+        assert!(f.is_ip_permitted("127.0.0.1".parse().unwrap()));
+    }
+
     #[test]
     fn ipv6_hosts_are_bracketed() {
         let f = filter(&["[::1]"]);
@@ -386,7 +632,7 @@ mod redirect_tests {
     #[tokio::test]
     async fn redirects_to_disallowed_hosts_are_refused() {
         let port = redirecting_server().await;
-        let filter = LocationHostFilter::new(&["127.0.0.1".to_string()]).unwrap();
+        let filter = LocationHostFilter::new(&["127.0.0.1".to_string()], false).unwrap();
         let err = filter
             .http_client()
             .unwrap()
@@ -395,5 +641,61 @@ mod redirect_tests {
             .await
             .unwrap_err();
         assert!(err.is_redirect(), "unexpected error: {}", err);
+    }
+}
+
+#[cfg(test)]
+mod resolver_tests {
+    use super::LocationHostFilter;
+
+    fn client(entries: &[&str]) -> reqwest::Client {
+        LocationHostFilter::new(
+            &entries.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            true,
+        )
+        .unwrap()
+        .http_client()
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn hostnames_resolving_to_private_ips_are_refused() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let err = client(&["*"])
+            .get(format!("http://localhost:{}/a.csv", port))
+            .send()
+            .await
+            .unwrap_err();
+        let message = format!("{:?}", err);
+        assert!(
+            message.contains("CUBESTORE_LOCATION_DENY_PRIVATE_IPS"),
+            "unexpected error: {}",
+            message
+        );
+    }
+
+    #[tokio::test]
+    async fn hostnames_resolving_to_listed_subnets_connect() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                let mut buf = [0u8; 1024];
+                let _ = socket.read(&mut buf).await;
+                let _ = socket
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
+                    )
+                    .await;
+            }
+        });
+        let res = client(&["127.0.0.0/8"])
+            .get(format!("http://localhost:{}/a.csv", port))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(res.text().await.unwrap(), "ok");
     }
 }

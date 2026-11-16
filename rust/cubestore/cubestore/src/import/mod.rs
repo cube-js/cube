@@ -1728,9 +1728,11 @@ mod location_validator_tests {
     }
 
     fn validator_with_hosts(hosts: &[&str]) -> Arc<LocationsValidatorImpl> {
-        let filter =
-            LocationHostFilter::new(&hosts.iter().map(|s| s.to_string()).collect::<Vec<_>>())
-                .unwrap();
+        let filter = LocationHostFilter::new(
+            &hosts.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            false,
+        )
+        .unwrap();
         LocationsValidatorImpl::new(false, filter).unwrap()
     }
 
