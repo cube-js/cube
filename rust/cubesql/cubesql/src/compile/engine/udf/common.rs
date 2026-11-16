@@ -2454,7 +2454,7 @@ fn generate_series_nth_i64(start: i64, step: i64, n: i64) -> Option<i64> {
 }
 
 /// The `n`-th element of the series. Computed from `start` instead of accumulating `step`, so
-/// rounding does not drift and a `step` too small to change `current` cannot stall the series.
+/// rounding does not drift.
 fn generate_series_nth_f64(start: f64, step: f64, n: i64) -> Option<f64> {
     Some(start + (n as f64) * step)
 }
@@ -2493,13 +2493,16 @@ macro_rules! generate_series_udtf {
                         if current > end {
                             break;
                         }
-                        // A float step below the precision of `current` rounds several `n` to
-                        // the same value; the series must stay strictly increasing.
-                        if last.map_or(true, |last| current > last) {
-                            builder.append_value(current);
-                            section_size += 1;
-                            last = Some(current);
+                        // A float step below the precision of `current` rounds to the previous
+                        // value: the series would repeat it, or never reach `end`.
+                        if last.is_some_and(|last| current <= last) {
+                            return Err(DataFusionError::Execution(
+                                "step size too small to advance the series".to_string(),
+                            ));
                         }
+                        builder.append_value(current);
+                        section_size += 1;
+                        last = Some(current);
                         n += 1;
                     }
                 }
