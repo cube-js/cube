@@ -105,8 +105,8 @@ Scope rules:
   the request; narrow the scope and try again.
 - A newly deployed view enters an **all** or matching **pattern** scope on the next manual sync.
   A **selected** scope changes only when you edit it.
-- Renaming a view or target creates a new target. The old one is kept, or dropped when the data
-  source drops removed views (see [Removed views](#removed-views)).
+- Renaming a view or target creates a new target. The old one is kept, or dropped under
+  **Delete the Metric View Cube created** (see [Removed views](#removed-views)).
 - Per-view target-name and root-source overrides are available through the configuration API,
   but are not editable in the card.
 
@@ -160,10 +160,10 @@ Omit it to keep the stored credential, or pass `null` to remove it.
 
 Run publication from CI after a successful Cube deployment. First, configure **All views**, a
 dedicated target catalog and schema, and publication enabled in **Settings → Data
-Sources**. Under **Delete the Metric View Cube created**, each CI run also drops the Metric Views
-of views the deployment removed or renamed (see [Removed views](#removed-views)). Run **Preview**
-and **Test access** before the first write. CI uses these saved settings; the API call does not
-override the scope or destination.
+Sources**. With **When a view leaves the scope** set to **Delete the Metric View Cube created**,
+each CI run also drops the Metric Views of views the deployment removed or renamed (see
+[Removed views](#removed-views)). Run **Preview** and **Test access** before the first write. CI
+uses these saved settings; the API call does not override the scope or destination.
 
 Store a [Platform API key](/api-reference/authentication) with deployment `SchemaUpdate` access as
 a CI secret. The recipe reads the saved settings, starts a run with their `configurationVersion`,
@@ -260,10 +260,13 @@ fi
 The expected-build check runs **after** publication starts; a mismatch cannot prevent or undo a
 write. `viewNames` lists planned views; `retained_obsolete` means an obsolete target was left in
 place, and `deleted_obsolete` that Cube dropped it. A `retained_obsolete` target with a `detail` is
-a drop that was held or failed, so the recipe rejects it. Publication-run `views[].outcome` values
-are `unchanged`, `created`, `updated`, `blocked`, `validation_failed`, `publish_failed`,
-`retained_obsolete`, and `deleted_obsolete`; these differ from preview outcomes. The recipe
-accepts only the successful outcomes.
+a drop that was held or failed, so the recipe rejects it. A hold that repeats keeps CI failing
+until you clear it: revert a target-name prefix change held by `deletion-cap-exceeded`, drop a
+`precondition-failed` Metric View in Databricks yourself, or switch **When a view leaves the
+scope** to **Keep its Metric View in Databricks**, which reports obsolete targets without a
+`detail`. Publication-run `views[].outcome` values are `unchanged`, `created`, `updated`,
+`blocked`, `validation_failed`, `publish_failed`, `retained_obsolete`, and `deleted_obsolete`;
+these differ from preview outcomes. The recipe accepts only the successful outcomes.
 `incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
 zero rejects definitions missing measures.
 
@@ -366,7 +369,9 @@ Cube drops a Metric View only when all of these hold:
   Metric View.
 - The object at that name is still a view, owned by the Databricks principal Cube publishes with.
   Cube checks this just before it drops it. If you transfer ownership of Cube's Metric Views,
-  Cube no longer drops them.
+  Cube no longer drops them: each sync labels such a Metric View **Obsolete, kept** with
+  `precondition-failed`. Drop it in Databricks yourself, and the next sync labels it
+  **Obsolete, deleted** and stops tracking it.
 
 A sync drops nothing, and labels each Metric View it would have dropped **Obsolete, kept** with the
 reason, when:
