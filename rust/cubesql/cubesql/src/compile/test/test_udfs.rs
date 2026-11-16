@@ -774,6 +774,49 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
     );
 
     insta::assert_snapshot!(
+        "generate_series_f64_no_drift",
+        execute_query(
+            "SELECT generate_series(0, 1, 0.1);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    insta::assert_snapshot!(
+        "generate_series_f64_step_below_precision",
+        execute_query(
+            "SELECT generate_series(10000000000000000.0, 10000000000000004.0, 1.0);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
+
+    for (sql, expected) in [
+        (
+            "SELECT generate_series('NaN'::double precision, 5.0);",
+            "start value cannot be NaN",
+        ),
+        (
+            "SELECT generate_series(1.0, 'Infinity'::double precision);",
+            "stop value cannot be infinity",
+        ),
+        (
+            "SELECT generate_series(1.0, 5.0, '-Infinity'::double precision);",
+            "step size cannot be infinity",
+        ),
+    ] {
+        let err = execute_query(sql.to_string(), DatabaseProtocol::PostgreSQL)
+            .await
+            .expect_err("a non-finite float argument must fail");
+        assert!(
+            err.to_string().contains(expected),
+            "{} failed with an unexpected error: {}",
+            sql,
+            err
+        );
+    }
+
+    insta::assert_snapshot!(
         "generate_series_date32_2_args",
         execute_query(
             "SELECT generate_series('2024-07-23'::date, '2024-07-28'::date);".to_string(),

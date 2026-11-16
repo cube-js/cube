@@ -2428,8 +2428,43 @@ impl Accumulator for StringAggAccumulator {
     }
 }
 
+fn generate_series_validate_i64(_start: i64, _end: i64, _step: i64) -> Result<()> {
+    Ok(())
+}
+
+fn generate_series_validate_f64(start: f64, end: f64, step: f64) -> Result<()> {
+    for (name, value) in [
+        ("start value", start),
+        ("stop value", end),
+        ("step size", step),
+    ] {
+        if value.is_nan() {
+            return Err(DataFusionError::Execution(format!("{name} cannot be NaN")));
+        }
+        if value.is_infinite() {
+            return Err(DataFusionError::Execution(format!(
+                "{name} cannot be infinity"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// The `n`-th element of the series, or `None` when it is past the type's range (and so past
+/// any `end`).
+fn generate_series_nth_i64(start: i64, step: i64, n: i64) -> Option<i64> {
+    step.checked_mul(n)
+        .and_then(|offset| start.checked_add(offset))
+}
+
+/// The `n`-th element of the series. Computed from `start` instead of accumulating `step`, so
+/// rounding does not drift and a `step` too small to change `current` cannot stall the series.
+fn generate_series_nth_f64(start: f64, step: f64, n: i64) -> Option<f64> {
+    Some(start + (n as f64) * step)
+}
+
 macro_rules! generate_series_udtf {
-    ($ARGS:expr, $TYPE: ident, $PRIMITIVE_TYPE: ident, $CHECKED_ADD:expr) => {{
+    ($ARGS:expr, $TYPE: ident, $PRIMITIVE_TYPE: ident, $VALIDATE:expr, $NTH:expr) => {{
         let mut section_sizes: Vec<usize> = Vec::new();
         let l_arr = &$ARGS[0].as_any().downcast_ref::<PrimitiveArray<$TYPE>>();
         if l_arr.is_some() {
@@ -2452,21 +2487,16 @@ macro_rules! generate_series_udtf {
 
                 let start = start.unwrap();
                 let end = end.unwrap();
+                $VALIDATE(start, end, step)?;
+
                 let mut section_size: i64 = 0;
                 if start <= end && step > 0 as $PRIMITIVE_TYPE {
-                    let mut current = start;
-                    loop {
+                    while let Some(current) = $NTH(start, step, section_size) {
                         if current > end {
                             break;
                         }
                         builder.append_value(current);
-
                         section_size += 1;
-                        // A step past the type's range is also past `end`: stop.
-                        let Some(next) = $CHECKED_ADD(current, step) else {
-                            break;
-                        };
-                        current = next;
                     }
                 }
                 section_sizes.push(section_size as usize);
@@ -2568,9 +2598,21 @@ pub fn create_generate_series_udtf() -> TableUDF {
         assert!(args.len() == 2 || args.len() == 3);
 
         if args[0].as_any().downcast_ref::<Int64Array>().is_some() {
-            generate_series_udtf!(args, Int64Type, i64, i64::checked_add)
+            generate_series_udtf!(
+                args,
+                Int64Type,
+                i64,
+                generate_series_validate_i64,
+                generate_series_nth_i64
+            )
         } else if args[0].as_any().downcast_ref::<Float64Array>().is_some() {
-            generate_series_udtf!(args, Float64Type, f64, |a: f64, b: f64| Some(a + b))
+            generate_series_udtf!(
+                args,
+                Float64Type,
+                f64,
+                generate_series_validate_f64,
+                generate_series_nth_f64
+            )
         } else if args[0].as_any().downcast_ref::<Date32Array>().is_some() {
             generate_series_non_primitive_udtf!(
                 args,
