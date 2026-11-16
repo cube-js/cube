@@ -106,6 +106,9 @@ fn is_non_public_ip(ip: IpAddr) -> bool {
                 || (segments[0] & 0xffc0) == 0xfe80
                 // ::/96 deprecated IPv4-compatible addresses.
                 || ip.octets()[..12] == [0u8; 12]
+                // 64:ff9b:1::/48 local-use NAT64 and 2002::/16 6to4 embed an IPv4 address.
+                || segments[..3] == [0x64, 0xff9b, 1]
+                || segments[0] == 0x2002
         }
     }
 }
@@ -543,6 +546,8 @@ mod tests {
             "http://[::ffff:127.0.0.1]/a.csv",
             "http://[::ffff:169.254.169.254]/a.csv",
             "http://[64:ff9b::a9fe:a9fe]/a.csv",
+            "http://[64:ff9b:1::a9fe:a9fe]/a.csv",
+            "http://[2002:a9fe:a9fe::]/a.csv",
         ] {
             let err = f.check(location).unwrap_err().message;
             assert!(
