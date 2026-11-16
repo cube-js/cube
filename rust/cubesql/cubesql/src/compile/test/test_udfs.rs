@@ -816,6 +816,8 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
         );
     }
 
+    // The `_rows` cases keep the input row with a NULL series value, while Postgres drops it:
+    // TableFunExec pads an empty series to one row whenever another column is selected.
     for (name, sql) in [
         (
             "generate_series_null_start",

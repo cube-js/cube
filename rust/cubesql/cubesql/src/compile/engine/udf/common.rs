@@ -2428,10 +2428,6 @@ impl Accumulator for StringAggAccumulator {
     }
 }
 
-fn generate_series_validate_i64(_start: i64, _end: i64, _step: i64) -> Result<()> {
-    Ok(())
-}
-
 fn generate_series_validate_f64(start: f64, end: f64, step: f64) -> Result<()> {
     for (name, value) in [
         ("start value", start),
@@ -2489,17 +2485,25 @@ macro_rules! generate_series_udtf {
                 let step = step_arr.value(step_idx);
                 $VALIDATE(start, end, step)?;
 
-                let mut section_size: i64 = 0;
+                let mut section_size: usize = 0;
                 if start <= end && step > 0 as $PRIMITIVE_TYPE {
-                    while let Some(current) = $NTH(start, step, section_size) {
+                    let mut n: i64 = 0;
+                    let mut last = None;
+                    while let Some(current) = $NTH(start, step, n) {
                         if current > end {
                             break;
                         }
-                        builder.append_value(current);
-                        section_size += 1;
+                        // A float step below the precision of `current` rounds several `n` to
+                        // the same value; the series must stay strictly increasing.
+                        if last.map_or(true, |last| current > last) {
+                            builder.append_value(current);
+                            section_size += 1;
+                            last = Some(current);
+                        }
+                        n += 1;
                     }
                 }
-                section_sizes.push(section_size as usize);
+                section_sizes.push(section_size);
             }
 
             return Ok((Arc::new(builder.finish()) as ArrayRef, section_sizes));
@@ -2603,7 +2607,7 @@ pub fn create_generate_series_udtf() -> TableUDF {
                 args,
                 Int64Type,
                 i64,
-                generate_series_validate_i64,
+                |_: i64, _: i64, _: i64| -> Result<()> { Ok(()) },
                 generate_series_nth_i64
             )
         } else if args[0].as_any().downcast_ref::<Float64Array>().is_some() {
