@@ -268,6 +268,91 @@ and request cancellation of an active run with `DELETE {statusUrl}`. Cancellatio
 writes but does not undo completed ones. `curl --fail` exits with code 22 and omits the response
 body on HTTP errors; on `409`, inspect run history before retrying.
 
+## Check a pull request before it merges
+
+A preview can convert YAML files sent with the request instead of the deployed model, so CI can
+catch a change that breaks conversion before it reaches Databricks. Send `"source": "files"` and
+`files`, a map of `.yml` or `.yaml` paths to their contents, such as your pull request's data model
+folder. Paths are relative to that folder, have no `.` or `..` segments, and use only letters,
+digits, `_`, `-`, `.` and `/`. A preview of files is read-only like any other preview, has no `buildJobId` in
+its response, and cannot be synced.
+
+To find regressions, preview the pull request's files and the deployment, then compare the two
+results view by view. A view regressed when it converts in the deployment but no longer converts
+in the pull request (`eligibleForPublication` turned `false`), or when its `withheldMembers` gained
+a measure. A view the pull request removes isn't compared.
+
+Files sent with the request aren't rendered, so a file with [Jinja templates](#jinja-templates)
+fails the preview with `400`. Preview such a data model after it's deployed.
+
+This Bash step requires `curl` and `jq` 1.6 or later. Set `CUBE_API_URL` to your tenant host
+without a trailing slash, `DEPLOYMENT_ID` to the production deployment, `CUBE_API_TOKEN` to a
+[Platform API key](/api-reference/authentication) with deployment `SchemaRead` access, and
+`MODEL_DIR` to the data model folder in your checkout. The example previews every view of the
+`default` data source; send the same selection in both previews. To preview a deployed data
+model with Jinja templates, the key also needs `SqlRunnerRead`.
+
+```bash
+set -euo pipefail
+
+previews="$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/databricks-metric-view-previews"
+auth_header="Authorization: Bearer $CUBE_API_TOKEN"
+selection='{"dataSourceName": "default", "selectionMode": "all"}'
+
+# Prints the completed result of the preview the request body on stdin starts.
+preview() {
+  local start status_url result_url status=''
+  start=$(curl --fail --silent --show-error --connect-timeout 10 --max-time 60 -X POST \
+    -H "$auth_header" -H 'Content-Type: application/json' --data-binary @- "$previews")
+  status_url=$(jq -r '.statusUrl' <<<"$start")
+  result_url=$(jq -r '.resultUrl' <<<"$start")
+  for ((attempt=0; attempt<${MAX_POLLS:-60}; attempt++)); do
+    status=$(curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
+      -H "$auth_header" "$CUBE_API_URL$status_url")
+    case "$(jq -r '.status' <<<"$status")" in
+      QUEUED|RUNNING) sleep 10 ;;
+      COMPLETED) jq -e '.resultAvailable' <<<"$status" >/dev/null && break; sleep 5 ;;
+      *) jq '{status, error}' <<<"$status" >&2; return 1 ;;
+    esac
+  done
+  curl --fail --silent --show-error --connect-timeout 10 --max-time 60 \
+    -H "$auth_header" "$CUBE_API_URL$result_url"
+}
+
+files='{}'
+while IFS= read -r -d '' file; do
+  files=$(jq --arg path "${file#"$MODEL_DIR"/}" --rawfile content "$file" \
+    '. + {($path): $content}' <<<"$files")
+done < <(find "$MODEL_DIR" -type f \( -name '*.yml' -o -name '*.yaml' \) -print0)
+
+deployed=$(preview <<<"$selection")
+proposed=$(jq --argjson files "$files" '. + {source: "files", files: $files}' <<<"$selection" |
+  preview)
+
+regressions=$(jq -n --argjson deployed "$deployed" --argjson proposed "$proposed" '
+  def members: [.withheldMembers[] | "\(.cube).\(.member)"];
+  ($proposed.views | map({key: .cubeViewName, value: .}) | from_entries) as $after
+  | [$deployed.views[] | select(.eligibleForPublication) | . as $before
+      | $after[.cubeViewName] | select(. != null)
+      | if .eligibleForPublication | not then
+          {view: .cubeViewName, regression: "no longer converts",
+           issues: [.issues[] | select(.severity == "ERROR") | .message]}
+        elif (members - ($before | members)) != [] then
+          {view: .cubeViewName, regression: "newly withheld",
+           members: (members - ($before | members))}
+        else empty end]')
+
+if [[ "$regressions" != '[]' ]]; then
+  jq . <<<"$regressions" >&2
+  exit 1
+fi
+```
+
+Paths in `files` are relative to `MODEL_DIR`, and only the YAML files go in the request, so
+`cube.js`, `cube.py` and other files stay in the checkout. The requests are limited like the
+deployed model: at most 512 files, 2 MiB each and 20 MiB in all. Previews and their results are
+kept for at most seven days.
+
 ## What can be published
 
 The **Preview** result is the authority for your deployed model. This preview release supports
