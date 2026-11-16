@@ -10,6 +10,7 @@ use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::symbols::transforms;
 use crate::planner::{AggregateWrap, MemberSymbol};
 use cubenativeutils::CubeError;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// The measure subquery renders measures without their aggregate for the select
@@ -66,6 +67,10 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         let keys_body =
             PhysicalPlanBuilder::inline_query_body(&aggregate_multiplied_subquery.keys, context)?;
         let keys_query = self.builder.process_node(keys_body.as_ref(), context)?;
+        // Rows reach the measure cube by the keys alone, never by a cube join.
+        let mut context = context.clone();
+        context.members_in_join_conditions = Some(Rc::new(HashSet::new()));
+        let context = &context;
 
         let keys_query_alias = "keys".to_string();
 

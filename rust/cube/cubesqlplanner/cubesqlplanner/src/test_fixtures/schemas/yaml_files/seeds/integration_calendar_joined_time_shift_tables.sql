@@ -14,10 +14,11 @@ FROM generate_series('2024-01-01'::date, '2024-01-07'::date, interval '1 day') A
 CREATE TABLE jts_sales (
     id INTEGER PRIMARY KEY,
     sale_date TIMESTAMP NOT NULL,
-    amount INTEGER NOT NULL
+    amount INTEGER NOT NULL,
+    kind TEXT NOT NULL
 );
 
-INSERT INTO jts_sales (id, sale_date, amount) VALUES
-    (1, '2024-01-01', 5),
-    (2, '2024-01-02', 10),
-    (3, '2024-01-03', 20);
+INSERT INTO jts_sales (id, sale_date, amount, kind) VALUES
+    (1, '2024-01-01', 5, 'a'),
+    (2, '2024-01-02', 10, 'b'),
+    (3, '2024-01-03', 20, 'a');

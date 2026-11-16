@@ -77,8 +77,8 @@ impl SqlNodesFactory {
     /// A calendar shift is rendered only in the join into the calendar when that
     /// join references the calendar key, so the calendar's own columns stay on
     /// the reporting dates; otherwise it is rendered wherever the key is read.
-    pub fn set_members_in_join_conditions(&mut self, keys: HashSet<MemberId>) {
-        self.members_in_join_conditions = Some(Rc::new(keys));
+    pub fn set_members_in_join_conditions(&mut self, keys: Option<Rc<HashSet<MemberId>>>) {
+        self.members_in_join_conditions = keys;
     }
 
     /// The factory a cube join condition renders with, `None` when it would

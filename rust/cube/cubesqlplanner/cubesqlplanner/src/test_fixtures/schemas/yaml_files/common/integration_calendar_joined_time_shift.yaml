@@ -10,6 +10,20 @@ cubes:
         time_shift:
           - name: previous_peak
             sql: "{CUBE}.prior_peak"
+      - name: retail_date
+        sql: "{CUBE}.date"
+        type: time
+    measures:
+      - name: day_sum
+        type: sum
+        sql: "extract(day from {CUBE}.date)::int"
+      - name: day_sum_prev_day
+        multi_stage: true
+        type: number
+        sql: "{day_sum}"
+        time_shift:
+          - type: prior
+            interval: 1 day
     joins:
       - name: jts_days_off
         relationship: one_to_one
@@ -131,10 +145,21 @@ cubes:
       - name: sale_date
         sql: sale_date
         type: time
+      - name: kind
+        sql: kind
+        type: string
+      - name: tier
+        sql: "{tier_of_total}"
+        type: string
+        multi_stage: true
     measures:
       - name: total
         sql: amount
         type: sum
+      - name: tier_of_total
+        sql: "CASE WHEN {total} < 15 THEN 'low' ELSE 'high' END"
+        type: string
+        multi_stage: true
       - name: total_previous_peak
         multi_stage: true
         type: number

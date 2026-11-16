@@ -351,3 +351,157 @@ async fn test_interval_shift_next_to_a_join_off_a_non_calendar_cube() {
     )
     .await;
 }
+
+fn calendar_measure_query(dimensions: &str) -> String {
+    let order = if dimensions.is_empty() {
+        String::new()
+    } else {
+        format!("\n  - id: {dimensions}")
+    };
+    formatdoc! {r#"
+        measures:
+          - jts_cal.day_sum
+          - jts_cal.day_sum_prev_day
+        dimensions: [{dimensions}]
+        time_dimensions:
+          - dimension: jts_cal.date
+            granularity: day
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-07"
+        order:
+          - id: jts_cal.date{order}
+    "#}
+}
+
+async fn assert_rows(query: &str, shape: Shape<'_>, expected: &[&[&str]]) {
+    let ctx = create_context();
+    assert_shape(&ctx.build_sql(query).unwrap(), &shape);
+
+    let Some(result) = ctx.try_execute_pg(query, SEED).await else {
+        return;
+    };
+    assert_eq!(table_rows(&result), to_rows(expected), "{result}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calendar_measure_interval_shift_by_calendar_pk() {
+    assert_rows(
+        &calendar_measure_query(""),
+        Shape {
+            present: &[r#"date_trunc('day', (("jts_cal".date + interval '1 day')::timestamptz"#],
+            absent: &["interval '-1 day'"],
+        },
+        &[
+            &["2024-01-01 00:00:00", "1", "NULL"],
+            &["2024-01-02 00:00:00", "2", "1"],
+            &["2024-01-03 00:00:00", "3", "2"],
+            &["2024-01-04 00:00:00", "4", "3"],
+            &["2024-01-05 00:00:00", "5", "4"],
+            &["2024-01-06 00:00:00", "6", "5"],
+            &["2024-01-07 00:00:00", "7", "6"],
+        ],
+    )
+    .await;
+}
+
+// A fact dimension multiplies the calendar measure, so it is aggregated over
+// the keys of the calendar rows the facts reach.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multiplied_calendar_measure_interval_shift_by_calendar_pk() {
+    let oracle = indoc! {"
+        WITH k AS (SELECT DISTINCT s.kind, c.date FROM jts_sales s JOIN jts_calendar c ON s.sale_date = c.date),
+             cur AS (SELECT kind, date AS d, sum(extract(day from date)::int) AS v FROM k GROUP BY 1, 2),
+             shifted AS (SELECT kind, d + interval '1 day' AS d, v FROM cur)
+        SELECT coalesce(cur.kind, shifted.kind), coalesce(cur.d, shifted.d), cur.v, shifted.v
+        FROM cur FULL JOIN shifted ON cur.kind = shifted.kind AND cur.d = shifted.d
+        ORDER BY 2, 1
+    "};
+    let expected: &[&[&str]] = &[
+        &["a", "2024-01-01 00:00:00", "1", "NULL"],
+        &["a", "2024-01-02 00:00:00", "NULL", "1"],
+        &["b", "2024-01-02 00:00:00", "2", "NULL"],
+        &["a", "2024-01-03 00:00:00", "3", "NULL"],
+        &["b", "2024-01-03 00:00:00", "NULL", "2"],
+        &["a", "2024-01-04 00:00:00", "NULL", "3"],
+    ];
+    let query = calendar_measure_query("jts_sales.kind");
+    let ctx = create_context();
+    if ctx.try_execute_pg(&query, SEED).await.is_some() {
+        assert_eq!(
+            oracle_rows(oracle).await,
+            to_rows(expected),
+            "oracle disagrees with the expected table"
+        );
+    }
+    assert_rows(
+        &query,
+        Shape {
+            present: &[
+                r#"ON "jts_cal_key_jts_sales".sale_date = ("jts_cal_key_jts_cal".date + interval '-1 day')"#,
+                r#"ON (("keys"."jts_cal__date" = ("jts_cal_key_jts_cal".date + interval '1 day')))"#,
+            ],
+            absent: &[r#""keys"."jts_cal__date" = ("jts_cal_key_jts_cal".date + interval '-1 day')"#],
+        },
+        expected,
+    )
+    .await;
+}
+
+// A multi-stage dimension is joined to the measure by the time dimension, so
+// both have to read it the same way.
+async fn assert_same_rows_as_by_fact_dimension(dimension: &str, shape: Shape<'_>) {
+    let query = |time_dimension: &str| {
+        formatdoc! {r#"
+            measures:
+              - jts_sales.total
+              - jts_sales.total_prev_day
+            dimensions:
+              - jts_sales.tier
+            time_dimensions:
+              - dimension: {time_dimension}
+                granularity: day
+                dateRange:
+                  - "2024-01-01"
+                  - "2024-01-07"
+            order:
+              - id: {time_dimension}
+        "#}
+    };
+    let ctx = create_context();
+    let joined = query(dimension);
+    assert_shape(&ctx.build_sql(&joined).unwrap(), &shape);
+
+    let Some(result) = ctx.try_execute_pg(&joined, SEED).await else {
+        return;
+    };
+    let control = ctx
+        .try_execute_pg(&query("jts_sales.sale_date"), SEED)
+        .await
+        .unwrap();
+    assert_eq!(table_rows(&result), table_rows(&control), "{result}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_interval_shift_by_calendar_pk_next_to_a_multi_stage_dimension() {
+    assert_same_rows_as_by_fact_dimension(
+        "jts_cal.date",
+        Shape {
+            present: &[r#"ON "jts_sales".sale_date = ("jts_cal".date + interval '-1 day')"#],
+            absent: &[r#"date_trunc('day', (("jts_cal".date + interval '-1 day')"#],
+        },
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_interval_shift_by_joined_non_calendar_dimension_next_to_a_multi_stage_dimension() {
+    assert_same_rows_as_by_fact_dimension(
+        "jts_days.date",
+        Shape {
+            present: &[r#"date_trunc('day', (("jts_days".date + interval '1 day')::timestamptz"#],
+            absent: &[r#"ON "jts_sales".sale_date = ("jts_days".date"#],
+        },
+    )
+    .await;
+}

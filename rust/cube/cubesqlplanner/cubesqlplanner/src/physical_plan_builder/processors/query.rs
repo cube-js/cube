@@ -63,10 +63,9 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         if let Some(evaluation_context) = logical_plan.evaluation_context() {
             context.apply_evaluation_context(evaluation_context);
         }
+        context.members_in_join_conditions =
+            Self::members_in_join_conditions(logical_plan).map(Rc::new);
         let mut context_factory = context.make_sql_nodes_factory()?;
-        if let Some(members) = Self::members_in_join_conditions(logical_plan) {
-            context_factory.set_members_in_join_conditions(members);
-        }
         let mut conditional_measures = logical_plan.conditional_measures().clone();
 
         if let Some(reason) = logical_plan.unrenderable_filter() {
