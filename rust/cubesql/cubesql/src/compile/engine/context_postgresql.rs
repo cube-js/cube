@@ -25,14 +25,15 @@ use super::information_schema::postgres::{
     PgCatalogEventTriggerProvider, PgCatalogExtensionProvider, PgCatalogForeignDataWrapperProvider,
     PgCatalogForeignServerProvider, PgCatalogForeignTableProvider, PgCatalogIndexProvider,
     PgCatalogInheritsProvider, PgCatalogLanguageProvider, PgCatalogLocksProvider,
-    PgCatalogMatviewsProvider, PgCatalogNamespaceProvider, PgCatalogOperatorProvider,
-    PgCatalogPartitionedTableProvider, PgCatalogProcProvider, PgCatalogRangeProvider,
-    PgCatalogRewriteProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
-    PgCatalogSettingsProvider, PgCatalogShdescriptionProvider, PgCatalogStatActivityProvider,
-    PgCatalogStatUserTablesProvider, PgCatalogStatioUserTablesProvider, PgCatalogStatsProvider,
-    PgCatalogTableProvider, PgCatalogTablespaceProvider, PgCatalogTimezoneAbbrevsProvider,
-    PgCatalogTimezoneNamesProvider, PgCatalogTypeProvider, PgCatalogUserMappingProvider,
-    PgCatalogUserProvider, PgCatalogViewsProvider, PgPreparedStatementsProvider,
+    PgCatalogMatviewsProvider, PgCatalogNamespaceProvider, PgCatalogOpclassProvider,
+    PgCatalogOperatorProvider, PgCatalogPartitionedTableProvider, PgCatalogProcProvider,
+    PgCatalogRangeProvider, PgCatalogRewriteProvider, PgCatalogRolesProvider,
+    PgCatalogSequenceProvider, PgCatalogSettingsProvider, PgCatalogShdescriptionProvider,
+    PgCatalogStatActivityProvider, PgCatalogStatUserTablesProvider,
+    PgCatalogStatioUserTablesProvider, PgCatalogStatsProvider, PgCatalogTableProvider,
+    PgCatalogTablespaceProvider, PgCatalogTimezoneAbbrevsProvider, PgCatalogTimezoneNamesProvider,
+    PgCatalogTypeProvider, PgCatalogUserMappingProvider, PgCatalogUserProvider,
+    PgCatalogViewsProvider, PgPreparedStatementsProvider,
 };
 use crate::{
     compile::{
@@ -172,6 +173,8 @@ impl DatabaseProtocol {
             "pg_catalog.pg_cast".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogForeignTableProvider>() {
             "pg_catalog.pg_foreign_table".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogOpclassProvider>() {
+            "pg_catalog.pg_opclass".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogOperatorProvider>() {
             "pg_catalog.pg_operator".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogRewriteProvider>() {
@@ -471,6 +474,7 @@ impl DatabaseProtocol {
                 "pg_language" => return Some(Arc::new(PgCatalogLanguageProvider::new())),
                 "pg_cast" => return Some(Arc::new(PgCatalogCastProvider::new())),
                 "pg_foreign_table" => return Some(Arc::new(PgCatalogForeignTableProvider::new())),
+                "pg_opclass" => return Some(Arc::new(PgCatalogOpclassProvider::new())),
                 "pg_operator" => return Some(Arc::new(PgCatalogOperatorProvider::new())),
                 "pg_rewrite" => return Some(Arc::new(PgCatalogRewriteProvider::new())),
                 "pg_external_schema" => {
