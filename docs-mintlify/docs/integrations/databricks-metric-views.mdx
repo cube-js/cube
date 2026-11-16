@@ -261,7 +261,8 @@ write. `viewNames` lists planned views; `retained_obsolete` means an obsolete ta
 place, and `deleted_obsolete` that Cube dropped it. A `retained_obsolete` target with a `detail` is
 a drop that was held or failed, so the recipe rejects it. Publication-run `views[].outcome` values
 are `unchanged`, `created`, `updated`, `blocked`, `validation_failed`, `publish_failed`,
-`retained_obsolete`, and `deleted_obsolete`; these differ from preview outcomes. The recipe accepts only the successful outcomes.
+`retained_obsolete`, and `deleted_obsolete`; these differ from preview outcomes. The recipe
+accepts only the successful outcomes.
 `incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
 zero rejects definitions missing measures.
 
