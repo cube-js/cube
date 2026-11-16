@@ -2461,6 +2461,9 @@ enabled, import downloads don't use HTTP proxies from the environment.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
+Set it on the router and every worker; host names are resolved and checked on the node
+that downloads the file.
+
 ## `CUBESTORE_LOG_LEVEL`
 
 The logging level for Cube Store.

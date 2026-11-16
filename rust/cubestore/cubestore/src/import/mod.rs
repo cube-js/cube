@@ -28,7 +28,7 @@ use cubehll::HllSketch;
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::cube_ext::ordfloat::OrdF64;
-use crate::import::host_filter::LocationHostFilter;
+use crate::import::host_filter::{HttpLocationError, LocationHostFilter, LocationHttpClient};
 use crate::import::limits::ConcurrencyLimits;
 use crate::metastore::table::Table;
 use crate::metastore::{is_valid_plain_binary_hll, HllFlavour, IdRow};
@@ -555,8 +555,9 @@ fn append_csv_value(
 pub trait LocationsValidator: DIService + Send + Sync {
     async fn validate(&self, locations: &Vec<String>) -> Result<(), CubeError>;
 
-    /// Client for `http(s)://` locations; redirects are checked against the host allowlist.
-    fn http_client(&self) -> &reqwest::Client;
+    /// The only client `http(s)://` locations may be requested with: it applies the host
+    /// allowlist to the location, its redirects and the addresses it resolves to.
+    fn http(&self) -> &LocationHttpClient;
 }
 
 /// How an import location is read. The validator, `resolve_location` and
@@ -585,8 +586,7 @@ impl LocationKind {
 
 pub struct LocationsValidatorImpl {
     location_allow_local_fs: bool,
-    host_filter: LocationHostFilter,
-    http_client: reqwest::Client,
+    http: LocationHttpClient,
 }
 
 #[async_trait]
@@ -598,8 +598,8 @@ impl LocationsValidator for LocationsValidatorImpl {
         Ok(())
     }
 
-    fn http_client(&self) -> &reqwest::Client {
-        &self.http_client
+    fn http(&self) -> &LocationHttpClient {
+        &self.http
     }
 }
 
@@ -608,18 +608,16 @@ impl LocationsValidatorImpl {
         location_allow_local_fs: bool,
         host_filter: LocationHostFilter,
     ) -> Result<Arc<Self>, CubeError> {
-        let http_client = host_filter.http_client()?;
         Ok(Arc::new(Self {
             location_allow_local_fs,
-            host_filter,
-            http_client,
+            http: LocationHttpClient::new(host_filter)?,
         }))
     }
 
     fn validate_location(&self, location: &str) -> Result<(), CubeError> {
         match LocationKind::of(location) {
             LocationKind::Stream => Ok(()),
-            LocationKind::Http => self.host_filter.check(location),
+            LocationKind::Http => self.http.check(location),
             LocationKind::Temp => {
                 // Fails early on traversal instead of waiting for the import job to pick it up.
                 LocationHelper::temp_uploads_path(location)?;
@@ -746,31 +744,38 @@ impl ImportServiceImpl {
                 .try_download_http_location(location, table_id, temp_dir)
                 .await;
 
+            let err = match result {
+                Ok(downloaded) => return Ok(downloaded),
+                Err(HttpLocationError::Denied(err)) => return Err(err),
+                Err(HttpLocationError::Failed(err)) => err,
+            };
             if retry_attempts <= 0 {
-                return result;
+                return Err(err);
             }
-            match result {
-                Ok(size) => {
-                    return Ok(size);
-                }
-                Err(err) => {
-                    log::error!(
-                        "Import {} download error: {}. Retrying {}/{}...",
-                        location,
-                        err,
-                        retry_attempts,
-                        max_retries
-                    );
-                    sleep(retries_sleep).await;
-                    retries_sleep *= sleep_multiplier;
-                }
-            }
+            log::error!(
+                "Import {} download error: {}. Retrying {}/{}...",
+                location,
+                err,
+                retry_attempts,
+                max_retries
+            );
+            sleep(retries_sleep).await;
+            retries_sleep *= sleep_multiplier;
         }
     }
 
     async fn try_download_http_location(
         &self,
         location: &str,
+        table_id: u64,
+        temp_dir: &Path,
+    ) -> Result<(File, usize, TempPath), HttpLocationError> {
+        let res = self.validator.http().get(location).await?;
+        Ok(Self::save_http_response(res, table_id, temp_dir).await?)
+    }
+
+    async fn save_http_response(
+        res: reqwest::Response,
         table_id: u64,
         temp_dir: &Path,
     ) -> Result<(File, usize, TempPath), CubeError> {
@@ -787,7 +792,6 @@ impl ImportServiceImpl {
             .into_parts();
         let mut file = File::from_std(file);
 
-        let res = self.validator.http_client().get(location).send().await?;
         if !res.status().is_success() {
             return Err(CubeError::user(format!(
                 "Unable to import from http location, status code: {}",
@@ -1024,7 +1028,7 @@ impl ImportService for ImportServiceImpl {
         let file_size = LocationHelper::location_file_size(
             location,
             self.remote_fs.clone(),
-            self.validator.http_client(),
+            self.validator.http(),
         )
         .await?;
         Ok(ImportServiceImpl::estimate_rows(location, file_size))
@@ -1041,23 +1045,20 @@ impl LocationHelper {
     pub async fn location_file_size(
         location: &str,
         remote_fs: Arc<dyn RemoteFs>,
-        client: &reqwest::Client,
+        http: &LocationHttpClient,
     ) -> Result<Option<u64>, CubeError> {
         let res = match LocationKind::of(location) {
             LocationKind::Http => {
-                let req = client.head(location).build()?;
-
                 // S3 doesn't support HEAD for pre signed urls with GetObject command
-                if req
-                    .url()
-                    .domain()
-                    .map(|v| v.contains("amazonaws.com"))
+                if url::Url::parse(location)
+                    .ok()
+                    .and_then(|url| url.domain().map(|v| v.contains("amazonaws.com")))
                     .unwrap_or(false)
                 {
                     return Ok(None);
                 }
 
-                let res = client.execute(req).await?;
+                let res = http.head(location).await?;
 
                 let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
 

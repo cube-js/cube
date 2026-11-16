@@ -1,5 +1,6 @@
 use crate::CubeError;
 use regex::Regex;
+use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use url::{Host, Url};
@@ -93,22 +94,28 @@ fn is_non_public_ip(ip: IpAddr) -> bool {
                 return is_non_public_ipv4(v4);
             }
             let segments = ip.segments();
-            // NAT64 (64:ff9b::/96) reaches the embedded IPv4 address.
-            if segments[..6] == [0x64, 0xff9b, 0, 0, 0, 0] {
+            // NAT64 (64:ff9b::/96) and IPv4-translated (::ffff:0:0:0/96) addresses reach the
+            // embedded IPv4 address.
+            if segments[..6] == [0x64, 0xff9b, 0, 0, 0, 0]
+                || segments[..6] == [0, 0, 0, 0, 0xffff, 0]
+            {
                 let [.., hi, lo] = segments;
                 return is_non_public_ipv4(Ipv4Addr::from(((hi as u32) << 16) | lo as u32));
             }
             ip.is_unspecified()
                 || ip.is_loopback()
                 || ip.is_multicast()
-                // fc00::/7 unique local, fe80::/10 link-local.
+                // fc00::/7 unique local, fe80::/10 link-local, fec0::/10 deprecated site-local.
                 || (segments[0] & 0xfe00) == 0xfc00
                 || (segments[0] & 0xffc0) == 0xfe80
+                || (segments[0] & 0xffc0) == 0xfec0
                 // ::/96 deprecated IPv4-compatible addresses.
                 || ip.octets()[..12] == [0u8; 12]
-                // 64:ff9b:1::/48 local-use NAT64 and 2002::/16 6to4 embed an IPv4 address.
+                // 64:ff9b:1::/48 local-use NAT64, 2002::/16 6to4 and 2001::/32 Teredo embed an
+                // IPv4 address.
                 || segments[..3] == [0x64, 0xff9b, 1]
                 || segments[0] == 0x2002
+                || segments[..2] == [0x2001, 0]
         }
     }
 }
@@ -130,6 +137,8 @@ fn is_non_public_ipv4(ip: Ipv4Addr) -> bool {
         || (a == 198 && (b & 0xfe) == 18)
         // 240.0.0.0/4 reserved.
         || a >= 240
+        // Azure WireServer: a public address that only answers from inside an Azure VM.
+        || ip == Ipv4Addr::new(168, 63, 129, 16)
 }
 
 impl LocationHostFilter {
@@ -316,21 +325,20 @@ impl LocationHostFilter {
     }
 
     /// An HTTP client whose redirects are held to the same allowlist as the location itself.
-    pub fn http_client(&self) -> Result<reqwest::Client, CubeError> {
+    fn http_client(&self) -> Result<reqwest::Client, CubeError> {
         let mut builder = reqwest::Client::builder();
         if !self.is_unrestricted() {
             let filter = self.clone();
             builder = builder.redirect(reqwest::redirect::Policy::custom(move |attempt| {
                 if attempt.previous().len() >= 10 {
-                    attempt.error("too many redirects")
-                } else if filter.is_allowed(attempt.url()) {
-                    attempt.follow()
-                } else {
-                    let message = format!(
-                        "redirect to a host that is not allowed: {}",
-                        attempt.url().host_str().unwrap_or("<none>")
-                    );
-                    attempt.error(message)
+                    return attempt.error("too many redirects");
+                }
+                match filter.check(attempt.url().as_str()) {
+                    Ok(()) => attempt.follow(),
+                    Err(e) => attempt.error(LocationDenied(format!(
+                        "it redirects to a location that is refused. {}",
+                        e.message
+                    ))),
                 }
             }));
         }
@@ -343,6 +351,92 @@ impl LocationHostFilter {
                 .no_proxy();
         }
         Ok(builder.build()?)
+    }
+}
+
+/// A refusal raised inside the HTTP client. `reqwest::Error` prints without its source, so
+/// [`LocationHttpClient`] looks for this type in the source chain instead.
+#[derive(Debug)]
+struct LocationDenied(String);
+
+impl fmt::Display for LocationDenied {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for LocationDenied {}
+
+pub enum HttpLocationError {
+    /// Refused by the host filter: the same request would be refused again.
+    Denied(CubeError),
+    Failed(CubeError),
+}
+
+impl From<CubeError> for HttpLocationError {
+    fn from(e: CubeError) -> Self {
+        HttpLocationError::Failed(e)
+    }
+}
+
+impl From<HttpLocationError> for CubeError {
+    fn from(e: HttpLocationError) -> Self {
+        match e {
+            HttpLocationError::Denied(e) | HttpLocationError::Failed(e) => e,
+        }
+    }
+}
+
+/// Requests `http(s)://` import locations. The underlying client stays private, so no request
+/// can skip the host filter, its redirect policy or its DNS resolver.
+pub struct LocationHttpClient {
+    filter: LocationHostFilter,
+    client: reqwest::Client,
+}
+
+impl LocationHttpClient {
+    pub fn new(filter: LocationHostFilter) -> Result<Self, CubeError> {
+        let client = filter.http_client()?;
+        Ok(Self { filter, client })
+    }
+
+    pub fn check(&self, location: &str) -> Result<(), CubeError> {
+        self.filter.check(location)
+    }
+
+    pub async fn get(&self, location: &str) -> Result<reqwest::Response, HttpLocationError> {
+        self.send(reqwest::Method::GET, location).await
+    }
+
+    pub async fn head(&self, location: &str) -> Result<reqwest::Response, HttpLocationError> {
+        self.send(reqwest::Method::HEAD, location).await
+    }
+
+    async fn send(
+        &self,
+        method: reqwest::Method,
+        location: &str,
+    ) -> Result<reqwest::Response, HttpLocationError> {
+        self.check(location).map_err(HttpLocationError::Denied)?;
+        self.client
+            .request(method, location)
+            .send()
+            .await
+            .map_err(|e| Self::classify(location, e))
+    }
+
+    fn classify(location: &str, err: reqwest::Error) -> HttpLocationError {
+        let mut source: Option<&(dyn std::error::Error + 'static)> = Some(&err);
+        while let Some(e) = source {
+            if let Some(LocationDenied(reason)) = e.downcast_ref::<LocationDenied>() {
+                return HttpLocationError::Denied(CubeError::user(format!(
+                    "Unable to import from '{}': {}",
+                    location, reason
+                )));
+            }
+            source = e.source();
+        }
+        HttpLocationError::Failed(err.into())
     }
 }
 
@@ -370,10 +464,10 @@ impl reqwest::dns::Resolve for PermittedIpResolver {
                     .map(|a| a.ip().to_string())
                     .collect::<Vec<_>>()
                     .join(", ");
-                return Err(format!(
-                    "{} resolves only to non-public IP addresses ({}), which CUBESTORE_LOCATION_DENY_PRIVATE_IPS forbids",
+                return Err(LocationDenied(format!(
+                    "{} resolves only to non-public IP addresses ({}), which CUBESTORE_LOCATION_DENY_PRIVATE_IPS forbids. Add their subnet to CUBESTORE_LOCATION_ALLOW_HOSTS to allow it.",
                     host, denied
-                )
+                ))
                 .into());
             }
             let addrs: reqwest::dns::Addrs = Box::new(permitted.into_iter());
@@ -536,6 +630,8 @@ mod tests {
         assert!(f.check("https://example.com/a.csv").is_ok());
         assert!(f.check("http://8.8.8.8/a.csv").is_ok());
         assert!(f.check("http://[2606:4700::1111]/a.csv").is_ok());
+        assert!(f.check("http://[::ffff:0:8.8.8.8]/a.csv").is_ok());
+        assert!(f.check("http://[2001:4860:4860::8888]/a.csv").is_ok());
         for location in [
             "http://127.0.0.1/a.csv",
             "http://0.0.0.0/a.csv",
@@ -556,6 +652,10 @@ mod tests {
             "http://[64:ff9b::a9fe:a9fe]/a.csv",
             "http://[64:ff9b:1::a9fe:a9fe]/a.csv",
             "http://[2002:a9fe:a9fe::]/a.csv",
+            "http://[fec0::1]/a.csv",
+            "http://[::ffff:0:10.0.0.1]/a.csv",
+            "http://[2001:0:4136:e378:8000:63bf:3fff:fdd2]/a.csv",
+            "http://168.63.129.16/machine?comp=goalstate",
         ] {
             let err = f.check(location).unwrap_err().message;
             assert!(
@@ -664,7 +764,7 @@ mod tests {
 
 #[cfg(test)]
 mod redirect_tests {
-    use super::LocationHostFilter;
+    use super::{HttpLocationError, LocationHostFilter, LocationHttpClient};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
 
@@ -690,29 +790,38 @@ mod redirect_tests {
     async fn redirects_to_disallowed_hosts_are_refused() {
         let port = redirecting_server().await;
         let filter = LocationHostFilter::new(&["127.0.0.1".to_string()], false).unwrap();
-        let err = filter
-            .http_client()
+        let err = LocationHttpClient::new(filter)
             .unwrap()
-            .get(format!("http://127.0.0.1:{}/a.csv", port))
-            .send()
+            .get(&format!("http://127.0.0.1:{}/a.csv", port))
             .await
             .unwrap_err();
-        assert!(err.is_redirect(), "unexpected error: {}", err);
+        let HttpLocationError::Denied(err) = err else {
+            panic!("the redirect should be refused, not fail");
+        };
+        assert!(
+            err.message.contains("redirects") && err.message.contains("http://localhost"),
+            "unexpected error: {}",
+            err.message
+        );
+        assert!(
+            err.message.contains("CUBESTORE_LOCATION_ALLOW_HOSTS"),
+            "unexpected error: {}",
+            err.message
+        );
     }
 }
 
 #[cfg(test)]
 mod resolver_tests {
-    use super::LocationHostFilter;
+    use super::{HttpLocationError, LocationHostFilter, LocationHttpClient};
 
-    fn client(entries: &[&str]) -> reqwest::Client {
-        LocationHostFilter::new(
+    fn client(entries: &[&str]) -> LocationHttpClient {
+        let filter = LocationHostFilter::new(
             &entries.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
             true,
         )
-        .unwrap()
-        .http_client()
-        .unwrap()
+        .unwrap();
+        LocationHttpClient::new(filter).unwrap()
     }
 
     #[tokio::test]
@@ -720,16 +829,18 @@ mod resolver_tests {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         let err = client(&["*"])
-            .get(format!("http://localhost:{}/a.csv", port))
-            .send()
+            .get(&format!("http://localhost:{}/a.csv", port))
             .await
             .unwrap_err();
-        let message = format!("{:?}", err);
+        let HttpLocationError::Denied(err) = err else {
+            panic!("the host should be refused, not fail");
+        };
         assert!(
-            message.contains("CUBESTORE_LOCATION_DENY_PRIVATE_IPS"),
+            err.message.contains("CUBESTORE_LOCATION_DENY_PRIVATE_IPS"),
             "unexpected error: {}",
-            message
+            err.message
         );
+        assert!(format!("{}", err).contains("localhost resolves only to"));
     }
 
     #[tokio::test]
@@ -748,11 +859,14 @@ mod resolver_tests {
                     .await;
             }
         });
-        let res = client(&["127.0.0.0/8"])
-            .get(format!("http://localhost:{}/a.csv", port))
-            .send()
+        // `*` lets the host name through; the subnet vouches for the address it resolves to.
+        let res = match client(&["*", "127.0.0.0/8"])
+            .get(&format!("http://localhost:{}/a.csv", port))
             .await
-            .unwrap();
+        {
+            Ok(res) => res,
+            Err(e) => panic!("unexpected error: {}", crate::CubeError::from(e)),
+        };
         assert_eq!(res.text().await.unwrap(), "ok");
     }
 }
