@@ -20,6 +20,7 @@ extern crate bincode;
 
 use bincode::{deserialize_from, serialize_into};
 
+use crate::import::limits::IndexMemoryBudget;
 use crate::metastore::{
     deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data, table::Table, Chunk,
     Column, ColumnType, IdRow, Index, IndexType, MetaStore, Partition, WAL,
@@ -211,6 +212,7 @@ pub struct ChunkStore {
     metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory>,
     memory_chunks: RwLock<HashMap<String, RecordBatch>>,
     chunk_size: usize,
+    index_memory_budget: IndexMemoryBudget,
 }
 
 crate::di_service!(ChunkStore, [ChunkDataStore]);
@@ -393,6 +395,7 @@ impl ChunkStore {
         metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
+        let index_memory_budget = IndexMemoryBudget::new(config.import_index_memory_budget());
         let store = ChunkStore {
             meta_store,
             remote_fs,
@@ -401,6 +404,7 @@ impl ChunkStore {
             metadata_cache_factory,
             memory_chunks: RwLock::new(HashMap::new()),
             chunk_size,
+            index_memory_budget,
         };
 
         Arc::new(store)
@@ -2649,6 +2653,9 @@ mod tests {
     }
 }
 
+/// Multiplier from an index's input column bytes to its import working memory.
+const INDEX_MEMORY_OVERHEAD_FACTOR: usize = 3;
+
 pub type ChunkUploadJob = JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>;
 
 impl ChunkStore {
@@ -3038,13 +3045,17 @@ impl ChunkStore {
             let preset_partitions = partitions_by_index
                 .as_mut()
                 .map(|all| std::mem::take(&mut all[i]));
-            futures.push(self.partition_rows_for_index(
-                &index,
-                &table,
-                preset_partitions,
-                remapped,
-                in_memory,
-            ));
+            // Bound the per-index fan-out: each pipeline holds a sorted take() copy plus a
+            // parquet writer, so gate it by an estimate of that working memory.
+            let estimated_memory =
+                columns_vec_buffer_size(&remapped) * INDEX_MEMORY_OVERHEAD_FACTOR;
+            let budget = self.index_memory_budget.clone();
+            let table = &table;
+            futures.push(async move {
+                let _permit = budget.acquire(estimated_memory).await?;
+                self.partition_rows_for_index(index, table, preset_partitions, remapped, in_memory)
+                    .await
+            });
         }
 
         let new_chunks = join_all(futures)
