@@ -3443,7 +3443,7 @@ __metadata:
     joi: "npm:^17.13.3"
     jsonwebtoken: "npm:^9.0.2"
     jwk-to-pem: "npm:^2.0.4"
-    lru-cache: "npm:^11.1.0"
+    lru-cache: "npm:^11.2.4"
     moment: "npm:^2.30.1"
     moment-timezone: "npm:^0.6.5"
     mysql: "npm:^2.18.1"
@@ -20881,7 +20881,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"lru-cache@npm:^11.0.0, lru-cache@npm:^11.1.0, lru-cache@npm:^11.2.1":
+"lru-cache@npm:^11.0.0, lru-cache@npm:^11.1.0, lru-cache@npm:^11.2.1, lru-cache@npm:^11.2.4":
   version: 11.2.4
   resolution: "lru-cache@npm:11.2.4"
   checksum: 10c0/4a24f9b17537619f9144d7b8e42cd5a225efdfd7076ebe7b5e7dc02b860a818455201e67fbf000765233fe7e339d3c8229fc815e9b58ee6ede511e07608c19b2

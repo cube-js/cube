@@ -469,8 +469,10 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
   };
 }
 
-// A location-free AST takes roughly 25-40 bytes of heap per character of source.
-const PARSED_DOCUMENT_BYTES_PER_CHAR = 40;
+// A location-free AST takes about 45 bytes of heap per character of a typical query,
+// but up to about 157 for the densest one (`a{a}a{a}...`). Sizing by the worst case
+// keeps `maxSize` a real bound on retained heap.
+const PARSED_DOCUMENT_BYTES_PER_CHAR = 160;
 
 const parsedDocuments = new LRUCache<string, DocumentNode>({
   max: 1000,
@@ -481,7 +483,7 @@ const parsedDocuments = new LRUCache<string, DocumentNode>({
   ttlAutopurge: true,
 });
 
-function parseDocument(query: string): DocumentNode {
+export function parseDocument(query: string): DocumentNode {
   const cached = parsedDocuments.get(query);
   if (cached) {
     // Not `updateAgeOnGet`: it does not re-arm the `ttlAutopurge` timer, so a
@@ -496,8 +498,13 @@ function parseDocument(query: string): DocumentNode {
   return document;
 }
 
-export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, variableValues: Record<string, any> = {}) {
-  const ast = parseDocument(query);
+export function getJsonQueryFromGraphQLQuery(
+  query: string | readonly string[],
+  metaConfig: any,
+  variableValues: Record<string, any> = {}
+) {
+  // `graphql-tag`, which parsed this before, also took the query wrapped in an array.
+  const ast = parseDocument(typeof query === 'string' ? query : query[0]);
 
   const operation: any = ast.definitions.find(
     ({ kind }) => kind === 'OperationDefinition'

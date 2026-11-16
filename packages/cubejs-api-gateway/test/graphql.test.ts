@@ -9,7 +9,7 @@ import { GraphQLObjectType } from 'graphql';
 import fs from 'fs-extra';
 import request from 'supertest';
 
-import { getJsonQueryFromGraphQLQuery, makeSchema } from '../src/graphql';
+import { getJsonQueryFromGraphQLQuery, makeSchema, parseDocument } from '../src/graphql';
 
 const metaConfig = [
   {
@@ -436,5 +436,71 @@ describe('getJsonQueryFromGraphQLQuery', () => {
     expect(getJsonQueryFromGraphQLQuery(commented, metaConfig)).toEqual({
       measures: ['Orders.count'],
     });
+  });
+
+  it('accepts a query wrapped in an array', () => {
+    expect(getJsonQueryFromGraphQLQuery(['query { cube { orders { count } } }'], metaConfig)).toEqual({
+      measures: ['Orders.count'],
+    });
+  });
+});
+
+describe('parseDocument', () => {
+  // 160 accounted bytes per character: 12K characters stay under the 2 MB entry limit.
+  const largeQuery = (id: number) => `{ cube { orders { ${'count '.repeat(2000)} } } } # ${id}`;
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('reuses the parsed document of a repeated query', () => {
+    const query = '{ cube { orders { count } } } # reuse';
+
+    expect(parseDocument(query)).toBe(parseDocument(query));
+  });
+
+  it('does not cache a query above the entry size limit', () => {
+    const query = `{ cube { orders { ${'count '.repeat(3000)} } } }`;
+
+    expect(parseDocument(query)).not.toBe(parseDocument(query));
+  });
+
+  it('evicts the least recently used documents past the total size limit', () => {
+    const first = parseDocument(largeQuery(0));
+    expect(parseDocument(largeQuery(0))).toBe(first);
+
+    for (let id = 1; id <= 20; id++) {
+      parseDocument(largeQuery(id));
+    }
+
+    expect(parseDocument(largeQuery(20))).toBe(parseDocument(largeQuery(20)));
+    expect(parseDocument(largeQuery(0))).not.toBe(first);
+  });
+
+  it('expires a document an hour after its last use', () => {
+    jest.useFakeTimers();
+
+    // lru-cache reads time from the `performance` object it saw at load, and fake
+    // timers install a new one, so only a copy loaded now follows the fake clock.
+    let parseWithFakeClock = parseDocument;
+    jest.isolateModules(() => {
+      // eslint-disable-next-line global-require
+      parseWithFakeClock = require('../src/graphql').parseDocument;
+    });
+
+    // The fake clock starts at 0, which lru-cache reads as an entry without a TTL.
+    jest.advanceTimersByTime(1);
+
+    const query = '{ cube { orders { count } } }';
+    const document = parseWithFakeClock(query);
+
+    jest.advanceTimersByTime(59 * 60 * 1000);
+    expect(parseWithFakeClock(query)).toBe(document);
+
+    jest.advanceTimersByTime(59 * 60 * 1000);
+    expect(parseWithFakeClock(query)).toBe(document);
+
+    jest.advanceTimersByTime(61 * 60 * 1000);
+    expect(parseWithFakeClock(query)).not.toBe(document);
   });
 });

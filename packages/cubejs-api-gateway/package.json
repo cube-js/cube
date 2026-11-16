@@ -41,7 +41,7 @@
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "jwk-to-pem": "^2.0.4",
-    "lru-cache": "^11.1.0",
+    "lru-cache": "^11.2.4",
     "moment": "^2.30.1",
     "moment-timezone": "^0.6.5",
     "nexus": "^1.1.0",
