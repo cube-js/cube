@@ -469,10 +469,14 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
   };
 }
 
+// A location-free AST takes roughly 25-40 bytes of heap per character of source.
+const PARSED_DOCUMENT_BYTES_PER_CHAR = 40;
+
 const parsedDocuments = new LRUCache<string, DocumentNode>({
   max: 1000,
-  maxSize: 16 * 1024 * 1024,
-  sizeCalculation: (_document, query) => query.length || 1,
+  maxSize: 64 * 1024 * 1024,
+  maxEntrySize: 1024 * 1024,
+  sizeCalculation: (_document, query) => (query.length * PARSED_DOCUMENT_BYTES_PER_CHAR) || 1,
 });
 
 function parseDocument(query: string): DocumentNode {
@@ -481,7 +485,7 @@ function parseDocument(query: string): DocumentNode {
     return cached;
   }
 
-  const document = parse(query);
+  const document = parse(query, { noLocation: true });
   parsedDocuments.set(query, document);
 
   return document;
