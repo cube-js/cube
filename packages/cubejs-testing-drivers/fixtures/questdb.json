@@ -145,6 +145,11 @@
   },
   "skip": [
     "---------------------------------------",
+    "No native approximate distinct count   ",
+    "---------------------------------------",
+    "SQL API: APPROX_DISTINCT push down",
+
+    "---------------------------------------",
     "SKIPPED FOR ALL                        ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -251,6 +256,11 @@
     "filtering ECommerce: equals a whole number with leading zeros"
   ],
   "tesseractSkip": [
+    "---------------------------------------",
+    "No native approximate distinct count   ",
+    "---------------------------------------",
+    "SQL API: APPROX_DISTINCT push down",
+
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",

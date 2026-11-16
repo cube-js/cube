@@ -118,7 +118,6 @@ async fn test_include_calc_group_dim() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "root case pruning leaks into leaves that exclude the filter; fixed by the planner state refactor"]
 async fn test_query_case_dim_with_filter_excluded_from_leaf() {
     let ctx = create_context();
 

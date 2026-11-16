@@ -26,13 +26,13 @@ struct InformationSchemaSchemataBuilder {
 impl InformationSchemaSchemataBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            catalog_names: StringBuilder::new(capacity),
-            schema_names: StringBuilder::new(capacity),
-            schema_owners: StringBuilder::new(capacity),
-            default_character_set_catalogs: StringBuilder::new(capacity),
-            default_character_set_schemas: StringBuilder::new(capacity),
-            default_character_set_names: StringBuilder::new(capacity),
-            sql_paths: StringBuilder::new(capacity),
+            catalog_names: StringBuilder::with_capacity(capacity, capacity),
+            schema_names: StringBuilder::with_capacity(capacity, capacity),
+            schema_owners: StringBuilder::with_capacity(capacity, capacity),
+            default_character_set_catalogs: StringBuilder::with_capacity(capacity, capacity),
+            default_character_set_schemas: StringBuilder::with_capacity(capacity, capacity),
+            default_character_set_names: StringBuilder::with_capacity(capacity, capacity),
+            sql_paths: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
@@ -42,19 +42,13 @@ impl InformationSchemaSchemataBuilder {
         schema_name: impl AsRef<str>,
         schema_owner: impl AsRef<str>,
     ) {
-        self.catalog_names
-            .append_value(catalog_name.as_ref())
-            .unwrap();
-        self.schema_names
-            .append_value(schema_name.as_ref())
-            .unwrap();
-        self.schema_owners
-            .append_value(schema_owner.as_ref())
-            .unwrap();
-        self.default_character_set_catalogs.append_null().unwrap();
-        self.default_character_set_schemas.append_null().unwrap();
-        self.default_character_set_names.append_null().unwrap();
-        self.sql_paths.append_null().unwrap();
+        self.catalog_names.append_value(catalog_name.as_ref());
+        self.schema_names.append_value(schema_name.as_ref());
+        self.schema_owners.append_value(schema_owner.as_ref());
+        self.default_character_set_catalogs.append_null();
+        self.default_character_set_schemas.append_null();
+        self.default_character_set_names.append_null();
+        self.sql_paths.append_null();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

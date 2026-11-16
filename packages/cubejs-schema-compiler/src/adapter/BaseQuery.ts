@@ -160,6 +160,7 @@ export type BaseQueryOptions = {
   localRefreshKey?: boolean;
   convertTzForRawTimeDimension?: boolean;
   multiStageLeafMerge?: boolean;
+  multiStageScanSharing?: boolean;
   cubestoreSupportMultistage?: boolean;
   cubestoreUnionFullKeyAggregate?: boolean;
   unionFullKeyAggregate?: boolean;
@@ -796,8 +797,12 @@ export class BaseQuery {
     return this.options.dataSource ?? this.detectDataSource();
   }
 
+  public queryDataSources(): string[] {
+    return R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
+  }
+
   protected detectDataSource(): string | undefined {
-    const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
+    const dataSources = this.queryDataSources();
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
       throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
     }
@@ -1172,6 +1177,7 @@ export class BaseQuery {
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       multiStageLeafMerge: this.options.multiStageLeafMerge ?? getEnv('tesseractMultiStageLeafMerge'),
+      multiStageScanSharing: this.options.multiStageScanSharing ?? getEnv('tesseractMultiStageScanSharing'),
       cubestoreUnionFullKeyAggregate: this.options.cubestoreUnionFullKeyAggregate ?? getEnv('tesseractCubeStoreUnionFullKeyAggregate'),
       unionFullKeyAggregate: this.options.unionFullKeyAggregate ?? this.unionFullKeyAggregateEnabled(),
       maxMultiStageDepth: this.options.maxMultiStageDepth ?? getEnv('maxMultiStageDepth'),
@@ -3478,6 +3484,10 @@ export class BaseQuery {
     return sql;
   }
 
+  public wrapBooleanDimension(sql: string) {
+    return sql;
+  }
+
   public pushCubeNameForCollectionIfNecessary(cubeName: string) {
     if ((this.evaluateSymbolContext || {}).cubeNames && cubeName) {
       this.evaluateSymbolContext.cubeNames.push(cubeName);
@@ -4670,7 +4680,7 @@ export class BaseQuery {
 
   public preAggregationLoadSql(cube: string, preAggregation: EvaluatedPreAggregationDefinition, tableName: string) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
-    return [`CREATE TABLE ${tableName} ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
+    return [`CREATE TABLE ${tableName} AS ${sqlAndParams[0]}`, sqlAndParams[1]];
   }
 
   public preAggregationPreviewSql(tableName: string) {
@@ -4760,7 +4770,7 @@ export class BaseQuery {
             preAggregation
           );
           const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
-          return this.paramAllocator.buildSqlAndParams(originalSqlPreAggregationQuery.evaluateSymbolSqlWithContext(
+          return originalSqlPreAggregationQuery.paramAllocator.buildSqlAndParams(originalSqlPreAggregationQuery.evaluateSymbolSqlWithContext(
             () => {
               if (cubeFromPath.sqlTable) {
                 return `SELECT * FROM ${originalSqlPreAggregationQuery.cubeSql(cube)}`;
@@ -4920,6 +4930,7 @@ export class BaseQuery {
         NULLIF: 'NULLIF({{ args_concat }})',
         ROUND: 'ROUND({{ args_concat }})',
 
+        TRIM: 'TRIM({{ args_concat }})',
         SUBSTR: 'SUBSTRING({{ args_concat }})',
         CHARACTERLENGTH: 'CHAR_LENGTH({{ args[0] }})',
 
@@ -5029,6 +5040,7 @@ export class BaseQuery {
         concat_strings: '{{ strings | join(\' || \' ) }}',
         wrap_segment_select: '{{ expr }}',
         wrap_segment_filter: '{{ expr }}',
+        wrap_boolean_dimension: '{{ expr }}',
         rolling_window_expr_timestamp_cast: '{{ value }}',
         // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z').
         // ANSI CAST of the quoted value is the most portable default; dialects override
@@ -5371,7 +5383,7 @@ export class BaseQuery {
     preAggregation: EvaluatedPreAggregationDefinition & { refreshKey?: RefreshKeyDefinition },
     preAggregationName: string,
     queryForSqlEvaluation: BaseQuery,
-  ) {
+  ): unknown[][] {
     return this.cacheValue(
       ['preAggregationInvalidateKeyQueries', cube, JSON.stringify(preAggregation)],
       () => {
@@ -5505,7 +5517,7 @@ export class BaseQuery {
     return threshold;
   }
 
-  public preAggregationStartEndQueries(cube: string, preAggregation: PreAggregationDefinitionExtended) {
+  public preAggregationStartEndQueries(cube: string, preAggregation: EvaluatedPreAggregationDefinition) {
     const references = this.cubeEvaluator.evaluatePreAggregationReferences(cube, preAggregation);
     const timeDimension = this.newTimeDimension(references.timeDimensions[0]);
 

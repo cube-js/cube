@@ -419,6 +419,7 @@ impl DatabaseProtocol {
                 "pg_stat_activity" => {
                     return Some(Arc::new(PgCatalogStatActivityProvider::new(
                         context.sessions.clone(),
+                        context.session_state.clone(),
                     )))
                 }
                 "pg_statio_user_tables" => {

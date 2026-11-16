@@ -366,7 +366,10 @@ SIEM tools.
 
 Requires [Audit Log][ref-audit-log] to be enabled on the
 [Enterprise plan](https://cube.dev/pricing). The authenticated user
-must have the `AuditLogManage` permission.
+must have the `AuditLogManage` permission. The [API key][ref-api-keys] must be
+scoped to [all deployments][ref-api-keys-deployment-scope], and its [endpoint
+scope][ref-api-keys-endpoint-scope] must include this endpoint. For a SIEM
+integration, use a key limited to only this endpoint.
 
 </Info>
 
@@ -374,8 +377,8 @@ Query parameters:
 
 | Parameter | Description | Required |
 | --- | --- | --- |
-| `start` | Start of the date range (ISO 8601 format, e.g., `2024-01-01`) | No |
-| `end` | End of the date range (ISO 8601 format, e.g., `2024-01-31`) | No |
+| `start` | Start of the date range (ISO 8601 format, e.g., `2024-01-01`) | Yes |
+| `end` | End of the date range (ISO 8601 format, e.g., `2024-01-31`) | Yes |
 | `search` | Full-text search across event data | No |
 | `eventName` | Filter by event type (e.g., `Logged in`) | No |
 | `userEmail` | Filter by user email | No |
@@ -402,22 +405,26 @@ curl \
 
 ### `/api/v1/deployments/{deployment_id}/dashboard-exports`
 
-Request a server-rendered snapshot of a whole published dashboard as PNG or
-PDF — the same rendering the [Download as PNG or PDF][ref-dashboard-download]
-action uses — without driving a browser through the console. A draft that
+Request a server-rendered file of a whole published dashboard as PNG or PDF —
+the same rendering the dashboard's [Download settings][ref-dashboard-download]
+dialog uses — without driving a browser through the console. A draft that
 has never been published can't be exported. Identify the dashboard with
 either `dashboardId` (numeric) or `dashboardPublicId` (string) — exactly one,
-not both. Requires **manage** access to the dashboard's workbook, the same
-permission the console's whole-dashboard download requires.
+not both. Requires **read** access to the dashboard's workbook and the
+**Download data** permission on the deployment, the same rule the console's
+whole-dashboard download follows; **manage** access to the workbook also
+passes.
 
-By default (`layout: screenshot`) the file captures the dashboard as it is
+`format` and `layout` are the dialog's **Format** and **Layout**. By default
+(`layout: screenshot`, **Snapshot**) the file captures the dashboard as it is
 laid out on screen. Pass `layout: print` with `format: pdf` —
 `{"dashboardPublicId": "abc123", "format": "pdf", "layout": "print"}` — for
 the dashboard's [print version][ref-print-version] instead: the A4 document
-its **Download print version** menu item produces, with every widget at full
-page width, one below another, every row of each table, and the control
-selections the file renders with stated as one summary line in place of the
-controls. `print` is available for PDF only.
+**Print version** produces, with every widget at full page width, one below
+another, every tab, every row of each table, and the control selections the
+file renders with stated as one summary line in place of the controls. `print`
+is available for PDF only. Without `filters`, `timeGrains` and
+`memberSwitchers`, the dashboard's published defaults apply.
 
 Rendering happens asynchronously, since a capture waits for every widget on
 the dashboard to finish querying: submit a job, poll it until `status` is
@@ -484,6 +491,8 @@ per-recipient reports with a bounded number of jobs open at a time. See the
 [ref-cli]: /reference/cli
 [ref-api-keys]: /admin/account-billing/api-keys
 [ref-personal-api-keys]: /admin/account-billing/api-keys#personal-api-keys
+[ref-api-keys-deployment-scope]: /admin/account-billing/api-keys#deployment-scope
+[ref-api-keys-endpoint-scope]: /admin/account-billing/api-keys#endpoint-scope
 [ref-roles-and-permissions]: /admin/users-and-permissions/roles-and-permissions
 [ref-dap]: /docs/data-modeling/data-access-policies
 [ref-security-context]: /docs/data-modeling/access-control/context

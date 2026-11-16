@@ -990,7 +990,8 @@ timestamps Cube Store keeps on each item:
   minutes by default). This means the node that claimed the query died
   mid-execution: a crashed process, a killed pod, a network partition.
 - **Orphaned queries** are `Pending` items that outlived their orphaned
-  deadline (set when the item is added; 120 seconds by default). This
+  deadline (at least 120 seconds by default, pushed forward to up to 1.5×
+  the timeout each time a waiting client adds the item again). This
   typically means everyone who cared about the result has gone away —
   clients disconnected and stopped re-requesting — so executing the query
   would be wasted work.

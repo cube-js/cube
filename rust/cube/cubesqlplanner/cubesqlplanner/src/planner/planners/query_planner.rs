@@ -43,11 +43,10 @@ impl QueryPlanner {
             let planner = SimpleQueryPlanner::new(self.query_tools.clone(), analysis);
             planner.plan(scope)
         } else {
-            let request = self.request.clone();
             let mut refs = Vec::new();
 
             let multi_stage_query_planner =
-                MultiStageQueryPlanner::try_new(self.query_tools.clone(), request.clone())?;
+                MultiStageQueryPlanner::try_new(self.query_tools.clone(), &analysis)?;
             if self.request.allow_multi_stage() {
                 refs.extend(multi_stage_query_planner.plan_queries(scope)?);
             }

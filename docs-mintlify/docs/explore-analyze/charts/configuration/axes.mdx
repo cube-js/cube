@@ -3,7 +3,7 @@ title: Axes
 description: Configure axis titles, grid lines, label formatting, dual Y-axis, reference lines, and reference bands.
 ---
 
-The **Axes** section in the Style tab controls the appearance and behavior of the X axis and Y axis (or left and right Y axes in dual-axis charts). Most axis settings are available for all Vega-based chart types (bar, line, area, scatter, heatmap).
+The **Axes** section in the Style tab controls the appearance and behavior of the X axis and Y axis (or left and right Y axes in dual-axis charts). These settings are available for bar, line, area, and scatter charts.
 
 {/* TODO screenshot: axes configuration panel open in Style tab (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
@@ -17,6 +17,7 @@ The **Axes** section in the Style tab controls the appearance and behavior of th
 | **Labels** | Toggle axis tick labels |
 | **Label angle** | Rotate axis labels (useful for long category names) |
 | **Label format** | Number or date format applied to axis labels |
+| **Every** | On a time axis, draw a tick at a fixed interval, for example every 3 months. Turn on **Every**, then set the count and the unit (day, week, month, quarter, or year). Units finer than the query's time grain are not offered. Off by default: the chart picks the ticks. |
 
 ## Y axis (left)
 
@@ -27,7 +28,14 @@ The **Axes** section in the Style tab controls the appearance and behavior of th
 | **Grid lines** | Toggle horizontal grid lines |
 | **Labels** | Toggle axis tick labels |
 | **Label format** | Number format applied to axis labels (e.g. `$,.0f` for currency) |
-| **Min / Max** | Override the axis scale minimum and maximum values |
+| **Log scale** | Draw the axis on a logarithmic scale. Not available when the data has values of zero or below. |
+| **Start at zero** | Keep zero in view. On by default. Turn it off to fit the axis to the data, for example when a line moves between 150k and 240k. An axis with bars always starts at zero. Not available with **Log scale** or a **Min** value. |
+| **Min / Max** | Override the axis scale minimum and maximum values. Leave a field blank to keep it automatic. |
+| **Interval** | Draw a tick at every multiple of this value, for example `50000`. Leave it blank for automatic ticks. Not available with **Log scale**. |
+
+On a 100% stacked chart, the axis always runs from 0% to 100%, so **Log scale**, **Start at zero**, **Min / Max**, and **Interval** are hidden.
+
+On a scatter chart, the X axis has the same scale settings as the Y axis.
 
 {/* TODO screenshot: Y-axis settings panel with title and grid controls (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 

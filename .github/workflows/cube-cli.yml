@@ -58,7 +58,7 @@ jobs:
           # macOS — Intel and Apple Silicon.
           - os: macos-15-intel
             target: x86_64-apple-darwin
-          - os: macos-14
+          - os: macos-15
             target: aarch64-apple-darwin
           # Windows.
           - os: windows-2022
@@ -90,7 +90,7 @@ jobs:
       matrix:
         # Both images ship pwsh, so install-cli.ps1 runs here too. The fake
         # binaries the test serves are shell scripts, which Windows can't run.
-        os: [ubuntu-24.04, macos-14]
+        os: [ubuntu-24.04, macos-15]
     steps:
       - uses: actions/checkout@v7
       - name: Test installers

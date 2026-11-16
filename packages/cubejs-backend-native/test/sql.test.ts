@@ -963,6 +963,67 @@ describe('SQLInterface', () => {
       }
     }
   );
+
+  test('binds :name parameters as SQL expressions and describes their types', async () => {
+    const methods = interfaceMethods();
+    const instance = await native.registerInterface({
+      ...methods,
+      canSwitchUserForSession: (_payload) => true,
+      preAggregationMatch: async ({ queries }) => ({ matches: queries.map(() => false) }),
+    });
+
+    const sql = 'SELECT customer_gender FROM KibanaSampleDataEcommerce WHERE customer_gender = :gender AND taxful_total_price > :price LIMIT :n';
+
+    const lines: any[] = [];
+    const cubeSqlStream = () => new Writable({
+      write: (chunk, _, callback) => {
+        lines.push(...chunk.toString('utf-8').split('\n').filter((l: string) => l.trim()).map((l: string) => JSON.parse(l)));
+        callback();
+      },
+    });
+
+    try {
+      expect(await native.describeSqlParams(instance, sql, { foo: 'bar' })).toEqual({
+        params: [
+          { name: 'gender', type: 'string' },
+          { name: 'price', type: 'number' },
+          { name: 'n', type: 'number' },
+        ],
+      });
+      expect(await native.describeSqlParams(instance, 'SELEC 1', { foo: 'bar' })).toEqual({
+        error: expect.stringMatching(/Unable to parse/),
+      });
+
+      await native.execSql(instance, sql, cubeSqlStream(), { foo: 'bar' }, undefined, undefined, undefined, undefined, undefined, [
+        { name: 'gender', value: "it's female", type: 'string' },
+        { name: 'price', value: '10 * 2', type: 'expr' },
+        { name: 'n', value: 5, type: 'number' },
+      ]);
+      // The mocked load answers with an error; the request it received is what counts
+      expect(methods.sqlApiLoad.mock.calls[0][0].query).toMatchObject({
+        filters: [
+          { member: 'KibanaSampleDataEcommerce.customer_gender', operator: 'equals', values: ["it's female"] },
+          { member: 'KibanaSampleDataEcommerce.taxful_total_price', operator: 'gt', values: ['20'] },
+        ],
+        limit: 5,
+      });
+
+      lines.length = 0;
+      await native.execSql(instance, sql, cubeSqlStream(), { foo: 'bar' }, undefined, undefined, undefined, undefined, undefined, [
+        { name: 'gender', value: 'female', type: 'string' },
+        { name: 'price', value: '(SELECT 1)', type: 'expr' },
+      ]);
+      expect(lines.find((l) => l.error)?.error).toMatch(/Invalid value of parameter :price: a subquery is not allowed/);
+
+      lines.length = 0;
+      await native.execSql(instance, sql, cubeSqlStream(), { foo: 'bar' }, undefined, undefined, undefined, undefined, undefined, [
+        { name: 'gender', value: false, type: 'string' },
+      ]);
+      expect(lines.find((l) => l.error)?.error).toMatch(/Invalid value of parameter :gender: expected a string/);
+    } finally {
+      await native.shutdownInterface(instance, 'fast');
+    }
+  });
 });
 
 describe('security context argument of the native entry points', () => {

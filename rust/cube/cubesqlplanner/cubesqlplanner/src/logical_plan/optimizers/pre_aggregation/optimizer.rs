@@ -219,13 +219,10 @@ impl PreAggregationOptimizer {
         time_shifts: &TimeShiftState,
     ) -> Result<Option<Rc<Query>>, CubeError> {
         // Row identity for an ungrouped read is judged against the join this
-        // very node will render, taken from the node itself rather than
-        // re-resolved, so the two can never disagree.
+        // node means, taken from the node itself rather than re-resolved, so
+        // the two can never disagree.
         let row_grain = if is_user_query && query.modifers().ungrouped {
-            RowGrain::RawRows(match query.source().base() {
-                InputBase::QueryInputs(inputs) => inputs.join().clone(),
-                _ => None,
-            })
+            RowGrain::RawRows(query.join().clone())
         } else {
             RowGrain::Aggregated
         };
@@ -245,7 +242,9 @@ impl PreAggregationOptimizer {
             }
             let source =
                 self.make_pre_aggregation_source(pre_aggregation, &matched_measures, scan_range)?;
-            Ok(Some(query.with_source(QuerySource::new(source))))
+            Ok(Some(
+                query.reading_rows_of(LogicalFrom::pre_aggregation(source)?)?,
+            ))
         } else {
             Ok(None)
         }
@@ -298,9 +297,9 @@ impl PreAggregationOptimizer {
                         distinct: false,
                         order_by: vec![],
                     }))
-                    .source(QuerySource::new(source))
-                    .build();
-                return Ok(Some(Rc::new(new_query)));
+                    .from(LogicalFrom::pre_aggregation(source)?)
+                    .build()?;
+                return Ok(Some(new_query));
             }
             refused_branches.extend(Self::lambda_branches(pre_aggregation));
         }
@@ -850,14 +849,7 @@ impl PreAggregationOptimizer {
     ) -> Result<Option<HashSet<MemberId>>, CubeError> {
         let helper = OptimizerHelper::new();
 
-        let match_state = self.match_dimensions(
-            &schema.dimensions,
-            &schema.time_dimensions,
-            &filters.dimensions_filters,
-            &filters.time_dimensions_filters,
-            &filters.segments,
-            pre_aggregation,
-        )?;
+        let match_state = self.match_dimensions(schema, filters, pre_aggregation)?;
 
         let all_measures = helper.all_measures(schema, filters);
         if match_state == MatchState::NotMatched {
@@ -935,26 +927,18 @@ impl PreAggregationOptimizer {
                     .try_fold(false, |acc, m| -> Result<bool, CubeError> {
                         Ok(acc || has_multi_stage_members(m, false)?)
                     })?;
-            if !query_has_multi_stage {
-                let has_filters = !filters.dimensions_filters.is_empty()
-                    || !filters.time_dimensions_filters.is_empty()
-                    || !filters.segments.is_empty();
-                let query_has_multiplied = if has_filters {
-                    MultiFactJoinGroups::try_new(
-                        self.query_tools.clone(),
-                        self.filtered_join_hints(schema, filters, &all_measures)?,
-                    )?
-                    .has_multiplied_measures()?
-                } else {
-                    query_groups.has_multiplied_measures()?
-                };
-                if !query_has_multiplied {
-                    return Ok(None);
-                }
+            if !query_has_multi_stage && !query_groups.has_multiplied_measures()? {
+                return Ok(None);
             }
         }
 
-        if !self.are_join_paths_matching(schema, &all_measures, &query_groups, pre_aggregation)? {
+        if !self.are_join_paths_matching(
+            schema,
+            filters,
+            &all_measures,
+            &query_groups,
+            pre_aggregation,
+        )? {
             return Ok(None);
         }
 
@@ -1169,51 +1153,45 @@ impl PreAggregationOptimizer {
         filters: &Rc<LogicalFilter>,
         measures: &[Rc<MemberSymbol>],
     ) -> Result<MultiFactJoinGroups, CubeError> {
+        // The query is planned with its filters: their members' join hints pick
+        // the path to a cube, can multiply measures, or be the only link between cubes.
         let hints = MeasuresJoinHints::builder(&self.query_join_hints)
-            .add_dimensions(&schema.dimensions)
-            .add_dimensions(&schema.time_dimensions)
-            .build(measures)?;
-        if let Ok(groups) =
-            MultiFactJoinGroups::try_new_if_joinable(self.query_tools.clone(), hints)?
-        {
-            return Ok(groups);
-        }
-        // A filtered member can be the only link between the cubes the query
-        // selects from, and the query itself is planned with its filters.
-        MultiFactJoinGroups::try_new(
-            self.query_tools.clone(),
-            self.filtered_join_hints(schema, filters, measures)?,
-        )
-    }
-
-    fn filtered_join_hints(
-        &self,
-        schema: &Rc<LogicalSchema>,
-        filters: &Rc<LogicalFilter>,
-        measures: &[Rc<MemberSymbol>],
-    ) -> Result<MeasuresJoinHints, CubeError> {
-        MeasuresJoinHints::builder(&self.query_join_hints)
             .add_dimensions(&schema.dimensions)
             .add_dimensions(&schema.time_dimensions)
             .add_filters(&filters.dimensions_filters)
             .add_filters(&filters.time_dimensions_filters)
             .add_filters(&filters.segments)
-            .build(measures)
+            .build(measures)?;
+        MultiFactJoinGroups::try_new(self.query_tools.clone(), hints)
     }
 
     fn are_join_paths_matching(
         &self,
         schema: &Rc<LogicalSchema>,
+        filters: &Rc<LogicalFilter>,
         measures: &[Rc<MemberSymbol>],
         query_groups: &MultiFactJoinGroups,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<bool, CubeError> {
         let pre_aggr_groups = &pre_aggregation.multi_fact_join_groups;
 
+        // A filter member stored over another path than the query's is another
+        // column under the same name.
+        let filter_members: Vec<_> = [
+            &filters.dimensions_filters,
+            &filters.time_dimensions_filters,
+            &filters.segments,
+        ]
+        .into_iter()
+        .flatten()
+        .flat_map(|item| item.all_member_evaluators())
+        .collect();
+
         for dim in schema
             .dimensions
             .iter()
             .chain(schema.time_dimensions.iter())
+            .chain(filter_members.iter())
         {
             let query_path = query_groups.resolve_join_path_for_dimension(dim);
             let pre_aggr_path = pre_aggr_groups.resolve_join_path_for_dimension(dim);
@@ -1279,24 +1257,26 @@ impl PreAggregationOptimizer {
 
     fn match_dimensions(
         &self,
-        dimensions: &Vec<Rc<MemberSymbol>>,
-        time_dimensions: &Vec<Rc<MemberSymbol>>,
-        filters: &Vec<FilterItem>,
-        time_dimension_filters: &Vec<FilterItem>,
-        segments: &Vec<FilterItem>,
+        schema: &LogicalSchema,
+        filters: &LogicalFilter,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<MatchState, CubeError> {
         let mut matcher =
             DimensionMatcher::new(self.query_tools.query_tools().clone(), pre_aggregation);
         matcher.try_match(
-            dimensions,
-            time_dimensions,
-            filters,
-            time_dimension_filters,
-            segments,
+            &schema.dimensions,
+            &schema.time_dimensions,
+            &filters.dimensions_filters,
+            &filters.time_dimensions_filters,
+            &filters.segments,
         )?;
-        let result = matcher.result();
-        Ok(result)
+        // A query reading no rollup column besides calc groups the rollup does
+        // not store would scan it for zero columns, which Arrow rejects.
+        let reads_measure = !schema.measures.is_empty() || !filters.measures_filter.is_empty();
+        if !reads_measure && !matcher.projects_stored_dimension() {
+            return Ok(MatchState::NotMatched);
+        }
+        Ok(matcher.result())
     }
 }
 

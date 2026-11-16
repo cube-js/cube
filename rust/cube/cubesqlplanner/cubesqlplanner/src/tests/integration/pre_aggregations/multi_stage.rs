@@ -260,7 +260,8 @@ async fn test_multi_stage_pre_agg_with_filter_multiplied_leaf() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multi_stage_pre_agg_covering_multiplying_filter() {
     // Same query, but the pre-aggregation also stores returns.customer_id —
-    // the dimension the multiplying filter applies to.
+    // the dimension the multiplying filter applies to, below the one_to_many
+    // edge where one order carries several of its values.
     let schema = MockSchema::from_yaml_file(YAML)
         .only_pre_aggregations(&["orders_amount_by_month_and_return_customer"]);
     let ctx = TestContext::new(schema).unwrap();
@@ -281,35 +282,13 @@ async fn test_multi_stage_pre_agg_covering_multiplying_filter() {
     "#};
 
     let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
-    let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
-    assert_eq!(
-        pre_aggrs.len(),
-        2,
-        "Expected 2 usages (shifted + unshifted leaf); got {:?}",
-        names
-    );
     assert!(
-        names
+        pre_aggrs.is_empty(),
+        "A multiplied rollup must not be summed across a filter-only member; got {:?}",
+        pre_aggrs
             .iter()
-            .all(|n| *n == "orders_amount_by_month_and_return_customer"),
-        "Both usages must be orders_amount_by_month_and_return_customer; got {:?}",
-        names
-    );
-    let shifted_range = Some((
-        "2023-12-01T00:00:00.000".to_string(),
-        "2024-02-29T23:59:59.999".to_string(),
-    ));
-    let original_range = Some((
-        "2024-01-01T00:00:00.000".to_string(),
-        "2024-03-31T23:59:59.999".to_string(),
-    ));
-    assert!(
-        pre_aggrs.iter().any(|u| u.date_range == shifted_range),
-        "Expected a usage with shifted date_range"
-    );
-    assert!(
-        pre_aggrs.iter().any(|u| u.date_range == original_range),
-        "Expected a usage with original date_range"
+            .map(|u| u.name().clone())
+            .collect::<Vec<_>>()
     );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {

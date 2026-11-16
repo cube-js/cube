@@ -463,6 +463,10 @@ pub trait ConfigObj: DIService {
 
     fn import_job_timeout(&self) -> u64;
 
+    /// Whether `CREATE TABLE ... LOCATION` may read a local filesystem path.
+    /// `temp://` import locations are always allowed regardless of this setting.
+    fn location_allow_local_fs(&self) -> bool;
+
     fn meta_store_snapshot_interval(&self) -> u64;
 
     fn meta_store_log_upload_interval(&self) -> u64;
@@ -792,6 +796,7 @@ pub struct ConfigObjImpl {
     pub server_name: String,
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
+    pub location_allow_local_fs: bool,
     pub enable_topk: bool,
     pub load_aware_import_placement_enabled: bool,
     pub repartition_chunks_time_budget_secs: u64,
@@ -980,6 +985,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn import_job_timeout(&self) -> u64 {
         self.import_job_timeout
+    }
+
+    fn location_allow_local_fs(&self) -> bool {
+        self.location_allow_local_fs
     }
 
     fn meta_store_snapshot_interval(&self) -> u64 {
@@ -2099,6 +2108,7 @@ impl Config {
                     .ok()
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
+                location_allow_local_fs: env_flag("CUBESTORE_LOCATION_ALLOW_LOCAL_FS", false),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 load_aware_import_placement_enabled: env_flag(
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
@@ -2401,6 +2411,8 @@ impl Config {
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
+                // Tests import CSV files straight from disk.
+                location_allow_local_fs: true,
                 enable_topk: true,
                 load_aware_import_placement_enabled: true,
                 repartition_chunks_time_budget_secs: 60,
@@ -2964,8 +2976,9 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<dyn LocationsValidator, _, _, _>(async move |_| {
-                LocationsValidatorImpl::new()
+            .register_typed::<dyn LocationsValidator, _, _, _>(async move |i| {
+                let config = i.get_service_typed::<dyn ConfigObj>().await;
+                LocationsValidatorImpl::new(config.location_allow_local_fs())
             })
             .await;
 

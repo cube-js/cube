@@ -118,7 +118,7 @@ pub struct StageRegistry {
     stages: Vec<(MemberId, Rc<QueryProperties>, StageRef)>,
     stage_count: usize,
     time_series: Vec<TimeSeriesEntry>,
-    date_range_query: Option<StageRef>,
+    date_range_queries: Vec<(MemberId, StageRef)>,
     resolved_multi_stage_dimensions: HashSet<MemberId>,
 }
 
@@ -161,12 +161,20 @@ impl StageRegistry {
         self.time_series.push(entry);
     }
 
-    pub fn date_range_query(&self) -> Option<&StageRef> {
-        self.date_range_query.as_ref()
+    /// The query computing the data range of the time dimension `member`.
+    pub fn date_range_query(&self, member: &MemberId) -> Option<&StageRef> {
+        self.date_range_queries
+            .iter()
+            .find(|(id, _)| id == member)
+            .map(|(_, stage)| stage)
     }
 
-    pub fn set_date_range_query(&mut self, stage: StageRef) {
-        self.date_range_query = Some(stage);
+    pub fn date_range_query_count(&self) -> usize {
+        self.date_range_queries.len()
+    }
+
+    pub fn add_date_range_query(&mut self, member: MemberId, stage: StageRef) {
+        self.date_range_queries.push((member, stage));
     }
 
     pub fn resolved_multi_stage_dimensions(&self) -> &HashSet<MemberId> {

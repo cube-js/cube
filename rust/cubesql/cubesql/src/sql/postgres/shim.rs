@@ -15,7 +15,7 @@ use super::{
 use crate::sql::statement::{redact_error_message, redact_sql_literals, redacted_query_key};
 use crate::{
     compile::{
-        convert_statement_to_cube_query,
+        convert_statement_to_cube_query, describe_statement_to_cube_query,
         parser::{parse_sql_to_statement, parse_sql_to_statements},
         qtrace::Qtrace,
         CommandCompletion, CompilationError, CopyFromPlan, DatabaseProtocol, QueryPlan,
@@ -1220,14 +1220,26 @@ impl AsyncPostgresShim {
                 let stmt_replacer = StatementPlaceholderReplacer::new();
                 let hacked_query = stmt_replacer.replace(query.clone())?;
 
-                let plan = convert_statement_to_cube_query(
-                    hacked_query,
-                    meta,
-                    self.session.clone(),
-                    qtrace,
-                    span_id.clone(),
-                )
-                .await;
+                // Placeholders are not values, so Bind plans such a statement again to run it
+                let plan = if parameters.is_empty() {
+                    convert_statement_to_cube_query(
+                        hacked_query,
+                        meta,
+                        self.session.clone(),
+                        qtrace,
+                        span_id.clone(),
+                    )
+                    .await
+                } else {
+                    describe_statement_to_cube_query(
+                        hacked_query,
+                        meta,
+                        self.session.clone(),
+                        qtrace,
+                        span_id.clone(),
+                    )
+                    .await
+                };
 
                 match plan {
                     Ok(plan) => {

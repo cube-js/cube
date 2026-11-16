@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/hive-driver",
   "description": "Cube Hive database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.8.19",
+  "version": "1.8.26",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -13,17 +13,16 @@
   },
   "main": "src/HiveDriver.js",
   "dependencies": {
-    "@cubejs-backend/base-driver": "1.8.19",
-    "@cubejs-backend/shared": "1.8.19",
+    "@cubejs-backend/base-driver": "1.8.26",
+    "@cubejs-backend/shared": "1.8.26",
     "jshs2": "^0.4.4",
     "sasl-plain": "^0.1.0",
     "saslmechanisms": "^0.1.1",
-    "sqlstring": "^2.3.3",
     "thrift": "^0.23.0"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.8.19"
+    "@cubejs-backend/linter": "1.8.26"
   },
   "publishConfig": {
     "access": "public"

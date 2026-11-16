@@ -31,15 +31,15 @@ impl PgCatalogRewriteBuilder {
         let capacity = 1;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            rulename: StringBuilder::new(capacity),
-            ev_class: UInt32Builder::new(capacity),
-            ev_type: StringBuilder::new(capacity),
-            ev_enabled: StringBuilder::new(capacity),
-            is_instead: BooleanBuilder::new(capacity),
-            ev_qual: StringBuilder::new(capacity),
-            ev_action: StringBuilder::new(capacity),
-            xmin: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            rulename: StringBuilder::with_capacity(capacity, capacity),
+            ev_class: UInt32Builder::with_capacity(capacity),
+            ev_type: StringBuilder::with_capacity(capacity, capacity),
+            ev_enabled: StringBuilder::with_capacity(capacity, capacity),
+            is_instead: BooleanBuilder::with_capacity(capacity),
+            ev_qual: StringBuilder::with_capacity(capacity, capacity),
+            ev_action: StringBuilder::with_capacity(capacity, capacity),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 

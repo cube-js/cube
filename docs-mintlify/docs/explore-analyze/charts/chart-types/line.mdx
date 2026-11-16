@@ -47,7 +47,16 @@ See [Axes](/docs/explore-analyze/charts/configuration/axes) for the full configu
 
 ## Axis behavior
 
-Line charts use a temporal X axis for time dimensions — continuous, time-aware, and not constrained to the result set. For non-time dimensions, the axis is ordinal: values are sorted in ascending order (numbers numerically, strings alphabetically) and points are evenly spaced, not spaced by value. Gaps in the line indicate missing data points.
+The X axis depends on the dimension:
+
+- **Time dimensions** get a temporal axis: continuous, time-aware, and not constrained to the result set.
+- **Numeric dimensions** get a linear axis: points are spaced by value, so a gap between values (for example, 2 and 5) shows on the axis.
+- **Other dimensions** get an ordinal axis: values are evenly spaced and sorted in ascending order by default.
+- **A line combined with bars** uses an ordinal axis for numeric dimensions too, since bars need evenly spaced slots. Numeric values sort in ascending numeric order by default.
+
+On an ordinal axis, pick another **Sort** for the dimension on the Fields tab to change the order, such as **None** to keep the results table order.
+
+A missing measure value breaks the line. On a linear or temporal axis, X values absent from the results are bridged by a straight segment.
 
 ## Combining with bars
 

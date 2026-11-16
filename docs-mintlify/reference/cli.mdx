@@ -533,6 +533,10 @@ cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders
 `commit` pushes the dev branch's edits to the shared branch it was forked from, and
 `merge-to-default` merges that branch into the deploy branch, rebuilds production, and
 **deletes the branch it merged** — pass `--keep-branch` to keep it.
+`data-model merge`, which merges a branch into its parent, takes no message: the agent
+writes the merge commit's message, as in
+[Development mode](/docs/data-modeling/dev-mode#merge-or-create-a-pull-request).
+`merge-to-default` needs `-m`.
 
 <Warning>
 

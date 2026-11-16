@@ -2,6 +2,7 @@ use cubenativeutils::CubeError;
 
 use super::pretty_print::*;
 use crate::planner::collectors::has_multi_stage_members;
+use crate::planner::query_properties::member_chain_eq;
 use crate::planner::{MemberId, MemberSymbol};
 use std::fmt;
 use std::rc::Rc;
@@ -42,6 +43,31 @@ impl LogicalSchema {
     pub fn into_rc(self) -> Rc<Self> {
         Rc::new(self)
     }
+
+    pub fn map_symbols(
+        &self,
+        f: &impl Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    ) -> Result<Self, CubeError> {
+        let map = |members: &Vec<Rc<MemberSymbol>>| -> Result<Vec<_>, CubeError> {
+            members.iter().map(f).collect()
+        };
+        Ok(Self {
+            time_dimensions: map(&self.time_dimensions)?,
+            dimensions: map(&self.dimensions)?,
+            measures: map(&self.measures)?,
+        })
+    }
+
+    pub fn visit_symbols(
+        &self,
+        f: &mut impl FnMut(&Rc<MemberSymbol>) -> Result<(), CubeError>,
+    ) -> Result<(), CubeError> {
+        self.time_dimensions
+            .iter()
+            .chain(self.dimensions.iter())
+            .chain(self.measures.iter())
+            .try_for_each(f)
+    }
 }
 
 impl LogicalSchema {
@@ -75,6 +101,11 @@ impl LogicalSchema {
 
     pub fn all_members(&self) -> impl Iterator<Item = &Rc<MemberSymbol>> {
         self.all_dimensions().chain(self.measures.iter())
+    }
+
+    /// Whether a dimension of the schema is `member`, references followed.
+    pub fn has_dimension(&self, member: &Rc<MemberSymbol>) -> bool {
+        self.all_dimensions().any(|d| member_chain_eq(d, member))
     }
 
     pub fn has_dimensions(&self) -> bool {

@@ -72,7 +72,7 @@ fn build_schema(kinds: &[ColKind]) -> SchemaRef {
             };
             Field::new(&name, dt, true)
         })
-        .collect();
+        .collect::<Vec<_>>();
     Arc::new(Schema::new(fields))
 }
 

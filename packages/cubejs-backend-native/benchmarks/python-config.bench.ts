@@ -25,7 +25,6 @@ describe('Python Configuration Loading', () => {
     // Load file contents once for all benchmarks
     const configPath = path.join(process.cwd(), 'benchmarks', 'fixtures', 'config.py');
     const configAsyncPath = path.join(process.cwd(), 'benchmarks', 'fixtures', 'config-async.py');
-    const oldConfigPath = path.join(process.cwd(), 'test', 'old-config.py');
 
     [configContent, configAsyncContent] = await Promise.all([
       fs.readFile(configPath, 'utf8'),

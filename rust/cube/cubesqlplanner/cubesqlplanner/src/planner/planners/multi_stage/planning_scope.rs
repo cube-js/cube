@@ -1,7 +1,5 @@
 use super::TimeShiftState;
-use crate::logical_plan::{
-    DimensionInput, DimensionInputKeys, LogicalSchema, Query, Subquery, SubqueryBody, SubqueryRef,
-};
+use crate::logical_plan::{DimensionInput, LogicalSchema, Subquery, SubqueryBody, SubqueryRef};
 use crate::planner::{InputId, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
@@ -57,7 +55,6 @@ impl SubqueryState {
                 DimensionInput {
                     subquery: Rc::new(subquery),
                     keys: calculation.join_dimensions()?,
-                    keys_kind: DimensionInputKeys::Grid,
                 },
             );
         }
@@ -156,18 +153,14 @@ impl PlanningScope {
 
     /// Adds `body` as a subquery its readers render in place; `schema` is
     /// what they may read from it.
-    pub fn add_inline_query(
+    pub fn add_inline(
         &mut self,
         name: String,
-        body: Rc<Query>,
+        body: impl Into<SubqueryBody>,
         schema: Rc<LogicalSchema>,
     ) -> Result<Rc<SubqueryRef>, CubeError> {
         let id = self.next_input_id();
-        self.add_member(Rc::new(Subquery::new_inline(
-            id,
-            name.clone(),
-            SubqueryBody::Query(body),
-        )))?;
+        self.add_member(Rc::new(Subquery::new_inline(id, name.clone(), body.into())))?;
         Ok(Rc::new(
             SubqueryRef::builder()
                 .id(id)

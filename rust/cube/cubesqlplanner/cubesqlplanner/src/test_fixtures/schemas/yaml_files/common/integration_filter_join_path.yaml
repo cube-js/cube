@@ -1,0 +1,108 @@
+# `sp_sales` reaches `brands` two ways: directly on its own brand, or through
+# `hcps` and the one_to_many `gross_sales`, which fans the sales out. The rollup
+# stores the brand of the direct path.
+cubes:
+    - name: sp_sales
+      sql: "SELECT * FROM sp_sales"
+      joins:
+          - name: hcps
+            relationship: many_to_one
+            sql: "{CUBE}.hcp_id = {hcps}.id"
+          - name: brands
+            relationship: many_to_one
+            sql: "{CUBE}.brand_id = {brands}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: brand_id
+            type: number
+            sql: brand_id
+      measures:
+          - name: amount
+            type: sum
+            sql: amount
+      pre_aggregations:
+          - name: by_brand
+            type: rollup
+            external: false
+            measures:
+                - amount
+            dimensions:
+                - brands.name
+          - name: by_gross_sale
+            type: rollup
+            external: false
+            measures:
+                - amount
+            dimensions:
+                - gross_sales.id
+
+    - name: hcps
+      sql: "SELECT * FROM hcps"
+      joins:
+          - name: gross_sales
+            relationship: one_to_many
+            sql: "{CUBE}.id = {gross_sales}.hcp_id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: count
+            type: count
+      pre_aggregations:
+          # Its join is rooted at `sp_sales`, the many side of the edge.
+          - name: by_sp_brand
+            type: rollup
+            external: false
+            measures:
+                - count
+            dimensions:
+                - sp_sales.brand_id
+
+    - name: gross_sales
+      sql: "SELECT * FROM gross_sales"
+      joins:
+          - name: brands
+            relationship: many_to_one
+            sql: "{CUBE}.brand_id = {brands}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+
+    - name: brands
+      sql: "SELECT * FROM brands"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+
+views:
+    # The brand is pinned to the fan-out path.
+    - name: sales_by_gross_brand
+      cubes:
+          - join_path: sp_sales
+            includes:
+                - amount
+          - join_path: sp_sales.hcps.gross_sales.brands
+            includes:
+                - name
+
+    # The brand is pinned to the path the rollup is built on.
+    - name: sales_by_own_brand
+      cubes:
+          - join_path: sp_sales
+            includes:
+                - amount
+          - join_path: sp_sales.brands
+            includes:
+                - name

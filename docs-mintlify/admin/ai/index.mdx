@@ -1,5 +1,5 @@
 ---
-description: Configure the agent that ships with every Cube deployment — accessible views, LLM, runtime, and memory.
+description: Configure the agent that ships with every Cube deployment — accessible views, LLM, and memory.
 title: Overview
 ---
 
@@ -38,7 +38,6 @@ Place agent properties at the root of `agents/config.yml`:
 ```yaml
 # agents/config.yml
 llm: claude_4_sonnet
-runtime: plain
 accessible_views:
   - orders_view
   - customers_view
@@ -54,7 +53,6 @@ suggestions:
 |---------------------|------------------|--------------------------|-------------------------------------------------------------------------------------------------------------------------|
 | `llm`               | string or object | `auto`                   | LLM provider — `auto`, a [predefined model](#llm) name, or a [BYOM](/admin/ai/bring-your-own-model) reference.          |
 | `embedding_llm`     | string or object | `text-embedding-3-large` | Embedding model — a predefined name or a BYOM reference.                                                                |
-| `runtime`           | string           | `plain`                  | [Runtime mode](#runtime) — `plain` or `reasoning`.                                                                      |
 | `accessible_views`  | array            | _all views_              | List of view names exposed to the agent as context guidance for which views to query. This is not a security control — if omitted or empty, all views are exposed. Use [access policies](/reference/data-modeling/data-access-policies) to enforce actual access restrictions. |
 | `memory_mode`       | string           | `space`                  | [Memory isolation mode](#memory) — `space`, `user`, or `disabled`.                                                      |
 | `suggestions`       | array            | _none_                   | [Starter prompts](#suggestions) offered on the agent's empty chat screen.                                               |
@@ -118,19 +116,6 @@ Predefined embedding models for the `embedding_llm` property:
 - `text-embedding-3-small`
 
 BYOM is also supported for embedding models.
-
-## Runtime
-
-The `runtime` property controls how the agent processes requests:
-
-| Mode         | Description                                                                                |
-|--------------|--------------------------------------------------------------------------------------------|
-| `plain`      | Default. Optimized for speed and cost. Recommended for most use cases.                     |
-| `reasoning`  | Enables extended thinking for complex analysis.                                            |
-
-<Warning>
-  `reasoning` is **experimental**. It may be unstable and is not yet feature-complete. Stick with `plain` unless you have a specific need for extended reasoning.
-</Warning>
 
 ## Memory
 

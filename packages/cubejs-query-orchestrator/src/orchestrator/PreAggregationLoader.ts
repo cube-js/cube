@@ -636,9 +636,15 @@ export class PreAggregationLoader {
           outputColumnTypes: this.preAggregation.outputColumnTypes,
           ...queryOptions
         }
-      ));
+      ))
+        .then(() => this.createIndexes(client, newVersionEntry, saveCancelFn, queryOptions))
+        .catch(async (error: any) => {
+          // A failed or cancelled `CREATE TABLE ... AS SELECT` can leave the table behind with part
+          // of the rows (e.g. ClickHouse), and it would be served once the build leaves the queue
+          await this.dropPartiallyBuiltTable(client, targetTableName, queryOptions);
+          throw error;
+        });
 
-      await this.createIndexes(client, newVersionEntry, saveCancelFn, queryOptions);
       await this.reportBuildLanded(targetTableName);
       await this.loadCache.fetchTables(this.preAggregation);
     } finally {
@@ -1039,7 +1045,7 @@ export class PreAggregationLoader {
   }
 
   private async dropPartiallyBuiltTable(driver: DriverInterface, table: string, queryOptions: QueryOptions) {
-    this.logger('Dropping partially built external pre-aggregation', queryOptions);
+    this.logger('Dropping partially built pre-aggregation', queryOptions);
 
     try {
       // Dropped without checking that it is there: `CREATE TABLE` carries no
@@ -1047,7 +1053,7 @@ export class PreAggregationLoader {
       // version until it is gone
       await driver.dropTable(table);
     } catch (e: any) {
-      this.logger('Dropping partially built external pre-aggregation error', {
+      this.logger('Dropping partially built pre-aggregation error', {
         ...queryOptions,
         error: e?.stack || e?.message
       });

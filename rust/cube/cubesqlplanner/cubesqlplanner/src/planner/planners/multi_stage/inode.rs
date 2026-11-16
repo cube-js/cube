@@ -28,6 +28,7 @@ use crate::planner::QueryTimeSeries;
 use cubenativeutils::CubeError;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// Semantic shape of a non-leaf multi-stage subquery: a rank window,
@@ -237,15 +238,9 @@ impl<'a> InodeStagePlanner<'a> {
             scope,
         )?;
 
-        // JOIN-model: when the measure side no longer enumerates the rows
-        // this inode has to report — because new_state misses a dim that
-        // was on the parent's `state`, or because a dropped query filter
-        // widened it — we build keys-side stages per child on the
-        // parent state, so the Merge broadcasts measure values
-        // onto the query grain and only onto it. Window-path Aggregate
-        // inodes (sum-of-sum / sum-of-count with no leaf-extending
-        // `include`) handle broadcast via the window expression instead and
-        // don't need keys_input.
+        // When the measure side no longer enumerates the parent state's rows, keys-side stages
+        // on that state build the grid the values are handed onto. The window path broadcasts
+        // through the window expression instead and needs no keys_input.
         let mut keys_input: Vec<StageRef> = vec![];
         if !use_window_path {
             let new_state_has = |sym: &Rc<MemberSymbol>| {
@@ -297,6 +292,7 @@ impl<'a> InodeStagePlanner<'a> {
                 &multi_stage_member,
                 &input,
                 &keys_input,
+                scope,
             )?
         };
         self.planner
@@ -423,6 +419,11 @@ impl<'a> InodeStagePlanner<'a> {
         let Ok(inner) = dep.clone().resolve_reference_chain().as_measure() else {
             return false;
         };
+        // A window's rows overlap, so their sum is not the window over the
+        // coarser grain, however deep the window sits.
+        if computes_over_cumulative(dep) {
+            return false;
+        }
         match inner.kind() {
             MeasureKind::Count(_) => true,
             MeasureKind::Aggregated(a) => a.agg_type() == AggregationType::Sum,
@@ -552,9 +553,8 @@ impl<'a> InodeStagePlanner<'a> {
     }
 
     /// Builds a measure-calculation subquery (Rank / Aggregate /
-    /// Calculate). Wires the input subqueries into a `Merge`
-    /// source; for the JOIN-based path (when the stage has keys inputs)
-    /// also wires keys-side refs.
+    /// Calculate) over its inputs; with keys inputs, their values are handed
+    /// onto the grid the keys inputs enumerate.
     fn plan_for_measure_calculation(
         &self,
         id: InputId,
@@ -565,11 +565,12 @@ impl<'a> InodeStagePlanner<'a> {
         multi_stage_member: &MultiStageInodeMember,
         inputs: &[StageRef],
         keys_inputs: &[StageRef],
+        scope: &mut PlanningScope,
     ) -> Result<Rc<Subquery>, CubeError> {
         let partition_by = multi_stage_member.grain().partition(&all_dimensions(state));
 
         // Rank always uses a window function. Aggregate inodes are
-        // routed through `Merge` by default; only the narrow
+        // planned as a join of their inputs by default; only the narrow
         // optimisation-eligible subset (planner sets `use_window_path`)
         // is emitted as a Window expression and additionally requires
         // partition_by to be a strict subset of all dimensions —
@@ -614,13 +615,7 @@ impl<'a> InodeStagePlanner<'a> {
             .partition_by(partition_by)
             .window_function_to_use(window_function_to_use)
             .order_by(query_order_by(member, state))
-            .source(Rc::new(
-                Merge::builder()
-                    .schema(input_schema(inputs))
-                    .subqueries(input_subqueries(inputs))
-                    .keys(input_subqueries(keys_inputs))
-                    .build(),
-            ))
+            .source(calculation_source(&alias, inputs, keys_inputs, scope)?)
             .build();
 
         let result = Subquery::new(
@@ -716,6 +711,44 @@ fn input_schema(inputs: &[StageRef]) -> Rc<LogicalSchema> {
         .into_rc()
 }
 
+// Inputs at the calculation's grain are merged by their keys. With keys
+// inputs, the measure inputs sit at coarser grains and their values are handed
+// onto the grid of the keys inputs, each by the grid keys it carries.
+fn calculation_source(
+    alias: &str,
+    inputs: &[StageRef],
+    keys_inputs: &[StageRef],
+    scope: &mut PlanningScope,
+) -> Result<CalculationSource, CubeError> {
+    let sources = input_subqueries(keys_inputs);
+    let Some(first) = sources.first() else {
+        let merge = Merge::builder()
+            .schema(input_schema(inputs))
+            .subqueries(input_subqueries(inputs))
+            .build();
+        return Ok(Rc::new(merge).into());
+    };
+    let grid_schema = LogicalSchema::default()
+        .set_dimensions(first.schema().dimensions.clone())
+        .set_time_dimensions(first.schema().time_dimensions.clone())
+        .into_rc();
+    let grid = scope.add_inline(
+        format!("{alias}_keys"),
+        Rc::new(
+            KeysGrid::builder()
+                .schema(grid_schema.clone())
+                .sources(sources)
+                .build(),
+        ),
+        grid_schema.clone(),
+    )?;
+    let legs = input_subqueries(inputs)
+        .into_iter()
+        .map(|subquery| LookupLeg::new(subquery, &grid_schema))
+        .collect();
+    Ok(Rc::new(GridLookup::builder().grid(grid).legs(legs).build()).into())
+}
+
 fn input_subqueries(inputs: &[StageRef]) -> Vec<Rc<SubqueryRef>> {
     inputs
         .iter()
@@ -747,11 +780,10 @@ fn multi_stage_filter_directive(member: &Rc<MemberSymbol>) -> Option<MultiStageF
 //    mutations — the leaf will read the original (narrow) date range while
 //    the outer rolling frame expects the extended one.
 //
-// 2. Switch-case pruning. `apply_static_filter_to_symbol` runs at the top
-//    of `plan_member` against `state.dimensions_filters()` —
-//    the *inherited* filters, before this function. If the inherited set
-//    restricts the switch dimension, case branches are pruned at symbol
-//    level; the subsequent `mode: fixed` reset cannot un-prune them.
+// 2. Switch-case pruning. `plan_member` prunes the member's own `case`
+//    against the *inherited* filters, before this function. If the inherited
+//    set restricts the switch dimension, its branches are gone; the
+//    subsequent `mode: fixed` reset cannot un-prune them.
 //
 // True when `narrowed` lost a *query-level* filter that `base` restricts the
 // grid by. Three conditions per filter: `base` has it, the query asked for it,
@@ -797,6 +829,22 @@ fn query_filters_dropped(
         base.time_dimensions_filters(),
         narrowed.time_dimensions_filters(),
     ) || any_dropped(root.segments(), base.segments(), narrowed.segments())
+}
+
+fn computes_over_cumulative(member: &Rc<MemberSymbol>) -> bool {
+    let mut visited = HashSet::new();
+    let mut pending = vec![member.clone()];
+    while let Some(member) = pending.pop() {
+        let member = member.resolve_reference_chain();
+        if !visited.insert(member.full_name()) {
+            continue;
+        }
+        if member.as_measure().is_ok_and(|m| m.is_cumulative()) {
+            return true;
+        }
+        pending.extend(member.get_dependencies());
+    }
+    false
 }
 
 fn apply_filter_directive_to_state(
@@ -847,32 +895,21 @@ fn narrow_time_dimensions_to_include(
             .resolve_reference_chain()
             .id()
             .clone();
-        // Bounds are compared normalized but kept as given, the form the series expects.
-        let precision = QueryTimeSeries::MILLISECOND_PRECISION;
-        let later_from = |a: &String, b: &String| -> Result<String, CubeError> {
-            let (na, nb) = (
-                QueryDateTimeHelper::format_from_date(a, precision)?,
-                QueryDateTimeHelper::format_from_date(b, precision)?,
-            );
-            Ok(if na >= nb { a.clone() } else { b.clone() })
-        };
-        let earlier_to = |a: &String, b: &String| -> Result<String, CubeError> {
-            let (na, nb) = (
-                QueryDateTimeHelper::format_to_date(a, precision)?,
-                QueryDateTimeHelper::format_to_date(b, precision)?,
-            );
-            Ok(if na <= nb { a.clone() } else { b.clone() })
-        };
+        let include_range = (from.clone(), to.clone());
         for time_dimension in time_dimensions.iter_mut() {
             let Ok(symbol) = time_dimension.as_time_dimension() else {
                 continue;
             };
-            if symbol.base_symbol().clone().resolve_reference_chain().id() != &base_id {
+            if symbol.resolved_base_id() != base_id {
                 continue;
             }
             let range = match symbol.date_range_vec().as_deref() {
-                Some([own_from, own_to]) => (later_from(own_from, from)?, earlier_to(own_to, to)?),
-                _ => (from.clone(), to.clone()),
+                Some([own_from, own_to]) => QueryDateTimeHelper::intersect_date_ranges(
+                    &(own_from.clone(), own_to.clone()),
+                    &include_range,
+                    QueryTimeSeries::MILLISECOND_PRECISION,
+                )?,
+                _ => include_range.clone(),
             };
             *time_dimension = MemberSymbol::new_time_dimension(symbol.with_date_range(Some(range)));
         }

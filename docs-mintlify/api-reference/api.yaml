@@ -732,21 +732,23 @@ paths:
 
 
           Pass `filters`, `timeGrains` and `memberSwitchers` to render the board with specific
-          control values, exactly as a scheduled notification does; omit them to render its saved
-          defaults.
+          control values, exactly as a scheduled notification does; omit them and the dashboard's
+          published defaults apply.
 
 
-          Pass `layout: print` with `format: pdf` for the paginated A4 document the dashboard's
-          "Download print version" menu item produces — one column, every table row, the filter
-          state as a summary line — instead of the default `screenshot` of the board. `print` with
-          `format: png` returns `400`.
+          `format` and `layout` are the Format and Layout of the dashboard's Download settings. The
+          default `screenshot` is Snapshot: the board as laid out, with the rows each table shows
+          and the control widgets. Pass `layout: print` with `format: pdf` for Print version — a
+          paginated A4 document with every tab and every table row, and the control values listed at
+          the top instead of the control widgets — instead of the default `screenshot`. Print
+          version is PDF only: `print` with `format: png` returns `400`.
 
 
           By default the dashboard renders under the calling user's own security context, so the
           file shows what that user would see. Requires **read** access to the dashboard's workbook
           and the **download data** permission on the deployment — the same rule the console's own
-          "Download as PNG / PDF" actions follow. **Manage** access to the workbook also passes, as
-          it did before the download data permission was required.
+          Download settings follow. **Manage** access to the workbook also passes, as it did before
+          the download data permission was required.
 
 
           To export on someone else's behalf, pass `renderAs`: the queries behind the image then run
@@ -2096,7 +2098,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NotificationDto'
+                $ref: '#/components/schemas/Notification'
           description: ''
       summary: Create a scheduled notification
       tags:
@@ -2169,7 +2171,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NotificationDto'
+                $ref: '#/components/schemas/Notification'
           description: ''
       summary: Get a scheduled notification
       tags:
@@ -2210,7 +2212,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NotificationDto'
+                $ref: '#/components/schemas/Notification'
           description: ''
       summary: Update a scheduled notification
       tags:
@@ -3349,7 +3351,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JsonConfigFileDto'
+                $ref: '#/components/schemas/JsonConfigFile'
           description: ''
       summary: Read a report definition as editable JSON text
       tags:
@@ -3389,7 +3391,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JsonConfigFileDto'
+                $ref: '#/components/schemas/JsonConfigFile'
           description: ''
       summary: Replace text in a report definition
       tags:
@@ -4228,6 +4230,109 @@ paths:
 
           To move a workbook you can use either this endpoint or the unified `POST /workspace/move`.
           Returns `404` if the workbook does not exist or belongs to a different deployment.
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/calculated-fields:
+    post:
+      operationId: createCalculatedField
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCalculatedFieldInput'
+        description: CreateCalculatedFieldInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculatedField'
+          description: ''
+      summary: Create a workbook calculated field
+      tags:
+        - Workbooks
+      x-mint:
+        content: >-
+          Add a calculated field to a workbook. Requires **edit** access to the workbook. Returns
+          `400` when the workbook already has a field with the same name (case-insensitive).
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/calculated-fields/{fieldId}:
+    delete:
+      operationId: deleteCalculatedField
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: fieldId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete a workbook calculated field
+      tags:
+        - Workbooks
+      x-mint:
+        content: Remove a calculated field from a workbook. Requires **edit** access to the workbook.
+    patch:
+      operationId: updateCalculatedField
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: fieldId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCalculatedFieldInput'
+        description: UpdateCalculatedFieldInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculatedField'
+          description: ''
+      summary: Update a workbook calculated field
+      tags:
+        - Workbooks
+      x-mint:
+        content: >-
+          Change a calculated field of a workbook; only the fields you send are changed. Requires
+          **edit** access to the workbook.
   /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard:
     put:
       operationId: updateWorkbookDashboard
@@ -4309,7 +4414,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JsonConfigFileDto'
+                $ref: '#/components/schemas/JsonConfigFile'
           description: ''
       summary: Read the dashboard draft as editable JSON text
       tags:
@@ -4322,7 +4427,7 @@ paths:
 
           Use it with `PATCH /workbooks/{workbookId}/dashboard/file` to change part of the dashboard
           without resending the whole configuration. Returns `400` for a workbook whose dashboard is
-          a Dashboard App.
+          an app.
     patch:
       operationId: replaceWorkbookDashboardFileText
       parameters:
@@ -4348,7 +4453,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JsonConfigFileDto'
+                $ref: '#/components/schemas/JsonConfigFile'
           description: ''
       summary: Replace text in the dashboard draft
       tags:
@@ -4605,7 +4710,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkbookPromotionPreviewDto'
+                $ref: '#/components/schemas/WorkbookPromotionPreview'
           description: ''
       summary: Preview a workbook promotion
       tags:
@@ -4678,7 +4783,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkbookPromotionDto'
+                $ref: '#/components/schemas/WorkbookPromotion'
           description: ''
       summary: Promote and publish a workbook
       tags:
@@ -4968,35 +5073,8 @@ paths:
         - Workspace
       x-mint:
         content: >-
-          Move any workspace item — a workbook, report, or folder — into a folder, in one unified
-          endpoint. Returns the moved item.
-
-
-          Request body:
-
-          - `type` — the item type: `WORKBOOK`, `REPORT`, or `FOLDER`.
-
-          - `id` — the id of the item to move.
-
-          - `folderId` — the destination folder id, or `null` to move the item to the workspace
-          root. For a folder, this becomes its new parent.
-
-
-          Access requirements depend on the item type and mirror the per-type rules:
-
-          - **Workbook** — manage access to the workbook, plus edit access to the destination folder
-          when moving into one.
-
-          - **Report** — manage access to the report, plus edit access to the destination folder, which
-          must belong to the same deployment.
-
-          - **Folder** — manage access to the folder being moved, plus manage or edit access to the
-          destination parent folder.
-
-
-          Moving a folder into one of its own descendants, or exceeding the maximum folder depth, is
-          rejected with `400`. Returns `404` if the item does not exist or belongs to a different
-          deployment.
+          Move a workbook, report, or folder to folderId (null for root). Source and destination
+          permissions are checked, and a report's destination must be in the route deployment.
   /api/v1/embed-tenants:
     get:
       operationId: listEmbedTenants
@@ -5126,7 +5204,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserGroupDTO'
+                $ref: '#/components/schemas/UserGroup'
           description: ''
       summary: Create an embed group
       tags:
@@ -5196,7 +5274,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserGroupDTO'
+                $ref: '#/components/schemas/UserGroup'
           description: ''
       summary: Get an embed group
       tags:
@@ -5236,7 +5314,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserGroupDTO'
+                $ref: '#/components/schemas/UserGroup'
           description: ''
       summary: Update an embed group
       tags:
@@ -5693,7 +5771,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmbedDashboardCommentDto'
+                $ref: '#/components/schemas/EmbedDashboardComment'
           description: ''
       summary: Post a comment on an embeddable dashboard
       tags:
@@ -5806,7 +5884,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmbedDashboardCommentDto'
+                $ref: '#/components/schemas/EmbedDashboardComment'
           description: ''
       summary: Edit a comment on an embeddable dashboard
       tags:
@@ -5844,7 +5922,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmbedDashboardCommentThreadDto'
+                $ref: '#/components/schemas/EmbedDashboardCommentThread'
           description: ''
       summary: Resolve or re-open a comment thread
       tags:
@@ -5915,7 +5993,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenerateSession'
-        description: GenerateSessionDTO
+        description: GenerateSession
         required: false
       responses:
         '200':
@@ -6019,7 +6097,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostTokenBySessionIdInput'
-        description: PostTokenBySessionIdInputDTO
+        description: PostTokenBySessionIdInput
         required: false
       responses:
         '200':
@@ -6074,9 +6152,10 @@ paths:
         - External Documents
       x-mint:
         content: >-
-          Returns a 15-minute `proof` to send as `placementProof` when placing into this
-          spreadsheet. `EXCEL` sends the workbook's `documentKey`; `GOOGLE_SHEETS`, a Google ID
-          token from the add-on's Apps Script.
+          Returns a single-use `proof` valid for 15 minutes and one placement operation. Send it as
+          `placementProof` when placing into this spreadsheet. `EXCEL` sends the workbook's
+          `documentKey`; `GOOGLE_SHEETS` sends identity and spreadsheet access tokens from the
+          add-on's Apps Script.
   /api/v1/external-documents/{externalWorkbookId}/placements:
     get:
       operationId: listExternalDocumentPlacements
@@ -6558,12 +6637,12 @@ paths:
           To scope the role to specific deployments, send a `Deployment` policy whose `resources`
           are the deployment ids as strings. A role usually also needs a `Global` policy naming the
           holder's license tier — `AIBIView`, `AIBIExplore` or `AIBIDevelop` — which is what the
-          console calls the role's Base Role. Pick a tier that covers the deployment actions you
-          grant: apart from the handful of actions available at every tier, the console forces
-          Developer (`AIBIDevelop`), so a lower tier here produces a role its role builder would not
-          have let you save. The current list of those actions is in [Auto-bump to
-          Developer](https://docs.cube.dev/admin/users-and-permissions/custom-roles#auto-bump-to-developer).
-          For example:
+          console calls the role's Base Role. List `SignIn` in that `Global` policy too: a role sent
+          without it does not let its holders sign in to the console. Pick a tier that covers the
+          deployment actions you grant: the console forces Developer (`AIBIDevelop`) for every
+          deployment action except `DeploymentRead`, `DeploymentAgentRead`, `DownloadData` and
+          `ChatHistoryRead`, so a lower tier here produces a role its role builder would not have
+          let you save:
 
 
           ```json
@@ -6573,7 +6652,7 @@ paths:
             "policies": [
               {
                 "resourceType": "Global",
-                "actions": ["AIBIDevelop"],
+                "actions": ["AIBIDevelop", "SignIn"],
                 "resources": ["All"]
               },
               {
@@ -6709,7 +6788,8 @@ paths:
 
           Updates the fields present in the body and leaves the rest alone. Sending `policies`
           replaces the role's policies outright, so read the role first if you mean to add one
-          rather than start over. Renaming to a name another role already holds answers `409`.
+          rather than start over. Policies sent without a `Global` `SignIn` stop the role's holders
+          signing in to the console. Renaming to a name another role already holds answers `409`.
           Built-in roles cannot be updated.
 
 
@@ -8598,6 +8678,86 @@ components:
         - ACTIVATE
         - DELETE
       type: string
+    CalculatedField:
+      properties:
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        createdBy:
+          type: number
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        expression:
+          type: string
+        format:
+          oneOf:
+            - $ref: '#/components/schemas/CalculatedFieldFormat'
+            - type: 'null'
+        id:
+          type: string
+        memberRole:
+          $ref: '#/components/schemas/CalculatedFieldMemberRole'
+        name:
+          type: string
+        semanticView:
+          type: string
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        valueType:
+          $ref: '#/components/schemas/CalculatedFieldValueType'
+      required:
+        - id
+        - name
+        - semanticView
+        - expression
+        - memberRole
+        - valueType
+        - createdBy
+        - createdAt
+        - updatedAt
+      type: object
+    CalculatedFieldFormat:
+      enum:
+        - percent
+        - currency
+        - imageUrl
+        - id
+        - link
+      type: string
+    CalculatedFieldMemberRole:
+      enum:
+        - measure
+        - dimension
+      type: string
+    CalculatedFieldValueType:
+      enum:
+        - string
+        - time
+        - boolean
+        - number
+        - number_agg
+        - count
+        - count_distinct
+        - count_distinct_approx
+        - sum
+        - avg
+        - min
+        - max
+        - geo
+      type: string
     ChatHistoryQuery:
       properties:
         columns:
@@ -8919,11 +9079,11 @@ components:
             - type: integer
             - type: 'null'
         type:
-          $ref: '#/components/schemas/ColumnFormatOverrideDtoType'
+          $ref: '#/components/schemas/ColumnFormatOverrideType'
       required:
         - type
       type: object
-    ColumnFormatOverrideDtoType:
+    ColumnFormatOverrideType:
       enum:
         - currency
         - percent
@@ -9122,6 +9282,66 @@ components:
       required:
         - name
       type: object
+    CreateCalculatedFieldInput:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        expression:
+          type: string
+        format:
+          oneOf:
+            - $ref: '#/components/schemas/CreateCalculatedFieldInputFormat'
+            - type: 'null'
+        memberRole:
+          $ref: '#/components/schemas/CreateCalculatedFieldInputMemberRole'
+        name:
+          type: string
+        semanticView:
+          type: string
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        valueType:
+          $ref: '#/components/schemas/CreateCalculatedFieldInputValueType'
+      required:
+        - name
+        - semanticView
+        - expression
+        - memberRole
+        - valueType
+      type: object
+    CreateCalculatedFieldInputFormat:
+      enum:
+        - percent
+        - currency
+        - imageUrl
+        - id
+        - link
+      type: string
+    CreateCalculatedFieldInputMemberRole:
+      enum:
+        - measure
+        - dimension
+      type: string
+    CreateCalculatedFieldInputValueType:
+      enum:
+        - string
+        - time
+        - boolean
+        - number
+        - number_agg
+        - count
+        - count_distinct
+        - count_distinct_approx
+        - sum
+        - avg
+        - min
+        - max
+        - geo
+      type: string
     CreateDeploymentEnvironmentTokenInput:
       properties:
         expires_in:
@@ -9267,6 +9487,28 @@ components:
       type: object
     CreateNotificationInput:
       properties:
+        addedControls:
+          description: >-
+            Controls added through the dashboard's Dynamic controls area that the notification
+            renders with. Each needs a field the area allows; its value goes in filters, timeGrains
+            or memberSwitchers.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardAddedControlInput'
+              type: array
+              maxItems: 50
+            - type: 'null'
+        crossFilters:
+          description: >-
+            Cross-filters the notification renders with: each is one chart's selection ("Filter
+            dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
+            every other chart renders filtered by it. The chart must be on the published dashboard,
+            with Cross-filtering on.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardCrossFilterInput'
+              type: array
+            - type: 'null'
         customCron:
           description: Custom cron expression (required if scheduleType is CUSTOM)
           oneOf:
@@ -9524,6 +9766,10 @@ components:
             - maxLength: 255
               type: string
             - type: 'null'
+        nameSource:
+          oneOf:
+            - $ref: '#/components/schemas/CreateReportInputNameSource'
+            - type: 'null'
         pivotItems:
           oneOf:
             - $ref: '#/components/schemas/PivotItemsInput'
@@ -9577,6 +9823,11 @@ components:
       enum:
         - GOOGLE_SHEETS
         - EXCEL
+      type: string
+    CreateReportInputNameSource:
+      enum:
+        - default
+        - auto
       type: string
     CreateReportInputSource:
       enum:
@@ -9877,7 +10128,7 @@ components:
             - type: boolean
             - type: 'null'
         status:
-          $ref: '#/components/schemas/DashboardDtoStatus'
+          $ref: '#/components/schemas/DashboardStatus'
         title:
           oneOf:
             - type: string
@@ -9904,6 +10155,53 @@ components:
         - versionId
         - reportSnapshots
       type: object
+    DashboardAddedControl:
+      properties:
+        config:
+          additionalProperties: true
+          type: object
+        key:
+          type: string
+        type:
+          $ref: '#/components/schemas/DashboardAddedControlType'
+      required:
+        - key
+        - type
+        - config
+      type: object
+    DashboardAddedControlInput:
+      properties:
+        config:
+          additionalProperties: true
+          description: >-
+            The added control's settings, as its `dc_` link param holds them: `dimension`
+            ("View.member") and, by type, `title`, `filterType`, `isMultipleSelectionAllowed`,
+            `allowedGrains`, `memberKind`, `options`, `optionGrains`. Other keys are dropped.
+          type: object
+        key:
+          description: The control's key, unique within the run, e.g. "k1"
+          pattern: ^[A-Za-z0-9_-]{1,32}$
+          type: string
+        type:
+          $ref: '#/components/schemas/DashboardAddedControlInputType'
+          description: The control type
+      required:
+        - key
+        - type
+        - config
+      type: object
+    DashboardAddedControlInputType:
+      enum:
+        - FILTER
+        - TIME_GRAIN
+        - FIELD
+      type: string
+    DashboardAddedControlType:
+      enum:
+        - FILTER
+        - TIME_GRAIN
+        - FIELD
+      type: string
     DashboardAppManifest:
       properties:
         dependencies:
@@ -9996,7 +10294,7 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
-      title: DashboardBreakpointColsDto
+      title: DashboardBreakpointCols
       type: object
     DashboardBreakpointColsInput:
       properties:
@@ -10044,7 +10342,7 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
-      title: DashboardBreakpointsDto
+      title: DashboardBreakpoints
       type: object
     DashboardBreakpointsInput:
       properties:
@@ -10200,12 +10498,95 @@ components:
         - CLASSIC
         - APP
       type: string
-    DashboardDtoStatus:
+    DashboardCrossFilter:
+      properties:
+        dimensions:
+          items:
+            $ref: '#/components/schemas/DashboardCrossFilterDimension'
+          type: array
+        sourceWidgetId:
+          type: string
+        view:
+          type: string
+      required:
+        - sourceWidgetId
+        - view
+        - dimensions
+      type: object
+    DashboardCrossFilterDimension:
+      properties:
+        grain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        member:
+          type: string
+        operator:
+          $ref: '#/components/schemas/DashboardCrossFilterDimensionOperator'
+        values:
+          items:
+            oneOf:
+              - type: string
+              - type: number
+          type: array
+      required:
+        - member
+        - operator
+        - values
+      type: object
+    DashboardCrossFilterDimensionInput:
+      properties:
+        grain:
+          description: A time member's granularity, e.g. "month", for a clicked period
+          oneOf:
+            - type: string
+            - type: 'null'
+        member:
+          description: The member's bare name in the cross filter's view, e.g. "status"
+          type: string
+        operator:
+          $ref: '#/components/schemas/DashboardCrossFilterDimensionInputOperator'
+          description: '"equals" (any of `values`) or "between" (`values` is [start, end], inclusive)'
+        values:
+          description: The selected values
+          items:
+            oneOf:
+              - type: string
+              - type: number
+          type: array
+      required:
+        - member
+        - operator
+        - values
+      type: object
+    DashboardCrossFilterDimensionInputOperator:
       enum:
-        - draft
-        - published
-        - archived
+        - equals
+        - between
       type: string
+    DashboardCrossFilterDimensionOperator:
+      enum:
+        - equals
+        - between
+      type: string
+    DashboardCrossFilterInput:
+      properties:
+        dimensions:
+          description: The selected values, one entry per dimension of the chart
+          items:
+            $ref: '#/components/schemas/DashboardCrossFilterDimensionInput'
+          type: array
+        sourceWidgetId:
+          description: The id of the chart widget the cross filter comes from
+          type: string
+        view:
+          description: The view the chart queries, e.g. "orders"
+          type: string
+      required:
+        - sourceWidgetId
+        - view
+        - dimensions
+      type: object
     DashboardEmbeddingResponse:
       properties:
         allowEmbed:
@@ -10516,6 +10897,12 @@ components:
             - $ref: '#/components/schemas/DashboardWidgetPositionInput'
             - type: 'null'
       type: object
+    DashboardStatus:
+      enum:
+        - draft
+        - published
+        - archived
+      type: string
     DashboardThemeInput:
       properties:
         backgroundColor:
@@ -10602,7 +10989,7 @@ components:
               additionalProperties: true
             - type: 'null'
         type:
-          $ref: '#/components/schemas/DashboardWidgetDtoType'
+          $ref: '#/components/schemas/DashboardWidgetType'
       required:
         - id
         - type
@@ -10638,20 +11025,6 @@ components:
         - position
       type: object
     DashboardWidgetDraftInputType:
-      enum:
-        - CHART
-        - TEXT
-        - FILTER
-        - AI
-        - TIME_GRAIN
-        - FIELD
-        - PARENT
-        - SPACER
-        - DIVIDER
-        - DYNAMIC_CONTROLS
-        - CONTAINER
-      type: string
-    DashboardWidgetDtoType:
       enum:
         - CHART
         - TEXT
@@ -10739,6 +11112,20 @@ components:
         - w
         - h
       type: object
+    DashboardWidgetType:
+      enum:
+        - CHART
+        - TEXT
+        - FILTER
+        - AI
+        - TIME_GRAIN
+        - FIELD
+        - PARENT
+        - SPACER
+        - DIVIDER
+        - DYNAMIC_CONTROLS
+        - CONTAINER
+      type: string
     DataModelFileContent:
       properties:
         content:
@@ -12480,7 +12867,7 @@ components:
         - read
         - none
       type: string
-    EmbedDashboardCommentDto:
+    EmbedDashboardComment:
       properties:
         body:
           type: string
@@ -12523,11 +12910,11 @@ components:
         - createdAt
         - isOwn
       type: object
-    EmbedDashboardCommentThreadDto:
+    EmbedDashboardCommentThread:
       properties:
         replies:
           items:
-            $ref: '#/components/schemas/EmbedDashboardCommentDto'
+            $ref: '#/components/schemas/EmbedDashboardComment'
           type: array
         resolvedAt:
           oneOf:
@@ -12542,7 +12929,7 @@ components:
             - type: integer
             - type: 'null'
         root:
-          $ref: '#/components/schemas/EmbedDashboardCommentDto'
+          $ref: '#/components/schemas/EmbedDashboardComment'
       required:
         - root
         - replies
@@ -12551,7 +12938,7 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/EmbedDashboardCommentThreadDto'
+            $ref: '#/components/schemas/EmbedDashboardCommentThread'
           type: array
         pageInfo:
           $ref: '#/components/schemas/PageInfo'
@@ -12602,7 +12989,7 @@ components:
         - addedMembers
         - unchangedMembers
       type: object
-    EmbedMentionableUserDto:
+    EmbedMentionableUser:
       properties:
         email:
           oneOf:
@@ -12624,7 +13011,7 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/EmbedMentionableUserDto'
+            $ref: '#/components/schemas/EmbedMentionableUser'
           type: array
         pageInfo:
           $ref: '#/components/schemas/PageInfo'
@@ -12719,7 +13106,7 @@ components:
         showGroupByCube:
           description: >-
             Whether the workbook data pane viewed with this session offers the "Group by Cube" /
-            "Group by folder" item in its more-actions menu. `false` hides the item AND pins the
+            "Group by Folder" item in its more-actions menu. `false` hides the item AND pins the
             pane to the grouping it would have defaulted to — by folder when the view defines
             folders, by cube otherwise. The choice is remembered per browser, so pinning is what
             makes the pane look the same for every user of the session rather than freezing whatever
@@ -12731,7 +13118,7 @@ components:
         showMemberNames:
           description: >-
             Whether the workbook data pane viewed with this session may display raw member NAMES
-            instead of their titles (the "Show member names" item in the pane's more-actions menu).
+            instead of their titles (the "Show Member Names" item in the pane's more-actions menu).
             Member names are the data model's own identifiers, so this is a schema-protection
             setting in the same family as the account-wide Show Generated SQL switch. `false` hides
             the menu item AND pins the pane to titles, so a user who already switched to names is
@@ -13231,7 +13618,7 @@ components:
         position:
           type: integer
         type:
-          $ref: '#/components/schemas/FolderDtoType'
+          $ref: '#/components/schemas/FolderType'
         updatedAt:
           oneOf:
             - format: date
@@ -13255,7 +13642,7 @@ components:
         - updatedAt
         - type
       type: object
-    FolderDtoType:
+    FolderType:
       enum:
         - FOLDER
         - WORKBOOK
@@ -13639,12 +14026,22 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        googleAccessToken:
+          description: Apps Script OAuth token with access to the requested spreadsheet.
+          oneOf:
+            - type: string
+            - type: 'null'
         googleIdToken:
           oneOf:
             - type: string
             - type: 'null'
         host:
           $ref: '#/components/schemas/IssuePlacementProofInputHost'
+        operation:
+          description: Placement operation that will consume this proof.
+          oneOf:
+            - $ref: '#/components/schemas/IssuePlacementProofInputOperation'
+            - type: 'null'
       required:
         - host
       type: object
@@ -13652,6 +14049,13 @@ components:
       enum:
         - GOOGLE_SHEETS
         - EXCEL
+      type: string
+    IssuePlacementProofInputOperation:
+      enum:
+        - create
+        - update
+        - connect
+        - upsert
       type: string
     IssuePlacementProofResponse:
       properties:
@@ -13663,7 +14067,7 @@ components:
         - proof
         - expiresAt
       type: object
-    JsonConfigFileDto:
+    JsonConfigFile:
       properties:
         content:
           description: >-
@@ -13776,10 +14180,30 @@ components:
         - WORKBOOK
         - REPORT
       type: string
-    NotificationDto:
+    Notification:
       properties:
+        addedControls:
+          description: >-
+            Controls added through the dashboard's Dynamic controls area that the notification
+            renders with.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardAddedControl'
+              type: array
+            - type: 'null'
         cronExpression:
           type: string
+        crossFilters:
+          description: >-
+            Cross-filters the notification renders with: each is one chart's selection ("Filter
+            dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
+            every other chart renders filtered by it. The chart must be on the published dashboard,
+            with Cross-filtering on.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardCrossFilter'
+              type: array
+            - type: 'null'
         dashboardId:
           type: integer
         deploymentId:
@@ -13989,7 +14413,7 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/NotificationDto'
+            $ref: '#/components/schemas/Notification'
           type: array
         pageInfo:
           oneOf:
@@ -14324,15 +14748,19 @@ components:
       type: string
     OssieConversionRuntime:
       properties:
+        convertersCommit:
+          description: The apache/ossie-converters commit the Cube converter was built from.
+          type: string
         cubeConverterVersion:
           type: string
         ossieCommit:
-          description: The apache/ossie commit the converter was built from.
+          description: The apache/ossie commit the Ossie core package was built from.
           type: string
         ossieCoreVersion:
           type: string
       required:
         - ossieCommit
+        - convertersCommit
         - ossieCoreVersion
         - cubeConverterVersion
       type: object
@@ -14588,6 +15016,7 @@ components:
             enum:
               - All
               - DeploymentsManage
+              - SignIn
               - DeploymentCreate
               - DeploymentRead
               - DeploymentUpdate
@@ -14691,14 +15120,14 @@ components:
       required:
         - targetDeploymentId
       type: object
-    PromotionActorDto:
+    PromotionActor:
       properties:
         apiKeyId:
           oneOf:
             - type: integer
             - type: 'null'
         authenticationMethod:
-          $ref: '#/components/schemas/PromotionActorDtoAuthenticationMethod'
+          $ref: '#/components/schemas/PromotionActorAuthenticationMethod'
         displayName:
           type: string
         userId:
@@ -14708,15 +15137,15 @@ components:
         - displayName
         - authenticationMethod
       type: object
-    PromotionActorDtoAuthenticationMethod:
+    PromotionActorAuthenticationMethod:
       enum:
         - session
         - apiKey
       type: string
-    PromotionReferenceDto:
+    PromotionReference:
       properties:
         availability:
-          $ref: '#/components/schemas/PromotionReferenceDtoAvailability'
+          $ref: '#/components/schemas/PromotionReferenceAvailability'
         deploymentId:
           oneOf:
             - type: integer
@@ -14732,7 +15161,7 @@ components:
       required:
         - availability
       type: object
-    PromotionReferenceDtoAvailability:
+    PromotionReferenceAvailability:
       enum:
         - available
         - unavailable
@@ -15161,7 +15590,7 @@ components:
             - type: 'null'
         source:
           oneOf:
-            - $ref: '#/components/schemas/ReportDtoSource'
+            - $ref: '#/components/schemas/ReportSource'
             - type: 'null'
         sqlQuery:
           oneOf:
@@ -15172,7 +15601,7 @@ components:
             - type: string
             - type: 'null'
         type:
-          $ref: '#/components/schemas/ReportDtoType'
+          $ref: '#/components/schemas/ReportType'
         updatedAt:
           oneOf:
             - format: date
@@ -15624,19 +16053,6 @@ components:
       required:
         - columns
       type: object
-    ReportDtoSource:
-      enum:
-        - GOOGLE_SHEETS
-        - EXCEL
-        - PLAYGROUND
-        - D3
-      type: string
-    ReportDtoType:
-      enum:
-        - FOLDER
-        - WORKBOOK
-        - REPORT
-      type: string
     ReportPlacement:
       properties:
         anchorCell:
@@ -15810,7 +16226,7 @@ components:
             - type: 'null'
         kind:
           oneOf:
-            - $ref: '#/components/schemas/ReportSnapshotDtoKind'
+            - $ref: '#/components/schemas/ReportSnapshotKind'
             - type: 'null'
         meta:
           oneOf:
@@ -15862,7 +16278,7 @@ components:
         - reportId
         - versionNumber
       type: object
-    ReportSnapshotDtoKind:
+    ReportSnapshotKind:
       enum:
         - vega
         - table
@@ -15880,6 +16296,19 @@ components:
                 $ref: '#/components/schemas/ColumnFormatOverride'
             - type: 'null'
       type: object
+    ReportSource:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+        - PLAYGROUND
+        - D3
+      type: string
+    ReportType:
+      enum:
+        - FOLDER
+        - WORKBOOK
+        - REPORT
+      type: string
     ReportsListResponse:
       properties:
         count:
@@ -16056,6 +16485,7 @@ components:
             enum:
               - All
               - DeploymentsManage
+              - SignIn
               - DeploymentCreate
               - DeploymentRead
               - DeploymentUpdate
@@ -16536,8 +16966,8 @@ components:
           type: string
         userId:
           description: >-
-            The creator. Every run executes as this user, and only they, an admin or a role granting
-            `ScheduledTasksManage` on the deployment may change, delete or run the task.
+            The creator. Every run executes as this user, and only they or an admin may change,
+            delete or run the task.
           type: integer
       required:
         - id
@@ -16805,14 +17235,17 @@ components:
             - type: 'null'
         format:
           $ref: '#/components/schemas/StartDashboardExportInputFormat'
-          description: 'Output format: `png` or `pdf`.'
+          description: >-
+            Output format, the Format of the dashboard's Download settings: `png` (PNG) or `pdf`
+            (PDF).
         layout:
           default: screenshot
           description: >-
-            How the dashboard is laid out. `screenshot` (the default) renders the board as it looks
-            on screen. `print` renders the paginated A4 document the dashboard's 'Download print
-            version' menu item produces: one column, every table row, and the filter state as a
-            summary line instead of filter controls. `print` is available for `format: 'pdf'` only.
+            How the dashboard is laid out, the Layout of the dashboard's Download settings.
+            `screenshot` (the default) is Snapshot: the board as laid out, with the rows each table
+            shows and the control widgets. `print` is Print version: a paginated A4 document with
+            every tab and every table row, and the control values listed at the top instead of the
+            control widgets. `print` is available for `format: 'pdf'` only.
           oneOf:
             - $ref: '#/components/schemas/StartDashboardExportInputLayout'
             - type: 'null'
@@ -17191,6 +17624,70 @@ components:
             - type: string
             - type: 'null'
       type: object
+    UpdateCalculatedFieldInput:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        expression:
+          oneOf:
+            - type: string
+            - type: 'null'
+        format:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateCalculatedFieldInputFormat'
+            - type: 'null'
+        memberRole:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateCalculatedFieldInputMemberRole'
+            - type: 'null'
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        semanticView:
+          oneOf:
+            - type: string
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        valueType:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateCalculatedFieldInputValueType'
+            - type: 'null'
+      type: object
+    UpdateCalculatedFieldInputFormat:
+      enum:
+        - percent
+        - currency
+        - imageUrl
+        - id
+        - link
+      type: string
+    UpdateCalculatedFieldInputMemberRole:
+      enum:
+        - measure
+        - dimension
+      type: string
+    UpdateCalculatedFieldInputValueType:
+      enum:
+        - string
+        - time
+        - boolean
+        - number
+        - number_agg
+        - count
+        - count_distinct
+        - count_distinct_approx
+        - sum
+        - avg
+        - min
+        - max
+        - geo
+      type: string
     UpdateDashboardEmbeddingInput:
       properties:
         allowEmbed:
@@ -17387,6 +17884,28 @@ components:
       type: object
     UpdateNotificationInput:
       properties:
+        addedControls:
+          description: >-
+            Controls added through the dashboard's Dynamic controls area. Replaces the stored set
+            when provided.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardAddedControlInput'
+              type: array
+              maxItems: 50
+            - type: 'null'
+        crossFilters:
+          description: >-
+            Cross-filters the notification renders with: each is one chart's selection ("Filter
+            dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
+            every other chart renders filtered by it. The chart must be on the published dashboard,
+            with Cross-filtering on. Replaces the stored set when
+            provided; [] clears it.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardCrossFilterInput'
+              type: array
+            - type: 'null'
         customCron:
           oneOf:
             - type: string
@@ -17582,7 +18101,7 @@ components:
         ownerUserId:
           description: >-
             Transfer the delivery to this active user, who must be able to read its report. They
-            become owner and run-as user. Admins and roles granting `ScheduledTasksManage` only.
+            become owner and run-as user. Admins only.
           oneOf:
             - type: integer
             - type: 'null'
@@ -17652,6 +18171,10 @@ components:
             - maxLength: 255
               type: string
             - type: 'null'
+        nameSource:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateReportInputNameSource'
+            - type: 'null'
         pivotItems:
           oneOf:
             - $ref: '#/components/schemas/PivotItems'
@@ -17670,6 +18193,10 @@ components:
               type: string
               minLength: 12
               maxLength: 12
+            - type: 'null'
+        renamed:
+          oneOf:
+            - type: boolean
             - type: 'null'
         resultChecksum:
           oneOf:
@@ -17705,6 +18232,10 @@ components:
       enum:
         - GOOGLE_SHEETS
         - EXCEL
+      type: string
+    UpdateReportInputNameSource:
+      enum:
+        - auto
       type: string
     UpdateScheduledTaskInput:
       properties:
@@ -17902,7 +18433,7 @@ components:
           type: integer
         impersonation:
           oneOf:
-            - $ref: '#/components/schemas/UserImpersonationDTO'
+            - $ref: '#/components/schemas/UserImpersonation'
             - type: 'null'
         isAdmin:
           type: boolean
@@ -17975,7 +18506,7 @@ components:
         id:
           type: integer
         source:
-          $ref: '#/components/schemas/UserAliasDTOSource'
+          $ref: '#/components/schemas/UserAliasSource'
         updatedAt:
           pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
           type: string
@@ -17991,7 +18522,7 @@ components:
         - createdAt
         - updatedAt
       type: object
-    UserAliasDTOSource:
+    UserAliasSource:
       enum:
         - ldap
         - saml
@@ -18071,12 +18602,12 @@ components:
         name:
           type: string
         type:
-          $ref: '#/components/schemas/UserAttributeDefinitionDTOType'
+          $ref: '#/components/schemas/UserAttributeDefinitionType'
       required:
         - name
         - type
       type: object
-    UserAttributeDefinitionDTOType:
+    UserAttributeDefinitionType:
       enum:
         - string
         - number
@@ -18256,7 +18787,7 @@ components:
         - email
         - username
       type: object
-    UserGroupDTO:
+    UserGroup:
       properties:
         description:
           oneOf:
@@ -18278,7 +18809,7 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/UserGroupDTO'
+            $ref: '#/components/schemas/UserGroup'
           type: array
         pageInfo:
           $ref: '#/components/schemas/PageInfo'
@@ -18286,7 +18817,7 @@ components:
         - items
         - pageInfo
       type: object
-    UserImpersonationDTO:
+    UserImpersonation:
       properties:
         expiresAt:
           oneOf:
@@ -18626,7 +19157,7 @@ components:
           type: string
         promotion:
           oneOf:
-            - $ref: '#/components/schemas/WorkbookPromotionSummaryDto'
+            - $ref: '#/components/schemas/WorkbookPromotionSummary'
             - type: 'null'
         publishedDashboard:
           oneOf:
@@ -18637,7 +19168,7 @@ components:
             - type: string
             - type: 'null'
         type:
-          $ref: '#/components/schemas/WorkbookDtoType'
+          $ref: '#/components/schemas/WorkbookType'
         updatedAt:
           oneOf:
             - format: date
@@ -18680,13 +19211,7 @@ components:
             - $ref: '#/components/schemas/DashboardConfigDraftInput'
             - type: 'null'
       type: object
-    WorkbookDtoType:
-      enum:
-        - FOLDER
-        - WORKBOOK
-        - REPORT
-      type: string
-    WorkbookPromotionDto:
+    WorkbookPromotion:
       properties:
         completedAt:
           oneOf:
@@ -18703,18 +19228,18 @@ components:
         linkId:
           type: integer
         outcome:
-          $ref: '#/components/schemas/WorkbookPromotionDtoOutcome'
+          $ref: '#/components/schemas/WorkbookPromotionOutcome'
         overrideRequested:
           type: boolean
         performedBy:
-          $ref: '#/components/schemas/PromotionActorDto'
+          $ref: '#/components/schemas/PromotionActor'
         source:
           oneOf:
-            - $ref: '#/components/schemas/PromotionReferenceDto'
+            - $ref: '#/components/schemas/PromotionReference'
             - type: 'null'
         target:
           oneOf:
-            - $ref: '#/components/schemas/PromotionReferenceDto'
+            - $ref: '#/components/schemas/PromotionReference'
             - type: 'null'
         targetDashboardVersionId:
           type: integer
@@ -18729,18 +19254,12 @@ components:
         - destinationChangedSincePreview
         - targetDashboardVersionId
       type: object
-    WorkbookPromotionDtoOutcome:
-      enum:
-        - created
-        - updated
-        - unchanged
-      type: string
-    WorkbookPromotionLinkDto:
+    WorkbookPromotionLink:
       properties:
         id:
           type: integer
         target:
-          $ref: '#/components/schemas/PromotionReferenceDto'
+          $ref: '#/components/schemas/PromotionReference'
       required:
         - id
         - target
@@ -18749,7 +19268,7 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/WorkbookPromotionLinkDto'
+            $ref: '#/components/schemas/WorkbookPromotionLink'
           type: array
         pageInfo:
           $ref: '#/components/schemas/PageInfo'
@@ -18757,7 +19276,13 @@ components:
         - items
         - pageInfo
       type: object
-    WorkbookPromotionPreviewDto:
+    WorkbookPromotionOutcome:
+      enum:
+        - created
+        - updated
+        - unchanged
+      type: string
+    WorkbookPromotionPreview:
       properties:
         destinationHash:
           oneOf:
@@ -18781,22 +19306,22 @@ components:
         - reportCount
         - sourceHash
       type: object
-    WorkbookPromotionSummaryDto:
+    WorkbookPromotionSummary:
       properties:
         firstPromotion:
           oneOf:
-            - $ref: '#/components/schemas/WorkbookPromotionDto'
+            - $ref: '#/components/schemas/WorkbookPromotion'
             - type: 'null'
         lastPromotion:
           oneOf:
-            - $ref: '#/components/schemas/WorkbookPromotionDto'
+            - $ref: '#/components/schemas/WorkbookPromotion'
             - type: 'null'
         linkId:
           type: integer
         origin:
-          $ref: '#/components/schemas/PromotionReferenceDto'
+          $ref: '#/components/schemas/PromotionReference'
         parent:
-          $ref: '#/components/schemas/PromotionReferenceDto'
+          $ref: '#/components/schemas/PromotionReference'
       required:
         - linkId
         - parent
@@ -18806,14 +19331,14 @@ components:
       properties:
         promotion:
           oneOf:
-            - $ref: '#/components/schemas/WorkbookPromotionSummaryDto'
+            - $ref: '#/components/schemas/WorkbookPromotionSummary'
             - type: 'null'
       type: object
     WorkbookPromotionsListResponse:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/WorkbookPromotionDto'
+            $ref: '#/components/schemas/WorkbookPromotion'
           type: array
         pageInfo:
           $ref: '#/components/schemas/PageInfo'
@@ -18821,6 +19346,12 @@ components:
         - items
         - pageInfo
       type: object
+    WorkbookType:
+      enum:
+        - FOLDER
+        - WORKBOOK
+        - REPORT
+      type: string
     WorkbooksListResponse:
       properties:
         count:
