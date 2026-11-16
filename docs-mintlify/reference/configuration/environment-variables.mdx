@@ -2452,7 +2452,9 @@ non-public IP address: loopback, private (RFC 1918), carrier-grade NAT, link-loc
 (including cloud metadata endpoints such as `169.254.169.254`), unique local IPv6,
 multicast, and reserved ranges. Host names are checked after DNS resolution, and Cube
 Store connects only to the addresses that passed. Subnets and IP addresses listed in
-[`CUBESTORE_LOCATION_ALLOW_HOSTS`](#cubestore_location_allow_hosts) stay allowed. When
+[`CUBESTORE_LOCATION_ALLOW_HOSTS`](#cubestore_location_allow_hosts) stay allowed; an IP
+address listed with a port, such as `127.0.0.1:9000`, stays allowed only on that port and
+only when the location uses the IP address itself, not a host name that resolves to it. When
 enabled, import downloads don't use HTTP proxies from the environment.
 
 | Possible Values | Default in Development | Default in Production |

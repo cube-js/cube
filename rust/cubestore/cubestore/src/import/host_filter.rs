@@ -217,17 +217,25 @@ impl LocationHostFilter {
         self.patterns.iter().any(|p| matches!(p, HostPattern::Any))
     }
 
-    /// Whether the connection may go to `ip`, whichever host name led there.
+    /// Whether the connection may go to `ip` on any port, whichever host name led there. An IP
+    /// entry with a port does not count: the resolver that calls this never sees the port.
     pub fn is_ip_permitted(&self, ip: IpAddr) -> bool {
-        !self.deny_private_ips || !is_non_public_ip(ip) || self.ip_is_listed(ip)
+        self.is_ip_permitted_on(ip, None)
     }
 
-    /// Covered by a subnet entry, or by an IP entry (on any port).
-    fn ip_is_listed(&self, ip: IpAddr) -> bool {
+    /// Like [`Self::is_ip_permitted`], but an IP entry with a port also counts when `port` is it.
+    fn is_ip_permitted_on(&self, ip: IpAddr, port: Option<u16>) -> bool {
+        !self.deny_private_ips || !is_non_public_ip(ip) || self.ip_is_listed(ip, port)
+    }
+
+    fn ip_is_listed(&self, ip: IpAddr, port: Option<u16>) -> bool {
         let ip = Self::unmap(ip);
         self.patterns.iter().any(|p| match p {
             HostPattern::Subnet(subnet) => subnet.contains(ip),
-            HostPattern::Ip { ip: entry, .. } => *entry == ip,
+            HostPattern::Ip {
+                ip: entry,
+                port: entry_port,
+            } => *entry == ip && entry_port.map_or(true, |p| Some(p) == port),
             HostPattern::Exact(_) | HostPattern::Wildcard(_) | HostPattern::Any => false,
         })
     }
@@ -241,8 +249,9 @@ impl LocationHostFilter {
 
     pub fn is_allowed(&self, url: &Url) -> bool {
         let ip = Self::ip_of(url);
+        let port = url.port_or_known_default();
         if let Some(ip) = ip {
-            if !self.is_ip_permitted(ip) {
+            if !self.is_ip_permitted_on(ip, port) {
                 return false;
             }
         }
@@ -253,7 +262,6 @@ impl LocationHostFilter {
             return false;
         };
         let host = host.to_lowercase();
-        let port = url.port_or_known_default();
         let host_port = port.map(|port| format!("{}:{}", host, port));
         self.patterns.iter().any(|p| match p {
             HostPattern::Any => true,
@@ -290,7 +298,7 @@ impl LocationHostFilter {
             ))
         })?;
         if let Some(ip) = Self::ip_of(&url) {
-            if !self.is_ip_permitted(ip) {
+            if !self.is_ip_permitted_on(ip, url.port_or_known_default()) {
                 return Err(CubeError::user(format!(
                     "Import location '{}' points to a non-public IP address, which CUBESTORE_LOCATION_DENY_PRIVATE_IPS forbids. Add its subnet to CUBESTORE_LOCATION_ALLOW_HOSTS to allow it.",
                     location
@@ -568,10 +576,25 @@ mod tests {
         assert!(f.check("http://127.0.0.1:9001/a.csv").is_err());
         assert!(f.check("http://192.168.0.1/a.csv").is_err());
         assert!(f.is_ip_permitted("10.0.0.5".parse().unwrap()));
-        assert!(f.is_ip_permitted("127.0.0.1".parse().unwrap()));
+        // Resolved addresses carry no port, so a `host:port` IP entry cannot vouch for them.
+        assert!(!f.is_ip_permitted("127.0.0.1".parse().unwrap()));
         assert!(f.is_ip_permitted("::ffff:10.0.0.5".parse().unwrap()));
         assert!(!f.is_ip_permitted("192.168.0.1".parse().unwrap()));
         assert!(f.is_ip_permitted("93.184.215.14".parse().unwrap()));
+    }
+
+    #[test]
+    fn deny_private_ips_keeps_the_port_of_an_ip_entry_with_any_host() {
+        let f = deny_private(&["*", "127.0.0.1:9000", "[::1]:9000"]);
+        assert!(f.check("http://127.0.0.1:9000/a.csv").is_ok());
+        assert!(f.check("http://[::1]:9000/a.csv").is_ok());
+        assert!(f.check("http://127.0.0.1:6379/a.csv").is_err());
+        assert!(f.check("http://127.0.0.1/a.csv").is_err());
+        assert!(f.check("http://[::1]:6379/a.csv").is_err());
+        assert!(f.is_allowed(&"http://127.0.0.1:9000/a.csv".parse().unwrap()));
+        assert!(!f.is_allowed(&"http://127.0.0.1:6379/a.csv".parse().unwrap()));
+        assert!(!f.is_ip_permitted("127.0.0.1".parse().unwrap()));
+        assert!(!f.is_ip_permitted("::1".parse().unwrap()));
     }
 
     #[test]
