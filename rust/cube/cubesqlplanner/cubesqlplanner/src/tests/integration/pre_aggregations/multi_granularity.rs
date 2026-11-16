@@ -28,6 +28,13 @@ async fn rollup_vs_source(query: &str, pre_agg: &str) -> Option<(String, String)
     Some((rollup, source))
 }
 
+// CubeStore formats values its own way, so its result is a snapshot.
+async fn on_cubestore(query: &str, pre_agg: &str) -> Option<String> {
+    let schema = MockSchema::from_yaml_file(YAML).only_pre_aggregations(&[pre_agg]);
+    let ctx = TestContext::new_with_external_cubestore(schema).unwrap();
+    ctx.try_execute_cubestore(query, SEED).await
+}
+
 async fn fallback_vs_source(query: &str, pre_agg: &str) -> Option<(String, String)> {
     let with_rollup = ctx_with(&[pre_agg]);
     let (sql, usages) = with_rollup
@@ -67,6 +74,9 @@ async fn day_query_on_a_single_day_reads_the_day_column() {
     if let Some((rollup, source)) = rollup_vs_source(&query, "all_grains").await {
         assert_eq!(rollup, source);
     }
+    if let Some(result) = on_cubestore(&query, "all_grains").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -74,6 +84,9 @@ async fn day_query_across_a_year_boundary_reads_the_day_column() {
     let query = query("day", "2024-12-28", "2025-01-03");
     if let Some((rollup, source)) = rollup_vs_source(&query, "all_grains").await {
         assert_eq!(rollup, source);
+    }
+    if let Some(result) = on_cubestore(&query, "all_grains").await {
+        insta::assert_snapshot!(result);
     }
 }
 
@@ -83,6 +96,9 @@ async fn month_query_reads_the_month_column() {
     if let Some((rollup, source)) = rollup_vs_source(&query, "all_grains").await {
         assert_eq!(rollup, source);
     }
+    if let Some(result) = on_cubestore(&query, "all_grains").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -91,6 +107,9 @@ async fn day_query_ignores_a_coarser_column_listed_first() {
     if let Some((rollup, source)) = rollup_vs_source(&query, "month_then_day").await {
         assert_eq!(rollup, source);
     }
+    if let Some(result) = on_cubestore(&query, "month_then_day").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -98,6 +117,9 @@ async fn quarter_query_rolls_up_a_finer_stored_column() {
     let query = query("quarter", "2024-10-01", "2025-03-31");
     if let Some((rollup, source)) = rollup_vs_source(&query, "month_then_day").await {
         assert_eq!(rollup, source);
+    }
+    if let Some(result) = on_cubestore(&query, "month_then_day").await {
+        insta::assert_snapshot!(result);
     }
 }
 
@@ -118,6 +140,9 @@ async fn week_query_reads_the_week_column_listed_before_month() {
     "#};
     if let Some((rollup, source)) = rollup_vs_source(query, "week_and_month").await {
         assert_eq!(rollup, source);
+    }
+    if let Some(result) = on_cubestore(query, "week_and_month").await {
+        insta::assert_snapshot!(result);
     }
 }
 
@@ -163,6 +188,9 @@ async fn day_and_month_in_one_query_read_the_day_column() {
     if let Some((rollup, source)) = rollup_vs_source(query, "month_then_day").await {
         assert_eq!(rollup, source);
     }
+    if let Some(result) = on_cubestore(query, "month_then_day").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 // The member's reads resolve to its stored grain columns, which hold no raw
@@ -194,6 +222,9 @@ async fn day_query_with_the_raw_dimension_stored_matches_the_source() {
     if let Some((rollup, source)) = rollup_vs_source(&query, "raw_and_grains").await {
         assert_eq!(rollup, source);
     }
+    if let Some(result) = on_cubestore(&query, "raw_and_grains").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 // Grain columns are stored in the query timezone, so a raw dimension stored
@@ -205,6 +236,9 @@ async fn day_query_in_a_non_utc_timezone_reads_the_day_column() {
     ", query("day", "2024-12-28", "2025-01-03")};
     if let Some((rollup, source)) = rollup_vs_source(&query, "raw_and_grains").await {
         assert_eq!(rollup, source);
+    }
+    if let Some(result) = on_cubestore(&query, "raw_and_grains").await {
+        insta::assert_snapshot!(result);
     }
 }
 
@@ -226,6 +260,9 @@ async fn include_window_without_granularity_reads_the_day_column() {
     if let Some((rollup, source)) = rollup_vs_source(query, "month_then_day").await {
         assert_eq!(rollup, source);
     }
+    if let Some(result) = on_cubestore(query, "month_then_day").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -243,6 +280,9 @@ async fn include_windows_of_different_alignment_in_one_month_query() {
     if let Some((rollup, source)) = rollup_vs_source(query, "month_then_day").await {
         assert_eq!(rollup, source);
     }
+    if let Some(result) = on_cubestore(query, "month_then_day").await {
+        insta::assert_snapshot!(result);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -257,5 +297,8 @@ async fn include_window_ending_on_a_whole_second_reads_the_day_column() {
     "#};
     if let Some((rollup, source)) = rollup_vs_source(query, "all_grains").await {
         assert_eq!(rollup, source);
+    }
+    if let Some(result) = on_cubestore(query, "all_grains").await {
+        insta::assert_snapshot!(result);
     }
 }

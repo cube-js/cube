@@ -1237,10 +1237,10 @@ impl TestContext {
             "CubeStore execution requires all matched pre-aggregations to be external"
         );
 
-        self.create_pre_agg_tables(&client, &pre_aggregations).await;
+        ctx.create_pre_agg_tables(&client, &pre_aggregations).await;
 
         let (mut conn, cs_schema) = super::cubestore_service::connect_with_schema().await;
-        let table_names = self
+        let table_names = ctx
             .upload_pre_agg_tables_to_cubestore(&client, &mut conn, &cs_schema, &pre_aggregations)
             .await;
 
