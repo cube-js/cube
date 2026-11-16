@@ -123,7 +123,7 @@ and [cancelling a run](/api-reference/databricks-metric-view-integration/cancel-
 Contact [Cube support](/admin/account-billing/support) for help with access.
 
 When saving settings through the API, `deletionPolicy` is `retain`, the default and what an
-omitted value saves, or `delete-managed`, which drops the Metric Views of removed views as
+omitted value saves, or `delete-managed`, which drops obsolete Metric Views as
 [Removed views](#removed-views) describes.
 
 ## Data sources served by `driver_factory` {#data-sources-served-by-driver_factory}
@@ -159,11 +159,11 @@ Omit it to keep the stored credential, or pass `null` to remove it.
 ## Trigger publication from CI
 
 Run publication from CI after a successful Cube deployment. First, configure **All views**, a
-dedicated target catalog and schema, and publication enabled in **Settings → Data
-Sources**. With **When a view leaves the scope** set to **Delete the Metric View Cube created**,
-each CI run also drops the Metric Views of views the deployment removed or renamed (see
-[Removed views](#removed-views)). Run **Preview** and **Test access** before the first write. CI
-uses these saved settings; the API call does not override the scope or destination.
+dedicated target catalog and schema, and publication enabled in **Settings → Data Sources**. With
+**When a view leaves the scope** set to **Delete the Metric View Cube created**, each CI run also
+drops the Metric Views the deployment made obsolete (see [Removed views](#removed-views)). Run
+**Preview** and **Test access** before the first write. CI uses these saved settings; the API call
+does not override the scope or destination.
 
 Store a [Platform API key](/api-reference/authentication) with deployment `SchemaUpdate` access as
 a CI secret. The recipe reads the saved settings, starts a run with their `configurationVersion`,
@@ -354,19 +354,21 @@ sensitive source data.
 
 ### Removed views
 
-A view leaves the scope when you remove it from the data model, rename it, or deselect it. By
-default its Metric View stays in Databricks, and run history labels it **Obsolete, kept**. To have
-syncs drop such Metric Views, choose **Delete the Metric View Cube created** under **When a view
-leaves the scope**, or save `deletionPolicy: delete-managed` through the API. The next sync drops
-each one and labels it **Obsolete, deleted**. A dropped Metric View loses its Databricks grants; if
-the view returns to scope, the next sync creates it again without them.
+A Metric View becomes obsolete when its view leaves the scope (you remove the view from the data
+model, rename it, or deselect it) or the view's target name changes (a target-name override or
+prefix change). By default an obsolete Metric View stays in Databricks, and run history labels it
+**Obsolete, kept**. To have syncs drop obsolete Metric Views, choose **Delete the Metric View Cube
+created** under **When a view leaves the scope**, or save `deletionPolicy: delete-managed` through
+the API. The next sync drops each one and labels it **Obsolete, deleted**. A dropped Metric View
+loses its Databricks grants; if its target comes back, the next sync creates it again without
+them.
 
 Cube drops a Metric View only when all of these hold:
 
 - Cube created it and still records it as its own, in the catalog and schema the data source
   publishes to now, in the same Unity Catalog metastore.
-- Its Cube view left the scope. A view still in scope whose conversion or write failed keeps its
-  Metric View.
+- It is obsolete: its Cube view left the scope, or the view now publishes to another target
+  name. A view still in scope whose conversion or write failed keeps its Metric View.
 - The object at that name is still a view, owned by the Databricks principal Cube publishes with.
   Cube checks this just before it drops it. If you transfer ownership of Cube's Metric Views,
   Cube no longer drops them: each sync labels such a Metric View **Obsolete, kept** with

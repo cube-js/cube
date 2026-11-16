@@ -16578,8 +16578,9 @@ components:
         deletionPolicy:
           $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputDeletionPolicy'
           description: >-
-            What a sync does with a Metric View whose Cube view left the scope. retain keeps it;
-            delete-managed drops it when Cube created it, under fixed safety rules.
+            What a sync does with a Metric View Cube created once it is obsolete: its Cube view left
+            the scope or its target name changed. retain keeps it; delete-managed drops it, under
+            fixed safety rules. Omitted, it saves retain, also on an update.
         enabled:
           type: boolean
         expectedConfigurationVersion:
