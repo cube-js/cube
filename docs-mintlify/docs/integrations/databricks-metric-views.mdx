@@ -290,7 +290,9 @@ without a trailing slash, `DEPLOYMENT_ID` to the production deployment, `CUBE_AP
 [Platform API key](/api-reference/authentication) with deployment `SchemaRead` access, and
 `MODEL_DIR` to the data model folder in your checkout. The example previews every view of the
 `default` data source; send the same selection in both previews. To preview a deployed data
-model with Jinja templates, the key also needs `SqlRunnerRead`.
+model with Jinja templates, the key also needs `SqlRunnerRead`. Set `MAX_POLLS` to scale the wait
+for your view count and warehouse start-up time (default: 60 attempts per preview, 10 seconds
+apart, plus request time).
 
 ```bash
 set -euo pipefail
@@ -298,6 +300,10 @@ set -euo pipefail
 previews="$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/databricks-metric-view-previews"
 auth_header="Authorization: Bearer $CUBE_API_TOKEN"
 selection='{"dataSourceName": "default", "selectionMode": "all"}'
+max_polls=${MAX_POLLS:-60}
+[[ "$max_polls" =~ ^[1-9][0-9]*$ ]] || { echo 'MAX_POLLS must be a positive integer.' >&2; exit 1; }
+results=$(mktemp -d)
+trap 'rm -rf "$results"' EXIT
 
 # Prints the completed result of the preview the request body on stdin starts.
 preview() {
@@ -306,7 +312,7 @@ preview() {
     -H "$auth_header" -H 'Content-Type: application/json' --data-binary @- "$previews")
   status_url=$(jq -r '.statusUrl' <<<"$start")
   result_url=$(jq -r '.resultUrl' <<<"$start")
-  for ((attempt=0; attempt<${MAX_POLLS:-60}; attempt++)); do
+  for ((attempt=0; attempt<max_polls; attempt++)); do
     status=$(curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
       -H "$auth_header" "$CUBE_API_URL$status_url")
     case "$(jq -r '.status' <<<"$status")" in
@@ -315,6 +321,10 @@ preview() {
       *) jq '{status, error}' <<<"$status" >&2; return 1 ;;
     esac
   done
+  if ! jq -e '.status == "COMPLETED" and .resultAvailable' <<<"$status" >/dev/null; then
+    echo "The preview didn't finish within $max_polls polls; raise MAX_POLLS." >&2
+    return 1
+  fi
   curl --fail --silent --show-error --connect-timeout 10 --max-time 60 \
     -H "$auth_header" "$CUBE_API_URL$result_url"
 }
@@ -325,13 +335,16 @@ while IFS= read -r -d '' file; do
     '. + {($path): $content}' <<<"$files")
 done < <(find "$MODEL_DIR" -type f \( -name '*.yml' -o -name '*.yaml' \) -print0)
 
-deployed=$(preview <<<"$selection")
-proposed=$(jq --argjson files "$files" '. + {source: "files", files: $files}' <<<"$selection" |
-  preview)
+# Previews write to files, not $(...), so set -e stops the step when a request fails.
+preview <<<"$selection" >"$results/deployed.json"
+printf '%s' "$files" |
+  jq --argjson selection "$selection" '$selection + {source: "files", files: .}' |
+  preview >"$results/proposed.json"
 
-regressions=$(jq -n --argjson deployed "$deployed" --argjson proposed "$proposed" '
+regressions=$(jq -n '
   def members: [.withheldMembers[] | "\(.cube).\(.member)"];
-  ($proposed.views | map({key: .cubeViewName, value: .}) | from_entries) as $after
+  input as $deployed | input as $proposed
+  | ($proposed.views | map({key: .cubeViewName, value: .}) | from_entries) as $after
   | [$deployed.views[] | select(.eligibleForPublication) | . as $before
       | $after[.cubeViewName] | select(. != null)
       | if .eligibleForPublication | not then
@@ -340,7 +353,7 @@ regressions=$(jq -n --argjson deployed "$deployed" --argjson proposed "$proposed
         elif (members - ($before | members)) != [] then
           {view: .cubeViewName, regression: "newly withheld",
            members: (members - ($before | members))}
-        else empty end]')
+        else empty end]' "$results/deployed.json" "$results/proposed.json")
 
 if [[ "$regressions" != '[]' ]]; then
   jq . <<<"$regressions" >&2
