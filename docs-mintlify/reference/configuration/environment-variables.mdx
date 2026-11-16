@@ -2419,6 +2419,22 @@ deployments where import files on the Cube Store hosts are managed by an operato
 Set it on the router and every worker; imports are re-checked on the node that runs
 them.
 
+## `CUBESTORE_LOCATION_ALLOW_PRIVATE_NETWORK`
+
+Whether `CREATE TABLE ... LOCATION` may download an `http://` or `https://` import
+source from a loopback, private, link-local or other non-public address, such as
+`localhost`, `10.0.0.0/8` or the cloud metadata endpoint `169.254.169.254`. Disabled by
+default. Hostnames are checked against the addresses they resolve to, including after
+redirects. Enable this if your export bucket is reachable only on a private network,
+e.g., a self-hosted MinIO.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+Set it on the router and every worker; imports are re-checked on the node that runs
+them.
+
 ## `CUBESTORE_LOG_LEVEL`
 
 The logging level for Cube Store.

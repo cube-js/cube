@@ -48,6 +48,7 @@ use cubedatasketches::HLLDataSketch;
 use tokio::time::{sleep, Duration};
 
 pub mod limits;
+pub mod network;
 
 impl ImportFormat {
     fn open_reader(file: File, location: &str) -> Pin<Box<dyn AsyncBufRead + Send>> {
@@ -580,6 +581,7 @@ impl LocationKind {
 
 pub struct LocationsValidatorImpl {
     location_allow_local_fs: bool,
+    location_allow_private_network: bool,
 }
 
 #[async_trait]
@@ -587,21 +589,40 @@ impl LocationsValidator for LocationsValidatorImpl {
     async fn validate(&self, locations: &Vec<String>) -> Result<(), CubeError> {
         for location in locations {
             self.validate_location(location)?;
+            if !self.location_allow_private_network
+                && LocationKind::of(location) == LocationKind::Http
+            {
+                let url = Self::parse_http_location(location)?;
+                network::check_resolved_host(location, &url).await?;
+            }
         }
         Ok(())
     }
 }
 
 impl LocationsValidatorImpl {
-    pub fn new(location_allow_local_fs: bool) -> Arc<Self> {
+    pub fn new(location_allow_local_fs: bool, location_allow_private_network: bool) -> Arc<Self> {
         Arc::new(Self {
             location_allow_local_fs,
+            location_allow_private_network,
         })
+    }
+
+    fn parse_http_location(location: &str) -> Result<url::Url, CubeError> {
+        url::Url::parse(location)
+            .map_err(|e| CubeError::user(format!("Invalid import location '{}': {}", location, e)))
     }
 
     fn validate_location(&self, location: &str) -> Result<(), CubeError> {
         match LocationKind::of(location) {
-            LocationKind::Stream | LocationKind::Http => Ok(()),
+            LocationKind::Stream => Ok(()),
+            LocationKind::Http => {
+                let url = Self::parse_http_location(location)?;
+                if !self.location_allow_private_network {
+                    network::check_url_host(location, &url)?;
+                }
+                Ok(())
+            }
             LocationKind::Temp => {
                 // Fails early on traversal instead of waiting for the import job to pick it up.
                 LocationHelper::temp_uploads_path(location)?;
@@ -644,6 +665,7 @@ pub struct ImportServiceImpl {
     config_obj: Arc<dyn ConfigObj>,
     limits: Arc<ConcurrencyLimits>,
     validator: Arc<dyn LocationsValidator>,
+    http_client: reqwest::Client,
 }
 
 crate::di_service!(ImportServiceImpl, [ImportService]);
@@ -657,8 +679,10 @@ impl ImportServiceImpl {
         config_obj: Arc<dyn ConfigObj>,
         limits: Arc<ConcurrencyLimits>,
         validator: Arc<dyn LocationsValidator>,
-    ) -> Arc<ImportServiceImpl> {
-        Arc::new(ImportServiceImpl {
+    ) -> Result<Arc<ImportServiceImpl>, CubeError> {
+        let http_client =
+            network::http_location_client(config_obj.location_allow_private_network())?;
+        Ok(Arc::new(ImportServiceImpl {
             meta_store,
             streaming_service,
             chunk_store,
@@ -666,7 +690,8 @@ impl ImportServiceImpl {
             config_obj,
             limits,
             validator,
-        })
+            http_client,
+        }))
     }
 
     pub async fn resolve_location(
@@ -769,7 +794,7 @@ impl ImportServiceImpl {
             .into_parts();
         let mut file = File::from_std(file);
 
-        let res = reqwest::get(location).await?;
+        let res = self.http_client.get(location).send().await?;
         if !res.status().is_success() {
             return Err(CubeError::user(format!(
                 "Unable to import from http location, status code: {}",
@@ -1004,7 +1029,8 @@ impl ImportService for ImportServiceImpl {
 
     async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError> {
         let file_size =
-            LocationHelper::location_file_size(location, self.remote_fs.clone()).await?;
+            LocationHelper::location_file_size(location, self.remote_fs.clone(), &self.http_client)
+                .await?;
         Ok(ImportServiceImpl::estimate_rows(location, file_size))
     }
 
@@ -1019,10 +1045,10 @@ impl LocationHelper {
     pub async fn location_file_size(
         location: &str,
         remote_fs: Arc<dyn RemoteFs>,
+        client: &reqwest::Client,
     ) -> Result<Option<u64>, CubeError> {
         let res = match LocationKind::of(location) {
             LocationKind::Http => {
-                let client = reqwest::Client::new();
                 let req = client.head(location).build()?;
 
                 // S3 doesn't support HEAD for pre signed urls with GetObject command
@@ -1695,13 +1721,14 @@ mod temp_upload_name_tests {
 #[cfg(test)]
 mod location_validator_tests {
     use super::{
-        Column, ColumnType, ImportFormat, ImportService, LocationKind, LocationsValidatorImpl,
+        Column, ColumnType, ImportFormat, ImportService, LocationKind, LocationsValidator,
+        LocationsValidatorImpl,
     };
     use crate::config::Config;
     use std::sync::Arc;
 
     fn validator(allow_local: bool) -> Arc<LocationsValidatorImpl> {
-        LocationsValidatorImpl::new(allow_local)
+        LocationsValidatorImpl::new(allow_local, false)
     }
 
     #[test]
@@ -1742,13 +1769,62 @@ mod location_validator_tests {
 
     #[test]
     fn http_locations_do_not_depend_on_the_local_setting() {
-        let denied = validator(false);
+        for allow_local in [false, true] {
+            let v = LocationsValidatorImpl::new(allow_local, false);
+            assert!(v
+                .validate_location("https://bucket.s3.amazonaws.com/data.csv")
+                .is_ok());
+        }
+    }
+
+    #[tokio::test]
+    async fn private_network_http_locations_require_an_explicit_flag() {
+        let denied = LocationsValidatorImpl::new(true, false);
+        for location in [
+            "http://127.0.0.1:19099/data.csv",
+            "http://169.254.169.254/latest/meta-data/",
+            "http://localhost:3030/data.csv",
+        ] {
+            let err = denied
+                .validate(&vec![location.to_string()])
+                .await
+                .unwrap_err()
+                .message;
+            assert!(
+                err.contains("CUBESTORE_LOCATION_ALLOW_PRIVATE_NETWORK"),
+                "unexpected error for {:?}: {}",
+                location,
+                err
+            );
+        }
         assert!(denied
-            .validate_location("http://127.0.0.1:19099/data.csv")
+            .validate_location("http://[invalid/data.csv")
+            .is_err());
+
+        let allowed = LocationsValidatorImpl::new(false, true);
+        assert!(allowed
+            .validate(&vec!["http://127.0.0.1:19099/data.csv".to_string()])
+            .await
             .is_ok());
-        assert!(denied
-            .validate_location("https://bucket.s3.amazonaws.com/data.csv")
-            .is_ok());
+    }
+
+    #[tokio::test]
+    async fn http_client_refuses_private_addresses() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let client = super::network::http_location_client(false).unwrap();
+        // `localhost` goes through the resolver, which must drop 127.0.0.1.
+        let err = client
+            .get(format!("http://localhost:{}/data.csv", port))
+            .send()
+            .await
+            .unwrap_err();
+        let err = format!("{:?}", err);
+        assert!(
+            err.contains("CUBESTORE_LOCATION_ALLOW_PRIVATE_NETWORK"),
+            "unexpected error: {}",
+            err
+        );
     }
 
     #[test]
