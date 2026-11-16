@@ -2497,7 +2497,8 @@ macro_rules! generate_series_udtf {
                         // value: the series would repeat it, or never reach `end`.
                         if last.is_some_and(|last| current <= last) {
                             return Err(DataFusionError::Execution(
-                                "step size too small to advance the series".to_string(),
+                                "step size is below the float precision of the series values"
+                                    .to_string(),
                             ));
                         }
                         builder.append_value(current);
@@ -2525,7 +2526,7 @@ macro_rules! generate_series_helper_date32 {
                 ))
             })?;
         let res = date_addsub_month_day_nano(current_dt, $STEP, true)?;
-        $CURRENT = (res.and_utc().timestamp() / 86400) as $PRIMITIVE_TYPE;
+        $CURRENT = res.and_utc().timestamp().div_euclid(86400) as $PRIMITIVE_TYPE;
     };
 }
 

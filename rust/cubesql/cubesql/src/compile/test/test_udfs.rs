@@ -797,14 +797,18 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
         ),
         (
             "SELECT generate_series(10000000000000000.0, 10000000000000004.0, 1.0);",
-            "step size too small",
+            "step size is below the float precision",
         ),
         (
             "SELECT generate_series(1.0, 2.0, 1e-300);",
-            "step size too small",
+            "step size is below the float precision",
         ),
         (
             "SELECT generate_series('2024-01-01'::date, '2024-01-02'::date, '1 hour'::interval);",
+            "step size does not advance the series",
+        ),
+        (
+            "SELECT generate_series('1969-12-01'::date, '1969-12-31'::date, '1 hour'::interval);",
             "step size does not advance the series",
         ),
         (
