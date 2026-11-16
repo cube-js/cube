@@ -357,12 +357,12 @@ sensitive source data.
 
 A Metric View becomes obsolete when its view leaves the scope (you remove the view from the data
 model, rename it, deselect it, or edit the pattern so it no longer matches) or the view's target
-name changes (a target-name override or prefix change). By default an obsolete Metric View stays in Databricks, and run history labels it
-**Obsolete, kept**. To have syncs drop obsolete Metric Views, choose **Delete the Metric View Cube
-created** under **When a view leaves the scope**, or save `deletionPolicy: delete-managed` through
-the API. The next sync drops each one and labels it **Obsolete, deleted**. A dropped Metric View
-loses its Databricks grants; if its target comes back, the next sync creates it again without
-them.
+name changes (a target-name override or prefix change). By default an obsolete Metric View stays in
+Databricks, and run history labels it **Obsolete, kept**. To have syncs drop obsolete Metric Views,
+choose **Delete the Metric View Cube created** under **When a view leaves the scope**, or save
+`deletionPolicy: delete-managed` through the API. The next sync drops each one and labels it
+**Obsolete, deleted**. A dropped Metric View loses its Databricks grants; if its target comes back,
+the next sync creates it again without them.
 
 Cube drops a Metric View only when all of these hold:
 
