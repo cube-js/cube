@@ -16578,8 +16578,8 @@ components:
         deletionPolicy:
           $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputDeletionPolicy'
           description: >-
-            Use retain. The delete-managed value is deprecated and currently retains obsolete Metric
-            Views; it does not delete them.
+            What a sync does with a Metric View whose Cube view left the scope. retain keeps it;
+            delete-managed drops it when Cube created it, under fixed safety rules.
         enabled:
           type: boolean
         expectedConfigurationVersion:
@@ -16621,13 +16621,10 @@ components:
         - selectionMode
       type: object
     SaveDatabricksMetricViewIntegrationInputDeletionPolicy:
-      oneOf:
-        - const: retain
-          type: string
-        - const: delete-managed
-          type: string
-          deprecated: true
-          description: Managed deletion is not implemented. Use retain.
+      enum:
+        - retain
+        - delete-managed
+      type: string
     SaveDatabricksMetricViewIntegrationInputSelectionMode:
       enum:
         - all

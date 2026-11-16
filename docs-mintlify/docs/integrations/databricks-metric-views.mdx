@@ -159,8 +159,10 @@ Omit it to keep the stored credential, or pass `null` to remove it.
 
 Run publication from CI after a successful Cube deployment. First, configure **All views**, a
 dedicated target catalog and schema, and publication enabled in **Settings → Data
-Sources**. Run **Preview** and **Test access** before the first write. CI uses these saved settings;
-the API call does not override the scope or destination.
+Sources**. Under **Delete the Metric View Cube created**, each CI run also drops the Metric Views
+of views the deployment removed or renamed (see [Removed views](#removed-views)). Run **Preview**
+and **Test access** before the first write. CI uses these saved settings; the API call does not
+override the scope or destination.
 
 Store a [Platform API key](/api-reference/authentication) with deployment `SchemaUpdate` access as
 a CI secret. The recipe reads the saved settings, starts a run with their `configurationVersion`,
@@ -257,9 +259,9 @@ fi
 The expected-build check runs **after** publication starts; a mismatch cannot prevent or undo a
 write. `viewNames` lists planned views; `retained_obsolete` means an obsolete target was left in
 place, and `deleted_obsolete` that Cube dropped it. A `retained_obsolete` target with a `detail` is
-a drop that was held or failed, so the recipe rejects it. Publication-run `views[].outcome` values are `unchanged`, `created`, `updated`, `blocked`,
-`validation_failed`, `publish_failed`, `retained_obsolete`, and `deleted_obsolete`; these differ
-from preview outcomes. The recipe accepts only the successful outcomes.
+a drop that was held or failed, so the recipe rejects it. Publication-run `views[].outcome` values
+are `unchanged`, `created`, `updated`, `blocked`, `validation_failed`, `publish_failed`,
+`retained_obsolete`, and `deleted_obsolete`; these differ from preview outcomes. The recipe accepts only the successful outcomes.
 `incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
 zero rejects definitions missing measures.
 
