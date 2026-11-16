@@ -472,7 +472,7 @@ pub trait ConfigObj: DIService {
     /// `*.example.com` or a subnet. `*` (the default) allows every host, empty allows none.
     fn location_allow_hosts(&self) -> &Vec<String>;
 
-    /// Whether `http(s)://` import locations may reach non-public IP addresses (also after
+    /// Whether `http(s)://` import locations are refused non-public IP addresses (also after
     /// DNS resolution) that `location_allow_hosts` does not list as a subnet or IP.
     fn location_deny_private_ips(&self) -> bool;
 
