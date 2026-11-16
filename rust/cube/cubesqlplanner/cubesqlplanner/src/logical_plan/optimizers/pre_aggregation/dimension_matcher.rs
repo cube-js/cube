@@ -114,7 +114,7 @@ impl<'a> DimensionMatcher<'a> {
                 .pre_aggregation_time_dimensions
                 .values()
                 .flatten()
-                .any(|(_, matched)| *matched);
+                .any(|entry| entry.matched);
 
         for filter in filters.iter() {
             let filter_match = self.try_match_filter_item(filter, true)?;
