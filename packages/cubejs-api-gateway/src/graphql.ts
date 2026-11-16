@@ -9,7 +9,10 @@ import {
   VariableNode,
   ValueNode,
   GraphQLSchema,
+  DocumentNode,
+  parse,
 } from 'graphql';
+import { LRUCache } from 'lru-cache';
 
 import {
   objectType,
@@ -30,7 +33,6 @@ import {
   DateTimeResolver,
 } from 'graphql-scalars';
 
-import gql from 'graphql-tag';
 import { QueryTypeEnum, MemberTypeEnum } from './types/enums';
 
 const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
@@ -467,8 +469,26 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
   };
 }
 
+const parsedDocuments = new LRUCache<string, DocumentNode>({
+  max: 1000,
+  maxSize: 16 * 1024 * 1024,
+  sizeCalculation: (_document, query) => query.length || 1,
+});
+
+function parseDocument(query: string): DocumentNode {
+  const cached = parsedDocuments.get(query);
+  if (cached) {
+    return cached;
+  }
+
+  const document = parse(query);
+  parsedDocuments.set(query, document);
+
+  return document;
+}
+
 export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, variableValues: Record<string, any> = {}) {
-  const ast = gql(query);
+  const ast = parseDocument(query);
 
   const operation: any = ast.definitions.find(
     ({ kind }) => kind === 'OperationDefinition'

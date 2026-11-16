@@ -9,7 +9,7 @@ import { GraphQLObjectType } from 'graphql';
 import fs from 'fs-extra';
 import request from 'supertest';
 
-import { makeSchema } from '../src/graphql';
+import { getJsonQueryFromGraphQLQuery, makeSchema } from '../src/graphql';
 
 const metaConfig = [
   {
@@ -416,6 +416,25 @@ describe('GraphQL Schema', () => {
         { orders: { count: '10', totalAmount: '500', status: 'completed' } },
         { orders: { count: '5', totalAmount: '200', status: 'pending' } },
       ]);
+    });
+  });
+});
+
+describe('getJsonQueryFromGraphQLQuery', () => {
+  it('translates queries that differ only by a comment-ending newline', () => {
+    const where = '(where: { orders: { id: { equals: "1" } } })';
+    const commented = `query { cube # note ${where}\n{ orders { count } } }`;
+    const filtered = `query { cube # note\n${where}\n{ orders { count } } }`;
+
+    expect(getJsonQueryFromGraphQLQuery(commented, metaConfig)).toEqual({
+      measures: ['Orders.count'],
+    });
+    expect(getJsonQueryFromGraphQLQuery(filtered, metaConfig)).toEqual({
+      measures: ['Orders.count'],
+      filters: [{ member: 'Orders.id', operator: 'equals', values: ['1'] }],
+    });
+    expect(getJsonQueryFromGraphQLQuery(commented, metaConfig)).toEqual({
+      measures: ['Orders.count'],
     });
   });
 });
