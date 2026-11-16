@@ -1860,6 +1860,33 @@ insertion, compaction etc.
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | `4`                    | `4`                   |
 
+## `CUBESTORE_LOCATION_ALLOW_HOSTS`
+
+A comma-separated list of hosts that `http://` and `https://` locations in
+`CREATE TABLE ... LOCATION` may point to, similar to `remote_url_allow_hosts` in
+ClickHouse.
+
+- `*` on its own allows every host. This is the default.
+- `files.example.com` matches that host on any port.
+- `files.example.com:8443` matches that port only.
+- `*` inside an entry stands for one domain label: `*.example.com` matches
+  `a.example.com`, but neither `a.b.example.com` nor `example.com`. It cannot stand
+  for part of an IP address: use a subnet instead of `10.0.0.*`.
+- `10.0.0.5`, `10.0.0.5:9000`, `::1` or `[::1]:9000` matches that IP address, however
+  the location spells it. An IPv6 address with a port needs brackets.
+- `10.0.0.0/8` or `fd00::/8` matches IP addresses in that subnet on any port. Subnets
+  apply to locations with an IP address in the URL, and to resolved addresses when
+  [`CUBESTORE_LOCATION_DENY_PRIVATE_IPS`](#cubestore_location_deny_private_ips) is set.
+
+An empty value allows no host. Redirects are checked against the same list.
+
+| Possible Values                                            | Default in Development | Default in Production |
+| ---------------------------------------------------------- | ---------------------- | --------------------- |
+| A comma-separated list of hosts, host patterns, or subnets | `*`                    | `*`                   |
+
+Set it on the router and every worker; imports are re-checked on the node that runs
+them.
+
 ## `CUBESTORE_LOCATION_ALLOW_LOCAL_FS`
 
 Whether `CREATE TABLE ... LOCATION` may use a local filesystem path as the import
@@ -1873,6 +1900,25 @@ deployments where import files on the Cube Store hosts are managed by an operato
 
 Set it on the router and every worker; imports are re-checked on the node that runs
 them.
+
+## `CUBESTORE_LOCATION_DENY_PRIVATE_IPS`
+
+Whether `http://` and `https://` import locations are refused when they point to a
+non-public IP address: loopback, private (RFC 1918), carrier-grade NAT, link-local
+(including cloud metadata endpoints such as `169.254.169.254`), unique local IPv6,
+multicast, and reserved ranges. Host names are checked after DNS resolution, and Cube
+Store connects only to the addresses that passed. Subnets and IP addresses listed in
+[`CUBESTORE_LOCATION_ALLOW_HOSTS`](#cubestore_location_allow_hosts) stay allowed; an IP
+address listed with a port, such as `127.0.0.1:9000`, stays allowed only on that port and
+only when the location uses the IP address itself, not a host name that resolves to it. When
+enabled, import downloads don't use HTTP proxies from the environment.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+Set it on the router and every worker; host names are resolved and checked on the node
+that downloads the file.
 
 ## `CUBESTORE_LOG_LEVEL`
 
