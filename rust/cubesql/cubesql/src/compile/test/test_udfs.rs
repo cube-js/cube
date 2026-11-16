@@ -755,33 +755,6 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
         .await?
     );
 
-    insta::assert_snapshot!(
-        "generate_series_i64_overflow",
-        execute_query(
-            "SELECT generate_series(9223372036854775806, 9223372036854775807);".to_string(),
-            DatabaseProtocol::PostgreSQL
-        )
-        .await?
-    );
-
-    insta::assert_snapshot!(
-        "generate_series_i64_overflow_step",
-        execute_query(
-            "SELECT generate_series(0, 9223372036854775807, 5000000000000000000);".to_string(),
-            DatabaseProtocol::PostgreSQL
-        )
-        .await?
-    );
-
-    insta::assert_snapshot!(
-        "generate_series_f64_no_drift",
-        execute_query(
-            "SELECT generate_series(0, 1, 0.1);".to_string(),
-            DatabaseProtocol::PostgreSQL
-        )
-        .await?
-    );
-
     for (sql, expected) in [
         (
             "SELECT generate_series('NaN'::double precision, 5.0);",
@@ -831,9 +804,19 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
         );
     }
 
-    // The `_rows` cases keep the input row with a NULL series value, while Postgres drops it:
-    // TableFunExec pads an empty series to one row whenever another column is selected.
     for (name, sql) in [
+        (
+            "generate_series_i64_overflow",
+            "SELECT generate_series(9223372036854775806, 9223372036854775807);",
+        ),
+        (
+            "generate_series_i64_overflow_step",
+            "SELECT generate_series(0, 9223372036854775807, 5000000000000000000);",
+        ),
+        (
+            "generate_series_f64_no_drift",
+            "SELECT generate_series(0, 1, 0.1);",
+        ),
         (
             "generate_series_i64_negative_start_large_step",
             "SELECT generate_series(-9000000000000000000, 9000000000000000000, 5000000000000000000);",
@@ -862,6 +845,8 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
             "generate_series_null_date",
             "SELECT generate_series('2024-07-23'::date, NULL::date);",
         ),
+        // The `_rows` cases keep the input row with a NULL series value, while Postgres drops
+        // it: TableFunExec pads an empty series to one row whenever another column is selected.
         (
             "generate_series_null_rows",
             "SELECT x, generate_series(x, 3) FROM (VALUES (1), (NULL), (2)) t(x);",

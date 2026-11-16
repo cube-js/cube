@@ -2449,13 +2449,22 @@ fn generate_series_validate_f64(start: f64, end: f64, step: f64) -> Result<()> {
 /// The `n`-th element of the series, or `None` when it is past the type's range (and so past
 /// any `end`).
 fn generate_series_nth_i64(start: i64, step: i64, n: i64) -> Option<i64> {
-    std::convert::TryFrom::try_from(start as i128 + step as i128 * n as i128).ok()
+    (start as i128 + step as i128 * n as i128).try_into().ok()
 }
 
 /// The `n`-th element of the series. Computed from `start` instead of accumulating `step`, so
 /// rounding does not drift.
 fn generate_series_nth_f64(start: f64, step: f64, n: i64) -> Option<f64> {
     Some(start + (n as f64) * step)
+}
+
+/// The step for `row`, a scalar step being shared by every row. `None` when it is NULL.
+fn generate_series_step<T: ArrowPrimitiveType>(
+    step_arr: &PrimitiveArray<T>,
+    row: usize,
+) -> Option<T::Native> {
+    let idx = if step_arr.len() > row { row } else { 0 };
+    step_arr.is_valid(idx).then(|| step_arr.value(idx))
 }
 
 macro_rules! generate_series_udtf {
@@ -2474,19 +2483,17 @@ macro_rules! generate_series_udtf {
 
             let mut builder = PrimitiveBuilder::<$TYPE>::with_capacity(1);
             for (i, (start, end)) in l_arr.iter().zip(r_arr.iter()).enumerate() {
-                let step_idx = if step_arr.len() > i { i } else { 0 };
                 // generate_series is strict: a NULL argument yields no rows, as in Postgres.
-                let (Some(start), Some(end), false) = (start, end, step_arr.is_null(step_idx))
+                let (Some(start), Some(end), Some(step)) =
+                    (start, end, generate_series_step(step_arr, i))
                 else {
                     section_sizes.push(0);
                     continue;
                 };
-                let step = step_arr.value(step_idx);
                 $VALIDATE(start, end, step)?;
 
-                let mut section_size: usize = 0;
+                let mut n: i64 = 0;
                 if start <= end && step > 0 as $PRIMITIVE_TYPE {
-                    let mut n: i64 = 0;
                     let mut last = None;
                     while let Some(current) = $NTH(start, step, n) {
                         if current > end {
@@ -2501,12 +2508,11 @@ macro_rules! generate_series_udtf {
                             ));
                         }
                         builder.append_value(current);
-                        section_size += 1;
                         last = Some(current);
                         n += 1;
                     }
                 }
-                section_sizes.push(section_size);
+                section_sizes.push(n as usize);
             }
 
             return Ok((Arc::new(builder.finish()) as ArrayRef, section_sizes));
@@ -2525,23 +2531,13 @@ macro_rules! generate_series_helper_date32 {
                 ))
             })?;
         let res = date_addsub_month_day_nano(current_dt, $STEP, true)?;
-        $CURRENT = res.and_utc().timestamp().div_euclid(86400) as $PRIMITIVE_TYPE;
+        $CURRENT = Date32Type::from_naive_date(res.date());
     };
 }
 
 macro_rules! generate_series_helper_timestamp {
     ($CURRENT:ident, $STEP:ident, $PRIMITIVE_TYPE: ident) => {
-        let current_dt = ::chrono::DateTime::from_timestamp(
-            ($CURRENT as i64).div_euclid(1_000_000_000),
-            $CURRENT.rem_euclid(1_000_000_000) as u32,
-        )
-        .map(|dt| dt.naive_utc())
-        .ok_or_else(|| {
-            DataFusionError::Execution(format!(
-                "Cannot convert timestamp to NaiveDateTime: {}",
-                $CURRENT
-            ))
-        })?;
+        let current_dt = timestamp_ns_to_datetime_checked($CURRENT)?;
         let res = date_addsub_month_day_nano(current_dt, $STEP, true)?;
         // A step past 2262-04-11 has no nanosecond timestamp, so it is also past `end`: stop.
         let Some(next) = res.and_utc().timestamp_nanos_opt() else {
@@ -2578,14 +2574,13 @@ macro_rules! generate_series_non_primitive_udtf {
 
             let mut builder = PrimitiveBuilder::<$TYPE>::with_capacity(1);
             for (i, (start, end)) in l_arr.iter().zip(r_arr.iter()).enumerate() {
-                let step_idx = if step_arr.len() > i { i } else { 0 };
                 // generate_series is strict: a NULL argument yields no rows, as in Postgres.
-                let (Some(start), Some(end), false) = (start, end, step_arr.is_null(step_idx))
+                let (Some(start), Some(end), Some(step)) =
+                    (start, end, generate_series_step(step_arr, i))
                 else {
                     section_sizes.push(0);
                     continue;
                 };
-                let step = step_arr.value(step_idx);
 
                 let mut section_size: usize = 0;
                 if generate_series_interval_is_positive(step) {
