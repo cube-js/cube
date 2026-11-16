@@ -3435,7 +3435,7 @@ __metadata:
     chrono-node: "npm:2.6.2"
     express: "npm:^4.22.2"
     express-graphql: "npm:^0.12.0"
-    graphql: "npm:^15.8.0"
+    graphql: "npm:^15.11.0"
     graphql-scalars: "npm:^1.10.0"
     http-proxy-middleware: "npm:^3.0.0"
     inflection: "npm:^1.12.0"
@@ -4206,7 +4206,7 @@ __metadata:
     "@types/ramda": "npm:^0.32.0"
     cross-spawn: "npm:^7.0.3"
     fs-extra: "npm:^11.1.1"
-    graphql: "npm:^15.8.0"
+    graphql: "npm:^15.11.0"
     http-proxy-agent: "npm:^7.0.2"
     https-proxy-agent: "npm:^7.0.6"
     is-docker: "npm:^2.1.1"
@@ -18039,10 +18039,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"graphql@npm:^15.8.0":
-  version: 15.8.0
-  resolution: "graphql@npm:15.8.0"
-  checksum: 10c0/30cc09b77170a9d1ed68e4c017ec8c5265f69501c96e4f34f8f6613f39a886c96dd9853eac925f212566ed651736334c8fe24ceae6c44e8d7625c95c3009a801
+"graphql@npm:^15.11.0, graphql@npm:^15.8.0":
+  version: 15.11.0
+  resolution: "graphql@npm:15.11.0"
+  checksum: 10c0/6ee882045cfc612a117ee21a5e9e0cc96f01128360b1782fa03ca76eb307deacd9ebc579a2cddd979cd274d2728e66212b4402d23659ca1b644bc0af70079878
   languageName: node
   linkType: hard
 

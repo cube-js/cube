@@ -39,7 +39,7 @@
     "@cubejs-backend/templates": "1.8.26",
     "cross-spawn": "^7.0.3",
     "fs-extra": "^11.1.1",
-    "graphql": "^15.8.0",
+    "graphql": "^15.11.0",
     "http-proxy-agent": "^7.0.2",
     "https-proxy-agent": "^7.0.6",
     "is-docker": "^2.1.1",
