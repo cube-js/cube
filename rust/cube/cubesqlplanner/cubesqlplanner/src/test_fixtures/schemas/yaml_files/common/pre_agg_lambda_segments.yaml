@@ -1,0 +1,53 @@
+cubes:
+  - name: impressions
+    sql: "SELECT * FROM impressions"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: app_id
+        type: number
+        sql: app_id
+      - name: environment
+        type: string
+        sql: environment
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: count
+        type: count
+    segments:
+      - name: production
+        sql: "{CUBE}.environment = 'production'"
+    pre_aggregations:
+      - name: history
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - app_id
+        segments:
+          - production
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: month
+
+      - name: recent
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - app_id
+        segments:
+          - production
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: day
+
+      - name: lambda
+        type: rollupLambda
+        rollups:
+          - impressions.history
+          - impressions.recent

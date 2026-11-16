@@ -148,6 +148,14 @@ impl PreAggregationProcessor<'_> {
                     Some(meas.canonical_alias()),
                 );
             }
+            for seg in pre_aggregation.segments().iter() {
+                let branch_seg = item.find_member(seg, &item.segments)?;
+                select_builder.add_projection_reference_member(
+                    &seg,
+                    QualifiedColumnName::new(None, branch_seg.alias()),
+                    Some(seg.alias()),
+                );
+            }
             let context = SqlNodesFactory::new();
             let select = select_builder.build(query_tools.clone(), context);
             let query_plan = QueryPlan::Select(Rc::new(select));
