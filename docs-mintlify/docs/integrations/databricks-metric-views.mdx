@@ -314,7 +314,7 @@ preview() {
   result_url=$(jq -r '.resultUrl' <<<"$start")
   for ((attempt=0; attempt<max_polls; attempt++)); do
     status=$(curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
-      -H "$auth_header" "$CUBE_API_URL$status_url")
+      --retry 3 --retry-delay 5 -H "$auth_header" "$CUBE_API_URL$status_url")
     case "$(jq -r '.status' <<<"$status")" in
       QUEUED|RUNNING) sleep 10 ;;
       COMPLETED) jq -e '.resultAvailable' <<<"$status" >/dev/null && break; sleep 5 ;;
@@ -326,19 +326,17 @@ preview() {
     return 1
   fi
   curl --fail --silent --show-error --connect-timeout 10 --max-time 60 \
-    -H "$auth_header" "$CUBE_API_URL$result_url"
+    --retry 3 --retry-delay 5 -H "$auth_header" "$CUBE_API_URL$result_url"
 }
-
-files='{}'
-while IFS= read -r -d '' file; do
-  files=$(jq --arg path "${file#"$MODEL_DIR"/}" --rawfile content "$file" \
-    '. + {($path): $content}' <<<"$files")
-done < <(find "$MODEL_DIR" -type f \( -name '*.yml' -o -name '*.yaml' \) -print0)
 
 # Previews write to files, not $(...), so set -e stops the step when a request fails.
 preview <<<"$selection" >"$results/deployed.json"
-printf '%s' "$files" |
-  jq --argjson selection "$selection" '$selection + {source: "files", files: .}' |
+find "$MODEL_DIR" -type f \( -name '*.yml' -o -name '*.yaml' \) -print0 |
+  while IFS= read -r -d '' file; do
+    jq -n --arg path "${file#"$MODEL_DIR"/}" --rawfile content "$file" \
+      '{key: $path, value: $content}'
+  done |
+  jq -s --argjson selection "$selection" '$selection + {source: "files", files: from_entries}' |
   preview >"$results/proposed.json"
 
 regressions=$(jq -n '
