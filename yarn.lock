@@ -15482,10 +15482,10 @@ graphql-ws@^5.7.0:
   resolved "https://registry.yarnpkg.com/graphql-ws/-/graphql-ws-5.7.0.tgz#4b9d7a0ee9555804582f27f5d7695d10aafdbdc8"
   integrity sha512-8yYuvnyqIjlJ/WfebOyu2GSOQeFauRxnfuTveY9yvrDGs2g3kR9Nv4gu40AKvRHbXlSJwTbMJ6dVxAtEyKwVRA==
 
-graphql@^15.8.0:
-  version "15.8.0"
-  resolved "https://registry.yarnpkg.com/graphql/-/graphql-15.8.0.tgz#33410e96b012fa3bdb1091cc99a94769db212b38"
-  integrity sha512-5gghUc24tP9HRznNpV2+FIoq3xKkj5dTQqf4v0CpdPbFVwFkWoxOM+o+2OC9ZSvjEMTjfmG9QT+gcvggTwW1zw==
+graphql@^15.11.0, graphql@^15.8.0:
+  version "15.11.0"
+  resolved "https://registry.yarnpkg.com/graphql/-/graphql-15.11.0.tgz#5cf5b7585e752d2c79fa41f79312c91df5c08ed7"
+  integrity sha512-8k3CvZ3VafZpQhDOOY5/FD6/c9ixG2pUkYBLFOyjI9T5WMrN9AylRWPsPRpI5+PgKXXubTOv/qKWs80TGNOAxA==
 
 gtoken@^7.0.0:
   version "7.1.0"
