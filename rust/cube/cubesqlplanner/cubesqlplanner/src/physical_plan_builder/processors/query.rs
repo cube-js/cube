@@ -1,6 +1,6 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::transforms as logical_transforms;
-use crate::logical_plan::Query;
+use crate::logical_plan::{JoinOn, Query, Relation};
 use crate::physical_plan::{
     CalcGroupItem, CalcGroupsJoin, Expr, From, MemberExpression, ReferenceSubstitutions,
     ReferencesBuilder, Select, SelectBuilder,
@@ -9,13 +9,42 @@ use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::filter::map_filter;
 use crate::planner::query_properties::member_chain_eq;
 use crate::planner::symbols::transforms;
-use crate::planner::{MeasureRenderModifier, MemberSymbol, OrderByItem};
+use crate::planner::{MeasureRenderModifier, MemberId, MemberSymbol, OrderByItem};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct QueryProcessor<'a> {
     builder: &'a PhysicalPlanBuilder,
+}
+
+impl QueryProcessor<'_> {
+    fn members_in_join_conditions(logical_plan: &Query) -> Option<HashSet<MemberId>> {
+        let from = logical_plan.from();
+        let Some(Relation::Cube { .. }) = from.root() else {
+            return None;
+        };
+        // Only a join into the member's own cube decides how rows reach it.
+        let mut members = HashSet::new();
+        for join in from.joins() {
+            let (Relation::Cube { cube, .. }, JoinOn::Sql(on_sql)) = (join.relation(), join.on())
+            else {
+                continue;
+            };
+            let mut seen = HashSet::new();
+            let mut pending = on_sql.get_dependencies();
+            while let Some(symbol) = pending.pop() {
+                if seen.insert(symbol.id().clone()) {
+                    pending.extend(symbol.get_dependencies());
+                }
+            }
+            members.extend(
+                seen.into_iter()
+                    .filter(|member| member.cube() == cube.cube_id()),
+            );
+        }
+        Some(members)
+    }
 }
 
 impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
@@ -34,6 +63,8 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         if let Some(evaluation_context) = logical_plan.evaluation_context() {
             context.apply_evaluation_context(evaluation_context);
         }
+        context.members_in_join_conditions =
+            Self::members_in_join_conditions(logical_plan).map(Rc::new);
         let mut context_factory = context.make_sql_nodes_factory()?;
         let mut conditional_measures = logical_plan.conditional_measures().clone();
 

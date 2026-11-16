@@ -47,7 +47,10 @@ impl LogicalFromProcessor<'_> {
                     join_builder.left_join_cube(
                         cube.clone(),
                         Some(alias.clone()),
-                        JoinCondition::new_base_join(SqlJoinCondition::try_new(on_sql.clone())?),
+                        JoinCondition::new_base_join(SqlJoinCondition::try_new_cube_join(
+                            on_sql.clone(),
+                            cube.cube_id().clone(),
+                        )?),
                     );
                 }
                 // An inline subquery renders its body in place; a CTE is read by name.

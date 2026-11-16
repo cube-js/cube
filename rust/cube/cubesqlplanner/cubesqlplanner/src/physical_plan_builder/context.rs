@@ -4,14 +4,16 @@ use crate::logical_plan::{Subquery, SubqueryRef};
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::Schema;
 use crate::planner::planners::multi_stage::{EvaluationContext, TimeShiftState};
-use crate::planner::{CubeId, InputId};
-use std::collections::HashMap;
+use crate::planner::{CubeId, InputId, MemberId};
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Clone, Default)]
 pub(super) struct PushDownBuilderContext {
     pub time_shifts: TimeShiftState,
     pub original_sql_pre_aggregations: HashMap<CubeId, String>,
+    // Members the cube joins of the select being built reference.
+    pub members_in_join_conditions: Option<Rc<HashSet<MemberId>>>,
     subqueries: HashMap<InputId, RegisteredSubquery>,
 }
 
@@ -36,9 +38,15 @@ impl PushDownBuilderContext {
         factory.set_time_shifts(TimeShiftState {
             dimensions_shifts: extracted.interval_shifts,
         });
-        factory.set_calendar_time_shifts(extracted.calendar_shifts);
+        factory.set_calendar_time_shifts(
+            TimeShiftState {
+                dimensions_shifts: extracted.calendar_interval_shifts,
+            },
+            extracted.calendar_shifts,
+        );
         factory.set_filter_params_time_shifts(extracted.filter_params_shifts);
         factory.set_original_sql_pre_aggregations(self.original_sql_pre_aggregations.clone());
+        factory.set_members_in_join_conditions(self.members_in_join_conditions.clone());
         Ok(factory)
     }
 
