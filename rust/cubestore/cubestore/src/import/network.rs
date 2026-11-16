@@ -157,8 +157,11 @@ pub fn http_location_client(allow_private_network: bool) -> Result<reqwest::Clie
     let builder = if allow_private_network {
         builder
     } else {
-        // IP literals bypass the resolver, so redirect targets are checked here.
+        // A proxy would resolve the target host itself, out of reach of the resolver
+        // filter, and an internal proxy host would be rejected by it.
+        // IP literals bypass the resolver, so redirect targets are checked in the policy.
         builder
+            .no_proxy()
             .dns_resolver(Arc::new(PublicOnlyResolver))
             .redirect(redirect::Policy::custom(|attempt| {
                 if attempt.previous().len() >= MAX_REDIRECTS {

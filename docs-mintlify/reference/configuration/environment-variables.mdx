@@ -2428,6 +2428,10 @@ default. Hostnames are checked against the addresses they resolve to, including 
 redirects. Enable this if your export bucket is reachable only on a private network,
 e.g., a self-hosted MinIO.
 
+While disabled, these downloads ignore `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`,
+since a proxy would resolve the hostname outside of this check. Enable this if imports
+must go through a proxy.
+
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |

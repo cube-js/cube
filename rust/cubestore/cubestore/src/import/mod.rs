@@ -587,15 +587,27 @@ pub struct LocationsValidatorImpl {
 #[async_trait]
 impl LocationsValidator for LocationsValidatorImpl {
     async fn validate(&self, locations: &Vec<String>) -> Result<(), CubeError> {
+        let mut hosts = std::collections::HashSet::new();
+        let mut lookups = Vec::new();
         for location in locations {
             self.validate_location(location)?;
             if !self.location_allow_private_network
                 && LocationKind::of(location) == LocationKind::Http
             {
                 let url = Self::parse_http_location(location)?;
-                network::check_resolved_host(location, &url).await?;
+                // A long LOCATION list usually shares one host; look each up once.
+                if hosts.insert(url.host_str().map(|h| h.to_string())) {
+                    lookups.push((location, url));
+                }
             }
         }
+        let checks = lookups
+            .iter()
+            .map(|(location, url)| network::check_resolved_host(location, url));
+        join_all(checks)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(())
     }
 }
@@ -1819,6 +1831,39 @@ mod location_validator_tests {
             .send()
             .await
             .unwrap_err();
+        let err = format!("{:?}", err);
+        assert!(
+            err.contains("CUBESTORE_LOCATION_ALLOW_PRIVATE_NETWORK"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[tokio::test]
+    async fn http_client_refuses_redirects_to_private_ip_literals() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buf = [0u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            let _ = socket
+                .write_all(
+                    b"HTTP/1.1 302 Found\r\nLocation: http://169.254.169.254/latest/meta-data/\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                )
+                .await;
+        });
+        let client = super::network::http_location_client(false).unwrap();
+        // The first hop is an IP literal, which skips the resolver, so only the redirect
+        // policy stands between the client and the redirect target.
+        let err = client
+            .get(format!("http://127.0.0.1:{}/data.csv", port))
+            .send()
+            .await
+            .unwrap_err();
+        assert!(err.is_redirect(), "unexpected error: {:?}", err);
         let err = format!("{:?}", err);
         assert!(
             err.contains("CUBESTORE_LOCATION_ALLOW_PRIVATE_NETWORK"),
