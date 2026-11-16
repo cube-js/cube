@@ -244,3 +244,66 @@ cubes:
           - name: name
             type: string
             sql: name
+
+    - name: ReentryA
+      sql: "SELECT * FROM sq_reentry_a"
+      joins:
+          - name: ReentryB
+            relationship: one_to_many
+            sql: "{ReentryA}.id = {ReentryB}.a_id"
+          - name: ReentryX
+            relationship: one_to_many
+            sql: "{ReentryA}.id = {ReentryX}.a_id AND {ReentryA.d} IS NOT NULL"
+          - name: ReentryC
+            relationship: many_to_one
+            sql: "{ReentryA}.c_id = {ReentryC}.id AND {ReentryA.e} IS NOT NULL"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: d
+            type: number
+            sql: "{ReentryB.cnt}"
+            sub_query: true
+            propagate_filters_to_sub_query: true
+          - name: e
+            type: number
+            sql: "{ReentryX.cnt}"
+            sub_query: true
+
+    - name: ReentryB
+      sql: "SELECT * FROM sq_reentry_b"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: kind
+            type: string
+            sql: kind
+      measures:
+          - name: cnt
+            type: count
+
+    - name: ReentryX
+      sql: "SELECT * FROM sq_reentry_b"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: cnt
+            type: count
+
+    - name: ReentryC
+      sql: "SELECT * FROM sq_reentry_c"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name

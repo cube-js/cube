@@ -109,10 +109,10 @@ pub struct PlanningScope {
     // `Some` while planning inside a multi-stage leaf scope; `None`
     // at the top level — there the ambient build context applies.
     evaluation_context: Option<EvaluationContext>,
-    // `sub_query` dimensions whose sub-queries are being planned, innermost
-    // last, and those found to need themselves.
-    sub_query_dimensions: Vec<MemberId>,
-    cyclic_sub_query_dimensions: HashSet<MemberId>,
+    // `sub_query` dimensions whose sub-queries are being planned, keyed with
+    // their filters, innermost last; and those found to need themselves.
+    sub_query_dimensions: Vec<(MemberId, String)>,
+    cyclic_sub_query_dimensions: HashSet<(MemberId, String)>,
 }
 
 /// The subqueries planned up to a point, to discard a failed planning attempt.
@@ -136,31 +136,27 @@ impl PlanningScope {
         self.subquery_state = checkpoint.0;
     }
 
-    /// Runs `plan` as the planning of the `sub_query` dimension `id`. Fails,
-    /// marking `id` cyclic, when `id` is already being planned: its value
-    /// would need itself.
+    /// Runs `plan` as the planning of the `sub_query` dimension `id` under
+    /// `filters`, a key of the filters its sub-query gets. Planning the same
+    /// pair again inside `plan` can only repeat forever, so that inner attempt
+    /// fails instead; the returned flag tells whether that happened.
     pub fn with_sub_query_dimension<T>(
         &mut self,
         id: &MemberId,
+        filters: String,
         plan: impl FnOnce(&mut Self) -> Result<T, CubeError>,
-    ) -> Result<T, CubeError> {
-        if self.sub_query_dimensions.contains(id) {
-            self.cyclic_sub_query_dimensions.insert(id.clone());
-            return Err(CubeError::user(
-                "Sub-query dimension needs its own value".to_string(),
-            ));
+    ) -> (Result<T, CubeError>, bool) {
+        let key = (id.clone(), filters);
+        if self.sub_query_dimensions.contains(&key) {
+            self.cyclic_sub_query_dimensions.insert(key);
+            let error = CubeError::user("Sub-query dimension needs its own value".to_string());
+            return (Err(error), false);
         }
-        self.sub_query_dimensions.push(id.clone());
+        self.sub_query_dimensions.push(key.clone());
         let result = plan(self);
         self.sub_query_dimensions.pop();
-        // A cycle an inner planner recovered from must not outlive this planning.
-        self.cyclic_sub_query_dimensions.remove(id);
-        result
-    }
-
-    /// Whether planning `id` was found to need itself; clears the mark.
-    pub fn take_cycle(&mut self, id: &MemberId) -> bool {
-        self.cyclic_sub_query_dimensions.remove(id)
+        let cyclic = self.cyclic_sub_query_dimensions.remove(&key);
+        (result, cyclic)
     }
 
     /// The input id and the unique name (`cte_0`, `cte_1`, ...) of the next

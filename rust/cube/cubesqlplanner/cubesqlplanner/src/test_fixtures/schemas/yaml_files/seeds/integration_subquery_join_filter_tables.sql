@@ -1,3 +1,6 @@
+DROP TABLE IF EXISTS sq_reentry_a CASCADE;
+DROP TABLE IF EXISTS sq_reentry_b CASCADE;
+DROP TABLE IF EXISTS sq_reentry_c CASCADE;
 DROP TABLE IF EXISTS sq_ms_facts CASCADE;
 DROP TABLE IF EXISTS sq_ms_lines CASCADE;
 DROP TABLE IF EXISTS sq_ms_orders CASCADE;
@@ -140,3 +143,16 @@ INSERT INTO sq_ms_facts VALUES
     (1, 1, NULL, 1, 10, '2024-01-01'),
     (2, 1, NULL, 2, 100, '2024-01-01'),
     (3, 2, NULL, 1, 1000, '2024-01-01');
+
+CREATE TABLE sq_reentry_c (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+CREATE TABLE sq_reentry_a (id INTEGER PRIMARY KEY, c_id INTEGER NOT NULL);
+CREATE TABLE sq_reentry_b (id INTEGER PRIMARY KEY, a_id INTEGER NOT NULL, kind TEXT NOT NULL);
+
+INSERT INTO sq_reentry_c VALUES (1, 'x'), (2, 'y');
+INSERT INTO sq_reentry_a VALUES (1, 1), (2, 1), (3, 2);
+INSERT INTO sq_reentry_b VALUES
+    (1, 1, 'k'),
+    (2, 1, 'k'),
+    (3, 2, 'm'),
+    (4, 3, 'k'),
+    (5, 3, 'm');

@@ -297,3 +297,39 @@ async fn test_filter_needing_another_filter_kept_after_cycle() {
     )
     .await;
 }
+
+// `ReentryA.d`'s sub-query joins `ReentryC` on `e`, whose sub-query (no filters
+// propagated) joins `ReentryX` on `d` again. That inner `d` has no filters, so
+// planning ends and the filter group stays in the outer `d` sub-query.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_sub_query_dimension_reentered_with_other_filters_keeps_them() {
+    let query = indoc! {r#"
+        dimensions:
+          - ReentryA.id
+          - ReentryA.d
+        filters:
+          - or:
+              - member: ReentryC.name
+                operator: equals
+                values:
+                  - x
+              - member: ReentryB.kind
+                operator: equals
+                values:
+                  - m
+        order:
+          - id: ReentryA.id
+    "#};
+
+    assert_matches_oracle(
+        query,
+        "SELECT a.id, (SELECT count(*) FROM sq_reentry_b b2 \
+             JOIN sq_reentry_a a2 ON a2.id = b2.a_id \
+             JOIN sq_reentry_c c2 ON c2.id = a2.c_id \
+             WHERE b2.a_id = a.id AND (c2.name = 'x' OR b2.kind = 'm')) d \
+         FROM sq_reentry_a a JOIN sq_reentry_c c ON c.id = a.c_id \
+         LEFT JOIN sq_reentry_b b ON b.a_id = a.id \
+         WHERE c.name = 'x' OR b.kind = 'm' GROUP BY 1 ORDER BY 1",
+    )
+    .await;
+}
