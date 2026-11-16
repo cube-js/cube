@@ -484,6 +484,9 @@ const parsedDocuments = new LRUCache<string, DocumentNode>({
 function parseDocument(query: string): DocumentNode {
   const cached = parsedDocuments.get(query);
   if (cached) {
+    // Not `updateAgeOnGet`: it does not re-arm the `ttlAutopurge` timer, so a
+    // document read once would never expire. `set` restarts the TTL and its timer.
+    parsedDocuments.set(query, cached);
     return cached;
   }
 
