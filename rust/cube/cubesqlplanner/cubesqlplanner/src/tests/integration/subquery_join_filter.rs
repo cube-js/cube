@@ -124,3 +124,70 @@ async fn test_join_free_filter_still_propagates_next_to_skipped_one() {
     )
     .await;
 }
+
+// `Orders` and `Customers` are joined only through `Shipments`, which the
+// second filter brings in; both filters still reach the sub-query.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filters_joined_through_another_filters_cube_propagate() {
+    let query = indoc! {r#"
+        dimensions:
+          - Orders.id
+          - Orders.total
+        filters:
+          - member: Customers.name
+            operator: equals
+            values:
+              - alice
+          - member: Shipments.status
+            operator: equals
+            values:
+              - sent
+        order:
+          - id: Orders.id
+    "#};
+
+    let sql = create_context().build_sql(query).unwrap();
+    assert!(
+        sql.matches("sq_customers").count() >= 2,
+        "Expected the customers filter in the sub-query too:\n{sql}"
+    );
+
+    assert_matches_oracle(
+        query,
+        "SELECT o.id, o.amount FROM sq_orders o \
+         JOIN sq_shipments s ON s.order_id = o.id \
+         JOIN sq_customers c ON c.id = s.customer_id \
+         WHERE c.name = 'alice' AND s.status = 'sent' ORDER BY o.id",
+    )
+    .await;
+}
+
+// The sub-query's measure lives on `Hub`, the only cube joining `Spoke` to the
+// filter's `Tag`, so the filter reaches the sub-query: `total` of spoke 1 is
+// 10, not 110.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_joined_through_measure_cube_propagates() {
+    let query = indoc! {r#"
+        dimensions:
+          - Hub.kind
+          - Spoke.total
+        filters:
+          - member: Tag.name
+            operator: equals
+            values:
+              - a
+        order:
+          - id: Hub.kind
+    "#};
+
+    assert_matches_oracle(
+        query,
+        "SELECT h.kind, t.total FROM sq_hub h \
+         JOIN sq_tag g ON g.id = h.tag_id \
+         JOIN (SELECT h2.spoke_id, sum(h2.amount) total FROM sq_hub h2 \
+               JOIN sq_tag g2 ON g2.id = h2.tag_id WHERE g2.name = 'a' GROUP BY 1) t \
+           ON t.spoke_id = h.spoke_id \
+         WHERE g.name = 'a' GROUP BY 1, 2 ORDER BY 1",
+    )
+    .await;
+}

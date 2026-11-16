@@ -33,3 +33,78 @@ cubes:
           - name: amount_sum
             type: sum
             sql: amount
+
+    - name: Shipments
+      sql: "SELECT * FROM sq_shipments"
+      joins:
+          - name: Orders
+            relationship: many_to_one
+            sql: "{Shipments}.order_id = {Orders}.id"
+          - name: Customers
+            relationship: many_to_one
+            sql: "{Shipments}.customer_id = {Customers}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+
+    - name: Customers
+      sql: "SELECT * FROM sq_customers"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+
+    - name: Hub
+      sql: "SELECT * FROM sq_hub"
+      joins:
+          - name: Spoke
+            relationship: many_to_one
+            sql: "{Hub}.spoke_id = {Spoke}.id"
+          - name: Tag
+            relationship: many_to_one
+            sql: "{Hub}.tag_id = {Tag}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: kind
+            type: string
+            sql: kind
+      measures:
+          - name: amount_sum
+            type: sum
+            sql: amount
+
+    - name: Spoke
+      sql: "SELECT * FROM sq_spoke"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: total
+            type: number
+            sql: "{Hub.amount_sum}"
+            sub_query: true
+            propagate_filters_to_sub_query: true
+
+    - name: Tag
+      sql: "SELECT * FROM sq_tag"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name

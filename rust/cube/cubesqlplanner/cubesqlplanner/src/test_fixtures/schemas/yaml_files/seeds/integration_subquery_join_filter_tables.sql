@@ -1,3 +1,8 @@
+DROP TABLE IF EXISTS sq_hub CASCADE;
+DROP TABLE IF EXISTS sq_spoke CASCADE;
+DROP TABLE IF EXISTS sq_tag CASCADE;
+DROP TABLE IF EXISTS sq_shipments CASCADE;
+DROP TABLE IF EXISTS sq_customers CASCADE;
 DROP TABLE IF EXISTS sq_orders CASCADE;
 DROP TABLE IF EXISTS sq_labels CASCADE;
 
@@ -20,3 +25,52 @@ INSERT INTO sq_labels (amount, label) VALUES
     (10, 'ten'),
     (20, 'twenty'),
     (40, 'forty');
+
+CREATE TABLE sq_customers (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE sq_shipments (
+    id INTEGER PRIMARY KEY,
+    order_id INTEGER NOT NULL,
+    customer_id INTEGER NOT NULL,
+    status TEXT NOT NULL
+);
+
+INSERT INTO sq_customers (id, name) VALUES
+    (1, 'alice'),
+    (2, 'bob');
+
+INSERT INTO sq_shipments (id, order_id, customer_id, status) VALUES
+    (1, 1, 1, 'sent'),
+    (2, 2, 2, 'sent'),
+    (3, 3, 1, 'lost');
+
+CREATE TABLE sq_spoke (
+    id INTEGER PRIMARY KEY
+);
+
+CREATE TABLE sq_tag (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+CREATE TABLE sq_hub (
+    id INTEGER PRIMARY KEY,
+    spoke_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    amount INTEGER NOT NULL
+);
+
+INSERT INTO sq_spoke (id) VALUES (1), (2);
+
+INSERT INTO sq_tag (id, name) VALUES
+    (1, 'a'),
+    (2, 'b');
+
+INSERT INTO sq_hub (id, spoke_id, tag_id, kind, amount) VALUES
+    (1, 1, 1, 'k1', 10),
+    (2, 1, 2, 'k1', 100),
+    (3, 2, 1, 'k2', 5);
