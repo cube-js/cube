@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { parseSqlInterval, getEnv, SQL_INTERVAL_UNITS } from '@cubejs-backend/shared';
+import { escapeIdentifierMySql, parseSqlInterval, getEnv, SQL_INTERVAL_UNITS } from '@cubejs-backend/shared';
 import { BaseQuery, type BaseQueryOptions, type DateJoinConditionFn } from './BaseQuery';
 import type { Compilers } from '../compiler/PrepareCompiler';
 import { BaseFilter } from './BaseFilter';
@@ -121,7 +121,7 @@ export class CubeStoreQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string) {
-    return `\`${name}\``;
+    return escapeIdentifierMySql(name);
   }
 
   public seriesSql(timeDimension: BaseTimeDimension) {
@@ -350,6 +350,7 @@ export class CubeStoreQuery extends BaseQuery {
     // across partitioned tables is unsafe. Don't push those join types down to CubeStore.
     delete templates.join_types.full;
     delete templates.join_types.right;
+    templates.functions.SPLITPART = 'SPLIT_PART({{ args_concat }})';
     delete templates.functions.WIDTH_BUCKET;
     // Multi-stage results are combined as UNION ALL + GROUP BY instead of a keys
     // grid LEFT JOINed to every measure subquery: CTEs are inlined, so the grid

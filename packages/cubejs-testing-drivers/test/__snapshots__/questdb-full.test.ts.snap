@@ -9879,17 +9879,17 @@ Array [
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2019-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2019-12-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "3",
+    "ECommerce.rollingCountByUnbounded": "2",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-02-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-02-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "6",
+    "ECommerce.rollingCountByUnbounded": "5",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-04-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-04-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "18",
+    "ECommerce.rollingCountByUnbounded": "11",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-06-01T10:00:00.000",
@@ -9899,12 +9899,12 @@ Array [
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-08-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-08-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "28",
+    "ECommerce.rollingCountByUnbounded": "24",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-10-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-10-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "44",
+    "ECommerce.rollingCountByUnbounded": "38",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",

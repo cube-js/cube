@@ -131,6 +131,43 @@ async fn test_measures_over_a_joined_query_share_a_base_scan() {
     assert_eq!(sql.matches("rw_customers").count(), 1, "{sql}");
 }
 
+// Each leaf plans its own subquery for a sub-query dimension, so two leaves
+// read the same rows only if those subqueries compute the same thing; telling
+// them apart by identity would keep every window on a scan of its own.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_measures_by_a_sub_query_dimension_share_a_base_scan() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_sum_trailing_7d
+          - orders.rolling_count_7d
+        dimensions:
+          - orders.customer_rows
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: day
+            dateRange:
+              - "2024-01-01"
+              - "2024-01-31"
+        order:
+          - id: orders.created_at
+          - id: orders.customer_rows
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    assert_eq!(
+        sql.matches(r#"AS "orders_customer_rows_subquery""#).count(),
+        1,
+        "{sql}"
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 // A time shift moves the period a window covers without changing anything in
 // the query the leaf holds, so two scans differing only by one read different
 // rows. Merging them would answer the shifted value with the unshifted one.

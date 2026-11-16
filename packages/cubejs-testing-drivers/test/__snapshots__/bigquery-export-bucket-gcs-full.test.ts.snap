@@ -18411,32 +18411,32 @@ Array [
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2019-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2019-12-01T10:00:00.000",
-    "ECommerce.rollingCountByLeading": "8",
+    "ECommerce.rollingCountByLeading": "4",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-02-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-02-01T10:00:00.000",
-    "ECommerce.rollingCountByLeading": "12",
+    "ECommerce.rollingCountByLeading": "13",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-04-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-04-01T10:00:00.000",
-    "ECommerce.rollingCountByLeading": "6",
+    "ECommerce.rollingCountByLeading": "8",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-06-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-06-01T10:00:00.000",
-    "ECommerce.rollingCountByLeading": "19",
+    "ECommerce.rollingCountByLeading": "10",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-08-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-08-01T10:00:00.000",
-    "ECommerce.rollingCountByLeading": "16",
+    "ECommerce.rollingCountByLeading": "20",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-10-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-10-01T10:00:00.000",
-    "ECommerce.rollingCountByLeading": null,
+    "ECommerce.rollingCountByLeading": "6",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
@@ -18451,7 +18451,7 @@ Array [
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2019-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2019-12-01T10:00:00.000",
-    "ECommerce.rollingCountByTrailing": "3",
+    "ECommerce.rollingCountByTrailing": "2",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-02-01T10:00:00.000",
@@ -18461,27 +18461,27 @@ Array [
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-04-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-04-01T10:00:00.000",
-    "ECommerce.rollingCountByTrailing": "12",
+    "ECommerce.rollingCountByTrailing": "6",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-06-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-06-01T10:00:00.000",
-    "ECommerce.rollingCountByTrailing": null,
+    "ECommerce.rollingCountByTrailing": "7",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-08-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-08-01T10:00:00.000",
-    "ECommerce.rollingCountByTrailing": "10",
+    "ECommerce.rollingCountByTrailing": "6",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-10-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-10-01T10:00:00.000",
-    "ECommerce.rollingCountByTrailing": "16",
+    "ECommerce.rollingCountByTrailing": "14",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-12-01T10:00:00.000",
-    "ECommerce.rollingCountByTrailing": null,
+    "ECommerce.rollingCountByTrailing": "6",
   },
 ]
 `;
@@ -18491,17 +18491,17 @@ Array [
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2019-12-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2019-12-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "3",
+    "ECommerce.rollingCountByUnbounded": "2",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-02-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-02-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "6",
+    "ECommerce.rollingCountByUnbounded": "5",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-04-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-04-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "18",
+    "ECommerce.rollingCountByUnbounded": "11",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-06-01T10:00:00.000",
@@ -18511,12 +18511,12 @@ Array [
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-08-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-08-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "28",
+    "ECommerce.rollingCountByUnbounded": "24",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-10-01T10:00:00.000",
     "ECommerce.customOrderDateNoPreAgg.two_mo_by_feb": "2020-10-01T10:00:00.000",
-    "ECommerce.rollingCountByUnbounded": "44",
+    "ECommerce.rollingCountByUnbounded": "38",
   },
   Object {
     "ECommerce.customOrderDateNoPreAgg": "2020-12-01T10:00:00.000",

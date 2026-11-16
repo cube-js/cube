@@ -3,6 +3,64 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.8.25](https://github.com/cube-js/cube/compare/v1.8.24...v1.8.25) (2026-11-14)
+
+### Performance Improvements
+
+- **tesseract:** Share scans and fuse calculations across multi-stage measures ([#12783](https://github.com/cube-js/cube/issues/12783)) ([8f7aa59](https://github.com/cube-js/cube/commit/8f7aa59b07f29ba2c154239fab12021440d80d6d))
+
+## [1.8.24](https://github.com/cube-js/cube/compare/v1.8.23...v1.8.24) (2026-11-14)
+
+### Performance Improvements
+
+- **server-core:** Run context functions at most once per request ([#12788](https://github.com/cube-js/cube/issues/12788)) ([8f44deb](https://github.com/cube-js/cube/commit/8f44debbde849fee4673d71ccf33815350e89386))
+
+## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
+
+### Features
+
+- Replace sqlstring with shared SQL formatter ([#12742](https://github.com/cube-js/cube/issues/12742)) ([28ef461](https://github.com/cube-js/cube/commit/28ef46136051a5d92c1a456a738f148ea0bedfbf))
+
+## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
+
+### Bug Fixes
+
+- **backend-shared:** Harden SQL parameter interpolation ([#11576](https://github.com/cube-js/cube/issues/11576)) ([cf12bc6](https://github.com/cube-js/cube/commit/cf12bc6ec51e83db8f6c08a88a4a8473ab8d291f))
+
+### BREAKING CHANGES
+
+- **backend-shared:** a `?` in code position that is not a placeholder throws
+  when values are bound (on ClickHouse use `if(cond, a, b)` instead of the
+  ternary operator). A placeholder inside a comment is no longer substituted,
+  so a commented-out FILTER_PARAMS fails with a parameter count mismatch. A
+  plain object bound as a parameter throws.
+
+## [1.8.21](https://github.com/cube-js/cube/compare/v1.8.20...v1.8.21) (2026-11-09)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.8.20](https://github.com/cube-js/cube/compare/v1.8.19...v1.8.20) (2026-11-06)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+### Bug Fixes
+
+- Escape quote characters in SQL identifiers ([#12622](https://github.com/cube-js/cube/issues/12622)) ([cc12c27](https://github.com/cube-js/cube/commit/cc12c27809e7ead38040428ce5dffb8b47c2c32c))
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
 ## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
 
 **Note:** Version bump only for package @cubejs-backend/shared

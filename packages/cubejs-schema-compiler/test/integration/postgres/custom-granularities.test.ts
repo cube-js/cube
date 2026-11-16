@@ -1,3 +1,4 @@
+import { getEnv } from '@cubejs-backend/shared';
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
@@ -1049,4 +1050,80 @@ describe('Custom Granularities', () => {
     ],
     compilers
   ));
+});
+
+describe('Rolling windows over a fiscal year custom granularity', () => {
+  jest.setTimeout(200000);
+
+  // Months of the fiscal year starting 2024-05-01 are worth 1, the next fiscal year's are worth 10.
+  const compilers = prepareYamlCompiler(`
+  cubes:
+    - name: sales
+      sql: >
+        SELECT d::timestamp AS day,
+               CASE WHEN d < '2025-05-01' THEN 1 ELSE 10 END AS amount
+        FROM generate_series('2024-05-01'::date, '2026-04-01'::date, interval '1 month') d
+
+      dimensions:
+        - name: day
+          sql: day
+          type: time
+          primary_key: true
+          public: true
+          granularities:
+            - name: fis_year
+              interval: 1 year
+              origin: '2024-05-01'
+
+      measures:
+        - name: amount
+          sql: amount
+          type: sum
+
+        - name: amount_ytd
+          sql: amount
+          type: sum
+          rolling_window:
+            type: to_date
+            granularity: fis_year
+
+        - name: amount_trailing_year
+          sql: amount
+          type: sum
+          rolling_window:
+            trailing: 1 year
+  `);
+
+  // The legacy planner cannot render a to_date window over a custom granularity.
+  if (getEnv('nativeSqlPlanner')) {
+    it('to_date window sums exactly one fiscal year at the fiscal year grain', async () => dbRunner.runQueryTest(
+      {
+        measures: ['sales.amount', 'sales.amount_ytd', 'sales.amount_trailing_year'],
+        timeDimensions: [{
+          dimension: 'sales.day',
+          granularity: 'fis_year',
+          dateRange: ['2024-05-01', '2026-04-30']
+        }],
+        order: [{ id: 'sales.day' }],
+        timezone: 'UTC'
+      },
+      [
+        {
+          sales__day_fis_year: '2024-05-01T00:00:00.000Z',
+          sales__amount: '12',
+          sales__amount_ytd: '12',
+          sales__amount_trailing_year: '12',
+        },
+        {
+          sales__day_fis_year: '2025-05-01T00:00:00.000Z',
+          sales__amount: '120',
+          sales__amount_ytd: '120',
+          sales__amount_trailing_year: '120',
+        },
+      ],
+      compilers
+    ));
+  } else {
+    test.skip('to_date window over a custom granularity', () => { expect(1).toBe(1); });
+  }
 });

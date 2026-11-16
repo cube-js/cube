@@ -26,10 +26,10 @@ impl PgCatalogAuthMembersBuilder {
         let capacity = 1;
 
         Self {
-            roleid: UInt32Builder::new(capacity),
-            member: UInt32Builder::new(capacity),
-            grantor: UInt32Builder::new(capacity),
-            admin_option: BooleanBuilder::new(capacity),
+            roleid: UInt32Builder::with_capacity(capacity),
+            member: UInt32Builder::with_capacity(capacity),
+            grantor: UInt32Builder::with_capacity(capacity),
+            admin_option: BooleanBuilder::with_capacity(capacity),
         }
     }
 

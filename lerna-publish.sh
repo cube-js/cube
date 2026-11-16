@@ -100,10 +100,13 @@ yarn lerna version "$BUMP" \
   --yes
 
 echo "Step 2: doing yarn install check..."
+# Yarn 4 locks workspace versions, so lerna has already rewritten yarn.lock for the bump.
+# Stage it so the check below only sees what the install changes on top of that.
+git add yarn.lock
 CUBESTORE_SKIP_POST_INSTALL=true yarn install
 
 echo "Step 3: checking git status..."
-if git status --porcelain | grep -q '^ M yarn.lock'; then
+if git status --porcelain | grep -q '^.M yarn.lock'; then
   echo "Error: yarn.lock is not clean after version bump and yarn install. Please review the changes and fix it or commit."
   echo "If you see any new entries in yarn.lock with @cubejs-*/* packages - probably not all packages versions were updated."
   GIT_PAGER=cat git diff yarn.lock

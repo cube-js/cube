@@ -391,3 +391,26 @@ async fn test_filter_over_literal_column_of_table_scan() {
     }
     insta::assert_snapshot!(results.join("\n"));
 }
+
+/// An interval cast to text is formatted like PostgreSQL's default `postgres` interval style
+#[tokio::test]
+async fn test_interval_cast_to_text() {
+    init_testing_logger();
+
+    insta::assert_snapshot!(execute_query(
+        // language=PostgreSQL
+        r#"
+            SELECT
+                CAST(INTERVAL '1 day 2 hours' AS TEXT) AS day_time,
+                CAST(INTERVAL '1 year 2 months' AS TEXT) AS year_month,
+                CAST(INTERVAL '1 year 2 months 3 days 4 hours 5 minutes 6.789 seconds' AS TEXT) AS month_day_nano,
+                CAST(INTERVAL '-1 day -2 hours' AS TEXT) AS negative,
+                CAST(INTERVAL '-1 day 2 hours' AS TEXT) AS mixed_signs,
+                CAST(INTERVAL '0 seconds' AS TEXT) AS zero
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await
+    .unwrap());
+}

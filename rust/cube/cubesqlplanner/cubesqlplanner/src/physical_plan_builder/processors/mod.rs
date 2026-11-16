@@ -1,5 +1,8 @@
 mod aggregate_multiplied_subquery;
-mod input_base;
+mod calculation_source;
+mod grid_lookup;
+mod keys_grid;
+mod logical_from;
 mod merge;
 mod multi_stage_dimension_calculation;
 mod multi_stage_get_date_range;
@@ -8,7 +11,5 @@ mod multi_stage_rolling_window;
 mod multi_stage_time_series;
 mod pre_aggregation;
 mod query;
-mod query_inputs;
-mod query_source;
 mod root_query;
 mod subquery_body;

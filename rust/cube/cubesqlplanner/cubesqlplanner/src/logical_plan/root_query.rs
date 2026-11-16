@@ -30,9 +30,38 @@ impl RootQuery {
         from: InputId,
         to: &Rc<SubqueryRef>,
     ) -> Result<Rc<Self>, CubeError> {
+        self.forward_all(&InputForwards::single(from, to))
+    }
+
+    /// The plan with `forwards` applied in one pass.
+    pub fn forward_all(self: &Rc<Self>, forwards: &InputForwards) -> Result<Rc<Self>, CubeError> {
+        if forwards.is_empty() {
+            return Ok(self.clone());
+        }
         self.as_plan_node()
-            .with_forwarded_input(from, to)?
+            .with_forwarded_input(forwards)?
             .into_logical_node()
+    }
+
+    /// The plan without the inline subqueries nothing reads.
+    pub fn without_unread_inline_subqueries(self: &Rc<Self>) -> Rc<Self> {
+        let mut read = HashSet::new();
+        collect_read_inputs(&self.query.as_plan_node(), &mut read);
+        let mut kept_rev = Vec::new();
+        for subquery in self.subqueries.iter().rev() {
+            if subquery.inline && !read.contains(&subquery.id) {
+                continue;
+            }
+            collect_read_inputs(&subquery.as_plan_node(), &mut read);
+            kept_rev.push(subquery.clone());
+        }
+        if kept_rev.len() == self.subqueries.len() {
+            return self.clone();
+        }
+        Rc::new(Self {
+            subqueries: kept_rev.into_iter().rev().collect(),
+            query: self.query.clone(),
+        })
     }
 
     /// Fails unless every subquery the plan reads is defined, once, before
@@ -49,6 +78,13 @@ impl RootQuery {
             }
         }
         check_inputs_defined(&self.query.as_plan_node(), &defined)
+    }
+}
+
+fn collect_read_inputs(node: &PlanNode, read: &mut HashSet<InputId>) {
+    read.extend(node.referenced_inputs());
+    for input in node.inputs() {
+        collect_read_inputs(&input, read);
     }
 }
 

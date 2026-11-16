@@ -224,7 +224,7 @@ impl Rewriter {
         .with_node_limit(
             env::var("CUBESQL_REWRITE_MAX_NODES")
                 .map(|v| v.parse::<usize>().unwrap())
-                .unwrap_or(10000),
+                .unwrap_or(100000),
         )
         .with_time_limit(Duration::from_secs(
             env::var("CUBESQL_REWRITE_TIMEOUT")
@@ -257,12 +257,12 @@ impl Rewriter {
     }
 
     pub async fn run_rewrite_to_completion(
-        &mut self,
+        self,
         cache_entry: Arc<CompilerCacheEntry>,
         qtrace: &mut Option<Qtrace>,
     ) -> Result<CubeEGraph, CubeError> {
         let cube_context = self.cube_context.clone();
-        let egraph = self.graph.clone();
+        let egraph = self.graph;
         if let Some(qtrace) = qtrace {
             qtrace.set_original_graph(&egraph);
         }
@@ -334,15 +334,16 @@ impl Rewriter {
     }
 
     pub async fn find_best_plan(
-        &mut self,
+        self,
         root: Id,
         cache_entry: Arc<CompilerCacheEntry>,
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
+        describe_only: bool,
     ) -> Result<LogicalPlan, CubeError> {
         let cube_context = self.cube_context.clone();
-        let egraph = self.graph.clone();
+        let egraph = self.graph;
         if let Some(qtrace) = qtrace {
             qtrace.set_original_graph(&egraph);
         }
@@ -397,11 +398,15 @@ impl Rewriter {
         // are extracted around until the plan has none of them
         let mut rejected: HashSet<LogicalPlanLanguage> = HashSet::new();
         let mut extraction = 0;
+        let mut unconvertible = false;
         let (best_cost, best) = loop {
             extraction += 1;
-            // Past the bound, settle for the plan over the data source
-            let prefer_pre_aggregations =
-                pre_aggregations && extraction <= MAX_PRE_AGGREGATION_EXTRACTIONS;
+            // Past the bound, or past a plan that fails to convert, settle for the plan over
+            // the data source. A plan that only describes the result needs no answer from Cube
+            let prefer_pre_aggregations = pre_aggregations
+                && !describe_only
+                && extraction <= MAX_PRE_AGGREGATION_EXTRACTIONS
+                && !unconvertible;
             let extraction_start = Instant::now();
             let (cost, best, egraph_nodes) = {
                 let egraph = egraph.clone();
@@ -446,7 +451,16 @@ impl Rewriter {
                 tokio::task::spawn_blocking(move || {
                     Self::pre_aggregation_scans(&best, &cube_context, &auth_context, &span_id)
                 })
-                .await??
+                .await?
+            };
+            // A plan that fails to convert can't read a pre-aggregation either
+            let scans = match scans {
+                Ok(scans) => scans,
+                Err(err) => {
+                    log::warn!("Pre-aggregation candidate plan failed to convert: {err}");
+                    unconvertible = true;
+                    continue;
+                }
             };
             // What can't be asked is not matched
             let mut matched = vec![false; scans.len()];

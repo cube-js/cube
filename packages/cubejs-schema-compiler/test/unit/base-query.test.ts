@@ -1220,7 +1220,7 @@ describe('SQL Generation', () => {
         useNativeSqlPlanner: true,
       });
       const [sql] = query.buildSqlAndParams();
-      expect(sql).toContain('CAST(? AS FLOAT64)');
+      expect(sql).toContain('CAST(? AS INT64)');
     });
 
     it('Test time series with different granularity - postgres', async () => {

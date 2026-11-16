@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/symbol_specialization.rs
+assertion_line: 450
+expression: result
+---
+sq_customers__name | sq_customers__done_amount | sq_orders__total_amount
+-------------------+---------------------------+------------------------
+Alice              | 300.00                    | 150.00                 
+Bob                | 500.00                    | 200.00                 
+Charlie            | 600.00                    | 300.00

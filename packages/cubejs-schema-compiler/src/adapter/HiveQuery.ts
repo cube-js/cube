@@ -1,5 +1,5 @@
 import R from 'ramda';
-import { splitSqlInterval } from '@cubejs-backend/shared';
+import { escapeIdentifierSparkSql, splitSqlInterval } from '@cubejs-backend/shared';
 
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
@@ -66,7 +66,7 @@ export class HiveQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string) {
-    return `\`${name}\``;
+    return escapeIdentifierSparkSql(name);
   }
 
   public simpleQuery() {

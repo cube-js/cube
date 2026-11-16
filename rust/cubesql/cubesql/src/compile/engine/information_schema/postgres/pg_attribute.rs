@@ -54,33 +54,33 @@ impl PgCatalogAttributeBuilder {
         let capacity = 10;
 
         Self {
-            attrelid: UInt32Builder::new(capacity),
-            attname: StringBuilder::new(capacity),
-            atttypid: UInt32Builder::new(capacity),
-            attstattarget: Int32Builder::new(capacity),
-            attlen: Int16Builder::new(capacity),
-            attnum: Int16Builder::new(capacity),
-            attndims: UInt32Builder::new(capacity),
-            attcacheoff: Int32Builder::new(capacity),
-            atttypmod: Int64Builder::new(capacity),
-            attbyval: BooleanBuilder::new(capacity),
-            attalign: StringBuilder::new(capacity),
-            attstorage: StringBuilder::new(capacity),
-            attcompression: StringBuilder::new(capacity),
-            attnotnull: BooleanBuilder::new(capacity),
-            atthasdef: BooleanBuilder::new(capacity),
-            atthasmissing: BooleanBuilder::new(capacity),
-            attidentity: StringBuilder::new(capacity),
-            attgenerated: StringBuilder::new(capacity),
-            attisdropped: BooleanBuilder::new(capacity),
-            attislocal: BooleanBuilder::new(capacity),
-            attinhcount: UInt32Builder::new(capacity),
-            attcollation: UInt32Builder::new(capacity),
-            attacl: StringBuilder::new(capacity),
-            attoptions: StringBuilder::new(capacity),
-            attfdwoptions: StringBuilder::new(capacity),
-            attmissingval: StringBuilder::new(capacity),
-            xmin: UInt32Builder::new(capacity),
+            attrelid: UInt32Builder::with_capacity(capacity),
+            attname: StringBuilder::with_capacity(capacity, capacity),
+            atttypid: UInt32Builder::with_capacity(capacity),
+            attstattarget: Int32Builder::with_capacity(capacity),
+            attlen: Int16Builder::with_capacity(capacity),
+            attnum: Int16Builder::with_capacity(capacity),
+            attndims: UInt32Builder::with_capacity(capacity),
+            attcacheoff: Int32Builder::with_capacity(capacity),
+            atttypmod: Int64Builder::with_capacity(capacity),
+            attbyval: BooleanBuilder::with_capacity(capacity),
+            attalign: StringBuilder::with_capacity(capacity, capacity),
+            attstorage: StringBuilder::with_capacity(capacity, capacity),
+            attcompression: StringBuilder::with_capacity(capacity, capacity),
+            attnotnull: BooleanBuilder::with_capacity(capacity),
+            atthasdef: BooleanBuilder::with_capacity(capacity),
+            atthasmissing: BooleanBuilder::with_capacity(capacity),
+            attidentity: StringBuilder::with_capacity(capacity, capacity),
+            attgenerated: StringBuilder::with_capacity(capacity, capacity),
+            attisdropped: BooleanBuilder::with_capacity(capacity),
+            attislocal: BooleanBuilder::with_capacity(capacity),
+            attinhcount: UInt32Builder::with_capacity(capacity),
+            attcollation: UInt32Builder::with_capacity(capacity),
+            attacl: StringBuilder::with_capacity(capacity, capacity),
+            attoptions: StringBuilder::with_capacity(capacity, capacity),
+            attfdwoptions: StringBuilder::with_capacity(capacity, capacity),
+            attmissingval: StringBuilder::with_capacity(capacity, capacity),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 
@@ -96,34 +96,34 @@ impl PgCatalogAttributeBuilder {
         let pg_typ = PgType::get_by_tid(column_type.to_pg_tid());
 
         // TODO: get data from pg_type description
-        self.attrelid.append_value(attrelid).unwrap();
-        self.attname.append_value(attname.as_ref()).unwrap();
-        self.atttypid.append_value(pg_typ.oid).unwrap();
-        self.attstattarget.append_value(0).unwrap();
-        self.attlen.append_value(pg_typ.typlen).unwrap();
-        self.attnum.append_value(attnum).unwrap();
-        self.attndims.append_value(is_array as u32).unwrap();
-        self.attcacheoff.append_value(-1).unwrap();
-        self.atttypmod.append_value(-1).unwrap();
-        self.attbyval.append_value(pg_typ.typbyval).unwrap();
-        self.attalign.append_value(pg_typ.typalign).unwrap();
-        self.attstorage.append_value(pg_typ.typstorage).unwrap();
-        self.attcompression.append_value("\0").unwrap();
-        self.attnotnull.append_value(attnotnull).unwrap();
-        self.atthasdef.append_value(false).unwrap();
-        self.atthasmissing.append_value(false).unwrap();
-        self.attidentity.append_value("").unwrap();
-        self.attgenerated.append_value("").unwrap();
-        self.attisdropped.append_value(false).unwrap();
-        self.attislocal.append_value(true).unwrap();
-        self.attinhcount.append_value(0).unwrap();
+        self.attrelid.append_value(attrelid);
+        self.attname.append_value(attname.as_ref());
+        self.atttypid.append_value(pg_typ.oid);
+        self.attstattarget.append_value(0);
+        self.attlen.append_value(pg_typ.typlen);
+        self.attnum.append_value(attnum);
+        self.attndims.append_value(is_array as u32);
+        self.attcacheoff.append_value(-1);
+        self.atttypmod.append_value(-1);
+        self.attbyval.append_value(pg_typ.typbyval);
+        self.attalign.append_value(pg_typ.typalign);
+        self.attstorage.append_value(pg_typ.typstorage);
+        self.attcompression.append_value("\0");
+        self.attnotnull.append_value(attnotnull);
+        self.atthasdef.append_value(false);
+        self.atthasmissing.append_value(false);
+        self.attidentity.append_value("");
+        self.attgenerated.append_value("");
+        self.attisdropped.append_value(false);
+        self.attislocal.append_value(true);
+        self.attinhcount.append_value(0);
         // FIXME: attcollation should be equal to pg_catalog.pg_collation.oid if type is collatable, 0 otherwise
-        self.attcollation.append_value(0).unwrap();
-        self.attacl.append_null().unwrap();
-        self.attoptions.append_null().unwrap();
-        self.attfdwoptions.append_null().unwrap();
-        self.attmissingval.append_null().unwrap();
-        self.xmin.append_value(1).unwrap();
+        self.attcollation.append_value(0);
+        self.attacl.append_null();
+        self.attoptions.append_null();
+        self.attfdwoptions.append_null();
+        self.attmissingval.append_null();
+        self.xmin.append_value(1);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

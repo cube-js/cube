@@ -33,19 +33,19 @@ impl RedshiftStlQueryBuilder {
     fn new() -> Self {
         let capacity = 1;
         Self {
-            userids: Int32Builder::new(capacity),
-            queries: Int32Builder::new(capacity),
-            labels: StringBuilder::new(capacity),
-            xids: Int64Builder::new(capacity),
-            pids: Int32Builder::new(capacity),
-            databases: StringBuilder::new(capacity),
-            querytxts: StringBuilder::new(capacity),
+            userids: Int32Builder::with_capacity(capacity),
+            queries: Int32Builder::with_capacity(capacity),
+            labels: StringBuilder::with_capacity(capacity, capacity),
+            xids: Int64Builder::with_capacity(capacity),
+            pids: Int32Builder::with_capacity(capacity),
+            databases: StringBuilder::with_capacity(capacity, capacity),
+            querytxts: StringBuilder::with_capacity(capacity, capacity),
             // FIXME: these must be timestamps but are compared directly to strings in Redshift
-            starttimes: StringBuilder::new(capacity),
-            endtimes: StringBuilder::new(capacity),
-            aborted: Int32Builder::new(capacity),
-            insert_pristine: Int32Builder::new(capacity),
-            concurrency_scaling_statuses: Int32Builder::new(capacity),
+            starttimes: StringBuilder::with_capacity(capacity, capacity),
+            endtimes: StringBuilder::with_capacity(capacity, capacity),
+            aborted: Int32Builder::with_capacity(capacity),
+            insert_pristine: Int32Builder::with_capacity(capacity),
+            concurrency_scaling_statuses: Int32Builder::with_capacity(capacity),
         }
     }
 

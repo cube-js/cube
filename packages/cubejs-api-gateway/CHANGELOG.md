@@ -3,6 +3,64 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.25](https://github.com/cube-js/cube/compare/v1.8.24...v1.8.25) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.24](https://github.com/cube-js/cube/compare/v1.8.23...v1.8.24) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
+
+### Bug Fixes
+
+- **api-gateway:** Allow only one WS authorization at a time per connection ([#12748](https://github.com/cube-js/cube/issues/12748)) ([220a1b5](https://github.com/cube-js/cube/commit/220a1b52a7ab3112711f2e8beea8483294dba3e5))
+
+### Features
+
+- **cubesql:** Support :name parameters in /v1/cubesql ([#12612](https://github.com/cube-js/cube/issues/12612)) ([6ee7550](https://github.com/cube-js/cube/commit/6ee75508b4fd0bc5333b10290b8c541a217332fc))
+
+## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
+
+### Bug Fixes
+
+- **api-gateway:** Improve WS message validation ([#12712](https://github.com/cube-js/cube/issues/12712)) ([e167248](https://github.com/cube-js/cube/commit/e167248f24e7837b6b417345300fb0a3c7b8d506))
+
+## [1.8.21](https://github.com/cube-js/cube/compare/v1.8.20...v1.8.21) (2026-11-09)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.20](https://github.com/cube-js/cube/compare/v1.8.19...v1.8.20) (2026-11-06)
+
+### Bug Fixes
+
+- **api-gateway:** Stricter validation for member expressions ([#12626](https://github.com/cube-js/cube/issues/12626)) ([52060fd](https://github.com/cube-js/cube/commit/52060fdea92e956fb213c444f25e3325c5b28b2d))
+
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+### Bug Fixes
+
+- **server-core:** Don't expand partitions to list pre-aggregations ([#12617](https://github.com/cube-js/cube/issues/12617)) ([9a7337c](https://github.com/cube-js/cube/commit/9a7337cd9c760785138d3fa23fb6e0942420cf9f))
+
+### Features
+
+- **schema-compiler:** Expose switch dimension values in /v1/meta ([#12225](https://github.com/cube-js/cube/issues/12225)) ([53d7e73](https://github.com/cube-js/cube/commit/53d7e73de1bbd114072299df241b4c4312484ace))
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+### Features
+
+- **cubesql:** Support responseFormat columnar for /v1/cubesql ([#12503](https://github.com/cube-js/cube/issues/12503)) ([0ef0e62](https://github.com/cube-js/cube/commit/0ef0e628f7e60de3aa116e0b28d064568146ac33))
+
 ## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
 
 ### Performance Improvements

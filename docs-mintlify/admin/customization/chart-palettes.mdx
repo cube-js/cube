@@ -48,7 +48,16 @@ Existing charts that use the palette pick up the new colors automatically.
 1. Go to **Admin → Customization → Chart palettes**.
 2. Click the row action on the palette you want to remove and select **Delete**.
 
-Charts that were using the deleted palette fall back to the built-in **Default** palette.
+Charts that were using the deleted palette fall back to the [default palette](#set-a-default-palette).
+
+## Set a default palette
+
+Charts that don't pick a palette use the account's default palette. Out of the box, it is the built-in **Default** palette. To use a custom palette instead:
+
+1. Go to **Admin → Customization → Chart palettes**.
+2. Click the row action on a custom palette and select **Set as default**.
+
+A star marks the default palette in the list. It also sets the chart colors of [apps](/admin/customization/app-theme#apps). To go back to the built-in **Default** palette, select **Clear default** on the current default. You can't delete the default palette.
 
 ## Apply a palette to a chart
 
@@ -63,4 +72,4 @@ The dropdown shows palettes that match the chart's color encoding:
 - **Discrete** palettes appear when the color encoding is categorical (for example, color by `status` or `category`).
 - **Continuous** palettes appear when the color encoding is quantitative or temporal (for example, color by `total_sale_price` or `created_at`).
 
-If no palette is explicitly selected, charts use the built-in **Default** palette.
+If no palette is explicitly selected, charts use the [default palette](#set-a-default-palette).

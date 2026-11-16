@@ -1170,9 +1170,9 @@ impl PostgresIntegrationTestSuite {
             .await;
         assert!(result.is_err());
 
-        // Set memory limits for testing: 5 MiB for session, 7 MiB total
-        env::set_var("CUBESQL_TEMP_TABLE_SESSION_MEM", "5");
-        env::set_var("CUBESQL_TEMP_TABLE_TOTAL_MEM", "7");
+        // Set memory limits for testing: 4 MiB for session, 5 MiB total
+        env::set_var("CUBESQL_TEMP_TABLE_SESSION_MEM", "4");
+        env::set_var("CUBESQL_TEMP_TABLE_TOTAL_MEM", "5");
 
         // Test that we can hit the session memory limit
         let large_table_query = "
@@ -1192,9 +1192,9 @@ impl PostgresIntegrationTestSuite {
             CROSS JOIN (SELECT c1 AS c3 FROM t1) AS t3
             CROSS JOIN (SELECT c1 AS c4 FROM t1) AS t4
             CROSS JOIN (SELECT c1 AS c5 FROM t1) AS t5
-        "; // Estimation might change with arrow upgrades; currently almost 1.5 MiB
+        "; // Estimation might change with arrow upgrades; currently ~1.21 MiB (1269760 bytes)
 
-        // We can create 3 tables estimating ~4.5 MiB
+        // We can create 3 tables estimating ~3.6 MiB
         let result = self
             .test_simple_query(large_table_query.to_string(), |_| {})
             .await;
@@ -1224,7 +1224,7 @@ impl PostgresIntegrationTestSuite {
         assert!(pg_tokio_error_to_string(&result.unwrap_err())
             .contains("temporary table memory limit reached"));
 
-        // We are currently at 4.5 MiB total limit, hence we should be allowed
+        // We are currently at ~3.6 MiB of the 5 MiB total limit, hence we should be allowed
         // to allocate one more similar table in a separate session
         let result = new_client.simple_query(large_table_query).await;
         assert!(result.is_ok());

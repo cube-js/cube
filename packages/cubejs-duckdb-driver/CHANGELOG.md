@@ -3,6 +3,56 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+## [1.8.25](https://github.com/cube-js/cube/compare/v1.8.24...v1.8.25) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+## [1.8.24](https://github.com/cube-js/cube/compare/v1.8.23...v1.8.24) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
+
+### Features
+
+- **cubesql:** Push down APPROX_DISTINCT aggregate ([#12713](https://github.com/cube-js/cube/issues/12713)) ([edb6b66](https://github.com/cube-js/cube/commit/edb6b66ae26c6d1bfb137fd7bf806caf99343f3a))
+
+## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
+
+### Bug Fixes
+
+- **cubesql:** Support `DATEDIFF` push down for DuckDB ([#12665](https://github.com/cube-js/cube/issues/12665)) ([4b43bf8](https://github.com/cube-js/cube/commit/4b43bf875b97bc0e95358c725fa38bb6bac7c3fc))
+
+### Features
+
+- **cubesql:** Push down TRIM and SPLIT_PART ([#12666](https://github.com/cube-js/cube/issues/12666)) ([38a8279](https://github.com/cube-js/cube/commit/38a8279381759c3a8389b2d10f952623bfd637da))
+
+## [1.8.21](https://github.com/cube-js/cube/compare/v1.8.20...v1.8.21) (2026-11-09)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+## [1.8.20](https://github.com/cube-js/cube/compare/v1.8.19...v1.8.20) (2026-11-06)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+### Bug Fixes
+
+- **duckdb-driver:** Map HUGEINT and unsigned integer columns to Cube Store types ([#12599](https://github.com/cube-js/cube/issues/12599)) ([778f84e](https://github.com/cube-js/cube/commit/778f84ebe875915f4d7212c68bdfbb2933ad7136)), closes [#7127](https://github.com/cube-js/cube/issues/7127)
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
 ## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
 
 **Note:** Version bump only for package @cubejs-backend/duckdb-driver

@@ -55,7 +55,8 @@ link_packages() {
 
             echo "Linking $package..."
             cd "$package"
-            yarn link
+            # Registering a package for `yarn link <name>` is Yarn 1 only, so bypass the repo's Yarn 4
+            YARN_IGNORE_PATH=1 yarn link
             cd "$SCRIPT_DIR"
         fi
     done

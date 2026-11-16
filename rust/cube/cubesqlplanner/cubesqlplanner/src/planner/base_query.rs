@@ -1,6 +1,8 @@
 use super::state::State;
 use super::top_level_planner::TopLevelPlanner;
-use super::{ModelContext, QueryModelContext, QueryProperties, QueryPropertiesCompiler};
+use super::{
+    ModelContext, QueryModelContext, QueryProperties, QueryPropertiesCompiler, RequestOptions,
+};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::logical_plan::PreAggregationUsage;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
@@ -48,7 +50,6 @@ pub struct BaseQuery<IT: InnerTypes> {
     context: NativeContextHolder<IT>,
     query_tools: Rc<State>,
     request: Rc<QueryProperties>,
-    cubestore_support_multistage: bool,
 }
 
 impl<IT: InnerTypes> BaseQuery<IT> {
@@ -57,10 +58,6 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         options: Rc<dyn BaseQueryOptions>,
         model_context: Rc<ModelContext>,
     ) -> Result<Self, CubeError> {
-        let cubestore_support_multistage = options
-            .static_data()
-            .cubestore_support_multistage
-            .unwrap_or(false);
         let query_tools = State::try_new(
             options.cube_evaluator()?,
             options.security_context()?,
@@ -80,6 +77,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                 options.static_data().data_source.clone(),
                 options.static_data().disable_external_pre_aggregations,
             ),
+            RequestOptions::from_static_data(options.static_data()),
         )?;
 
         let request = QueryPropertiesCompiler::new(query_tools.clone()).build(options)?;
@@ -88,16 +86,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             context,
             query_tools,
             request,
-            cubestore_support_multistage,
         })
     }
 
     pub fn build_sql_and_params(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
-        let planner = TopLevelPlanner::new(
-            self.request.clone(),
-            self.query_tools.clone(),
-            self.cubestore_support_multistage,
-        );
+        let planner = TopLevelPlanner::new(self.request.clone(), self.query_tools.clone());
 
         let (sql, usages) = planner.plan()?;
 

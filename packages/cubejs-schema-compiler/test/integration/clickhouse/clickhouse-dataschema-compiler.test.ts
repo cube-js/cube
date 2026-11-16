@@ -6,7 +6,7 @@ import { prepareCompiler } from '../../../src/compiler/PrepareCompiler';
 
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
-import { logSqlAndParams } from '../../unit/TestUtil';
+import { debugLog } from '../../unit/TestUtil';
 
 const itif = (condition: boolean, description: string, fn: jest.ProvidesCallback) => (condition ? it(description, fn) : it.skip(description, fn));
 
@@ -162,7 +162,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then((res: any) => {
         expect(res).toEqual(
@@ -225,7 +225,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
       }]
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then((res: any) => {
       expect(res).toEqual(
@@ -295,7 +295,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
           id: 'visitors.enabled_source'
         }]
       });
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then((res: any) => {
         expect(res).toEqual(
@@ -376,7 +376,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
           }],
           timezone: 'America/Los_Angeles'
         });
-        logSqlAndParams(query);
+        debugLog(...query.buildSqlAndParams());
         const res = await dbRunner.testQuery(query.buildSqlAndParams());
 
         expect(res).toEqual(responses[index]);
@@ -419,7 +419,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
         order: [],
         timezone: 'America/Los_Angeles'
       });
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
       expect(query.buildSqlAndParams()[0]).toMatch(/bar/);
     });
   });
@@ -501,7 +501,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
         order: [],
         timezone: 'America/Los_Angeles'
       });
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
       const res = await dbRunner.testQuery(query.buildSqlAndParams());
 
       expect(res).toEqual([

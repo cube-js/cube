@@ -4,6 +4,7 @@ mod cost;
 pub mod language;
 pub mod rewriter;
 pub mod rules;
+pub mod shared_list;
 
 use self::analysis::{LogicalPlanData, MemberNameToExpr};
 use crate::compile::rewrite::{

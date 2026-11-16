@@ -169,10 +169,11 @@ export async function runEnvironment(
   if (type === 'oracle') {
     compose.withWaitStrategy('data', Wait.forHealthCheck().withStartupTimeout(240 * 1000));
   }
-  // Pinot is a 4-container cluster (zookeeper/controller/broker/server). Wait on the
-  // server HEALTHCHECK (last in the dependency chain) before seeding/connecting.
+  // Pinot is a 4-container cluster: wait on pinot-server's HEALTHCHECK (last in the chain). Compose
+  // overwrites every strategy's own timeout with the global one, so raise the global value (as for Trino).
   if (type === 'pinot') {
-    compose.withWaitStrategy('pinot-server', Wait.forHealthCheck().withStartupTimeout(180 * 1000));
+    compose.withStartupTimeout(180 * 1000);
+    compose.withWaitStrategy('pinot-server', Wait.forHealthCheck());
   }
   // QuestDB opens its Postgres-wire port before it is ready to serve queries, so
   // wait on the container HEALTHCHECK (defined in the questdb fixture, hitting the

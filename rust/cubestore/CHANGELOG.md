@@ -3,6 +3,54 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
+
+### Bug Fixes
+
+- **cubestore:** Push LIMIT to workers for queries without ORDER BY and GROUP BY ([#12778](https://github.com/cube-js/cube/issues/12778)) ([8f63d9d](https://github.com/cube-js/cube/commit/8f63d9d6f2168ed84afae0e5149dc9bd3aa4c694))
+
+## [1.8.25](https://github.com/cube-js/cube/compare/v1.8.24...v1.8.25) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.24](https://github.com/cube-js/cube/compare/v1.8.23...v1.8.24) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
+
+### Bug Fixes
+
+- **cubestore:** Disable local filesystem imports by default ([#12779](https://github.com/cube-js/cube/issues/12779)) ([bcbe7fd](https://github.com/cube-js/cube/commit/bcbe7fd7f5c7d204a928fdf589a93c2eb0df7c72))
+- **cubestore:** Keep a queued query a client still waits for from being orphaned ([#12761](https://github.com/cube-js/cube/issues/12761)) ([1b0e81f](https://github.com/cube-js/cube/commit/1b0e81ffd9f13fa72ebcf39766b7c1da82d057ce)), closes [cube-js/cube#12755](https://github.com/cube-js/cube/issues/12755)
+- **cubestore:** Reject path traversal in temp uploads and remote fs paths ([#12773](https://github.com/cube-js/cube/issues/12773)) ([5c18c87](https://github.com/cube-js/cube/commit/5c18c8761a22b68f5d3e45cc2cea685257243738))
+
+## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.21](https://github.com/cube-js/cube/compare/v1.8.20...v1.8.21) (2026-11-09)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.20](https://github.com/cube-js/cube/compare/v1.8.19...v1.8.20) (2026-11-06)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+### Bug Fixes
+
+- **cubestore:** Update OpenTelemetry to 0.32 and drop the unused SDK crates ([#12530](https://github.com/cube-js/cube/issues/12530)) ([e9f0a90](https://github.com/cube-js/cube/commit/e9f0a904c0a17e16030be6ee636e305d63d3e481))
+
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
 ## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

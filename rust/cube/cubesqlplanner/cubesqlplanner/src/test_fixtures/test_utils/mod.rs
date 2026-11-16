@@ -37,3 +37,53 @@ pub fn table_rows(result: &str) -> Vec<Vec<String>> {
         })
         .collect()
 }
+
+/// Rows of a result without the named column, sorted, so results that differ
+/// only in that column and in row order compare equal.
+pub fn rows_without_column(result: &str, column: &str) -> Vec<Vec<String>> {
+    let header: Vec<String> = result
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .split('|')
+        .map(|cell| cell.trim().to_string())
+        .collect();
+    let skip = header.iter().position(|name| name == column);
+    let mut rows: Vec<Vec<String>> = table_rows(result)
+        .into_iter()
+        .map(|row| {
+            row.into_iter()
+                .enumerate()
+                .filter(|(i, _)| Some(*i) != skip)
+                .map(|(_, cell)| cell)
+                .collect()
+        })
+        .collect();
+    rows.sort();
+    rows
+}
+
+/// Asserts on Postgres that `query` returns the rows of `equivalent`, a query
+/// computing the same values another way, with the named columns left out.
+pub async fn assert_same_rows(
+    ctx: &TestContext,
+    seed_file: &str,
+    query: &str,
+    column: &str,
+    equivalent: &str,
+    equivalent_column: &str,
+) {
+    let (Some(result), Some(expected)) = (
+        ctx.try_execute_pg(query, seed_file).await,
+        ctx.try_execute_pg(equivalent, seed_file).await,
+    ) else {
+        return;
+    };
+    assert_eq!(
+        rows_without_column(&result, column),
+        rows_without_column(&expected, equivalent_column),
+        "\nresult:\n{}\nexpected:\n{}",
+        result,
+        expected
+    );
+}

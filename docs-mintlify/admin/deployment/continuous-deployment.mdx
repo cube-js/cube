@@ -81,6 +81,10 @@ What happens after connecting depends on the deploy mode:
 - In **Deploy with CLI** mode, production deployment remains manual. See
   [Connecting GitHub on a CLI deployment](#connecting-github-on-a-cli-deployment).
 
+If GitHub branch protection or a ruleset requires pull requests on the production
+branch, development mode doesn't publish to it directly. Open a pull request in
+GitHub instead. See [Merge or publish changes](/docs/data-modeling/dev-mode#merge-or-create-a-pull-request).
+
 ### GitHub App permissions
 
 Install the **Cube Cloud GitHub App** on the account that owns the repository:
