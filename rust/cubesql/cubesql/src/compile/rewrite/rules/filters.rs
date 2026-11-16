@@ -5967,7 +5967,7 @@ impl FilterRules {
                         dts.push(last_value);
                     }
 
-                    let format = "%Y-%m-%dT%H:%M:%S%.3fZ";
+                    let format = "%Y-%m-%dT%H:%M:%S%.3f";
                     let dts = dts
                         .into_iter()
                         .map(|(dt, new_dt)| {
@@ -6378,8 +6378,6 @@ fn format_iso_timestamp(dt: NaiveDateTime) -> String {
             Item::Literal(":"),
             Item::Numeric(Second, Zero),
             Item::Fixed(Fixed::Nanosecond3),
-            // TODO remove when there're no more non rewrite tests
-            Item::Literal("Z"),
         ]
         .iter(),
     )

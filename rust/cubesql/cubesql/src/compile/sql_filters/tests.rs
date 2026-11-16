@@ -3693,7 +3693,7 @@ async fn test_sql_filters_round_trip_reported_values() -> Result<(), CubeError> 
         // The query's upper bound is midnight, not the whole of the day
         Some(vec![
             "2020-01-01".to_string(),
-            "2021-01-01T00:00:00.000Z".to_string()
+            "2021-01-01T00:00:00.000".to_string()
         ]),
         "a date is reported in the form the query wrote it"
     );

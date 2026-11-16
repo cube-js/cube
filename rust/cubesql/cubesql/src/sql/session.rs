@@ -445,6 +445,16 @@ pub struct Session {
 }
 
 impl SessionState {
+    /// The time zone Cube reads this session's queries in, when it is a zone name.
+    pub fn query_time_zone(&self) -> Option<chrono_tz::Tz> {
+        let session = self.query_timezone.read().ok()?.clone();
+        session
+            .or_else(|| std::env::var("CUBEJS_DEFAULT_TIMEZONE").ok())?
+            .trim()
+            .parse()
+            .ok()
+    }
+
     /// A principal is user + security context: user names repeat across tenants and all
     /// `/v1/cubesql` sessions share one placeholder user, so without a context nothing matches.
     pub fn can_observe_session(&self, other: &SessionState) -> bool {

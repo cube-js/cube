@@ -1,14 +1,16 @@
+use chrono::{Duration, NaiveDateTime, Utc};
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 use datafusion::physical_plan::displayable;
 use pretty_assertions::assert_eq;
+use serde_json::json;
 
 use crate::compile::{
     rewrite::rewriter::Rewriter,
     test::{
         convert_select_to_query_plan, convert_select_to_query_plan_customized, execute_query,
-        init_testing_logger, utils::LogicalPlanTestUtils,
+        init_testing_logger, utils::LogicalPlanTestUtils, TestContext,
     },
     DatabaseProtocol,
 };
@@ -57,7 +59,7 @@ GROUP BY
                 V1LoadRequestQueryFilterItem {
                     member: Some("MultiTypeCube.dim_date0".to_string()),
                     operator: Some("afterDate".to_string()),
-                    values: Some(vec!["2019-01-01T00:00:00.000Z".to_string()]),
+                    values: Some(vec!["2019-01-01T00:00:00.000".to_string()]),
                     or: None,
                     and: None,
                 },
@@ -252,8 +254,8 @@ LIMIT 5000
                 dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                 granularity: Some("month".to_string()),
                 date_range: Some(serde_json::json!(vec![
-                    "2026-01-01T00:00:00.000Z".to_string(),
-                    "2026-06-26T00:00:00.000Z".to_string(),
+                    "2026-01-01T00:00:00.000".to_string(),
+                    "2026-06-26T00:00:00.000".to_string(),
                 ])),
             }]),
             order: Some(vec![vec![
@@ -345,10 +347,10 @@ async fn test_filter_date_beyond_nanosecond_range() {
     init_testing_logger();
 
     for (bound, expected) in [
-        ("2262-04-11", "2262-04-11T00:00:00.000Z"),
-        ("2262-04-12", "2262-04-12T00:00:00.000Z"),
-        ("9999-12-31", "9999-12-31T00:00:00.000Z"),
-        ("1600-01-01", "1600-01-01T00:00:00.000Z"),
+        ("2262-04-11", "2262-04-11T00:00:00.000"),
+        ("2262-04-12", "2262-04-12T00:00:00.000"),
+        ("9999-12-31", "9999-12-31T00:00:00.000"),
+        ("1600-01-01", "1600-01-01T00:00:00.000"),
     ] {
         // The `date` literal and the bare string take different normalization paths.
         for literal in [format!("date '{bound}'"), format!("'{bound}'")] {
@@ -411,8 +413,8 @@ GROUP BY dim_str0
             dimension: "MultiTypeCube.dim_date0".to_string(),
             granularity: None,
             date_range: Some(serde_json::json!(vec![
-                "2020-01-01T00:00:00.000Z".to_string(),
-                "9999-12-31T00:00:00.000Z".to_string(),
+                "2020-01-01T00:00:00.000".to_string(),
+                "9999-12-31T00:00:00.000".to_string(),
             ])),
         }]),
     );
@@ -439,8 +441,8 @@ GROUP BY dim_str0
             member: Some("MultiTypeCube.dim_date0".to_string()),
             operator: Some("equals".to_string()),
             values: Some(vec![
-                "2020-01-01T00:00:00.000Z".to_string(),
-                "9999-12-31T00:00:00.000Z".to_string(),
+                "2020-01-01T00:00:00.000".to_string(),
+                "9999-12-31T00:00:00.000".to_string(),
             ]),
             or: None,
             and: None,
@@ -571,7 +573,7 @@ GROUP BY dim_str0
         Some(vec![V1LoadRequestQueryFilterItem {
             member: Some("MultiTypeCube.dim_date0".to_string()),
             operator: Some("beforeOrOnDate".to_string()),
-            values: Some(vec!["9999-12-31T00:00:00.000Z".to_string()]),
+            values: Some(vec!["9999-12-31T00:00:00.000".to_string()]),
             or: None,
             and: None,
         }]),
@@ -683,12 +685,12 @@ GROUP BY dim_str0
                     serde_json::json!({
                         "member": "MultiTypeCube.dim_date0",
                         "operator": "beforeDate",
-                        "values": [format!("{date}T00:00:00.000Z")],
+                        "values": [format!("{date}T00:00:00.000")],
                     }),
                     serde_json::json!({
                         "member": "MultiTypeCube.dim_date0",
                         "operator": "afterOrOnDate",
-                        "values": [format!("{next_day}T00:00:00.000Z")],
+                        "values": [format!("{next_day}T00:00:00.000")],
                     }),
                 ]),
                 and: None,
@@ -747,8 +749,8 @@ GROUP BY dim_str0
             dimension: "MultiTypeCube.dim_date0".to_string(),
             granularity: None,
             date_range: Some(serde_json::json!([
-                "9999-12-31T00:00:00.000Z",
-                "9999-12-31T23:59:59.999Z"
+                "9999-12-31T00:00:00.000",
+                "9999-12-31T23:59:59.999"
             ])),
         }]),
     );
@@ -763,11 +765,11 @@ async fn test_filter_date_trunc_date_beyond_nanosecond_range() {
     for (predicate, expected_range) in [
         (
             "date_trunc('day', dim_date0) = DATE '9999-12-31'",
-            ["9999-12-31T00:00:00.000Z", "9999-12-31T23:59:59.999Z"],
+            ["9999-12-31T00:00:00.000", "9999-12-31T23:59:59.999"],
         ),
         (
             "date_trunc('day', dim_date0) IN (DATE '9999-12-30', DATE '9999-12-31')",
-            ["9999-12-30T00:00:00.000Z", "9999-12-31T23:59:59.999Z"],
+            ["9999-12-30T00:00:00.000", "9999-12-31T23:59:59.999"],
         ),
     ] {
         let query_plan = convert_select_to_query_plan(
@@ -798,4 +800,146 @@ GROUP BY dim_str0
             predicate
         );
     }
+}
+
+#[tokio::test]
+async fn test_filter_date_literal_in_session_time_zone() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+    context
+        .execute_query("SET TIME ZONE 'America/Vancouver'")
+        .await
+        .unwrap();
+
+    // A bound has no time zone designator, whichever way it reaches Cube, so that
+    // Cube reads all of them in the session's time zone.
+    let request = context
+        .convert_sql_to_cube_query(
+            r#"
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE order_date >= '2026-09-16 05:00:00'
+            GROUP BY 1
+            "#,
+        )
+        .await
+        .unwrap()
+        .as_logical_plan()
+        .find_cube_scan()
+        .request;
+    assert_eq!(request.timezone, Some("America/Vancouver".to_string()));
+    assert_eq!(
+        request.filters,
+        Some(vec![V1LoadRequestQueryFilterItem {
+            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+            operator: Some("afterOrOnDate".to_string()),
+            values: Some(vec!["2026-09-16T05:00:00.000".to_string()]),
+            or: None,
+            and: None,
+        }])
+    );
+
+    let request = context
+        .convert_sql_to_cube_query(
+            r#"
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE order_date >= '2026-09-16 05:00:00' AND order_date < '2026-09-16 09:00:00'
+            GROUP BY 1
+            "#,
+        )
+        .await
+        .unwrap()
+        .as_logical_plan()
+        .find_cube_scan()
+        .request;
+    assert_eq!(
+        request.time_dimensions,
+        Some(vec![V1LoadRequestQueryTimeDimension {
+            dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+            granularity: None,
+            date_range: Some(json!(vec![
+                "2026-09-16T05:00:00.000".to_string(),
+                "2026-09-16T08:59:59.999".to_string(),
+            ])),
+        }])
+    );
+}
+
+#[tokio::test]
+async fn test_filter_now_in_session_time_zone() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // UTC+05:30 all year
+    let offset = Duration::minutes(330);
+    let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+    context
+        .execute_query("SET TIME ZONE 'Asia/Kolkata'")
+        .await
+        .unwrap();
+
+    // The current time is the session's wall time, as a literal bound is.
+    let before = Utc::now().naive_utc() + offset;
+    let request = context
+        .convert_sql_to_cube_query(
+            r#"
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE order_date >= NOW() - INTERVAL '1 hour'
+            GROUP BY 1
+            "#,
+        )
+        .await
+        .unwrap()
+        .as_logical_plan()
+        .find_cube_scan()
+        .request;
+    let after = Utc::now().naive_utc() + offset;
+    let filters = request.filters.unwrap();
+    assert_eq!(filters[0].operator.as_deref(), Some("afterOrOnDate"));
+    let values = filters[0].values.clone().unwrap();
+    let bound = NaiveDateTime::parse_from_str(&values[0], "%Y-%m-%dT%H:%M:%S%.3f").unwrap()
+        + Duration::hours(1);
+    assert!(
+        before - Duration::milliseconds(1) <= bound && bound <= after,
+        "expected a time from {} to {}, got: {:?}",
+        before,
+        after,
+        values
+    );
+
+    // The current date is the session's too. The test may straddle midnight.
+    let today = (Utc::now().naive_utc() + offset).date();
+    let request = context
+        .convert_sql_to_cube_query(
+            r#"
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE order_date >= CURRENT_DATE
+            GROUP BY 1
+            "#,
+        )
+        .await
+        .unwrap()
+        .as_logical_plan()
+        .find_cube_scan()
+        .request;
+    let values = request.filters.unwrap()[0].values.clone().unwrap();
+    let expected = [today, today + Duration::days(1)]
+        .iter()
+        .map(|day| day.format("%Y-%m-%dT00:00:00.000").to_string())
+        .collect::<Vec<_>>();
+    assert!(
+        values.len() == 1 && expected.contains(&values[0]),
+        "expected one of {:?}, got: {:?}",
+        expected,
+        values
+    );
 }
