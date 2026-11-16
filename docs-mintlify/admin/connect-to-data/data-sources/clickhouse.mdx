@@ -42,6 +42,19 @@ CUBEJS_DB_PASS=**********
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency)               | The number of [concurrent queries][ref-data-source-concurrency] to the data source  | A valid number            |    ❌    |
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
+
+## Boolean Dimensions and Segments
+
+ClickHouse evaluates comparisons to `UInt8`, not `Bool`. Cube casts [`boolean`
+dimensions][ref-dimension-type] and segments to `Bool` when it selects them, so
+boolean dimensions return `true` and `false`, and pre-aggregations store both
+as `Bool` columns.
+
+A `boolean` dimension over a `String` column has to hold values that ClickHouse
+can read as booleans, such as `true`/`false`, `1`/`0`, or `yes`/`no`.
+Otherwise, the query fails with `CANNOT_PARSE_BOOL`. For any other values,
+compare the column in the dimension's `sql`, e.g., `{CUBE}.status = 'active'`.
+
 ## Pre-Aggregation Feature Support
 
 When using [pre-aggregations][ref-preaggs] with ClickHouse, you have to define
@@ -231,6 +244,7 @@ You can connect to a ClickHouse database with compression enabled, by setting
 [ref-recipe-enable-ssl]: /recipes/configuration/using-ssl-connections-to-data-source
 [ref-caching-large-preaggs]: /docs/pre-aggregations/using-pre-aggregations#export-bucket
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
+[ref-dimension-type]: /reference/data-modeling/dimensions#type
 [self-preaggs-batching]: #batching
 [ref-preaggs]: /docs/pre-aggregations/using-pre-aggregations
 [ref-preaggs-indexes]: /reference/data-modeling/pre-aggregations#indexes

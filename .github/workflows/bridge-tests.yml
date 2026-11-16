@@ -3,7 +3,6 @@ name: Bridge tests
 on:
   pull_request:
     paths:
-      - '.github/actions/setup-yarn-1/**'
       - '.github/workflows/bridge-tests.yml'
       - 'rust/cube/cubesqlplanner/**'
       - 'rust/cube/cubenativeutils/**'
@@ -38,18 +37,16 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24.x
-      - name: Set Yarn version
-        uses: ./.github/actions/setup-yarn-1
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+        run: echo "dir=$(yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
       - name: Restore yarn cache
         uses: actions/cache@v6
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          key: ${{ runner.os }}-yarn4-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-yarn-
+            ${{ runner.os }}-yarn4-
       - name: Yarn install
         uses: nick-fields/retry@v4
         env:
@@ -59,7 +56,7 @@ jobs:
           retry_on: error
           retry_wait_seconds: 15
           timeout_minutes: 20
-          command: yarn install --frozen-lockfile
+          command: yarn install --immutable
       - name: Build native (debug, --features bridge-test-harness)
         working-directory: ./packages/cubejs-backend-native
         run: yarn run native:build-debug-bridge-tests

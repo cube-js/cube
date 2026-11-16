@@ -2,13 +2,13 @@ use chrono::prelude::*;
 use comfy_table::{Cell, Table};
 use datafusion::arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, Date32Array, Date64Array, DecimalArray, Float16Array,
+        Array, ArrayRef, BooleanArray, Date32Array, Date64Array, Decimal128Array, Float16Array,
         Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
         IntervalDayTimeArray, IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeStringArray,
         ListArray, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
         TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
     },
-    datatypes::{DataType, IntervalUnit, Schema, TimeUnit},
+    datatypes::{DataType, IntervalDayTime, IntervalMonthDayNano, IntervalUnit, Schema, TimeUnit},
     record_batch::RecordBatch,
 };
 use rust_decimal::prelude::*;
@@ -210,6 +210,13 @@ impl Decimal128Value {
         Self { n, scale }
     }
 
+    /// Arrow allows a negative decimal scale; Postgres NUMERIC (and this type) do not
+    pub fn scale_from_arrow(scale: i8) -> Result<usize, CubeError> {
+        <usize as std::convert::TryFrom<i8>>::try_from(scale).map_err(|_| {
+            CubeError::internal(format!("Unsupported negative decimal scale: {}", scale))
+        })
+    }
+
     pub fn as_decimal(&self) -> Result<Decimal, CubeError> {
         Ok(Decimal::try_from_i128_with_scale(
             self.n,
@@ -336,7 +343,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::List(field) => Ok(ColumnType::List(field)),
         DataType::Int32 | DataType::UInt32 => Ok(ColumnType::Int32),
-        DataType::Decimal(_, _) => Ok(ColumnType::Int32),
+        DataType::Decimal128(_, _) => Ok(ColumnType::Int32),
         DataType::Int8
         | DataType::Int16
         | DataType::Int64
@@ -346,6 +353,54 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         DataType::Null => Ok(ColumnType::String),
         x => Err(CubeError::unsupported(format!("unsupported type {:?}", x))),
     }
+}
+
+pub(crate) fn interval_year_month_value(months: i32) -> IntervalValue {
+    IntervalValue::new(months, 0, 0, 0, 0, 0)
+}
+
+pub(crate) fn interval_day_time_value(value: IntervalDayTime) -> IntervalValue {
+    let days: i32 = value.days;
+    let milliseconds_part: i32 = value.milliseconds;
+
+    let secs = milliseconds_part / 1000;
+    let milliseconds_remainder = milliseconds_part % 1000;
+    let mins = secs / 60;
+    let hours = mins / 60;
+
+    let secs = secs - (mins * 60);
+    let mins = mins - (hours * 60);
+
+    IntervalValue::new(0, days, hours, mins, secs, milliseconds_remainder * 1000)
+}
+
+pub(crate) fn interval_month_day_nano_value(value: IntervalMonthDayNano) -> IntervalValue {
+    let months: i32 = value.months;
+    let days: i32 = value.days;
+    let nanoseconds_part: i64 = value.nanoseconds;
+
+    let secs = nanoseconds_part / 1_000_000_000;
+    let secs_nano_fraction = (nanoseconds_part % 1_000_000_000) as i32;
+
+    let mins = secs / 60;
+    let hours = mins / 60;
+
+    let secs = secs - (mins * 60);
+    let mins = mins - (hours * 60);
+
+    let whole_usecs = secs_nano_fraction / 1000;
+    let nanos_remainder = secs_nano_fraction % 1000;
+
+    // Postgres supposedly believes in rounding to even.  Supposedly because they
+    // might also mix up fractional seconds with base-2 floating point, affecting
+    // microsecond rounding.
+    let usecs: i32 = if secs_nano_fraction < 0 {
+        whole_usecs - (nanos_remainder - (whole_usecs & 1) < -500) as i32
+    } else {
+        whole_usecs + (nanos_remainder + (whole_usecs & 1) > 500) as i32
+    };
+
+    IntervalValue::new(months, days, hours as i32, mins as i32, secs as i32, usecs)
 }
 
 pub fn batches_to_dataframe(
@@ -438,7 +493,7 @@ pub fn batches_to_dataframe(
                         } else {
                             TableValue::Timestamp(TimestampValue::new(
                                 a.value(i) * 1_000_000_i64,
-                                tz.clone(),
+                                tz.as_deref().map(str::to_string),
                             ))
                         });
                     }
@@ -454,7 +509,7 @@ pub fn batches_to_dataframe(
                         } else {
                             TableValue::Timestamp(TimestampValue::new(
                                 a.value(i) * 1000_i64,
-                                tz.clone(),
+                                tz.as_deref().map(str::to_string),
                             ))
                         });
                     }
@@ -468,7 +523,10 @@ pub fn batches_to_dataframe(
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            TableValue::Timestamp(TimestampValue::new(a.value(i), tz.clone()))
+                            TableValue::Timestamp(TimestampValue::new(
+                                a.value(i),
+                                tz.as_deref().map(str::to_string),
+                            ))
                         });
                     }
                 }
@@ -478,30 +536,11 @@ pub fn batches_to_dataframe(
                         .downcast_ref::<IntervalDayTimeArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if a.is_null(i) {
-                            rows[i].push(TableValue::Null);
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
                         } else {
-                            let value: u64 = a.value(i) as u64;
-                            let days: i32 = ((value & 0xFFFFFFFF00000000) >> 32) as i32;
-                            let milliseconds_part: i32 = (value & 0xFFFFFFFF) as i32;
-
-                            let secs = milliseconds_part / 1000;
-                            let milliseconds_remainder = milliseconds_part % 1000;
-                            let mins = secs / 60;
-                            let hours = mins / 60;
-
-                            let secs = secs - (mins * 60);
-                            let mins = mins - (hours * 60);
-
-                            rows[i].push(TableValue::Interval(IntervalValue::new(
-                                0,
-                                days,
-                                hours,
-                                mins,
-                                secs,
-                                milliseconds_remainder * 1000,
-                            )));
-                        }
+                            TableValue::Interval(interval_day_time_value(a.value(i)))
+                        });
                     }
                 }
                 DataType::Interval(IntervalUnit::YearMonth) => {
@@ -510,18 +549,11 @@ pub fn batches_to_dataframe(
                         .downcast_ref::<IntervalYearMonthArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if a.is_null(i) {
-                            rows[i].push(TableValue::Null);
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
                         } else {
-                            rows[i].push(TableValue::Interval(IntervalValue::new(
-                                a.value(i),
-                                0,
-                                0,
-                                0,
-                                0,
-                                0,
-                            )));
-                        }
+                            TableValue::Interval(interval_year_month_value(a.value(i)))
+                        });
                     }
                 }
                 DataType::Interval(IntervalUnit::MonthDayNano) => {
@@ -530,57 +562,21 @@ pub fn batches_to_dataframe(
                         .downcast_ref::<IntervalMonthDayNanoArray>()
                         .unwrap();
                     for i in 0..num_rows {
-                        if a.is_null(i) {
-                            rows[i].push(TableValue::Null);
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
                         } else {
-                            let value: u128 = a.value(i) as u128;
-                            let months: i32 =
-                                ((value & 0xFFFFFFFF000000000000000000000000) >> 96) as i32;
-                            let days: i32 = ((value & 0xFFFFFFFF0000000000000000) >> 64) as i32;
-                            let nanoseconds_part: i64 = (value & 0xFFFFFFFFFFFFFFFF) as i64;
-
-                            let secs = nanoseconds_part / 1_000_000_000;
-                            let secs_nano_fraction = (nanoseconds_part % 1_000_000_000) as i32;
-
-                            let mins = secs / 60;
-                            let hours = mins / 60;
-
-                            let secs = secs - (mins * 60);
-                            let mins = mins - (hours * 60);
-
-                            let whole_usecs = secs_nano_fraction / 1000;
-                            let nanos_remainder = secs_nano_fraction % 1000;
-
-                            // Postgres supposedly believes in rounding to even.  Supposedly because they
-                            // might also mix up fractional seconds with base-2 floating point, affecting
-                            // microsecond rounding.
-                            let usecs: i32;
-                            if secs_nano_fraction < 0 {
-                                usecs = whole_usecs
-                                    - (nanos_remainder - (whole_usecs & 1) < -500) as i32;
-                            } else {
-                                usecs = whole_usecs
-                                    + (nanos_remainder + (whole_usecs & 1) > 500) as i32;
-                            }
-
-                            rows[i].push(TableValue::Interval(IntervalValue::new(
-                                months,
-                                days,
-                                hours as i32,
-                                mins as i32,
-                                secs as i32,
-                                usecs,
-                            )));
-                        }
+                            TableValue::Interval(interval_month_day_nano_value(a.value(i)))
+                        });
                     }
                 }
-                DataType::Decimal(_, s) => {
-                    let a = array.as_any().downcast_ref::<DecimalArray>().unwrap();
+                DataType::Decimal128(_, s) => {
+                    let a = array.as_any().downcast_ref::<Decimal128Array>().unwrap();
+                    let scale = Decimal128Value::scale_from_arrow(*s)?;
                     for i in 0..num_rows {
                         rows[i].push(if a.is_null(i) {
                             TableValue::Null
                         } else {
-                            TableValue::Decimal128(Decimal128Value::new(a.value(i), *s))
+                            TableValue::Decimal128(Decimal128Value::new(a.value(i), scale))
                         });
                     }
                 }

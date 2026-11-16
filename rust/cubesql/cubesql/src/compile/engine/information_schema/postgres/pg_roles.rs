@@ -35,36 +35,36 @@ struct PgCatalogRolesBuilder {
 impl PgCatalogRolesBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            rolname: StringBuilder::new(capacity),
-            rolsuper: BooleanBuilder::new(capacity),
-            rolinherit: BooleanBuilder::new(capacity),
-            rolcreaterole: BooleanBuilder::new(capacity),
-            rolcreatedb: BooleanBuilder::new(capacity),
-            rolcanlogin: BooleanBuilder::new(capacity),
-            rolreplication: BooleanBuilder::new(capacity),
-            rolconnlimit: Int32Builder::new(capacity),
-            rolpassword: StringBuilder::new(capacity),
-            rolvaliduntil: TimestampNanosecondBuilder::new(capacity),
-            rolbypassrls: BooleanBuilder::new(capacity),
-            rolconfig: ListBuilder::new(StringBuilder::new(capacity)),
-            oid: UInt32Builder::new(capacity),
+            rolname: StringBuilder::with_capacity(capacity, capacity),
+            rolsuper: BooleanBuilder::with_capacity(capacity),
+            rolinherit: BooleanBuilder::with_capacity(capacity),
+            rolcreaterole: BooleanBuilder::with_capacity(capacity),
+            rolcreatedb: BooleanBuilder::with_capacity(capacity),
+            rolcanlogin: BooleanBuilder::with_capacity(capacity),
+            rolreplication: BooleanBuilder::with_capacity(capacity),
+            rolconnlimit: Int32Builder::with_capacity(capacity),
+            rolpassword: StringBuilder::with_capacity(capacity, capacity),
+            rolvaliduntil: TimestampNanosecondBuilder::with_capacity(capacity),
+            rolbypassrls: BooleanBuilder::with_capacity(capacity),
+            rolconfig: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            oid: UInt32Builder::with_capacity(capacity),
         }
     }
 
     fn add_role(&mut self, rolname: &str) {
-        self.rolname.append_value(rolname).unwrap();
-        self.rolsuper.append_value(true).unwrap();
-        self.rolinherit.append_value(true).unwrap();
-        self.rolcreaterole.append_value(false).unwrap();
-        self.rolcreatedb.append_value(true).unwrap();
-        self.rolcanlogin.append_value(true).unwrap();
-        self.rolreplication.append_value(false).unwrap();
-        self.rolconnlimit.append_value(-1).unwrap();
-        self.rolpassword.append_value("********").unwrap();
-        self.rolvaliduntil.append_null().unwrap();
-        self.rolbypassrls.append_value(true).unwrap();
-        self.rolconfig.append(false).unwrap();
-        self.oid.append_value(10).unwrap();
+        self.rolname.append_value(rolname);
+        self.rolsuper.append_value(true);
+        self.rolinherit.append_value(true);
+        self.rolcreaterole.append_value(false);
+        self.rolcreatedb.append_value(true);
+        self.rolcanlogin.append_value(true);
+        self.rolreplication.append_value(false);
+        self.rolconnlimit.append_value(-1);
+        self.rolpassword.append_value("********");
+        self.rolvaliduntil.append_null();
+        self.rolbypassrls.append_value(true);
+        self.rolconfig.append(false);
+        self.oid.append_value(10);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -132,7 +132,7 @@ impl TableProvider for PgCatalogRolesProvider {
             Field::new("rolbypassrls", DataType::Boolean, false),
             Field::new(
                 "rolconfig",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new("oid", DataType::UInt32, false),

@@ -498,10 +498,54 @@ export interface SqlResponseStream {
   on(event: 'close' | 'drain', listener: () => void): unknown;
 }
 
-export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: SqlResponseStream, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string, throwContinueWait?: boolean, requestId?: string): Promise<void> => {
+/**
+ * Layout of the `data` chunks of a `/v1/cubesql` response: `default` sends
+ * rows (`[[row0], [row1], ...]`), `columnar` sends one array per schema column
+ * (`[[col0], [col1], ...]`).
+ */
+export type SqlResponseFormat = 'default' | 'columnar';
+
+/**
+ * Type of a SQL API parameter value: an `expr` is SQL, any other type is a literal.
+ */
+export type SqlParamValueType = 'number' | 'string' | 'time' | 'boolean' | 'expr';
+
+/**
+ * Value of a `:name` parameter of a SQL API query, e.g.
+ * `{ name: 'status', value: 'shipped', type: 'string' }`; `null` is SQL `NULL` whatever the type.
+ */
+export interface SqlParam {
+  name: string;
+  value: string | number | boolean | null;
+  type: SqlParamValueType;
+}
+
+export type SqlParams = SqlParam[];
+
+export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: SqlResponseStream, securityContext?: any, cacheMode: CacheMode = 'stale-if-slow', timezone?: string, throwContinueWait?: boolean, requestId?: string, responseFormat?: SqlResponseFormat, params?: SqlParams): Promise<void> => {
   const native = loadNative();
 
-  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone, throwContinueWait, requestId);
+  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null, cacheMode, timezone, throwContinueWait, requestId, responseFormat, params ? JSON.stringify(params) : null);
+};
+
+/** Cube type of a parameter; `unknown` when nothing around it implies a simple one. */
+export type SqlParamType = 'number' | 'string' | 'time' | 'boolean' | 'unknown';
+
+export interface SqlParamDescription {
+  name: string;
+  type: SqlParamType;
+}
+
+export type SqlParamsResponse = { params: SqlParamDescription[] } | { error: string };
+
+/**
+ * The `:name` parameters of a SQL API query in the order they first appear, each with
+ * the type its surroundings expect, or `{ error }` when the query is invalid.
+ */
+export const describeSqlParams = async (instance: SqlInterfaceInstance, sqlQuery: string, securityContext?: unknown): Promise<SqlParamsResponse> => {
+  const native = loadNative();
+
+  return native.describeSqlParams(instance, sqlQuery, securityContext ? JSON.stringify(securityContext) : null);
 };
 
 // TODO parse result from native code
@@ -579,6 +623,7 @@ export type NativeQueryOptions = {
   totalQuery?: boolean;
   cubestoreSupportMultistage?: boolean;
   multiStageLeafMerge?: boolean;
+  multiStageScanSharing?: boolean;
   cubestoreUnionFullKeyAggregate?: boolean;
   unionFullKeyAggregate?: boolean;
   maxMultiStageDepth?: number;

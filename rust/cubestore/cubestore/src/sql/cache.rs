@@ -191,7 +191,7 @@ impl SqlResultCache {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self, context, plan, exec))]
+    #[tracing::instrument(level = "trace", skip_all)]
     pub async fn get<F>(
         self: &Arc<Self>,
         query: &str,
@@ -372,7 +372,7 @@ impl SqlResultCache {
         panic!("Unexpected state: wait receiver expected but cache was empty")
     }
 
-    #[tracing::instrument(level = "trace", skip(self, receiver))]
+    #[tracing::instrument(level = "trace", skip_all)]
     async fn wait_for_queue(
         &self,
         mut receiver: Option<watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>>,

@@ -42,20 +42,20 @@ impl PgCatalogStatsBuilder {
         let capacity = 10;
 
         Self {
-            schemaname: StringBuilder::new(capacity),
-            tablename: StringBuilder::new(capacity),
-            attname: StringBuilder::new(capacity),
-            inherited: BooleanBuilder::new(capacity),
-            null_frac: Float32Builder::new(capacity),
-            avg_width: Int32Builder::new(capacity),
-            n_distinct: Float32Builder::new(capacity),
-            most_common_vals: ListBuilder::new(StringBuilder::new(capacity)),
-            most_common_freqs: ListBuilder::new(Float32Builder::new(capacity)),
-            histogram_bounds: ListBuilder::new(StringBuilder::new(capacity)),
-            correlation: Float32Builder::new(capacity),
-            most_common_elems: ListBuilder::new(StringBuilder::new(capacity)),
-            most_common_elem_freqs: ListBuilder::new(Float32Builder::new(capacity)),
-            elem_count_histogram: ListBuilder::new(Float32Builder::new(capacity)),
+            schemaname: StringBuilder::with_capacity(capacity, capacity),
+            tablename: StringBuilder::with_capacity(capacity, capacity),
+            attname: StringBuilder::with_capacity(capacity, capacity),
+            inherited: BooleanBuilder::with_capacity(capacity),
+            null_frac: Float32Builder::with_capacity(capacity),
+            avg_width: Int32Builder::with_capacity(capacity),
+            n_distinct: Float32Builder::with_capacity(capacity),
+            most_common_vals: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            most_common_freqs: ListBuilder::new(Float32Builder::with_capacity(capacity)),
+            histogram_bounds: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            correlation: Float32Builder::with_capacity(capacity),
+            most_common_elems: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            most_common_elem_freqs: ListBuilder::new(Float32Builder::with_capacity(capacity)),
+            elem_count_histogram: ListBuilder::new(Float32Builder::with_capacity(capacity)),
         }
     }
 
@@ -66,20 +66,20 @@ impl PgCatalogStatsBuilder {
         attname: impl AsRef<str>,
         avg_width: usize,
     ) {
-        self.schemaname.append_value(schemaname).unwrap();
-        self.tablename.append_value(tablename).unwrap();
-        self.attname.append_value(attname).unwrap();
-        self.inherited.append_value(false).unwrap();
-        self.null_frac.append_value(0.0).unwrap();
-        self.avg_width.append_value(avg_width as i32).unwrap();
-        self.n_distinct.append_value(0.0).unwrap();
-        self.most_common_vals.append(false).unwrap();
-        self.most_common_freqs.append(false).unwrap();
-        self.histogram_bounds.append(false).unwrap();
-        self.correlation.append_null().unwrap();
-        self.most_common_elems.append(false).unwrap();
-        self.most_common_elem_freqs.append(false).unwrap();
-        self.elem_count_histogram.append(false).unwrap();
+        self.schemaname.append_value(schemaname);
+        self.tablename.append_value(tablename);
+        self.attname.append_value(attname);
+        self.inherited.append_value(false);
+        self.null_frac.append_value(0.0);
+        self.avg_width.append_value(avg_width as i32);
+        self.n_distinct.append_value(0.0);
+        self.most_common_vals.append(false);
+        self.most_common_freqs.append(false);
+        self.histogram_bounds.append(false);
+        self.correlation.append_null();
+        self.most_common_elems.append(false);
+        self.most_common_elem_freqs.append(false);
+        self.elem_count_histogram.append(false);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -150,33 +150,33 @@ impl TableProvider for PgCatalogStatsProvider {
             Field::new("n_distinct", DataType::Float32, false),
             Field::new(
                 "most_common_vals",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new(
                 "most_common_freqs",
-                DataType::List(Box::new(Field::new("item", DataType::Float32, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Float32, true))),
                 true,
             ),
             Field::new(
                 "histogram_bounds",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new("correlation", DataType::Float32, true),
             Field::new(
                 "most_common_elems",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new(
                 "most_common_elem_freqs",
-                DataType::List(Box::new(Field::new("item", DataType::Float32, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Float32, true))),
                 true,
             ),
             Field::new(
                 "elem_count_histogram",
-                DataType::List(Box::new(Field::new("item", DataType::Float32, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Float32, true))),
                 true,
             ),
         ]))

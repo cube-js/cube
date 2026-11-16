@@ -26,10 +26,10 @@ impl PgCatalogEnumBuilder {
         let capacity = 1;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            enumtypid: UInt32Builder::new(capacity),
-            enumsortorder: Float32Builder::new(capacity),
-            enumlabel: StringBuilder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            enumtypid: UInt32Builder::with_capacity(capacity),
+            enumsortorder: Float32Builder::with_capacity(capacity),
+            enumlabel: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 

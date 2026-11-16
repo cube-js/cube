@@ -1868,7 +1868,7 @@ mod tests {
         get_test_tenant_ctx, rewrite_engine::create_test_postgresql_cube_context, run_async_test,
     };
     use datafusion::{
-        arrow::datatypes::{DataType, Field, Schema},
+        arrow::datatypes::{DataType, Field, IntervalDayTimeType, Schema},
         logical_plan::{col, lit, LogicalPlanBuilder},
     };
 
@@ -2038,7 +2038,9 @@ mod tests {
 
             // 2026-06-01 minus 28 days
             let date = Expr::Literal(ScalarValue::Date32(Some(20605)));
-            let interval = Expr::Literal(ScalarValue::IntervalDayTime(Some(28i64 << 32)));
+            let interval = Expr::Literal(ScalarValue::IntervalDayTime(Some(
+                IntervalDayTimeType::make_value(28, 0),
+            )));
             let plan = LogicalPlanBuilder::from(table_scan)
                 .filter(col("ts").gt_eq(date.clone() - interval.clone()))
                 .expect("Failed to add filter")

@@ -10,6 +10,7 @@
       "CUBEJS_DB_NAME": "FREEPDB1",
       "CUBEJS_DB_USER": "test",
       "CUBEJS_DB_PASS": "test",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "test_preaggs",
       "CUBEJS_PG_SQL_PORT": "5656",
       "CUBEJS_SQL_USER": "admin",
       "CUBEJS_SQL_PASSWORD": "admin_password",
@@ -28,6 +29,9 @@
       "APP_USER": "test",
       "APP_USER_PASSWORD": "test"
     },
+    "volumes": [
+      "../fixtures/oracle-init.sql:/container-entrypoint-initdb.d/oracle-init.sql"
+    ],
     "ports" : ["1521"],
     "healthcheck": {
       "test": ["CMD", "healthcheck.sh"],
@@ -222,7 +226,16 @@
     "---------------------------------------",
     "Multi-stage results combined over dimensions: verified on Trino only so far",
     "---------------------------------------",
-    "querying BigECommerce: multi-stage measures combined over dimensions"
+    "querying BigECommerce: multi-stage measures combined over dimensions",
+    "---------------------------------------",
+    "Number filter casts: only BigQuery casts whole numbers to an integer type",
+    "---------------------------------------",
+    "filtering ECommerce: equals a whole number beyond double precision",
+    "filtering ECommerce: equals several whole numbers beyond double precision",
+    "filtering ECommerce: gt a fractional number on a whole-number column",
+    "filtering ECommerce: lt a whole number beyond INT64",
+    "filtering ECommerce: gte a number in exponent notation",
+    "filtering ECommerce: equals a whole number with leading zeros"
   ],
   "tesseractSkip": [
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -282,6 +295,15 @@
     "---------------------------------------",
     "Multi-stage results combined over dimensions: verified on Trino only so far",
     "---------------------------------------",
-    "querying BigECommerce: multi-stage measures combined over dimensions"
+    "querying BigECommerce: multi-stage measures combined over dimensions",
+    "---------------------------------------",
+    "Number filter casts: only BigQuery casts whole numbers to an integer type",
+    "---------------------------------------",
+    "filtering ECommerce: equals a whole number beyond double precision",
+    "filtering ECommerce: equals several whole numbers beyond double precision",
+    "filtering ECommerce: gt a fractional number on a whole-number column",
+    "filtering ECommerce: lt a whole number beyond INT64",
+    "filtering ECommerce: gte a number in exponent notation",
+    "filtering ECommerce: equals a whole number with leading zeros"
   ]
 }

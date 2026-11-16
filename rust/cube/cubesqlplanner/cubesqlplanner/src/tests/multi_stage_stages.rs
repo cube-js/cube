@@ -122,3 +122,70 @@ fn the_query_carries_the_budget() {
         err
     );
 }
+
+/// A sub-query dimension over a multi-stage measure: the root query plans no stages itself, so a
+/// refusal can only come from the dimension subquery.
+fn sub_query_dimension_schema(levels: usize) -> String {
+    let mut yaml = doubling_schema(levels).replacen(
+        "      dimensions:\n",
+        "      dimensions:\n          - name: customer_id\n            type: number\n            sql: customer_id\n",
+        1,
+    );
+    yaml.push_str(
+        &format!(
+            indoc! {r#"
+            - name: customers
+              sql: "SELECT * FROM ms_customers"
+              joins:
+                  - name: orders
+                    relationship: one_to_many
+                    sql: "{{CUBE}}.id = {{orders.customer_id}}"
+              dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                  - name: orders_level
+                    type: number
+                    sql: "{{orders.level_{}}}"
+                    sub_query: true
+              measures:
+                  - name: count
+                    type: count
+        "#},
+            levels
+        )
+        .lines()
+        .map(|line| format!("    {}\n", line))
+        .collect::<String>(),
+    );
+    yaml
+}
+
+/// The request's budget reaches the multi-stage planning inside a dimension subquery.
+#[test]
+fn a_dimension_subquery_carries_the_budget() {
+    let build = |limit: Option<usize>| {
+        let schema = MockSchema::from_yaml(&sub_query_dimension_schema(3)).unwrap();
+        let mut query = String::from(indoc! {r#"
+            measures:
+              - customers.count
+            dimensions:
+              - customers.orders_level
+        "#});
+        if let Some(limit) = limit {
+            query.push_str(&format!("max_multi_stage_stages: {}\n", limit));
+        }
+        TestContext::new(schema).unwrap().build_sql(&query)
+    };
+    build(None).expect("the sub-query dimension must plan under the default budget");
+    let err = build(Some(2))
+        .map(|_| ())
+        .expect_err("the dimension subquery must be refused under a budget of 2");
+    assert!(
+        err.to_string()
+            .contains("needs more than 2 multi-stage stages"),
+        "message must name the budget the query carried, got: {}",
+        err
+    );
+}

@@ -1228,7 +1228,7 @@ mod tests {
 
     #[test]
     fn test_timestamp_timezones_match_every_unit() {
-        let utc = Some("UTC".to_string());
+        let utc: Option<std::sync::Arc<str>> = Some("UTC".into());
         for (with_tz, without_tz) in [
             (
                 ScalarValue::TimestampNanosecond(Some(0), utc.clone()),

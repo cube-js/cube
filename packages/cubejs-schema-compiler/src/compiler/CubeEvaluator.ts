@@ -13,6 +13,7 @@ import {
   HierarchyDefinition,
   JoinDefinition,
   PreAggregationDefinition,
+  PreAggregationDefinitionOriginalSql,
   PreAggregationDefinitionRollup,
   type SqlDefinition,
   type SqlFn,
@@ -220,7 +221,8 @@ export type PreAggregationDefinitions = Record<string, PreAggregationDefinition>
 
 export type PreAggregationTimeDimensionReference = {
   dimension: string,
-  granularity: string,
+  // An originalSql pre-aggregation has a time dimension for partitioning only
+  granularity?: string,
 };
 
 /// Strings in `dimensions`, `measures` and `timeDimensions[*].dimension` can contain full join path, not just `cube.member`
@@ -1412,15 +1414,26 @@ export class CubeEvaluator extends CubeSymbols {
     return this.evaluateReferences(cube, rollupReferences, { originalSorting: true });
   }
 
-  public evaluatePreAggregationReferences(cube: string, aggregation: PreAggregationDefinitionRollup): PreAggregationReferences {
+  public evaluatePreAggregationReferences(cube: string, aggregation: PreAggregationDefinitionRollup | PreAggregationDefinitionOriginalSql): PreAggregationReferences {
     const timeDimensions: Array<PreAggregationTimeDimensionReference> = [];
 
     if (aggregation.timeDimensionReference) {
       timeDimensions.push({
         dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference, { collectJoinHints: true }),
-        granularity: aggregation.granularity
+        granularity: aggregation.type === 'originalSql' ? undefined : aggregation.granularity
       });
-    } else if (aggregation.timeDimensionReferences) {
+    }
+    if (aggregation.type === 'originalSql') {
+      return {
+        allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
+        dimensions: [],
+        measures: [],
+        timeDimensions,
+        rollups: [],
+        rollupsReferences: [],
+      };
+    }
+    if (!aggregation.timeDimensionReference && aggregation.timeDimensionReferences) {
       // eslint-disable-next-line guard-for-in
       for (const timeDimensionReference of aggregation.timeDimensionReferences) {
         timeDimensions.push({

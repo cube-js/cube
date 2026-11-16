@@ -32,7 +32,7 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
         let context_factory = context.make_sql_nodes_factory()?;
         let from = self
             .builder
-            .process_node(measure_calculation.source().as_ref(), context)?;
+            .process_node(measure_calculation.source(), context)?;
         let references_builder = ReferencesBuilder::new(from.clone());
 
         let mut substitutions = ReferenceSubstitutions::new();

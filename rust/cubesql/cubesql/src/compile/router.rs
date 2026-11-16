@@ -46,6 +46,7 @@ pub struct QueryRouter {
     state: Arc<SessionState>,
     meta: Arc<MetaContext>,
     session_manager: Arc<SessionManager>,
+    describe_only: bool,
 }
 
 impl QueryRouter {
@@ -58,6 +59,15 @@ impl QueryRouter {
             state,
             meta,
             session_manager,
+            describe_only: false,
+        }
+    }
+
+    /// Plans to describe the result only, see [`QueryEngine::plan_with_options`]
+    pub fn describe_only(self) -> Self {
+        Self {
+            describe_only: true,
+            ..self
         }
     }
 
@@ -758,10 +768,10 @@ impl QueryRouter {
             // The width of a character type is not part of the Arrow type, and has to
             // travel with the field for COPY to enforce it
             if let Some(length) = character_length(&column.data_type) {
-                field = field.with_metadata(Some(BTreeMap::from([(
+                field = field.with_metadata(BTreeMap::from([(
                     MAX_LENGTH_METADATA.to_string(),
                     length.to_string(),
-                )])));
+                )]));
             }
 
             fields.push(field);
@@ -970,7 +980,14 @@ impl QueryRouter {
 
         let sql_query_engine = SqlQueryEngine::new(self.session_manager.clone());
         let (plan, _) = sql_query_engine
-            .plan(stmt, qtrace, span_id, self.meta.clone(), self.state.clone())
+            .plan_with_options(
+                stmt,
+                qtrace,
+                span_id,
+                self.meta.clone(),
+                self.state.clone(),
+                self.describe_only,
+            )
             .await?;
 
         Ok(plan)
@@ -1051,9 +1068,9 @@ fn sql_type_to_arrow_type(data_type: &ast::DataType) -> Result<DataType, Compila
             _ => DataType::Float64,
         },
         ast::DataType::Decimal(info) | ast::DataType::Numeric(info) => match info {
-            ast::ExactNumberInfo::None => DataType::Decimal(MAX_DECIMAL_PRECISION, 10),
+            ast::ExactNumberInfo::None => DataType::Decimal128(MAX_DECIMAL_PRECISION as u8, 10),
             ast::ExactNumberInfo::Precision(precision) => {
-                DataType::Decimal(decimal_precision(*precision)?, 0)
+                DataType::Decimal128(decimal_precision(*precision)? as u8, 0)
             }
             ast::ExactNumberInfo::PrecisionAndScale(precision, scale) => {
                 let precision = decimal_precision(*precision)?;
@@ -1066,7 +1083,7 @@ fn sql_type_to_arrow_type(data_type: &ast::DataType) -> Result<DataType, Compila
                     )));
                 }
 
-                DataType::Decimal(precision, scale)
+                DataType::Decimal128(precision as u8, scale as i8)
             }
         },
         ast::DataType::CharVarying(_)
@@ -1123,14 +1140,33 @@ pub async fn convert_statement_to_cube_query(
     qtrace: &mut Option<Qtrace>,
     span_id: Option<Arc<SpanId>>,
 ) -> CompilationResult<QueryPlan> {
+    let stmt = rewrite_planned_statement(stmt, qtrace);
+    let planner = QueryRouter::new(session.state.clone(), meta, session.session_manager.clone());
+    planner.plan(stmt, qtrace, span_id).await
+}
+
+/// Plans a statement to describe its result, e.g. one with placeholders that are not values
+pub async fn describe_statement_to_cube_query(
+    stmt: ast::Statement,
+    meta: Arc<MetaContext>,
+    session: Arc<Session>,
+    qtrace: &mut Option<Qtrace>,
+    span_id: Option<Arc<SpanId>>,
+) -> CompilationResult<QueryPlan> {
+    let stmt = rewrite_planned_statement(stmt, qtrace);
+    let planner = QueryRouter::new(session.state.clone(), meta, session.session_manager.clone())
+        .describe_only();
+    planner.plan(stmt, qtrace, span_id).await
+}
+
+fn rewrite_planned_statement(stmt: ast::Statement, qtrace: &mut Option<Qtrace>) -> ast::Statement {
     let stmt = rewrite_statement(stmt);
 
     if let Some(qtrace) = qtrace {
         qtrace.set_visitor_replaced_statement(&stmt);
     }
 
-    let planner = QueryRouter::new(session.state.clone(), meta, session.session_manager.clone());
-    planner.plan(stmt, qtrace, span_id).await
+    stmt
 }
 
 pub async fn convert_sql_to_cube_query(

@@ -123,7 +123,7 @@ fn assert_served_by(ctx: &TestContext, query: &str, expected_rollup: &str) {
 /// computed in f64 against Postgres' NUMERIC, so the two differ in the last
 /// digit (`2.4285714285714284` vs `...86`); numbers are therefore compared
 /// rounded. Everything else must match cell for cell.
-fn normalize(table: &str) -> String {
+pub(super) fn normalize(table: &str) -> String {
     fn normalize_cell(cell: &str) -> String {
         let cell = cell.trim();
         // Only rewrite cells shaped like CubeStore's `2024-05-01T00:00:00.000Z`,

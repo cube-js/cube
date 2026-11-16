@@ -54,6 +54,8 @@ pub mod util;
 pub use datafusion::cube_ext::spawn;
 pub use datafusion::cube_ext::spawn_blocking;
 
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CubeError {
     pub message: String,

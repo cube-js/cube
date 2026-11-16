@@ -788,6 +788,89 @@ describe('SQLInterface', () => {
     }
   );
 
+  test.each([
+    ['two rows', [['female', 'male'], [4, 6]]],
+    ['no rows', [[], []]],
+  ])('responseFormat columnar sends one array per schema column (%s)', async (_name, columns) => {
+    const instance = await native.registerInterface({
+      ...interfaceMethods(),
+      sqlApiLoad: jest.fn(async () => ({
+        results: [
+          {
+            annotation: {
+              measures: {},
+              dimensions: {},
+              segments: {},
+              timeDimensions: {},
+            },
+            data: {
+              members: [
+                'KibanaSampleDataEcommerce.customer_gender',
+                'KibanaSampleDataEcommerce.count',
+              ],
+              columns,
+            },
+          },
+        ],
+      })),
+      canSwitchUserForSession: (_payload: any) => true,
+      preAggregationMatch: async ({ queries }: any) => ({ matches: queries.map(() => false) }),
+    });
+
+    const run = async (responseFormat?: 'default' | 'columnar') => {
+      let buf = '';
+      const lines: any[] = [];
+      const cubeSqlStream = new Writable({
+        write(chunk, _enc, callback) {
+          const raw = (buf + chunk.toString('utf-8')).split('\n');
+          buf = raw.pop() || '';
+          for (const l of raw) {
+            if (l.trim().length) {
+              lines.push(JSON.parse(l));
+            }
+          }
+          callback();
+        },
+      });
+
+      await native.execSql(
+        instance,
+        'SELECT customer_gender, MEASURE(count) AS cnt FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10;',
+        cubeSqlStream,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        responseFormat,
+      );
+
+      expect(lines.find((o) => o.error)).toBeUndefined();
+      return lines;
+    };
+
+    try {
+      const rowLines = await run();
+      const columnarLines = await run('columnar');
+
+      expect(columnarLines[0]).toEqual(rowLines[0]);
+
+      const rows = rowLines.filter((o) => o.data).flatMap((o) => o.data);
+      const columnarChunks = columnarLines.filter((o) => o.data);
+      for (const chunk of columnarChunks) {
+        expect(chunk.data).toHaveLength(2);
+      }
+
+      const transposed = columnarChunks.flatMap(
+        (chunk) => chunk.data[0].map((_: unknown, i: number) => chunk.data.map((col: unknown[]) => col[i]))
+      );
+      expect(transposed).toEqual(rows);
+      expect(rows).toHaveLength(columns[0].length);
+    } finally {
+      await native.shutdownInterface(instance, 'fast');
+    }
+  });
+
   // Identity of the pre-aggregations behind the result, so a client can join a
   // chart to the build it is watching. Arrow schema metadata is a string map,
   // so the object round-trips through JSON on the way here.
@@ -880,6 +963,67 @@ describe('SQLInterface', () => {
       }
     }
   );
+
+  test('binds :name parameters as SQL expressions and describes their types', async () => {
+    const methods = interfaceMethods();
+    const instance = await native.registerInterface({
+      ...methods,
+      canSwitchUserForSession: (_payload) => true,
+      preAggregationMatch: async ({ queries }) => ({ matches: queries.map(() => false) }),
+    });
+
+    const sql = 'SELECT customer_gender FROM KibanaSampleDataEcommerce WHERE customer_gender = :gender AND taxful_total_price > :price LIMIT :n';
+
+    const lines: any[] = [];
+    const cubeSqlStream = () => new Writable({
+      write: (chunk, _, callback) => {
+        lines.push(...chunk.toString('utf-8').split('\n').filter((l: string) => l.trim()).map((l: string) => JSON.parse(l)));
+        callback();
+      },
+    });
+
+    try {
+      expect(await native.describeSqlParams(instance, sql, { foo: 'bar' })).toEqual({
+        params: [
+          { name: 'gender', type: 'string' },
+          { name: 'price', type: 'number' },
+          { name: 'n', type: 'number' },
+        ],
+      });
+      expect(await native.describeSqlParams(instance, 'SELEC 1', { foo: 'bar' })).toEqual({
+        error: expect.stringMatching(/Unable to parse/),
+      });
+
+      await native.execSql(instance, sql, cubeSqlStream(), { foo: 'bar' }, undefined, undefined, undefined, undefined, undefined, [
+        { name: 'gender', value: "it's female", type: 'string' },
+        { name: 'price', value: '10 * 2', type: 'expr' },
+        { name: 'n', value: 5, type: 'number' },
+      ]);
+      // The mocked load answers with an error; the request it received is what counts
+      expect(methods.sqlApiLoad.mock.calls[0][0].query).toMatchObject({
+        filters: [
+          { member: 'KibanaSampleDataEcommerce.customer_gender', operator: 'equals', values: ["it's female"] },
+          { member: 'KibanaSampleDataEcommerce.taxful_total_price', operator: 'gt', values: ['20'] },
+        ],
+        limit: 5,
+      });
+
+      lines.length = 0;
+      await native.execSql(instance, sql, cubeSqlStream(), { foo: 'bar' }, undefined, undefined, undefined, undefined, undefined, [
+        { name: 'gender', value: 'female', type: 'string' },
+        { name: 'price', value: '(SELECT 1)', type: 'expr' },
+      ]);
+      expect(lines.find((l) => l.error)?.error).toMatch(/Invalid value of parameter :price: a subquery is not allowed/);
+
+      lines.length = 0;
+      await native.execSql(instance, sql, cubeSqlStream(), { foo: 'bar' }, undefined, undefined, undefined, undefined, undefined, [
+        { name: 'gender', value: false, type: 'string' },
+      ]);
+      expect(lines.find((l) => l.error)?.error).toMatch(/Invalid value of parameter :gender: expected a string/);
+    } finally {
+      await native.shutdownInterface(instance, 'fast');
+    }
+  });
 });
 
 describe('security context argument of the native entry points', () => {

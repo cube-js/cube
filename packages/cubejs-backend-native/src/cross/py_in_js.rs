@@ -43,7 +43,7 @@ pub fn cl_repr_py_function_wrapper(mut cx: FunctionContext) -> JsResult<JsPromis
         )?);
     }
 
-    let py_method = Python::with_gil(|py| this.borrow().fun.clone_ref(py));
+    let py_method = Python::attach(|py| this.borrow().fun.clone_ref(py));
     let py_runtime = match py_runtime() {
         Ok(r) => r,
         Err(err) => return cx.throw_error(format!("Unable to init python runtime: {:?}", err)),

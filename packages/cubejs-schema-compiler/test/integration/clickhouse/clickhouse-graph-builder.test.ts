@@ -2,7 +2,7 @@ import { getEnv } from '@cubejs-backend/shared';
 import { UserError } from '../../../src/compiler/UserError';
 import { prepareJsCompiler } from '../../unit/PrepareCompiler';
 import { ClickHouseDbRunner } from './ClickHouseDbRunner';
-import { debugLog, logSqlAndParams } from '../../unit/TestUtil';
+import { debugLog } from '../../unit/TestUtil';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 import type { BaseQueryOptions } from '../../../src/adapter/BaseQuery';
 
@@ -298,7 +298,7 @@ describe('ClickHouse JoinGraph', () => {
         }]
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         expect(res).toEqual(
@@ -344,7 +344,7 @@ describe('ClickHouse JoinGraph', () => {
 
     const query = compilers.createQuery(ClickHouseQuery, q);
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     const result = await dbRunner.testQuery(query.buildSqlAndParams());
 
@@ -524,7 +524,7 @@ describe('ClickHouse JoinGraph', () => {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       expect(query.buildSqlAndParams()[0]).toMatch(/HLL_COUNT\.MERGE/);
       expect(query.buildSqlAndParams()[0]).toMatch(/HLL_COUNT\.INIT/);
@@ -543,7 +543,7 @@ describe('ClickHouse JoinGraph', () => {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         debugLog(JSON.stringify(res));
@@ -566,7 +566,7 @@ describe('ClickHouse JoinGraph', () => {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         debugLog(JSON.stringify(res));
@@ -592,7 +592,7 @@ describe('ClickHouse JoinGraph', () => {
         timezone: 'America/Los_Angeles'
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         debugLog(JSON.stringify(res));
@@ -625,7 +625,7 @@ describe('ClickHouse JoinGraph', () => {
       }]
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));
@@ -659,7 +659,7 @@ describe('ClickHouse JoinGraph', () => {
       }]
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));
@@ -695,7 +695,7 @@ describe('ClickHouse JoinGraph', () => {
       }]
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));
@@ -729,7 +729,7 @@ describe('ClickHouse JoinGraph', () => {
       }]
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));
@@ -762,7 +762,7 @@ describe('ClickHouse JoinGraph', () => {
         }]
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         debugLog(JSON.stringify(res));
@@ -816,7 +816,7 @@ describe('ClickHouse JoinGraph', () => {
         }]
       });
 
-      logSqlAndParams(query);
+      debugLog(...query.buildSqlAndParams());
 
       return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
         debugLog(JSON.stringify(res));
@@ -958,7 +958,7 @@ describe('ClickHouse JoinGraph', () => {
       preAggregationsSchema: ''
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     debugLog(preAggregationsDescription);
@@ -1000,7 +1000,7 @@ describe('ClickHouse JoinGraph', () => {
       preAggregationsSchema: ''
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription()[0];
     debugLog(preAggregationsDescription);
@@ -1035,7 +1035,7 @@ describe('ClickHouse JoinGraph', () => {
       }
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));
@@ -1059,7 +1059,7 @@ describe('ClickHouse JoinGraph', () => {
       }
     });
 
-    logSqlAndParams(query);
+    debugLog(...query.buildSqlAndParams());
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       debugLog(JSON.stringify(res));

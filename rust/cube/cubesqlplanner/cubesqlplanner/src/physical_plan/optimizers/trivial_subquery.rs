@@ -17,7 +17,8 @@
 //! reference.
 
 use super::super::{
-    Cte, From, FromSource, Join, JoinItem, QueryPlan, Select, SingleAliasedSource, SingleSource,
+    Cte, From, FromSource, Join, JoinItem, QueryPlan, Schema, Select, SingleAliasedSource,
+    SingleSource,
 };
 use crate::physical_plan::CalcGroupsJoin;
 use cubenativeutils::CubeError;
@@ -101,13 +102,13 @@ fn optimize_from(from: &Rc<From>) -> Result<Rc<From>, CubeError> {
 
 fn optimize_single_source(source: &SingleAliasedSource) -> Result<SingleAliasedSource, CubeError> {
     match &source.source {
-        SingleSource::Subquery(plan) => {
+        SingleSource::Subquery(plan, schema) => {
             let optimized = optimize_plan(plan)?;
-            if let Some(collapsed) = try_collapse(&optimized, &source.alias) {
+            if let Some(collapsed) = try_collapse(&optimized, schema, &source.alias) {
                 return Ok(collapsed);
             }
             Ok(SingleAliasedSource::new_from_source(
-                SingleSource::Subquery(optimized),
+                SingleSource::Subquery(optimized, schema.clone()),
                 source.alias.clone(),
             ))
         }
@@ -116,8 +117,13 @@ fn optimize_single_source(source: &SingleAliasedSource) -> Result<SingleAliasedS
 }
 
 /// If `plan` is a trivial pass-through select over a single table
-/// reference, return that table reference re-aliased with the outer alias.
-fn try_collapse(plan: &Rc<QueryPlan>, alias: &String) -> Option<SingleAliasedSource> {
+/// reference, return that table reference re-aliased with the outer alias,
+/// keeping the schema the derived table exposed to its readers.
+fn try_collapse(
+    plan: &Rc<QueryPlan>,
+    schema: &Rc<Schema>,
+    alias: &String,
+) -> Option<SingleAliasedSource> {
     let QueryPlan::Select(select) = plan.as_ref() else {
         return None;
     };
@@ -132,7 +138,7 @@ fn try_collapse(plan: &Rc<QueryPlan>, alias: &String) -> Option<SingleAliasedSou
     };
     Some(SingleAliasedSource::new_from_table_reference(
         reference.clone(),
-        select.schema(),
+        schema.clone(),
         Some(alias.clone()),
     ))
 }

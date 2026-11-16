@@ -353,6 +353,10 @@ impl MockSqlTemplatesRender {
             "{{ expr }}".to_string(),
         );
         templates.insert(
+            "expressions/wrap_boolean_dimension".to_string(),
+            "{{ expr }}".to_string(),
+        );
+        templates.insert(
             "expressions/wrap_segment_filter".to_string(),
             "{{ expr }}".to_string(),
         );

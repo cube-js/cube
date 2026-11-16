@@ -386,8 +386,10 @@ export class JoinGraph implements CompilerInterface {
       return null;
     }
 
+    // Each edge is one object per `from-to` pair (see `joinsByPath`), so equal edges are the same
+    // object and deduplicating by reference matches a deep comparison.
     return {
-      joins: R.uniq(R.sortBy(([index]) => index, result.joins).map(([_, join]) => join)),
+      joins: [...new Set(R.sortBy(([index]) => index, result.joins).map(([_, join]) => join))],
       root
     };
   }

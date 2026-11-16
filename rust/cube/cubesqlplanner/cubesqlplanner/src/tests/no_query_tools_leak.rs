@@ -11,6 +11,8 @@
 //! owner is dropped, a still-upgradable `Weak` means a cycle kept the value
 //! alive. `assert_released` encodes that check and is reusable for any `Rc<T>`.
 
+use crate::planner::top_level_planner::TopLevelPlanner;
+use crate::planner::QueryPropertiesCompiler;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
@@ -51,8 +53,13 @@ fn query_tools_released_after_join_query() {
           - customers.name
     "};
     let options = ctx.create_query_options_from_yaml(query_yaml);
-    let _sql = ctx
-        .build_sql_from_options(options)
+    // Planned on the probed context's own `State`: the shared SQL helpers may
+    // plan on a fresh one.
+    let request = QueryPropertiesCompiler::new(ctx.query_tools().clone())
+        .build(options)
+        .expect("query should compile");
+    TopLevelPlanner::new(request, ctx.query_tools().clone())
+        .plan()
         .expect("planning should succeed");
 
     drop(ctx);

@@ -64,12 +64,12 @@ enum RowGrain {
 }
 
 // Outcome of one matching pass over a single set of candidate pre-aggregations.
-enum MultiStageMatch {
+enum SubqueryMatch {
     Matched(Rc<RootQuery>),
-    // A stage matched no candidate, so no subset of the candidates covers it
+    // A subquery matched no candidate, so no subset of the candidates covers it
     // either.
-    UnmatchedStage,
-    // Every stage matched, but the matches span both external types, so no one
+    UnmatchedSubquery,
+    // Every subquery matched, but the matches span both external types, so no one
     // query can read them all.
     ExternalTypesSplit,
 }
@@ -143,8 +143,8 @@ impl PreAggregationOptimizer {
             )));
         }
 
-        if self.allow_multi_stage && !root.subqueries().is_empty() {
-            return self.try_rewrite_root_with_multistages(root, compiled_pre_aggregations);
+        if self.allow_multi_stage && root.subqueries().iter().any(|s| !s.inline) {
+            return self.try_rewrite_root_with_subqueries(root, compiled_pre_aggregations);
         }
 
         Ok(None)
@@ -219,13 +219,10 @@ impl PreAggregationOptimizer {
         time_shifts: &TimeShiftState,
     ) -> Result<Option<Rc<Query>>, CubeError> {
         // Row identity for an ungrouped read is judged against the join this
-        // very node will render, taken from the node itself rather than
-        // re-resolved, so the two can never disagree.
+        // node means, taken from the node itself rather than re-resolved, so
+        // the two can never disagree.
         let row_grain = if is_user_query && query.modifers().ungrouped {
-            RowGrain::RawRows(match query.source().base() {
-                InputBase::QueryInputs(inputs) => inputs.join().clone(),
-                _ => None,
-            })
+            RowGrain::RawRows(query.join().clone())
         } else {
             RowGrain::Aggregated
         };
@@ -245,7 +242,9 @@ impl PreAggregationOptimizer {
             }
             let source =
                 self.make_pre_aggregation_source(pre_aggregation, &matched_measures, scan_range)?;
-            Ok(Some(query.with_source(QuerySource::new(source))))
+            Ok(Some(
+                query.reading_rows_of(LogicalFrom::pre_aggregation(source)?)?,
+            ))
         } else {
             Ok(None)
         }
@@ -298,27 +297,27 @@ impl PreAggregationOptimizer {
                         distinct: false,
                         order_by: vec![],
                     }))
-                    .source(QuerySource::new(source))
-                    .build();
-                return Ok(Some(Rc::new(new_query)));
+                    .from(LogicalFrom::pre_aggregation(source)?)
+                    .build()?;
+                return Ok(Some(new_query));
             }
             refused_branches.extend(Self::lambda_branches(pre_aggregation));
         }
         Ok(None)
     }
 
-    fn try_rewrite_root_with_multistages(
+    fn try_rewrite_root_with_subqueries(
         &mut self,
         root: &Rc<RootQuery>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
     ) -> Result<Option<Rc<RootQuery>>, CubeError> {
-        match self.match_multistages(root, compiled_pre_aggregations)? {
-            MultiStageMatch::Matched(rewritten) => return Ok(Some(rewritten)),
-            MultiStageMatch::UnmatchedStage => return Ok(None),
-            MultiStageMatch::ExternalTypesSplit => {}
+        match self.match_subqueries(root, compiled_pre_aggregations)? {
+            SubqueryMatch::Matched(rewritten) => return Ok(Some(rewritten)),
+            SubqueryMatch::UnmatchedSubquery => return Ok(None),
+            SubqueryMatch::ExternalTypesSplit => {}
         }
 
-        // Retrying within a single external type trades per-stage precision for
+        // Retrying within a single external type trades per-subquery precision for
         // a set one query can read, against an alternative of reading the fact
         // table. CubeStore goes first as the default and faster store.
         for external in [true, false] {
@@ -335,14 +334,14 @@ impl PreAggregationOptimizer {
                 })
                 .cloned()
                 .collect();
-            let outcome = self.match_multistages(root, &candidates)?;
+            let outcome = self.match_subqueries(root, &candidates)?;
             // These candidates share one external type, and that is the same
             // value a usage built from them reports, so the pass cannot split.
             debug_assert!(
-                !matches!(outcome, MultiStageMatch::ExternalTypesSplit),
+                !matches!(outcome, SubqueryMatch::ExternalTypesSplit),
                 "a pass over one external type reported a split"
             );
-            if let MultiStageMatch::Matched(rewritten) = outcome {
+            if let SubqueryMatch::Matched(rewritten) = outcome {
                 return Ok(Some(rewritten));
             }
         }
@@ -350,11 +349,11 @@ impl PreAggregationOptimizer {
         Ok(None)
     }
 
-    fn match_multistages(
+    fn match_subqueries(
         &mut self,
         root: &Rc<RootQuery>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
-    ) -> Result<MultiStageMatch, CubeError> {
+    ) -> Result<SubqueryMatch, CubeError> {
         let query = root.query();
         let rewriter = LogicalPlanRewriter::new();
         let mut has_unrewritten_leaf = false;
@@ -377,58 +376,63 @@ impl PreAggregationOptimizer {
         let mut needed: HashSet<InputId> = HashSet::new();
         collect_subquery_refs(&query.as_plan_node(), &mut needed);
 
-        let mut rewritten_multistages_rev = Vec::new();
-        for multi_stage in root.subqueries().iter().rev() {
-            let is_dimension_calc =
-                matches!(multi_stage.body, SubqueryBody::DimensionCalculation(_));
-            if !is_dimension_calc && !needed.contains(&multi_stage.id) {
+        let mut kept_subqueries_rev = Vec::new();
+        for subquery in root.subqueries().iter().rev() {
+            let is_dimension_calc = matches!(
+                subquery.body,
+                SubqueryBody::MultiStageDimensionCalculation(_)
+            );
+            if !is_dimension_calc && !needed.contains(&subquery.id) {
                 continue;
             }
-            let rewritten = rewriter.rewrite_top_down_with(multi_stage.clone(), |plan_node| {
+            // Rendered by its reader, so it is served along with that reader.
+            if subquery.inline {
+                collect_subquery_refs(&subquery.as_plan_node(), &mut needed);
+                kept_subqueries_rev.push(subquery.clone());
+                continue;
+            }
+            let rewritten = rewriter.rewrite_top_down_with(subquery.clone(), |plan_node| {
                 let res = match plan_node {
-                    PlanNode::Subquery(member) => {
-                        let SubqueryBody::LeafMeasure(leaf) = &member.body else {
-                            return Ok(NodeRewriteResult::pass());
-                        };
-                        let time_shifts = leaf
-                            .evaluation_context()
-                            .as_ref()
-                            .map(|context| context.time_shifts.clone())
-                            .unwrap_or_default();
-                        if let Some(rewritten) = self.try_rewrite_query(
-                            &leaf,
-                            compiled_pre_aggregations,
-                            &time_shifts,
-                            false,
-                        )? {
-                            let new_member = member.with_body(SubqueryBody::LeafMeasure(rewritten));
-                            NodeRewriteResult::rewritten(new_member.as_plan_node())
-                        } else {
-                            has_unrewritten_leaf = true;
-                            NodeRewriteResult::stop()
+                    PlanNode::Subquery(member) => match &member.body {
+                        SubqueryBody::Query(leaf) => {
+                            let time_shifts = leaf
+                                .evaluation_context()
+                                .as_ref()
+                                .map(|context| context.time_shifts.clone())
+                                .unwrap_or_default();
+                            if let Some(rewritten) = self.try_rewrite_query(
+                                &leaf,
+                                compiled_pre_aggregations,
+                                &time_shifts,
+                                false,
+                            )? {
+                                let new_member = member.with_body(SubqueryBody::Query(rewritten));
+                                NodeRewriteResult::rewritten(new_member.as_plan_node())
+                            } else {
+                                has_unrewritten_leaf = true;
+                                NodeRewriteResult::stop()
+                            }
                         }
-                    }
-                    PlanNode::AggregateMultipliedSubquery(agg) => {
-                        // A multiplied subquery hoisted out of a multi-stage
-                        // leaf carries that leaf's evaluation context (time
-                        // shifts, mutated filter state) — matching it against
-                        // the root filter would be wrong. Such subqueries are
-                        // covered by rewriting their leaf wrapper instead.
-                        if agg.evaluation_context.is_some() {
-                            has_unrewritten_leaf = true;
-                            NodeRewriteResult::stop()
-                        } else if let Some(rewritten) = self.try_rewrite_schema_and_filter(
-                            &agg.schema,
-                            &root_filter,
-                            compiled_pre_aggregations,
-                        )? {
-                            let new_agg = agg.with_pre_aggregation_override(rewritten);
-                            NodeRewriteResult::rewritten(new_agg.as_plan_node())
-                        } else {
-                            has_unrewritten_leaf = true;
-                            NodeRewriteResult::stop()
+                        SubqueryBody::AggregateMultipliedSubquery(agg) => {
+                            // Hoisted out of a multi-stage leaf, it renders under that
+                            // leaf's evaluation, so the root filter does not describe it.
+                            if agg.evaluation_context.is_some() {
+                                has_unrewritten_leaf = true;
+                                NodeRewriteResult::stop()
+                            } else if let Some(rewritten) = self.try_rewrite_schema_and_filter(
+                                &agg.schema,
+                                &root_filter,
+                                compiled_pre_aggregations,
+                            )? {
+                                let new_member = member.with_body(SubqueryBody::Query(rewritten));
+                                NodeRewriteResult::rewritten(new_member.as_plan_node())
+                            } else {
+                                has_unrewritten_leaf = true;
+                                NodeRewriteResult::stop()
+                            }
                         }
-                    }
+                        _ => NodeRewriteResult::pass(),
+                    },
                     _ => NodeRewriteResult::stop(),
                 };
                 Ok(res)
@@ -439,15 +443,15 @@ impl PreAggregationOptimizer {
                 break;
             }
             collect_subquery_refs(&rewritten.as_plan_node(), &mut needed);
-            rewritten_multistages_rev.push(rewritten);
+            kept_subqueries_rev.push(rewritten);
         }
-        let rewritten_multistages = rewritten_multistages_rev.into_iter().rev().collect();
+        let kept_subqueries = kept_subqueries_rev.into_iter().rev().collect();
 
         if has_unrewritten_leaf {
             // Rollback usages added during failed attempt
             self.usages.truncate(saved_usages_len);
             self.usage_counter = saved_counter;
-            return Ok(MultiStageMatch::UnmatchedStage);
+            return Ok(SubqueryMatch::UnmatchedSubquery);
         }
 
         // One query cannot read both external types, so a set that spans
@@ -458,13 +462,13 @@ impl PreAggregationOptimizer {
             if new_usages.iter().any(|u| u.external() != first_external) {
                 self.usages.truncate(saved_usages_len);
                 self.usage_counter = saved_counter;
-                return Ok(MultiStageMatch::ExternalTypesSplit);
+                return Ok(SubqueryMatch::ExternalTypesSplit);
             }
         }
 
-        Ok(MultiStageMatch::Matched(Rc::new(
+        Ok(SubqueryMatch::Matched(Rc::new(
             RootQuery::builder()
-                .subqueries(rewritten_multistages)
+                .subqueries(kept_subqueries)
                 .query(query.clone())
                 .build(),
         )))
@@ -561,9 +565,20 @@ impl PreAggregationOptimizer {
                     .collect();
                 Rc::new(PreAggregationSource::Union(PreAggregationUnion { items }))
             }
-            PreAggregationSource::Join(_) => {
-                // Join pre-aggregations: usage_index is set on the PreAggregation node itself
-                source.clone()
+            PreAggregationSource::Join(join) => {
+                let items = join
+                    .items
+                    .iter()
+                    .map(|item| PreAggregationJoinItem {
+                        from: Self::source_with_usage_index(&item.from, usage_index),
+                        to: Self::source_with_usage_index(&item.to, usage_index),
+                        ..item.clone()
+                    })
+                    .collect();
+                Rc::new(PreAggregationSource::Join(PreAggregationJoin {
+                    root: Self::source_with_usage_index(&join.root, usage_index),
+                    items,
+                }))
             }
         }
     }
@@ -919,26 +934,18 @@ impl PreAggregationOptimizer {
                     .try_fold(false, |acc, m| -> Result<bool, CubeError> {
                         Ok(acc || has_multi_stage_members(m, false)?)
                     })?;
-            if !query_has_multi_stage {
-                let has_filters = !filters.dimensions_filters.is_empty()
-                    || !filters.time_dimensions_filters.is_empty()
-                    || !filters.segments.is_empty();
-                let query_has_multiplied = if has_filters {
-                    MultiFactJoinGroups::try_new(
-                        self.query_tools.clone(),
-                        self.filtered_join_hints(schema, filters, &all_measures)?,
-                    )?
-                    .has_multiplied_measures()?
-                } else {
-                    query_groups.has_multiplied_measures()?
-                };
-                if !query_has_multiplied {
-                    return Ok(None);
-                }
+            if !query_has_multi_stage && !query_groups.has_multiplied_measures()? {
+                return Ok(None);
             }
         }
 
-        if !self.are_join_paths_matching(schema, &all_measures, &query_groups, pre_aggregation)? {
+        if !self.are_join_paths_matching(
+            schema,
+            filters,
+            &all_measures,
+            &query_groups,
+            pre_aggregation,
+        )? {
             return Ok(None);
         }
 
@@ -1153,51 +1160,45 @@ impl PreAggregationOptimizer {
         filters: &Rc<LogicalFilter>,
         measures: &[Rc<MemberSymbol>],
     ) -> Result<MultiFactJoinGroups, CubeError> {
+        // The query is planned with its filters: their members' join hints pick
+        // the path to a cube, can multiply measures, or be the only link between cubes.
         let hints = MeasuresJoinHints::builder(&self.query_join_hints)
-            .add_dimensions(&schema.dimensions)
-            .add_dimensions(&schema.time_dimensions)
-            .build(measures)?;
-        if let Ok(groups) =
-            MultiFactJoinGroups::try_new_if_joinable(self.query_tools.clone(), hints)?
-        {
-            return Ok(groups);
-        }
-        // A filtered member can be the only link between the cubes the query
-        // selects from, and the query itself is planned with its filters.
-        MultiFactJoinGroups::try_new(
-            self.query_tools.clone(),
-            self.filtered_join_hints(schema, filters, measures)?,
-        )
-    }
-
-    fn filtered_join_hints(
-        &self,
-        schema: &Rc<LogicalSchema>,
-        filters: &Rc<LogicalFilter>,
-        measures: &[Rc<MemberSymbol>],
-    ) -> Result<MeasuresJoinHints, CubeError> {
-        MeasuresJoinHints::builder(&self.query_join_hints)
             .add_dimensions(&schema.dimensions)
             .add_dimensions(&schema.time_dimensions)
             .add_filters(&filters.dimensions_filters)
             .add_filters(&filters.time_dimensions_filters)
             .add_filters(&filters.segments)
-            .build(measures)
+            .build(measures)?;
+        MultiFactJoinGroups::try_new(self.query_tools.clone(), hints)
     }
 
     fn are_join_paths_matching(
         &self,
         schema: &Rc<LogicalSchema>,
+        filters: &Rc<LogicalFilter>,
         measures: &[Rc<MemberSymbol>],
         query_groups: &MultiFactJoinGroups,
         pre_aggregation: &CompiledPreAggregation,
     ) -> Result<bool, CubeError> {
         let pre_aggr_groups = &pre_aggregation.multi_fact_join_groups;
 
+        // A filter member stored over another path than the query's is another
+        // column under the same name.
+        let filter_members: Vec<_> = [
+            &filters.dimensions_filters,
+            &filters.time_dimensions_filters,
+            &filters.segments,
+        ]
+        .into_iter()
+        .flatten()
+        .flat_map(|item| item.all_member_evaluators())
+        .collect();
+
         for dim in schema
             .dimensions
             .iter()
             .chain(schema.time_dimensions.iter())
+            .chain(filter_members.iter())
         {
             let query_path = query_groups.resolve_join_path_for_dimension(dim);
             let pre_aggr_path = pre_aggr_groups.resolve_join_path_for_dimension(dim);

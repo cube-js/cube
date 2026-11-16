@@ -23,18 +23,18 @@ struct RedshiftStvSlicesBuilder {
 impl RedshiftStvSlicesBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            node: Int32Builder::new(capacity),
-            slice: Int32Builder::new(capacity),
-            localslice: Int32Builder::new(capacity),
-            r#type: StringBuilder::new(capacity),
+            node: Int32Builder::with_capacity(capacity),
+            slice: Int32Builder::with_capacity(capacity),
+            localslice: Int32Builder::with_capacity(capacity),
+            r#type: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
     fn add_table(&mut self, node: i32, slice: i32, localslice: i32, r#type: impl AsRef<str>) {
-        self.node.append_value(node).unwrap();
-        self.slice.append_value(slice).unwrap();
-        self.localslice.append_value(localslice).unwrap();
-        self.r#type.append_value(r#type).unwrap();
+        self.node.append_value(node);
+        self.slice.append_value(slice);
+        self.localslice.append_value(localslice);
+        self.r#type.append_value(r#type);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

@@ -1,97 +1,97 @@
-<p align="center"><a href="https://cube.dev"><img src="https://i.imgur.com/zYHXm4o.png" alt="Cube" width="300px"></a></p>
+<p align="center"><a href="https://cube.dev"><img src="https://raw.githubusercontent.com/cube-js/cube/master/.github/assets/cube-core-logo.png" alt="Cube Core — Open-Source Semantic Layer" width="300px"></a></p>
 
 [Website](https://cube.dev) • [Docs](https://docs.cube.dev) •
-[Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [Twitter](https://twitter.com/the_cube_dev)
+[Blog](https://cube.dev/blog) • [Slack](https://slack.cube.dev) • [X](https://twitter.com/the_cube_dev)
 
 # Supported tags and respective `Dockerfile` links
 
-Debian based: `<version>`, `latest`, `dev`
+- `<version>` (`v<major>.<minor>.<patch>`, `v<major>.<minor>`, `v<major>`), `latest` —
+  [`latest.Dockerfile`][link-dockerfile-latest]
+- `<version>-jdk`, `jdk` — with a JDK for JDBC-based
+  drivers, [`latest-debian-jdk.Dockerfile`][link-dockerfile-jdk]
+- `dev` — built from the `master` branch, not for production use
+
+[link-dockerfile-latest]: https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/latest.Dockerfile
+[link-dockerfile-jdk]: https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/latest-debian-jdk.Dockerfile
 
 # Quick reference
 
-Where to get help? Check out our [Slack][link-slack], [Stack
-Overflow][link-stack-overflow] or [GitHub Discussions][link-github-discussions]
-pages.
+Where to get help? Check out our [Slack][link-slack] or [Stack
+Overflow][link-stack-overflow].
 
-[link-slack]: https://slack.cube.dev/
-[link-stack-overflow]: https://stackoverflow.com/search?q=cube.js
-[link-github-discussions]: https://github.com/cube-js/cube.js/discussions
+Found an issue? File it on our [GitHub Issues][link-github-issues] page.
 
-Found an issue? File it on our GitHub Issues page.
-
-Supported architectures: `amd64`
+Supported architectures: `amd64`, `arm64`
 
 Need the documentation? Check out the [Cube documentation
-website][link-cubejs-docs].
+website][link-cube-docs].
 
-[link-cubejs-docs]: https://docs.cube.dev
+[link-slack]: https://slack.cube.dev/
+[link-stack-overflow]: https://stackoverflow.com/questions/tagged/cube.js
+[link-github-issues]: https://github.com/cube-js/cube/issues
+[link-cube-docs]: https://docs.cube.dev
 
-# What is Cube?
+# What is Cube Core?
 
-Cube is an open-source analytical API platform. It is primarily used to build
-internal business intelligence tools or add customer-facing analytics to
-existing applications.
+Cube Core is the open-source semantic layer. Define metrics, dimensions, joins,
+and access rules once in code, then expose them through SQL, REST, and GraphQL
+APIs to anything downstream — BI tools, custom applications, or AI agents.
 
-Cube was designed to work with Serverless Query Engines like AWS Athena and
-Google BigQuery. Multi-stage querying approach makes it suitable for handling
-trillions of data points. Most modern RDBMS work with Cube as well and can be
-tuned for adequate performance.
-
-Unlike others, it is not a monolith application, but a set of modules, which
-does one thing well. Cube provides modules to run transformations and
-modeling in data warehouse, querying and caching, managing API gateway and
-building UI on top of that.
+Cube Core works with all SQL data sources, including cloud data warehouses like
+Snowflake, Databricks, and BigQuery; query engines like Presto and Amazon
+Athena; and application databases like Postgres. It has a built-in relational
+caching engine, Cube Store, to provide sub-second latency and high concurrency
+for API requests.
 
 # How to use this image
 
-## Start a Cube instance
+The image expects your data model and configuration in `/cube/conf`. Mount your
+project folder there.
+
+## Start Cube in development mode
 
 ```bash
-docker pull cubejs/cube:latest
-docker run -d -p 3000:3000 -p 4000:4000 \
-  -e CUBEJS_DB_HOST=postgres://hostname \
-  -e CUBEJS_DB_NAME=<DB_NAME> \
-  -e CUBEJS_DB_USER=<USER> \
-  -e CUBEJS_DB_PASS=<PASS> \
-  -e CUBEJS_DB_TYPE=<DB_TYPE> \
-  -e CUBEJS_API_SECRET=<API_SECRET> \
-  -v $(pwd):/cube/conf \
+docker run -p 4000:4000 -p 15432:15432 \
+  -v ${PWD}:/cube/conf \
+  -e CUBEJS_DEV_MODE=true \
   cubejs/cube:latest
 ```
 
-The Cube Developer Playground will be available at `http://localhost:4000`.
-For more information about supported environment variables, please consult the
-documentation for [Environment Variables][link-cubejs-env-vars].
+Then open `http://localhost:4000` to continue setup in Playground. The SQL API
+is available on port `15432`.
 
-[link-cubejs-env-vars]: https://docs.cube.dev/reference/configuration/environment-variables
+> **Development mode is an authentication bypass.** Never expose it to the
+> internet or use it in production. See
+> [`CUBEJS_DEV_MODE`][link-cube-dev-mode] for details.
 
-### Using Docker Compose
+## Start Cube in production mode
 
-```yaml
-version: '2.2'
-
-services:
-  cube:
-    image: cubejs/cube:latest
-    depends_on:
-      - redis
-    links:
-      - redis
-    ports:
-      # It's better to use random port binding for 4000/3000 ports
-      # without it you will not able to start multiple projects inside docker
-      - 4000:4000  # Cube API and Developer Playground
-      - 3000:3000  # Dashboard app, if created
-    env_file: .env
-    volumes:
-      # If you are going to use own dependencies, for example axios/vault or anything else for getting configuration
-      - .:/cube/conf
-
-  redis:
-    image: redis:6
-    restart: always
+```bash
+docker run -d -p 4000:4000 -p 15432:15432 \
+  -v ${PWD}:/cube/conf \
+  -e CUBEJS_DB_TYPE=<DB_TYPE> \
+  -e CUBEJS_DB_HOST=<HOST> \
+  -e CUBEJS_DB_NAME=<DB_NAME> \
+  -e CUBEJS_DB_USER=<USER> \
+  -e CUBEJS_DB_PASS=<PASS> \
+  -e CUBEJS_API_SECRET=<API_SECRET> \
+  -e CUBEJS_PG_SQL_PORT=15432 \
+  -e CUBEJS_SQL_USER=<SQL_USER> \
+  -e CUBEJS_SQL_PASSWORD=<SQL_PASSWORD> \
+  cubejs/cube:<version>
 ```
 
-### License
+Pin a specific version tag instead of `latest` in production. For all supported
+options, see [Environment Variables][link-cube-env-vars].
 
-Cube Docker is [Apache 2.0 licensed](./LICENSE).
+A production deployment also needs a refresh worker and a Cube Store cluster
+for pre-aggregations. See [Deployment][link-cube-deployment] for a complete
+Docker Compose example.
+
+[link-cube-dev-mode]: https://docs.cube.dev/reference/configuration/environment-variables#cubejs_dev_mode
+[link-cube-env-vars]: https://docs.cube.dev/reference/configuration/environment-variables
+[link-cube-deployment]: https://docs.cube.dev/cube-core/deployment
+
+# License
+
+Cube is [Apache 2.0 licensed](https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/LICENSE).

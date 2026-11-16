@@ -136,6 +136,8 @@ async fn init_cubestore() -> CubeStoreInstance {
         )
         .env("CUBESTORE_DATA_DIR", &data_dir)
         .env("CUBESTORE_SELECT_WORKERS", "0")
+        // Pre-aggregation fixtures are loaded via `LOCATION '/tmp/...csv'`.
+        .env("CUBESTORE_LOCATION_ALLOW_LOCAL_FS", "true")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()

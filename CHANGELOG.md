@@ -3,6 +3,158 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
+
+### Bug Fixes
+
+- **cubestore:** Push LIMIT to workers for queries without ORDER BY and GROUP BY ([#12778](https://github.com/cube-js/cube/issues/12778)) ([8f63d9d](https://github.com/cube-js/cube/commit/8f63d9d6f2168ed84afae0e5149dc9bd3aa4c694))
+- **tesseract:** Match filter members' join paths against pre-aggregations ([#12803](https://github.com/cube-js/cube/issues/12803)) ([d334efa](https://github.com/cube-js/cube/commit/d334efa01bddacf3b7b9383781bf1f3092236d02))
+
+## [1.8.25](https://github.com/cube-js/cube/compare/v1.8.24...v1.8.25) (2026-11-14)
+
+### Performance Improvements
+
+- **tesseract:** Share scans and fuse calculations across multi-stage measures ([#12783](https://github.com/cube-js/cube/issues/12783)) ([8f7aa59](https://github.com/cube-js/cube/commit/8f7aa59b07f29ba2c154239fab12021440d80d6d))
+
+## [1.8.24](https://github.com/cube-js/cube/compare/v1.8.23...v1.8.24) (2026-11-14)
+
+### Performance Improvements
+
+- **server-core:** Run context functions at most once per request ([#12788](https://github.com/cube-js/cube/issues/12788)) ([8f44deb](https://github.com/cube-js/cube/commit/8f44debbde849fee4673d71ccf33815350e89386))
+
+## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
+
+### Bug Fixes
+
+- **api-gateway:** Allow only one WS authorization at a time per connection ([#12748](https://github.com/cube-js/cube/issues/12748)) ([220a1b5](https://github.com/cube-js/cube/commit/220a1b52a7ab3112711f2e8beea8483294dba3e5))
+- **cubesql:** Don't push LIMIT 0 into ungrouped CubeScan of all members ([#12717](https://github.com/cube-js/cube/issues/12717)) ([893d5c5](https://github.com/cube-js/cube/commit/893d5c510550ae830be19b78b23c283c8e4819bc))
+- **cubesql:** Fix COUNT over NULL and reject aggregate FILTER ([#12724](https://github.com/cube-js/cube/issues/12724)) ([935e9b0](https://github.com/cube-js/cube/commit/935e9b01d187edb5dfc81523ab5f9642fac9231d))
+- **cubesql:** Fix duplicate field error for repeated operands with ORDER BY ([#12716](https://github.com/cube-js/cube/issues/12716)) ([7143039](https://github.com/cube-js/cube/commit/71430397544c8278e596fffbed9a11c2781db3d2))
+- **cubesql:** Hide other users' query text in pg_stat_activity ([#12720](https://github.com/cube-js/cube/issues/12720)) ([904eeda](https://github.com/cube-js/cube/commit/904eeda0908475a22ba69f91f33d22f521806291))
+- **cubesql:** Load order-only members of ordered CubeScans ([#12611](https://github.com/cube-js/cube/issues/12611)) ([eb065c6](https://github.com/cube-js/cube/commit/eb065c6cc4c4b5e2e6d70cca5ce7f81d93dab7db))
+- **cubesql:** Reject malformed Bind parameters instead of panicking ([#12770](https://github.com/cube-js/cube/issues/12770)) ([28483c9](https://github.com/cube-js/cube/commit/28483c928e321b3cc9d96dd01079af1ecd84388e))
+- **cubestore:** Disable local filesystem imports by default ([#12779](https://github.com/cube-js/cube/issues/12779)) ([bcbe7fd](https://github.com/cube-js/cube/commit/bcbe7fd7f5c7d204a928fdf589a93c2eb0df7c72))
+- **cubestore:** Keep a queued query a client still waits for from being orphaned ([#12761](https://github.com/cube-js/cube/issues/12761)) ([1b0e81f](https://github.com/cube-js/cube/commit/1b0e81ffd9f13fa72ebcf39766b7c1da82d057ce)), closes [cube-js/cube#12755](https://github.com/cube-js/cube/issues/12755)
+- **cubestore:** Reject path traversal in temp uploads and remote fs paths ([#12773](https://github.com/cube-js/cube/issues/12773)) ([5c18c87](https://github.com/cube-js/cube/commit/5c18c8761a22b68f5d3e45cc2cea685257243738))
+- **snowflake-driver:** Hide connection details on connection error ([#12774](https://github.com/cube-js/cube/issues/12774)) ([faa4348](https://github.com/cube-js/cube/commit/faa4348b03bd92e73610bbd59fe0ed60548ed0f8))
+
+### Features
+
+- **cubesql:** Push down APPROX_DISTINCT aggregate ([#12713](https://github.com/cube-js/cube/issues/12713)) ([edb6b66](https://github.com/cube-js/cube/commit/edb6b66ae26c6d1bfb137fd7bf806caf99343f3a))
+- **cubesql:** Support :name parameters in /v1/cubesql ([#12612](https://github.com/cube-js/cube/issues/12612)) ([6ee7550](https://github.com/cube-js/cube/commit/6ee75508b4fd0bc5333b10290b8c541a217332fc))
+- **docker:** Security upgrade Node.js from 24.22.1 to 24.22.3 ([#12745](https://github.com/cube-js/cube/issues/12745)) ([8b2fc0a](https://github.com/cube-js/cube/commit/8b2fc0a81baa0db9da76517a1e4e5a89a841c138))
+- **model-schema:** Ship types for the manifest the package returns ([#12751](https://github.com/cube-js/cube/issues/12751)) ([2cf5ed9](https://github.com/cube-js/cube/commit/2cf5ed927914c768814e45a944773872b781981c))
+- Replace sqlstring with shared SQL formatter ([#12742](https://github.com/cube-js/cube/issues/12742)) ([28ef461](https://github.com/cube-js/cube/commit/28ef46136051a5d92c1a456a738f148ea0bedfbf))
+
+### Performance Improvements
+
+- **cubesql:** Cut memory use of SQL API query planning ([#12719](https://github.com/cube-js/cube/issues/12719)) ([9ea33c3](https://github.com/cube-js/cube/commit/9ea33c35641b2c9a6c25328526cbdc64f570fb07))
+
+## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
+
+### Bug Fixes
+
+- **api-gateway:** Improve WS message validation ([#12712](https://github.com/cube-js/cube/issues/12712)) ([e167248](https://github.com/cube-js/cube/commit/e167248f24e7837b6b417345300fb0a3c7b8d506))
+- **backend-shared:** Harden SQL parameter interpolation ([#11576](https://github.com/cube-js/cube/issues/11576)) ([cf12bc6](https://github.com/cube-js/cube/commit/cf12bc6ec51e83db8f6c08a88a4a8473ab8d291f))
+- **clickhouse-driver:** Kill cancelled queries and drop half-built tables ([#12337](https://github.com/cube-js/cube/issues/12337)) ([63d5d26](https://github.com/cube-js/cube/commit/63d5d2672c2b75a3c72305f12b68b1f413787a37))
+- **cubesql:** Describe parameterized statements without asking Cube at Parse ([#12668](https://github.com/cube-js/cube/issues/12668)) ([56723bc](https://github.com/cube-js/cube/commit/56723bcee9a8e1c5bbe9be0d11bc8b2774c75dcf)), closes [#12459](https://github.com/cube-js/cube/issues/12459)
+- **cubesql:** Raise default CUBESQL_REWRITE_MAX_NODES to 100000 ([#12669](https://github.com/cube-js/cube/issues/12669)) ([8e945ab](https://github.com/cube-js/cube/commit/8e945ab92bfa73c4f0aa0489e6c73585075136e5))
+- **cubesql:** Support `DATEDIFF` push down for DuckDB ([#12665](https://github.com/cube-js/cube/issues/12665)) ([4b43bf8](https://github.com/cube-js/cube/commit/4b43bf875b97bc0e95358c725fa38bb6bac7c3fc))
+- **oracle-driver:** Build in-database pre-aggregations ([#12601](https://github.com/cube-js/cube/issues/12601)) ([3bde433](https://github.com/cube-js/cube/commit/3bde43370d0bce10b3e8c3c68afa1496cd910303)), closes [#3127](https://github.com/cube-js/cube/issues/3127)
+- **schema-compiler:** Fix stack overflow on cross data source originalSql joins ([#12621](https://github.com/cube-js/cube/issues/12621)) ([54c367d](https://github.com/cube-js/cube/commit/54c367def8585769c06f03fc75bf2ce0ba52ad28)), closes [#12571](https://github.com/cube-js/cube/issues/12571)
+- **schema-compiler:** Keep boolean dimensions and segments boolean in ClickHouse pre-aggregations ([#12598](https://github.com/cube-js/cube/issues/12598)) ([27e426c](https://github.com/cube-js/cube/commit/27e426cac0ebba535434e6ae268bac7f5c03aeb3)), closes [#9494](https://github.com/cube-js/cube/issues/9494)
+- **tesseract:** Bind partition range of a time series as params ([#12576](https://github.com/cube-js/cube/issues/12576)) ([764482d](https://github.com/cube-js/cube/commit/764482d8fe07c6b04c8c0e8f3e42ede029d5151f)), closes [#12375](https://github.com/cube-js/cube/issues/12375)
+- **tesseract:** Match week rollups for trailing week rolling windows ([#12585](https://github.com/cube-js/cube/issues/12585)) ([4aba94b](https://github.com/cube-js/cube/commit/4aba94b4904e922350b18cc63d853fa44c06d5f2)), closes [#8580](https://github.com/cube-js/cube/issues/8580) [#7863](https://github.com/cube-js/cube/issues/7863)
+- **tesseract:** Order by a non-selected measure over a multi-fact query ([#12583](https://github.com/cube-js/cube/issues/12583)) ([e09d8da](https://github.com/cube-js/cube/commit/e09d8da3a234d468bce85d2614042c3c97a45491)), closes [#7803](https://github.com/cube-js/cube/issues/7803)
+- **tesseract:** Plan the FROM and calc groups of a query explicitly ([#12710](https://github.com/cube-js/cube/issues/12710)) ([d07f879](https://github.com/cube-js/cube/commit/d07f87906e96f25f2fecb833e7b2a5ea04742493))
+
+### Features
+
+- **cubesql:** Push down TRIM and SPLIT_PART ([#12666](https://github.com/cube-js/cube/issues/12666)) ([38a8279](https://github.com/cube-js/cube/commit/38a8279381759c3a8389b2d10f952623bfd637da))
+- **cubestore:** Publish multi-arch Docker images ([#12098](https://github.com/cube-js/cube/issues/12098)) ([d6b684a](https://github.com/cube-js/cube/commit/d6b684a7ec608c29ed928f7c3fae0f48c016e11b))
+- **model-schema:** Publish the package with every release, with the manifest's hash in index.json ([#12708](https://github.com/cube-js/cube/issues/12708)) ([6226b4a](https://github.com/cube-js/cube/commit/6226b4a606f07db347c3cf0fa8634050d01b2bc7))
+
+### BREAKING CHANGES
+
+- **backend-shared:** a `?` in code position that is not a placeholder throws
+  when values are bound (on ClickHouse use `if(cond, a, b)` instead of the
+  ternary operator). A placeholder inside a comment is no longer substituted,
+  so a commented-out FILTER_PARAMS fails with a parameter count mismatch. A
+  plain object bound as a parameter throws.
+
+## [1.8.21](https://github.com/cube-js/cube/compare/v1.8.20...v1.8.21) (2026-11-09)
+
+### Bug Fixes
+
+- **tesseract:** Plan a rolling window over its stage's state ([#12643](https://github.com/cube-js/cube/issues/12643)) ([5120fa3](https://github.com/cube-js/cube/commit/5120fa39267d24b0fbb1cadc22e9c2147c593fac))
+
+### Features
+
+- **cubesql:** Upgrade DataFusion to Arrow 60 ([#12550](https://github.com/cube-js/cube/issues/12550)) ([c5d6fea](https://github.com/cube-js/cube/commit/c5d6fead08eac71a1df986c884ce108c4ba56c09)), closes [cube-js/arrow-datafusion#233](https://github.com/cube-js/arrow-datafusion/issues/233)
+- Upgrade pyo3 to 0.29 ([#12606](https://github.com/cube-js/cube/issues/12606)) ([15ad7e5](https://github.com/cube-js/cube/commit/15ad7e55989da338fd3b6a91e5bbd63e2581e8d2))
+
+## [1.8.20](https://github.com/cube-js/cube/compare/v1.8.19...v1.8.20) (2026-11-06)
+
+### Bug Fixes
+
+- **api-gateway:** Stricter validation for member expressions ([#12626](https://github.com/cube-js/cube/issues/12626)) ([52060fd](https://github.com/cube-js/cube/commit/52060fdea92e956fb213c444f25e3325c5b28b2d))
+- **tesseract:** Specialize symbols against the query that computes them ([#12639](https://github.com/cube-js/cube/issues/12639)) ([76d63a6](https://github.com/cube-js/cube/commit/76d63a6443cced460b81c11a116be587dd92c91a))
+
+### Performance Improvements
+
+- **server-core:** Skip views when the refresh scheduler warms cube refresh keys ([#12631](https://github.com/cube-js/cube/issues/12631)) ([ae1bcb4](https://github.com/cube-js/cube/commit/ae1bcb432157873b09aab6db4804ab3a0824e34b))
+
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+### Bug Fixes
+
+- **duckdb-driver:** Map HUGEINT and unsigned integer columns to Cube Store types ([#12599](https://github.com/cube-js/cube/issues/12599)) ([778f84e](https://github.com/cube-js/cube/commit/778f84ebe875915f4d7212c68bdfbb2933ad7136)), closes [#7127](https://github.com/cube-js/cube/issues/7127)
+- Escape quote characters in SQL identifiers ([#12622](https://github.com/cube-js/cube/issues/12622)) ([cc12c27](https://github.com/cube-js/cube/commit/cc12c27809e7ead38040428ce5dffb8b47c2c32c))
+- **schema-compiler:** Cast whole-number BigQuery filter values to INT64 ([#12600](https://github.com/cube-js/cube/issues/12600)) ([c56e60b](https://github.com/cube-js/cube/commit/c56e60b27731178a7dd5e63e68d6acbacc664778)), closes [#10083](https://github.com/cube-js/cube/issues/10083)
+- **schema-compiler:** Keep milliseconds in ClickHouse time range bounds ([#12597](https://github.com/cube-js/cube/issues/12597)) ([6288330](https://github.com/cube-js/cube/commit/6288330d28b5a210b1ae50f3ac97ca91c456dcbf)), closes [#10326](https://github.com/cube-js/cube/issues/10326)
+- **schema-compiler:** Keep sub-second precision of ClickHouse raw time dimensions ([#12596](https://github.com/cube-js/cube/issues/12596)) ([fc119d4](https://github.com/cube-js/cube/commit/fc119d4345f9b667e50bb3154226d91171440d79)), closes [#9051](https://github.com/cube-js/cube/issues/9051)
+- **schema-compiler:** Keep the offset of unordered MSSQL queries ([#12588](https://github.com/cube-js/cube/issues/12588)) ([282f569](https://github.com/cube-js/cube/commit/282f56966f1ce4e8eb7835e752d71758ddf27b1b)), closes [#7392](https://github.com/cube-js/cube/issues/7392)
+- **schema-compiler:** Start MSSQL weeks on Monday ([#12595](https://github.com/cube-js/cube/issues/12595)) ([19c3b45](https://github.com/cube-js/cube/commit/19c3b45bf6bd878b06f193d627401232f97e772a)), closes [#7758](https://github.com/cube-js/cube/issues/7758)
+- **server-core:** Don't expand partitions to list pre-aggregations ([#12617](https://github.com/cube-js/cube/issues/12617)) ([9a7337c](https://github.com/cube-js/cube/commit/9a7337cd9c760785138d3fa23fb6e0942420cf9f))
+- **tesseract:** Read ungrouped multi-fact measures from one scan of the widest tree ([#12594](https://github.com/cube-js/cube/issues/12594)) ([2870353](https://github.com/cube-js/cube/commit/28703536b8ecaed6d4602dd952de66e7fdd279e3))
+- **tesseract:** Render a case dimension without when branches as its else value ([#12590](https://github.com/cube-js/cube/issues/12590)) ([0ccc43b](https://github.com/cube-js/cube/commit/0ccc43b59f82b0740067f5e3e2f98e73e651d649)), closes [#6158](https://github.com/cube-js/cube/issues/6158)
+- **tesseract:** Suffix every leg of a rollupJoin scanned more than once ([#12577](https://github.com/cube-js/cube/issues/12577)) ([ef48cd2](https://github.com/cube-js/cube/commit/ef48cd2015493130869e79abbf2c2129b6980573)), closes [#12531](https://github.com/cube-js/cube/issues/12531)
+
+### Features
+
+- **schema-compiler:** Expose switch dimension values in /v1/meta ([#12225](https://github.com/cube-js/cube/issues/12225)) ([53d7e73](https://github.com/cube-js/cube/commit/53d7e73de1bbd114072299df241b4c4312484ace))
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+### Bug Fixes
+
+- **cubestore:** Update OpenTelemetry to 0.32 and drop the unused SDK crates ([#12530](https://github.com/cube-js/cube/issues/12530)) ([e9f0a90](https://github.com/cube-js/cube/commit/e9f0a904c0a17e16030be6ee636e305d63d3e481))
+- **tesseract:** Read sub-query dimensions from their own subquery ([#12569](https://github.com/cube-js/cube/issues/12569)) ([3fb3372](https://github.com/cube-js/cube/commit/3fb3372026b4709c70b09dbfd636862c3dd2d6fe))
+
+### Features
+
+- **model-schema:** Generate a JSON Schema of the YAML model language from CubeValidator ([#12511](https://github.com/cube-js/cube/issues/12511)) ([929b0d3](https://github.com/cube-js/cube/commit/929b0d363c71c23e280a581c301fc2083cb5a4b6))
+- **model-schema:** Generate a JSON Schema of the YAML model language from CubeValidator ([#12562](https://github.com/cube-js/cube/issues/12562)) ([aa82f87](https://github.com/cube-js/cube/commit/aa82f8756301b5afa8c5100413b0c03108381313)), closes [#12511](https://github.com/cube-js/cube/issues/12511) [#12561](https://github.com/cube-js/cube/issues/12561)
+
+### Performance Improvements
+
+- **cubesql:** Deserialize streamed columnar chunks straight into Arrow builders ([#12556](https://github.com/cube-js/cube/issues/12556)) ([20d7246](https://github.com/cube-js/cube/commit/20d724651d97b6ad162eaede74e5caf47780f87d))
+- **schema-compiler:** Deduplicate join tree edges by reference ([#12560](https://github.com/cube-js/cube/issues/12560)) ([26c703f](https://github.com/cube-js/cube/commit/26c703f1cf35e549f9b7b208216c35058b71266e))
+
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+### Bug Fixes
+
+- **tesseract:** Rolling base buckets honour custom granularity origins ([#12549](https://github.com/cube-js/cube/issues/12549)) ([a2ec6b3](https://github.com/cube-js/cube/commit/a2ec6b37949ca431216d7cb38c0223ebf1f7ac6e))
+
+### Features
+
+- **cubesql:** Support responseFormat columnar for /v1/cubesql ([#12503](https://github.com/cube-js/cube/issues/12503)) ([0ef0e62](https://github.com/cube-js/cube/commit/0ef0e628f7e60de3aa116e0b28d064568146ac33))
+
+### Performance Improvements
+
+- **backend-native:** Move stream chunk parsing off the JS main thread ([#12520](https://github.com/cube-js/cube/issues/12520)) ([a15c1fd](https://github.com/cube-js/cube/commit/a15c1fd65582690d213e8a22a0fcbeaea40df2d0))
+
 ## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
 
 ### Bug Fixes

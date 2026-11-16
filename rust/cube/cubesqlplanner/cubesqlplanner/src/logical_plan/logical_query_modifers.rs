@@ -4,6 +4,7 @@ use crate::planner::RowLimit;
 
 /// Per-query modifiers that sit outside the result schema: paging,
 /// ordering, and the ungrouped and distinct flags.
+#[derive(Clone)]
 pub struct LogicalQueryModifiers {
     pub offset: Option<usize>,
     pub limit: Option<RowLimit>,

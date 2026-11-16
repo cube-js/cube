@@ -12,7 +12,7 @@ On the left side, you can select a semantic view you would like to query. Inside
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/E4XxO44VGqc"
+  src="https://www.youtube-nocookie.com/embed/E4XxO44VGqc"
   title="Add all members in Cube"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -31,7 +31,7 @@ current tab only.
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/9GZ_BqJ06DI"
+  src="https://www.youtube-nocookie.com/embed/9GZ_BqJ06DI"
   title="UI improvements for running queries and refreshing charts in Cube"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -41,7 +41,7 @@ current tab only.
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/kACxFU9KDX4"
+  src="https://www.youtube-nocookie.com/embed/kACxFU9KDX4"
   title="Disable Automatic Query Execution"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -95,7 +95,7 @@ for dimensions:
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/el26UiMKMOo"
+  src="https://www.youtube-nocookie.com/embed/el26UiMKMOo"
   title="New filter operators in Cube"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -115,16 +115,27 @@ On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
   without **(null)** keeps null rows.
 - The **contains**, **starts with** and **ends with** family matches a
   substring, prefix or suffix, ignoring case.
-- **between** includes both bounds.
+- **between** includes both bounds. A range from `start of …` or `now` to the
+  start of a period, such as **Last month**, stops just before that period; see
+  [`default_ui_filters`][ref-default-ui-filters] for the exact rule.
 - **is null**, **is not null**, **is empty** and **is not empty** take no value.
   Empty means the empty string, which is not the same as null.
 - The period operators take any date inside the period — **in the year** with
   `2026-03-14` matches all of 2026.
-- A date value can be fixed or relative. The date editor's **Relative** tab
-  takes values like `today`, `7 days ago`, `this month` or `2 weeks from now`,
-  and resolves them every time the query runs, so the window rolls forward on
-  its own. The full list is under
+- A date value is picked in a popover with a search field and the
+  **Presets**, **Relative** and **Fixed** tabs. **between** picks a range, such
+  as **Last month** or **Past 30 days**, and its **Up to now** or **From now**
+  box ends or starts the range now instead of at midnight. **after**,
+  **before** and the "or on" variants pick one moment, such as **Now** or
+  **Start of last month**, and **is** and **is not** pick a day, such as
+  **Yesterday**. A preset or relative value resolves
+  every time the query runs, so the window rolls forward on its own. The
+  [dashboard filter widget][ref-time-filter-values] uses the same popover, and
+  the accepted values are under
   [`default_ui_filters`][ref-default-ui-filters].
+- With a range set, the chip shows **is** and the range's name, for example
+  *Created at* **is** *last month*, with the dates in a tooltip. A single date
+  reads like *Created at* **before** *start of last month*.
 
 ### Combining filters
 
@@ -176,8 +187,10 @@ change their values, switch operators, or remove them.
 
 Date range filters can use relative bounds like `7 days ago` or `this month`.
 A relative range resolves each time the query runs, so the window rolls
-forward day over day, and the filter's date editor opens on the **Relative**
-tab showing its bounds. See
+forward day over day. The filter's popover opens on **Relative** for a range
+that only that tab offers, and on **Presets** otherwise, such as for
+`["start of 1 month ago", "this month"]` (last month). A range that isn't a
+preset is listed above the presets. See
 [`default_ui_filters`][ref-default-ui-filters] for the full list of accepted
 operators and values.
 
@@ -289,7 +302,7 @@ present.
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/We7kAnfgRlw"
+  src="https://www.youtube-nocookie.com/embed/We7kAnfgRlw"
   title="Fill in Missing Rows in Cube"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -333,7 +346,7 @@ the comparison to all measures at once.
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/9GlOez6Pp84"
+  src="https://www.youtube-nocookie.com/embed/9GlOez6Pp84"
   title="More ways to compare periods in Cube"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -343,7 +356,7 @@ the comparison to all measures at once.
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/I5rlxNvJmYQ"
+  src="https://www.youtube-nocookie.com/embed/I5rlxNvJmYQ"
   title="Period-over-Period Comparison in Cube"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -410,7 +423,7 @@ Two indicators next to each result describe the data behind it.
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/oycWBU4bpzo"
+  src="https://www.youtube-nocookie.com/embed/oycWBU4bpzo"
   title="Results freshness indicator in cube"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -427,7 +440,7 @@ Click the download button (**Download as CSV**) in the report's toolbar. A dialo
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/ok75BJeJcAM"
+  src="https://www.youtube-nocookie.com/embed/ok75BJeJcAM"
   title="Export as CSV from Cube"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -450,7 +463,7 @@ You can edit the Semantic SQL directly in the editor to refine a query — for e
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/9gYLxAec9gw"
+  src="https://www.youtube-nocookie.com/embed/9gYLxAec9gw"
   title="SQL formatting in the Semantic SQL editor and custom SQL filters in Cube"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -488,7 +501,7 @@ token is generated, overriding the claims that would otherwise come from your se
 <iframe
   width="100%"
   height="400"
-  src="https://www.youtube.com/embed/V1dhvFGi-NI"
+  src="https://www.youtube-nocookie.com/embed/V1dhvFGi-NI"
   title="Testing Groups and Attributes with Cube Cloud Security Context"
   frameBorder="0"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -497,8 +510,34 @@ token is generated, overriding the claims that would otherwise come from your se
 
 The security context you set is also respected by [AI agents][ref-analytics-chat]:
 any query an agent runs on your behalf—whether in the workbook or in the IDE—executes
-under the same context. This lets you confirm an agent sees exactly the data a given
-end user would.
+under the same context, unless you ask the agent for a different context for a single
+query (see below). This lets you confirm an agent sees exactly the data a given end
+user would.
+
+### Asking the agent for a security context
+
+You can also ask an agent to run a single query under a given security context, for
+example: "Show revenue by region for `tenant_id` 45." The agent passes the context with
+that query only. It doesn't change the context in the selector, and it doesn't carry
+over to later queries unless you ask again. For that query, it replaces any context set
+in the selector: the query runs with your session's claims and the context you asked
+for, not with the selector's values.
+
+The query card shows the context the query ran under, for example **Security context:
+tenant_id = 45**. **Load all** loads the rows under the same context. **Explore** isn't
+available on such a card, because Explore doesn't carry over the query's security context.
+
+The agent can set any claim in the security context, such as `tenant_id`, as well as
+Cube Cloud groups and user attributes. The access rules are the same as for the
+selector; see the note below. If the agent can't use the context you asked for, it
+reports an error. It never runs the query under a different context. The agent can't
+use a security context:
+
+- to save a report: a saved report always runs under each viewer's own context;
+- in [embedded chat][ref-embedding] or with [Cube token
+  authentication][ref-chat-api-cube-token];
+- to set the `email`, `scope` or `cubeCloudScope` claims, or any `cubeCloud` key other
+  than `groups` and `userAttributes`.
 
 ### What you can override
 
@@ -559,7 +598,10 @@ behaves as intended.
 [ref-time-granularity-period-comparisons]: /docs/explore-analyze/dashboards/widgets/controls#time-granularity-period-comparisons
 [ref-explore]: /docs/explore-analyze/explore
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
+[ref-embedding]: /embedding
+[ref-chat-api-cube-token]: /reference/embed-apis/chat-api#cube-token-authentication
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
+[ref-time-filter-values]: /docs/explore-analyze/dashboards/widgets/controls#operators-by-dimension-type
 [ref-table-chart]: /docs/explore-analyze/charts/chart-types/table
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields
 [ref-auto-run]: /reference/data-modeling/view#auto_run

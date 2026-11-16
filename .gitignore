@@ -1,5 +1,7 @@
 node_modules
-.yarn
+.pnp.*
+**/.yarn/*
+!/.yarn/releases
 .yarnrc
 /.idea
 /.vscode

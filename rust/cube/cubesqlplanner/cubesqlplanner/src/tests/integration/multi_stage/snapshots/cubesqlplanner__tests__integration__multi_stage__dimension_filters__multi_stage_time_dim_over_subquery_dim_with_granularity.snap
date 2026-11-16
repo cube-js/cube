@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/dimension_filters.rs
+assertion_line: 17
+expression: result
+---
+activity__played_at    | activity__theo_win_subquery_dim | activity__settled_at_month | activity__theo_win
+-----------------------+---------------------------------+----------------------------+-------------------
+2024-01-10 00:00:00+00 | 100                             | 2024-04-01 00:00:00        | 100               
+2024-01-15 00:00:00+00 | 50                              | 2024-03-01 00:00:00        | 50                
+2024-02-10 00:00:00+00 | 200                             | 2024-08-01 00:00:00        | 200               
+2024-03-15 00:00:00+00 | 60                              | 2024-05-01 00:00:00        | 60

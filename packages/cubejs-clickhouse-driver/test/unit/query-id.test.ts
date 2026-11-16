@@ -91,16 +91,75 @@ describe('ClickHouseDriver query id', () => {
 
   it('escapes the query id in the KILL QUERY statement', async () => {
     const driver = createDriver();
-    const promise = (driver as any).queryResponse('SELECT 1', [], { requestId: 'a\'b-span-1' });
-    await promise;
+    const promise = driver.query('SELECT 1', [], { requestId: 'a\'b-span-1' }) as Promise<unknown> & { cancel(): Promise<void> };
+    await Promise.all([promise.cancel(), promise.catch(() => undefined)]);
 
     const { query_id: queryId } = mockQuery.mock.calls[0][0];
     expect(queryId).toMatch(new RegExp(`^a'b-${UUID}$`));
+    expect(mockCommand.mock.calls[0][0]).toMatchObject({
+      query: `KILL QUERY WHERE query_id = 'a''${queryId.slice(2)}' SYNC`,
+    });
+  });
+
+  it('rejects a cancelled query only after it is killed', async () => {
+    const events: string[] = [];
+    mockQuery.mockImplementationOnce(({ abort_signal: signal }) => new Promise((_, reject) => {
+      signal.addEventListener('abort', () => reject(new Error('aborted')));
+    }));
+    mockCommand.mockImplementationOnce(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      events.push('killed');
+      return {};
+    });
+
+    const promise = createDriver().query('SELECT 1', []) as Promise<unknown> & { cancel(): Promise<void> };
+    const settled = promise.catch(() => events.push('rejected'));
+    await promise.cancel();
+    await settled;
+
+    expect(events).toEqual(['killed', 'rejected']);
+  });
+
+  it('settles a cancelled query when the kill does not finish in time', async () => {
+    class ShortKillDriver extends ClickHouseDriver {
+      protected readonly killQueryTimeout = 50;
+    }
+    mockQuery.mockImplementationOnce(({ abort_signal: signal }) => new Promise((_, reject) => {
+      signal.addEventListener('abort', () => reject(new Error('aborted')));
+    }));
+    mockCommand.mockImplementationOnce(({ abort_signal: signal }) => new Promise((_, reject) => {
+      signal.addEventListener('abort', () => reject(new Error('kill timed out')));
+    }));
+
+    const driver = new ShortKillDriver({ host: 'localhost', port: '8123', dataSource: 'default' });
+    const promise = driver.query('SELECT 1', []) as Promise<unknown> & { cancel(): Promise<void> };
+
+    await Promise.all([
+      expect(promise.cancel()).rejects.toThrow('kill timed out'),
+      expect(promise).rejects.toThrow('aborted'),
+    ]);
+  });
+
+  it('does not kill a query that already finished', async () => {
+    const promise = createDriver().query('SELECT 1', []) as Promise<unknown> & { cancel(): Promise<void> };
+    await promise;
 
     await promise.cancel();
-    expect(mockCommand.mock.calls[0][0]).toEqual({
-      query: `KILL QUERY WHERE query_id = 'a''${queryId.slice(2)}'`,
-    });
+    expect(mockCommand).not.toHaveBeenCalled();
+  });
+
+  it('exposes a cancel handle on query(), downloadQueryResults() and dropTable()', async () => {
+    const driver = createDriver();
+
+    for (const promise of [
+      driver.query('SELECT 1', []),
+      driver.query('CREATE TABLE t AS SELECT 1', []),
+      driver.downloadQueryResults('SELECT 1', [], { highWaterMark: 100 }),
+      driver.dropTable('t'),
+    ]) {
+      expect((promise as any).cancel).toBeInstanceOf(Function);
+      await promise;
+    }
   });
 
   it('tags streaming queries', async () => {

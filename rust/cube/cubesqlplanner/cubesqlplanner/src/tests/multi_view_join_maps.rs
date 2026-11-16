@@ -1,7 +1,7 @@
 //! A member follows its own view's join path, not the paths of other views
 //! in the query.
 
-use crate::planner::MemberSymbol;
+use crate::planner::{MemberSymbol, QueryAnalysis};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
@@ -16,8 +16,9 @@ fn create_context() -> TestContext {
 fn join_groups(ctx: &TestContext, query: &str) -> Vec<(String, Vec<String>, Vec<String>)> {
     let props = ctx.create_query_properties(query).unwrap();
     let measures: Vec<Rc<MemberSymbol>> = props.measures().clone();
-    let groups = props
-        .compute_join_multi_fact_groups_with_measures(&measures)
+    let groups = QueryAnalysis::try_new(props)
+        .unwrap()
+        .join_groups_for_measures(&measures)
         .unwrap();
     groups
         .groups()
