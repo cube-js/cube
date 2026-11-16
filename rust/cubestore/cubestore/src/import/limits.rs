@@ -48,15 +48,23 @@ const MIB: usize = 1024 * 1024;
 /// run in parallel. Permits are counted in MiB to stay within the `u32` semaphore range.
 #[derive(Clone)]
 pub struct IndexMemoryBudget {
-    budget: Arc<Semaphore>,
+    // `None` when the budget is disabled.
+    budget: Option<Arc<Semaphore>>,
     total_permits: u32,
 }
 
 impl IndexMemoryBudget {
+    /// A zero `budget_bytes` disables the budget: every acquisition succeeds at once.
     pub fn new(budget_bytes: usize) -> IndexMemoryBudget {
+        if budget_bytes == 0 {
+            return IndexMemoryBudget {
+                budget: None,
+                total_permits: 0,
+            };
+        }
         let total_permits = Self::bytes_to_permits(budget_bytes, u32::MAX);
         IndexMemoryBudget {
-            budget: Arc::new(Semaphore::new(total_permits as usize)),
+            budget: Some(Arc::new(Semaphore::new(total_permits as usize))),
             total_permits,
         }
     }
@@ -64,9 +72,12 @@ impl IndexMemoryBudget {
     /// Acquire a permit sized to `bytes`. Clamped to the whole budget so an index whose estimate
     /// exceeds the budget still runs (alone) instead of deadlocking. The returned guard releases
     /// the permit on drop, including on error.
-    pub async fn acquire(&self, bytes: usize) -> Result<OwnedSemaphorePermit, CubeError> {
+    pub async fn acquire(&self, bytes: usize) -> Result<Option<OwnedSemaphorePermit>, CubeError> {
+        let Some(budget) = &self.budget else {
+            return Ok(None);
+        };
         let permits = Self::bytes_to_permits(bytes, self.total_permits);
-        Ok(self.budget.clone().acquire_many_owned(permits).await?)
+        Ok(Some(budget.clone().acquire_many_owned(permits).await?))
     }
 
     fn bytes_to_permits(bytes: usize, cap: u32) -> u32 {
@@ -120,6 +131,12 @@ mod tests {
         // 16 MiB budget, each index needs 1 MiB -> all four run together.
         let budget = IndexMemoryBudget::new(16 * MIB);
         assert_eq!(peak_concurrency(budget, 4, MIB).await, 4);
+    }
+
+    #[tokio::test]
+    async fn zero_budget_does_not_limit() {
+        let budget = IndexMemoryBudget::new(0);
+        assert_eq!(peak_concurrency(budget, 4, 64 * MIB).await, 4);
     }
 
     #[tokio::test]

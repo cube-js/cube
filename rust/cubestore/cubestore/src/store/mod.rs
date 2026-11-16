@@ -2653,11 +2653,17 @@ mod tests {
     }
 }
 
-/// Working memory to build one index's chunks from `columns`: the sorted and post-processed
-/// copies of the input, plus a parquet writer that reserves page buffers per column up front.
-fn estimate_index_build_memory(columns: &[ArrayRef]) -> usize {
+// Working memory to build one index's chunks from `columns`: the sorted and post-processed
+// copies of the input, plus a parquet writer that reserves page buffers per column up front.
+// In-memory chunks are kept as record batches and never write parquet.
+fn estimate_index_build_memory(columns: &[ArrayRef], in_memory: bool) -> usize {
     const PARQUET_WRITER_BYTES_PER_COLUMN: usize = 2 * 1024 * 1024;
-    2 * columns_vec_buffer_size(columns) + columns.len() * PARQUET_WRITER_BYTES_PER_COLUMN
+    let copies = 2 * columns_vec_buffer_size(columns);
+    if in_memory {
+        copies
+    } else {
+        copies + columns.len() * PARQUET_WRITER_BYTES_PER_COLUMN
+    }
 }
 
 pub type ChunkUploadJob = JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>;
@@ -3010,7 +3016,7 @@ impl ChunkStore {
                 .as_mut()
                 .map(|all| std::mem::take(&mut all[i]));
             // Bound the fan-out over indexes by memory: each one builds a full sorted copy.
-            let estimated_memory = estimate_index_build_memory(&remapped);
+            let estimated_memory = estimate_index_build_memory(&remapped, in_memory);
             let budget = self.index_memory_budget.clone();
             let table = &table;
             futures.push(async move {
