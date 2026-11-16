@@ -2653,8 +2653,12 @@ mod tests {
     }
 }
 
-/// Multiplier from an index's input column bytes to its import working memory.
-const INDEX_MEMORY_OVERHEAD_FACTOR: usize = 3;
+/// Working memory to build one index's chunks from `columns`: the sorted and post-processed
+/// copies of the input, plus a parquet writer that reserves page buffers per column up front.
+fn estimate_index_build_memory(columns: &[ArrayRef]) -> usize {
+    const PARQUET_WRITER_BYTES_PER_COLUMN: usize = 2 * 1024 * 1024;
+    2 * columns_vec_buffer_size(columns) + columns.len() * PARQUET_WRITER_BYTES_PER_COLUMN
+}
 
 pub type ChunkUploadJob = JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>;
 
@@ -3045,10 +3049,8 @@ impl ChunkStore {
             let preset_partitions = partitions_by_index
                 .as_mut()
                 .map(|all| std::mem::take(&mut all[i]));
-            // Bound the per-index fan-out: each pipeline holds a sorted take() copy plus a
-            // parquet writer, so gate it by an estimate of that working memory.
-            let estimated_memory =
-                columns_vec_buffer_size(&remapped) * INDEX_MEMORY_OVERHEAD_FACTOR;
+            // Bound the fan-out over indexes by memory: each one builds a full sorted copy.
+            let estimated_memory = estimate_index_build_memory(&remapped);
             let budget = self.index_memory_budget.clone();
             let table = &table;
             futures.push(async move {

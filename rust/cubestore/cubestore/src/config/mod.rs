@@ -1616,6 +1616,21 @@ where
     n
 }
 
+// Index builds share the ingestion process with the frames being imported, so they get half of
+// its limit. Otherwise a quarter of the container limit, split across job runners that may each
+// import at once.
+fn default_import_index_memory_budget() -> usize {
+    if let Some(limit) =
+        env_parse_optional_size("CUBESTORE_INGESTION_WORKER_MEMORY_LIMIT", None, None)
+    {
+        return limit / 2;
+    }
+    let job_runners = env_parse("CUBESTORE_JOB_RUNNERS", 4usize).max(1);
+    crate::util::memory::cgroup_memory_limit()
+        .map(|limit| limit as usize / (4 * job_runners))
+        .unwrap_or(1024 * 1024 * 1024)
+}
+
 pub fn env_parse_size(name: &str, default: usize, max: Option<usize>, min: Option<usize>) -> usize {
     let v = match env::var(name).ok() {
         None => {
@@ -2099,14 +2114,9 @@ impl Config {
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
-                // A quarter of the select worker memory limit when set, otherwise 1 GiB.
                 import_index_memory_budget: env_parse_size(
                     "CUBESTORE_IMPORT_INDEX_MEMORY_BUDGET",
-                    env::var("CUBESTORE_SELECT_WORKER_MEMORY_LIMIT")
-                        .ok()
-                        .and_then(|v| parse_size::parse_size(&v).ok())
-                        .map(|limit| (limit / 4) as usize)
-                        .unwrap_or(1024 * 1024 * 1024),
+                    default_import_index_memory_budget(),
                     None,
                     Some(1024 * 1024),
                 ),
