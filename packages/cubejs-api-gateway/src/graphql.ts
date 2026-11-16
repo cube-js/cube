@@ -477,6 +477,8 @@ const parsedDocuments = new LRUCache<string, DocumentNode>({
   maxSize: 32 * 1024 * 1024,
   maxEntrySize: 1024 * 1024,
   sizeCalculation: (_document, query) => (query.length * PARSED_DOCUMENT_BYTES_PER_CHAR) || 1,
+  ttl: 60 * 60 * 1000,
+  ttlAutopurge: true,
 });
 
 function parseDocument(query: string): DocumentNode {
