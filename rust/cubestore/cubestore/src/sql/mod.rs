@@ -984,6 +984,7 @@ impl SqlServiceImpl {
                             match input_format.as_str() {
                                 "csv" => Result::Ok(ImportFormat::CSV),
                                 "csv_no_header" => Result::Ok(ImportFormat::CSVNoHeader),
+                                "parquet" => Result::Ok(ImportFormat::Parquet),
                                 _ => Result::Err(CubeError::user(format!(
                                     "Bad input_format {}",
                                     value
@@ -1049,6 +1050,11 @@ impl SqlServiceImpl {
                             escape,
                             quote,
                         },
+                        ImportFormat::Parquet => {
+                            return Err(CubeError::user(
+                                "CSV delimiter options cannot be used with Parquet".to_string(),
+                            ))
+                        }
                     }
                 }
                 let build_range_end = with_options

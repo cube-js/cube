@@ -31,6 +31,51 @@ CUBEJS_DB_BQ_PROJECT_ID=gcp-project-id
 CUBEJS_DB_BQ_CREDENTIALS=<base_64_credentials_json>
 ```
 
+## Optional Parquet pre-aggregation exports
+
+CSV with signed download URLs remains the default. To opt into Parquet, configure
+`exportBucketFormat: 'parquet'` in the `BigQueryDriver` constructor along with the
+existing `exportBucket` setting. This requires a CubeStore build with external
+Parquet import support and a matching driver/orchestrator that advertises and
+passes `parquetImport`. Other external drivers continue to receive CSV.
+
+```js
+const { BigQueryDriver } = require('@cubejs-backend/bigquery-driver');
+
+module.exports = {
+  driverFactory: () => new BigQueryDriver({
+    projectId: 'your-project',
+    exportBucket: 'your-export-bucket',
+    exportBucketFormat: 'parquet',
+  }),
+};
+```
+
+Parquet export returns `gs://` locations. CubeStore's own runtime identity must
+have read access to the export bucket, independently of the BigQuery driver's
+identity. The CubeStore GCS importer accepts its `CUBESTORE_GCP_KEY_FILE` and
+`CUBESTORE_GCP_CREDENTIALS` settings, supported ADC files, local gcloud credentials,
+and GKE metadata-server credentials. `object_store` 0.11.1 does not support
+arbitrary `external_account` credential files.
+
+The default CSV export is unchanged: same object names, same signed URLs, and no
+object deletion, so it needs no additional bucket permissions.
+
+Each Parquet export attempt uses a unique object prefix
+(`<table>-<uuid>/part-*.parquet`). When the import finishes, whether it succeeded
+or failed, the driver deletes only that attempt's objects, which requires
+`storage.objects.delete` on the export bucket. Cleanup is best effort: a failure
+is logged as a warning and does not fail the pre-aggregation build. Configure a
+bucket lifecycle rule for objects left by failed cleanups or cancelled exports.
+Nothing outside the attempt's own prefix is ever listed or deleted.
+
+External Parquet import matches columns by name and converts supported scalar
+Arrow types to the destination types. Missing or duplicate requested columns,
+failed casts, nested values, and HyperLogLog columns are rejected rather than
+silently replaced with nulls. Existing destination precision/scale limits apply;
+Parquet does not increase CubeStore's decimal range. CSV-specific import options
+are not applicable to Parquet.
+
 ### License
 
 Cube BigQuery Database Driver is [Apache 2.0 licensed](./LICENSE).

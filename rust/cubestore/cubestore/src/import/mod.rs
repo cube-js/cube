@@ -48,6 +48,7 @@ use cubedatasketches::HLLDataSketch;
 use tokio::time::{sleep, Duration};
 
 pub mod limits;
+mod parquet;
 
 impl ImportFormat {
     fn open_reader(file: File, location: &str) -> Pin<Box<dyn AsyncBufRead + Send>> {
@@ -431,6 +432,9 @@ impl CsvImportParser {
             ImportFormat::CSVOptions {
                 delimiter, quote, ..
             } => (delimiter.unwrap_or(','), quote.is_none()),
+            ImportFormat::Parquet => {
+                return Err(CubeError::user("Parquet cannot be read as CSV".to_string()))
+            }
         };
         if delimiter as u16 > 255 {
             return Err(CubeError::user(format!(
@@ -561,6 +565,8 @@ pub enum LocationKind {
     Stream,
     Temp,
     Http,
+    /// `gs://bucket/object`, read with Cube Store's own Google credentials.
+    Gcs,
     Local,
 }
 
@@ -572,6 +578,8 @@ impl LocationKind {
             LocationKind::Temp
         } else if location.starts_with("http://") || location.starts_with("https://") {
             LocationKind::Http
+        } else if location.starts_with("gs://") {
+            LocationKind::Gcs
         } else {
             LocationKind::Local
         }
@@ -605,6 +613,11 @@ impl LocationsValidatorImpl {
             LocationKind::Temp => {
                 // Fails early on traversal instead of waiting for the import job to pick it up.
                 LocationHelper::temp_uploads_path(location)?;
+                Ok(())
+            }
+            LocationKind::Gcs => {
+                // Fails early on a malformed location instead of waiting for the import job.
+                LocationHelper::gcs_bucket_and_object(location)?;
                 Ok(())
             }
             LocationKind::Local if self.location_allow_local_fs => Ok(()),
@@ -699,6 +712,16 @@ impl ImportServiceImpl {
                     .await?;
                 Ok((temp_file, None))
             }
+            LocationKind::Gcs => {
+                let (file, size, path) = self
+                    .download_gcs_location(location, table_id, temp_dir)
+                    .await?;
+                log::info!("Import downloaded {} ({} bytes)", location, size);
+                self.meta_store
+                    .update_location_download_size(table_id, location.to_string(), size)
+                    .await?;
+                Ok((file, Some(path)))
+            }
             LocationKind::Stream => Err(CubeError::internal(format!(
                 "Stream location cannot be imported as a file: {}",
                 location
@@ -791,6 +814,40 @@ impl ImportServiceImpl {
         Ok((file, size, path))
     }
 
+    /// Streams a `gs://bucket/object` location into a temp file using Cube Store's own
+    /// Google credentials (key settings, ADC file, or the metadata server).
+    async fn download_gcs_location(
+        &self,
+        location: &str,
+        table_id: u64,
+        temp_dir: &Path,
+    ) -> Result<(File, u64, TempPath), CubeError> {
+        let (bucket, object) = LocationHelper::gcs_bucket_and_object(location)?;
+        let client = crate::remotefs::gcs_client::GcsClient::new(bucket)?;
+        let response = client.download(object).await?;
+        let (file, path) = tempfile::Builder::new()
+            .prefix(&table_id.to_string())
+            .tempfile_in(temp_dir)
+            .map_err(|e| {
+                CubeError::internal(format!(
+                    "Open tempfile in {}: {}",
+                    temp_dir.to_str().unwrap_or("<invalid>"),
+                    e
+                ))
+            })?
+            .into_parts();
+        let mut file = File::from_std(file);
+        let mut stream = response.bytes_stream();
+        let mut size = 0u64;
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            file.write_all(&chunk).await?;
+            size += chunk.len() as u64;
+        }
+        file.seek(SeekFrom::Start(0)).await?;
+        Ok((file, size, path))
+    }
+
     async fn download_temp_file(&self, location: &str) -> Result<File, CubeError> {
         let to_download = LocationHelper::temp_uploads_path(location)?;
         // TODO check file size
@@ -831,6 +888,11 @@ impl ImportServiceImpl {
         let (file, tmp_path) = self
             .resolve_location(location, table.get_id(), &temp_dir)
             .await?;
+        if matches!(format, ImportFormat::Parquet) {
+            let result = self.do_import_parquet(table, file, data_loaded_size).await;
+            drop(tmp_path);
+            return result;
+        }
         let reader = ImportFormat::open_reader(file, location);
         let mut parser = CsvImportParser::new(&format, table.get_row().get_columns().clone())?;
         let disable_quoting = parser.disable_quoting;
@@ -1061,10 +1123,30 @@ impl LocationHelper {
                     Err(e) => Err(e),
                 }?
             }
+            LocationKind::Gcs => {
+                let (bucket, object) = Self::gcs_bucket_and_object(location)?;
+                let client = crate::remotefs::gcs_client::GcsClient::new(bucket)?;
+                Some(client.metadata(object).await?.size()?)
+            }
             LocationKind::Stream => None,
             LocationKind::Local => Some(tokio::fs::metadata(location).await?.len()),
         };
         Ok(res)
+    }
+
+    /// Splits `gs://bucket/object` into its bucket and object name. The object name is kept
+    /// verbatim: GCS object names may contain any further `/`.
+    pub fn gcs_bucket_and_object(location: &str) -> Result<(&str, &str), CubeError> {
+        location
+            .strip_prefix("gs://")
+            .and_then(|uri| uri.split_once('/'))
+            .filter(|(bucket, object)| !bucket.is_empty() && !object.is_empty())
+            .ok_or_else(|| {
+                CubeError::user(format!(
+                    "Invalid GCS location: '{}'. Expected gs://bucket/object",
+                    location
+                ))
+            })
     }
     pub fn temp_uploads_path(location: &str) -> Result<String, CubeError> {
         let name = location
@@ -1695,7 +1777,8 @@ mod temp_upload_name_tests {
 #[cfg(test)]
 mod location_validator_tests {
     use super::{
-        Column, ColumnType, ImportFormat, ImportService, LocationKind, LocationsValidatorImpl,
+        Column, ColumnType, ImportFormat, ImportService, LocationHelper, LocationKind,
+        LocationsValidatorImpl,
     };
     use crate::config::Config;
     use std::sync::Arc;
@@ -1720,8 +1803,39 @@ mod location_validator_tests {
             LocationKind::of("https://bucket.s3.amazonaws.com/data.csv"),
             LocationKind::Http
         );
+        assert_eq!(
+            LocationKind::of("gs://bucket/export/part-000000000000.parquet"),
+            LocationKind::Gcs
+        );
         assert_eq!(LocationKind::of("/etc/passwd"), LocationKind::Local);
         assert_eq!(LocationKind::of("relative.csv"), LocationKind::Local);
+    }
+
+    #[test]
+    fn gcs_locations_do_not_depend_on_the_local_setting() {
+        // Without the Gcs kind a gs:// location would fall through to Local and be rejected
+        // by the default CUBESTORE_LOCATION_ALLOW_LOCAL_FS=false.
+        let denied = validator(false);
+        assert!(denied
+            .validate_location("gs://bucket/export/part-000000000000.parquet")
+            .is_ok());
+        for malformed in ["gs://", "gs://bucket", "gs://bucket/", "gs:///object"] {
+            let err = denied.validate_location(malformed).unwrap_err().message;
+            assert!(
+                err.contains("Expected gs://bucket/object"),
+                "unexpected error for {:?}: {}",
+                malformed,
+                err
+            );
+        }
+    }
+
+    #[test]
+    fn gcs_locations_keep_the_object_name_verbatim() {
+        assert_eq!(
+            LocationHelper::gcs_bucket_and_object("gs://bucket/a b/100%/part-0.parquet").unwrap(),
+            ("bucket", "a b/100%/part-0.parquet")
+        );
     }
 
     #[test]

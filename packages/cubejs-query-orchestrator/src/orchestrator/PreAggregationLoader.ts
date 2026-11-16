@@ -9,6 +9,7 @@ import {
   DriverInterface,
   IndexesSQL,
   isDownloadTableCSVData,
+  isDownloadTableParquetData,
   QueuePriority,
   SaveCancelFn,
   StreamOptions,
@@ -909,7 +910,7 @@ export class PreAggregationLoader {
 
       this.logger('Downloading external pre-aggregation completed', {
         ...queryOptions,
-        isUnloadSupported: isDownloadTableCSVData(tableData)
+        isUnloadSupported: isDownloadTableCSVData(tableData) || isDownloadTableParquetData(tableData)
       });
 
       return tableData;
@@ -930,7 +931,7 @@ export class PreAggregationLoader {
 
     if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
       tableData = await saveCancelFn(
-        client.unload(table, this.getUnloadOptions()),
+        client.unload(table, { ...this.getUnloadOptions(), parquetImport: externalDriverCapabilities.parquetImport }),
       );
     } else if (externalDriverCapabilities.streamImport && client.stream) {
       tableData = await saveCancelFn(
@@ -974,7 +975,7 @@ export class PreAggregationLoader {
       return saveCancelFn(
         client.unload(
           table,
-          { ...this.getUnloadOptions(), query: { sql, params } },
+          { ...this.getUnloadOptions(), query: { sql, params }, parquetImport: externalDriverCapabilities.parquetImport },
         )
       );
     } else if (externalDriverCapabilities.streamImport && client.stream) {

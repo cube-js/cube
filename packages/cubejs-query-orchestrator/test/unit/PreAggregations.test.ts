@@ -467,6 +467,120 @@ describe('PreAggregations', () => {
     });
   });
 
+  describe('external pre-aggregation export format', () => {
+    const types: TableStructure = [{ name: 'orders__count', type: 'bigint' }];
+    const newVersionEntry = {
+      table_name: 'stb_pre_aggregations.orders_export',
+      structure_version: 'aaaa1111',
+      content_version: 'bbbb2222',
+      last_updated_at: 1600000000000,
+      naming_version: 2,
+    };
+
+    // Builds one external pre-aggregation through the same entry point a build job uses, with a
+    // source that exports Parquet only when asked to, the way the BigQuery driver does.
+    const build = async (externalCapabilities: object, uploadError?: Error) => {
+      const events: string[] = [];
+      const release = jest.fn(async () => {
+        events.push('release');
+      });
+      const unload = jest.fn(async (_table: string, options: { parquetImport?: boolean }) => {
+        events.push('unload');
+        return options.parquetImport === true
+          ? { parquetFile: ['gs://bucket/attempt/part-000000000000.parquet'], release }
+          : { csvFile: ['https://signed.example/part-000000000000.csv.gz'] };
+      });
+      const uploadTableWithIndexes = jest.fn(async (_table: string, _columns: TableStructure, _tableData: DownloadTableData) => {
+        events.push('upload');
+        if (uploadError) {
+          throw uploadError;
+        }
+      });
+
+      Object.assign(mockDriver!, {
+        capabilities: () => ({}),
+        isUnloadSupported: async () => true,
+        unload,
+        tableColumnTypes: async () => types,
+      });
+      Object.assign(mockExternalDriver!, {
+        capabilities: () => externalCapabilities,
+        uploadTableWithIndexes,
+      });
+
+      const preAggregations = new PreAggregations(
+        'TEST',
+        mockDriverFactory,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
+        queryCache!,
+        {
+          queueOptions: async () => ({ executionTimeout: 1, concurrency: 2 }),
+          externalDriverFactory: async () => asDriver(mockExternalDriver!),
+        },
+      );
+      const loader = new PreAggregationLoader(
+        mockDriverFactory,
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        () => {},
+        queryCache!,
+        preAggregations,
+        partialMock<PreAggregationDescription>({
+          preAggregationsSchema: 'stb_pre_aggregations',
+          tableName: 'stb_pre_aggregations.orders_export',
+          dataSource: 'default',
+          external: true,
+          loadSql: ['CREATE TABLE stb_pre_aggregations.orders_export AS SELECT 1', []],
+          invalidateKeyQueries: [],
+        }),
+        [],
+        new PreAggregationLoadCache(mockDriverFactory, queryCache!, preAggregations, { dataSource: 'default' }),
+        { requestId: 'export-format' },
+      );
+
+      const result = loader.refresh(newVersionEntry, [], asDriver<RefreshClient>(mockDriver!));
+      return { result, events, unload, uploadTableWithIndexes, release };
+    };
+
+    test('asks for Parquet only when the destination declares it, and releases the export after the import', async () => {
+      const { result, events, unload, uploadTableWithIndexes, release } = await build({ csvImport: true, parquetImport: true });
+      await result;
+
+      expect(unload.mock.calls[0][0]).toBe(PreAggregations.targetTableName(newVersionEntry));
+      expect(unload.mock.calls[0][1]).toMatchObject({ maxFileSize: 64, parquetImport: true });
+
+      const [table, columns, tableData] = uploadTableWithIndexes.mock.calls[0];
+      expect(table).toBe(PreAggregations.targetTableName(newVersionEntry));
+      // Parquet exports carry no column types of their own; they come from the exported table
+      expect(columns).toEqual(types);
+      expect(tableData).toMatchObject({ parquetFile: ['gs://bucket/attempt/part-000000000000.parquet'] });
+
+      expect(events).toEqual(['unload', 'upload', 'release']);
+      expect(release).toHaveBeenCalledTimes(1);
+    });
+
+    test.each([
+      ['does not declare Parquet import', { csvImport: true }],
+      ['declines Parquet import', { csvImport: true, parquetImport: false }],
+    ])('keeps the CSV export when the destination %s', async (_name, capabilities) => {
+      const { result, events, unload, uploadTableWithIndexes } = await build(capabilities);
+      await result;
+
+      expect(unload.mock.calls[0][1].parquetImport).not.toBe(true);
+      expect(uploadTableWithIndexes.mock.calls[0][2]).toMatchObject({ csvFile: ['https://signed.example/part-000000000000.csv.gz'] });
+      expect(uploadTableWithIndexes.mock.calls[0][2]).not.toHaveProperty('parquetFile');
+      expect(events).toEqual(['unload', 'upload']);
+    });
+
+    test('releases the export once when the import fails, and reports the import error', async () => {
+      const { result, events, release } = await build({ csvImport: true, parquetImport: true }, new Error('import boom'));
+
+      await expect(result).rejects.toThrow('import boom');
+      expect(events).toEqual(['unload', 'upload', 'release']);
+      expect(release).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('isPartitionExist', () => {
     test('initializes a missing data source queue before checking the job result', async () => {
       const preAggregations = new PreAggregations(

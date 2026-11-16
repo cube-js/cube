@@ -81,7 +81,7 @@ export class DriverTests {
     `;
     const tableName = await this.createUnloadTable(query);
     assert(this.driver.unload);
-    const data = await this.driver.unload(tableName, { maxFileSize: 64 });
+    const data = DriverTests.csvExport(await this.driver.unload(tableName, { maxFileSize: 64 }));
     expect(data.csvFile.length).toEqual(1);
     const string = await downloadAndGunzip(data.csvFile[0]);
     let expectedCsvRows = this.getExpectedCsvRows();
@@ -128,7 +128,7 @@ export class DriverTests {
     `;
     const tableName = await this.createUnloadTable(query);
     assert(driver.unload);
-    const data = await driver.unload(tableName, { maxFileSize: 64 });
+    const data = DriverTests.csvExport(await driver.unload(tableName, { maxFileSize: 64 }));
     expect(data.exportBucketCsvEscapeSymbol).toBe('"');
     await driver.release();
   }
@@ -144,7 +144,7 @@ export class DriverTests {
     `;
     const tableName = await this.createUnloadTable(query);
     assert(driver.unload);
-    const data = await driver.unload(tableName, { maxFileSize: 64 });
+    const data = DriverTests.csvExport(await driver.unload(tableName, { maxFileSize: 64 }));
     expect(data.exportBucketCsvEscapeSymbol).toBe('\'');
     await driver.release();
   }
@@ -160,7 +160,7 @@ export class DriverTests {
     `;
     const tableName = await this.createUnloadTable(query);
     assert(driver.unload);
-    const data = await driver.unload(tableName, { maxFileSize: 64 });
+    const data = DriverTests.csvExport(await driver.unload(tableName, { maxFileSize: 64 }));
     expect(data.exportBucketCsvEscapeSymbol).toBeUndefined();
     await driver.release();
   }
@@ -172,8 +172,16 @@ export class DriverTests {
     `;
     const tableName = await this.createUnloadTable(query);
     assert(this.driver.unload);
-    const data = await this.driver.unload(tableName, { maxFileSize: 64 });
+    const data = DriverTests.csvExport(await this.driver.unload(tableName, { maxFileSize: 64 }));
     expect(data.csvFile.length).toEqual(0);
+  }
+
+  /**
+   * `unload` exports CSV unless the caller passes `parquetImport`, which these tests never do.
+   */
+  private static csvExport<T extends object>(data: T): Extract<T, { csvFile: string[] }> {
+    assert('csvFile' in data, 'Expected unload to export CSV when Parquet import was not requested');
+    return data as Extract<T, { csvFile: string[] }>;
   }
 
   private async createUnloadTable(query: string): Promise<string> {
