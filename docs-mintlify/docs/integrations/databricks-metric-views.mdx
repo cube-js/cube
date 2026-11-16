@@ -261,10 +261,10 @@ The expected-build check runs **after** publication starts; a mismatch cannot pr
 write. `viewNames` lists planned views; `retained_obsolete` means an obsolete target was left in
 place, and `deleted_obsolete` that Cube dropped it. A `retained_obsolete` target with a `detail` is
 a drop that was held or failed, so the recipe rejects it. A hold that repeats keeps CI failing
-until you clear it: revert a target-name prefix change held by `deletion-cap-exceeded`, drop a
-`precondition-failed` Metric View in Databricks yourself, or switch **When a view leaves the
-scope** to **Keep its Metric View in Databricks**, which reports obsolete targets without a
-`detail`. Publication-run `views[].outcome` values are `unchanged`, `created`, `updated`,
+until you clear it: for `deletion-cap-exceeded`, restore views or revert the prefix change as
+[Removed views](#removed-views) describes; drop a `precondition-failed` Metric View in Databricks
+yourself; or switch **When a view leaves the scope** to **Keep its Metric View in Databricks**,
+which reports obsolete targets without a `detail`. Publication-run `views[].outcome` values are `unchanged`, `created`, `updated`,
 `blocked`, `validation_failed`, `publish_failed`, `retained_obsolete`, and `deleted_obsolete`;
 these differ from preview outcomes. The recipe accepts only the successful outcomes.
 `incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
@@ -366,7 +366,9 @@ them.
 Cube drops a Metric View only when all of these hold:
 
 - Cube created it and still records it as its own, in the catalog and schema the data source
-  publishes to now, in the same Unity Catalog metastore.
+  publishes to now, in the same Unity Catalog metastore. After you change the target catalog or
+  schema, the Metric Views in the old location stay in Databricks and every sync labels them
+  **Obsolete, kept**; drop them in Databricks yourself.
 - It is obsolete: its Cube view left the scope, or the view now publishes to another target
   name. A view still in scope whose conversion or write failed keeps its Metric View.
 - The object at that name is still a view, owned by the Databricks principal Cube publishes with.
@@ -381,9 +383,11 @@ reason, when:
 - `no-views`: no view in the sync converted to a Metric View definition;
 - `create-failed`: Databricks rejected or failed the creation of a new view's Metric View, so a
   renamed view would otherwise lose both names;
-- `deletion-cap-exceeded`: it would drop more than 20 Metric Views. Remove views in smaller
-  batches. A target-name prefix change that renames more than 20 views is held on every sync
-  until you revert it.
+- `deletion-cap-exceeded`: it would drop more than 20 Metric Views. Remove views in batches of
+  at most 20 per sync. The hold repeats on every sync while more than 20 are obsolete, and
+  dropping them in Databricks yourself does not clear it. Restore views or revert the target-name
+  change until 20 or fewer are obsolete, or switch to **Keep its Metric View in Databricks**,
+  which keeps them all.
 
 A failed drop is labeled **Obsolete, kept** with its failure code, and the next sync tries again. A
 data model file that fails to load stops the sync before anything is written or dropped. Disabling
