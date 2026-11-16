@@ -15,6 +15,10 @@ cubes:
       - name: cohort_date
         sql: cohort_date
         type: time
+        granularities:
+          - name: half_day
+            interval: 12 hours
+            origin: "2024-07-01"
 
     measures:
       - name: count
@@ -43,6 +47,16 @@ cubes:
             - member: activity.cohort_date
               operator: inDateRange
               values: ["2025-01-01T00:00:00", "2025-01-31T23:59:59"]
+
+      - name: amount_q4_2024
+        type: number
+        multi_stage: true
+        sql: "{amount}"
+        filter:
+          include:
+            - member: activity.cohort_date
+              operator: inDateRange
+              values: ["2024-10-01", "2024-12-31"]
 
       - name: amount_early_january
         type: number
@@ -111,3 +125,56 @@ cubes:
             granularity: day
           - dimension: cohort_date
             granularity: year
+
+      - name: month_with_raw_dimension
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimension: cohort_date
+        granularity: month
+
+      - name: quarter_only
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+        time_dimension: cohort_date
+        granularity: quarter
+
+      - name: quarter_with_raw_dimension
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimension: cohort_date
+        granularity: quarter
+
+      - name: week_with_raw_dimension
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimension: cohort_date
+        granularity: week
+
+      - name: half_day_only
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+        time_dimension: cohort_date
+        granularity: half_day
