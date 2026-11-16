@@ -1,21 +1,12 @@
 use crate::CubeError;
 use regex::Regex;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use url::{Host, Url};
 
-/// Restricts the hosts `http(s)://` import locations may point to, modeled on ClickHouse's
-/// `remote_url_allow_hosts`. A `host` entry matches the host on any port, a `host:port` entry
-/// matches that port only. `*` stands for one domain label, so `*.example.com` matches
-/// `a.example.com` but neither `a.b.example.com` nor `example.com`. A CIDR entry such as
-/// `10.0.0.0/8` matches IP literals in that subnet on any port; hostnames are not resolved.
-/// A lone `*` allows every host and is the default, so existing deployments keep working;
-/// with no entries at all no host is allowed, like an empty `remote_url_allow_hosts`.
-///
-/// With `deny_private_ips` loopback, private, link-local and other non-public addresses are
-/// refused unless a subnet or IP entry covers them. Hostnames are checked after resolution,
-/// and the HTTP client connects only to the addresses that passed, so DNS rebinding cannot
-/// swap them in between.
+/// Allowlist for `http(s)://` import hosts (see `CUBESTORE_LOCATION_ALLOW_HOSTS` docs).
+/// A lone `*` (the default) allows every host; with no entries no host is allowed.
+/// `deny_private_ips` also refuses non-public addresses, for host names after DNS resolution.
 #[derive(Debug, Clone)]
 pub struct LocationHostFilter {
     patterns: Vec<HostPattern>,
@@ -36,18 +27,12 @@ enum HostPattern {
     Any,
     Exact(String),
     Wildcard(Regex),
+    /// Kept parsed: the URL parser canonicalizes IP hosts, so entry text may never equal them.
+    Ip {
+        ip: IpAddr,
+        port: Option<u16>,
+    },
     Subnet(IpSubnet),
-}
-
-impl HostPattern {
-    fn matches(&self, candidate: &str) -> bool {
-        match self {
-            HostPattern::Any => true,
-            HostPattern::Exact(host) => host == candidate,
-            HostPattern::Wildcard(regex) => regex.is_match(candidate),
-            HostPattern::Subnet(_) => false,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -169,16 +154,29 @@ impl LocationHostFilter {
                 CubeError::user(format!("Invalid allowed subnet {:?}: {}", entry, e))
             });
         }
-        let is_host_char =
-            |c: char| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ':' | '[' | ']');
-        if entry.is_empty() || !entry.chars().all(|c| c == '*' || is_host_char(c)) {
-            return Err(CubeError::user(format!(
-                "Invalid allowed host {:?}: expected `host`, `host:port`, a pattern like `*.example.com` or a subnet like `10.0.0.0/8`",
-                entry
-            )));
-        }
         if entry == "*" {
             return Ok(HostPattern::Any);
+        }
+        if let Some((ip, port)) = Self::parse_ip_entry(&entry) {
+            return Ok(HostPattern::Ip {
+                ip: Self::unmap(ip),
+                port,
+            });
+        }
+        let (host, port) = match entry.rsplit_once(':') {
+            Some((host, port)) => (host, Some(port)),
+            None => (entry.as_str(), None),
+        };
+        let is_host_char =
+            |c: char| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '*');
+        if host.is_empty()
+            || !host.chars().all(is_host_char)
+            || port.map_or(false, |p| p.parse::<u16>().is_err())
+        {
+            return Err(CubeError::user(format!(
+                "Invalid allowed host {:?}: expected `host`, `host:port`, a pattern like `*.example.com`, an IP address (IPv6 with a port as `[::1]:8080`) or a subnet like `10.0.0.0/8`",
+                entry
+            )));
         }
         if !entry.contains('*') {
             return Ok(HostPattern::Exact(entry));
@@ -194,6 +192,20 @@ impl LocationHostFilter {
         Ok(HostPattern::Wildcard(regex))
     }
 
+    /// `127.0.0.1`, `127.0.0.1:9000`, `::1`, `[::1]`, `[::1]:9000`.
+    fn parse_ip_entry(entry: &str) -> Option<(IpAddr, Option<u16>)> {
+        fn bracketed(s: &str) -> Option<IpAddr> {
+            let v6 = s.strip_prefix('[')?.strip_suffix(']')?;
+            v6.parse::<Ipv6Addr>().ok().map(IpAddr::V6)
+        }
+        if let Some(ip) = bracketed(entry).or_else(|| entry.parse().ok()) {
+            return Some((ip, None));
+        }
+        let (host, port) = entry.rsplit_once(':')?;
+        let ip = bracketed(host).or_else(|| host.parse::<Ipv4Addr>().ok().map(IpAddr::V4))?;
+        Some((ip, Some(port.parse().ok()?)))
+    }
+
     pub fn is_unrestricted(&self) -> bool {
         !self.deny_private_ips && self.allows_any_host()
     }
@@ -207,27 +219,14 @@ impl LocationHostFilter {
         !self.deny_private_ips || !is_non_public_ip(ip) || self.ip_is_listed(ip)
     }
 
-    /// Covered by a subnet entry, or by an exact entry that is this IP (on any port).
+    /// Covered by a subnet entry, or by an IP entry (on any port).
     fn ip_is_listed(&self, ip: IpAddr) -> bool {
         let ip = Self::unmap(ip);
         self.patterns.iter().any(|p| match p {
             HostPattern::Subnet(subnet) => subnet.contains(ip),
-            HostPattern::Exact(entry) => Self::entry_ip(entry) == Some(ip),
-            HostPattern::Wildcard(_) | HostPattern::Any => false,
+            HostPattern::Ip { ip: entry, .. } => *entry == ip,
+            HostPattern::Exact(_) | HostPattern::Wildcard(_) | HostPattern::Any => false,
         })
-    }
-
-    fn entry_ip(entry: &str) -> Option<IpAddr> {
-        if let Ok(ip) = entry.trim_start_matches('[').trim_end_matches(']').parse() {
-            return Some(Self::unmap(ip));
-        }
-        let (host, port) = entry.rsplit_once(':')?;
-        port.parse::<u16>().ok()?;
-        host.trim_start_matches('[')
-            .trim_end_matches(']')
-            .parse()
-            .ok()
-            .map(Self::unmap)
     }
 
     fn unmap(ip: IpAddr) -> IpAddr {
@@ -250,21 +249,21 @@ impl LocationHostFilter {
         let Some(host) = url.host_str() else {
             return false;
         };
-        if let Some(ip) = ip {
-            if self.patterns.iter().any(|p| match p {
-                HostPattern::Subnet(subnet) => subnet.contains(ip),
-                _ => false,
-            }) {
-                return true;
-            }
-        }
         let host = host.to_lowercase();
-        let host_port = url
-            .port_or_known_default()
-            .map(|port| format!("{}:{}", host, port));
-        std::iter::once(&host)
-            .chain(host_port.as_ref())
-            .any(|candidate| self.patterns.iter().any(|p| p.matches(candidate)))
+        let port = url.port_or_known_default();
+        let host_port = port.map(|port| format!("{}:{}", host, port));
+        self.patterns.iter().any(|p| match p {
+            HostPattern::Any => true,
+            HostPattern::Subnet(subnet) => ip.map_or(false, |ip| subnet.contains(ip)),
+            HostPattern::Ip {
+                ip: entry,
+                port: entry_port,
+            } => ip == Some(*entry) && entry_port.map_or(true, |p| Some(p) == port),
+            HostPattern::Exact(entry) => *entry == host || Some(entry) == host_port.as_ref(),
+            HostPattern::Wildcard(regex) => {
+                regex.is_match(&host) || host_port.as_ref().map_or(false, |c| regex.is_match(c))
+            }
+        })
     }
 
     /// IPv4-mapped IPv6 literals (`[::ffff:10.0.0.1]`) count as their IPv4 address.
@@ -584,6 +583,28 @@ mod tests {
     }
 
     #[test]
+    fn ip_entries_match_any_spelling() {
+        for entry in ["::1", "[::1]", "[0:0:0:0:0:0:0:1]", "0:0:0:0:0:0:0:1"] {
+            let f = filter(&[entry]);
+            assert!(f.check("http://[::1]:8080/a.csv").is_ok(), "{}", entry);
+            assert!(f.check("http://[0:0::1]/a.csv").is_ok(), "{}", entry);
+            assert!(f.check("http://[::2]/a.csv").is_err(), "{}", entry);
+        }
+        let f = filter(&["[FD00:0::1]:9000", "::ffff:10.0.0.1", "127.0.0.1:9000"]);
+        assert!(f.check("http://[fd00::1]:9000/a.csv").is_ok());
+        assert!(f.check("http://[fd00::1]:9001/a.csv").is_err());
+        assert!(f.check("http://[fd00::1]/a.csv").is_err());
+        assert!(f.check("http://10.0.0.1/a.csv").is_ok());
+        assert!(f.check("http://0x7f000001:9000/a.csv").is_ok());
+        assert!(f.check("http://127.0.0.1/a.csv").is_err());
+
+        let f = deny_private(&["fd00::1"]);
+        assert!(f.check("http://[fd00::1]/a.csv").is_ok());
+        assert!(f.is_ip_permitted("fd00::1".parse().unwrap()));
+        assert!(!f.is_ip_permitted("fd00::2".parse().unwrap()));
+    }
+
+    #[test]
     fn invalid_entries_are_rejected() {
         for entry in [
             "https://example.com",
@@ -591,6 +612,14 @@ mod tests {
             " ",
             r"files\d+\.com",
             "a b",
+            "host:port",
+            "127.0.0.1:99999",
+            "::zz",
+            "[::1",
+            "[127.0.0.1]",
+            "::1:x",
+            "fd00::1::2",
+            "a:b:c",
         ] {
             assert!(
                 LocationHostFilter::validate_entry(entry).is_err(),

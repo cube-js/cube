@@ -2416,6 +2416,8 @@ ClickHouse.
 - `files.example.com:8443` matches that port only.
 - `*` inside an entry stands for one domain label: `*.example.com` matches
   `a.example.com`, but neither `a.b.example.com` nor `example.com`.
+- `10.0.0.5`, `10.0.0.5:9000`, `::1` or `[::1]:9000` matches that IP address, however
+  the location spells it. An IPv6 address with a port needs brackets.
 - `10.0.0.0/8` or `fd00::/8` matches IP addresses in that subnet on any port. Subnets
   apply to locations with an IP address in the URL, and to resolved addresses when
   [`CUBESTORE_LOCATION_DENY_PRIVATE_IPS`](#cubestore_location_deny_private_ips) is set.
