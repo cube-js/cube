@@ -625,7 +625,7 @@ conversation's branch, or omit `chatId` to start a new conversation on the one y
 | Tool | Description | Access |
 | --- | --- | --- |
 | `searchDataModel` | Searches the semantic model by similarity — views and their measures and dimensions — to discover what is queryable. Returns compact records (name, title, description, type) to reference in `runQuery`. Pass the dev `branchName` from `startDataModelEdit` to search that branch's model, including members that don't exist in production yet. | Read-only |
-| `runQuery` | Runs a Cube SQL query (PostgreSQL dialect) against the [SQL API][ref-sql-api]. Returns a schema, a page of rows, and `hasMore` / `totalRows` for pagination via `offset`. Pass the dev `branchName` from `startDataModelEdit` to query that branch instead of the deployed model. Pass a `securityContext` object to run this one query under [another security context][ref-agent-security-context]; the result echoes it. | Read-only |
+| `runQuery` | Runs a Cube SQL query (PostgreSQL dialect) against the [SQL API][ref-sql-api]. Returns a schema, a page of rows, and `hasMore` / `totalRows` for pagination via `offset`. Pass the dev `branchName` from `startDataModelEdit` to query that branch instead of the deployed model. Pass a `securityContext` object to run this one query under [another security context][ref-agent-security-context]; the result echoes it. Pass `periodComparisons` to add [period comparison columns](#period-comparisons). | Read-only |
 
 Call `searchDataModel` before `runQuery` to find exact view and member names rather than
 guessing them — pass the same `branchName` to both so the members you find are the ones the
@@ -638,6 +638,49 @@ isn't an active dev branch — for example the deploy branch's own name, or a fe
 with no dev worker running — fails with an error rather than silently answering from the
 deployed model, so a query aimed at the wrong branch never looks like a query that just
 returned no rows.
+
+#### Period comparisons
+
+Pass `periodComparisons` to `runQuery` to compare measures with an earlier period, such as
+month over month or year over year, instead of writing `LAG()` or a self-join. Cube runs the
+same query over the shifted period and adds the derived columns to `schema` and `data`, next to
+each measure. The values, titles, and formats are the same as in a workbook report with a
+[period comparison][ref-period-comparison].
+
+Each entry takes:
+
+- `measure` — the measure to compare, as selected in the query.
+- `timeDimension` — the time dimension to shift. Select it in the query at the `day`, `week`,
+  `month`, `quarter`, or `year` granularity, or filter on it with a date range.
+- `offset` — how far back the earlier period is, e.g., `{ "amount": 1, "unit": "month" }`.
+  `unit` is one of `day`, `week`, `month`, `quarter`, or `year`.
+- `outputs` — the columns to add: `previous` (the value in the earlier period), `difference`,
+  and `percentChange` (a ratio, e.g., `0.25` for +25%). Defaults to `["previous"]`.
+
+```json
+{
+  "sqlQuery": "SELECT DATE_TRUNC('month', created_at) AS month, MEASURE(revenue) AS revenue FROM orders_view GROUP BY 1",
+  "periodComparisons": [
+    {
+      "measure": "revenue",
+      "timeDimension": "created_at",
+      "offset": { "amount": 1, "unit": "year" },
+      "outputs": ["previous", "percentChange"]
+    }
+  ]
+}
+```
+
+The result lists the added columns in `periodComparisonColumns`, each with its `name`, `title`,
+`measure`, `timeDimension`, `offset`, and `output`. Column names follow the
+`<measure>__pop_<amount><unit>_<output>` pattern, e.g., `revenue__pop_1year_previous`.
+
+Cube computes the comparison before it slices the page, so a row is compared correctly even
+when its earlier period is on another page. If the earlier period has no rows, an additive
+measure such as a sum or a count reads `0`, and other measures read `null`.
+
+If a comparison can't be computed, `runQuery` still returns the rows, without that comparison's
+columns, and explains why in `periodComparisonErrors`.
 
 ### Dashboard authoring
 
@@ -906,6 +949,7 @@ and friends) are set.
 [ref-agent-security-context]: /docs/explore-analyze/workbooks/querying-data#asking-the-agent-for-a-security-context
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-period-comparison]: /docs/explore-analyze/workbooks/querying-data#period-over-period-comparison
 [ref-dev-mode]: /docs/data-modeling/dev-mode
 [ref-reviewing-changes]: /docs/data-modeling/data-model-ide#reviewing-changes
 [ref-folders]: /docs/organize-content/folders

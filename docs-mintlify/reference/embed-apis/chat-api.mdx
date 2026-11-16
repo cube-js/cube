@@ -965,6 +965,7 @@ The `cubeSqlApi` tool executes SQL queries and returns data with metadata. The i
   - `lookup`: the query only finds something a later query needs, such as an ID, a name or which values exist
 - `memoryId` (string): Reference to previous analysis or context
 - `vegaSpec` (string): Vega-Lite v5 visualization specification as JSON string (when visualization is generated)
+- `periodComparisons` (array): Period comparisons the agent asked for, e.g., month over month, with `measure`, `timeDimension`, `offset` and `outputs`. Present when the user asks to compare periods — see [Period comparisons][ref-mcp-period-comparisons]
 
 **Result Structure:**
 ```json
@@ -1021,6 +1022,8 @@ The `cubeSqlApi` tool executes SQL queries and returns data with metadata. The i
 - `data` (array): Query result rows as arrays of values
 - `totalRows` (number): Total number of rows returned
 - `truncated` (boolean): `true` when `data` holds fewer rows than `totalRows` — see [Loading all results](#loading-all-results)
+- `periodComparisonColumns` (array): Period comparison columns added to `schema` and `data`, each with its `name`, `title`, `measure`, `timeDimension`, `offset` and `output`. Present when the query has period comparisons
+- `periodComparisonErrors` (array of strings): Why a period comparison couldn't be computed. Its columns are left out; the rest of the result is unaffected
 - `uuid` (string): Unique identifier for this query result
 - `vegaSpec` (string): Vega-Lite v5 visualization specification as JSON string (when visualization is generated)
 
@@ -1069,7 +1072,8 @@ still applies.
 
 `sqlQuery` keeps the `LIMIT` the agent wrote, e.g. `LIMIT 5000`, so `totalRows`
 never exceeds it. To fetch more, raise the `LIMIT` before running the query; the
-deployment's [row limit][ref-row-limit] still applies. With API key
+deployment's [row limit][ref-row-limit] still applies. Period comparison columns are not part of
+`sqlQuery`, so the SQL API returns the rows without them. With API key
 authentication, if you set `sessionSettings.timezone`, pass the same value as
 `timezone` to `/v1/cubesql`.
 
@@ -1619,6 +1623,7 @@ while (true) {
 [ref-headless-embedding]: /embedding#headless-embedding
 [ref-cubesql]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql
 [ref-row-limit]: /reference/core-data-apis/queries#row-limit
+[ref-mcp-period-comparisons]: /docs/integrations/mcp-server#period-comparisons
 [ref-generate-session]: /reference/embed-apis/generate-session
 [ref-session-token]: /api-reference/embed/exchange-a-session-for-an-embed-token
 [ref-deployment-token]: /api-reference/deployments/deployment-token
