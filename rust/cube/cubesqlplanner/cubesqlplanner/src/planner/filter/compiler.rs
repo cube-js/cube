@@ -7,6 +7,7 @@ use crate::planner::time_dimension::{resolve_relative_date_range, QueryDateTimeH
 use crate::planner::{
     Compiler, CubeId, MemberSymbol, SymbolPath, SymbolPathType, TimeDimensionSymbol,
 };
+use chrono::Timelike;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -120,8 +121,16 @@ impl<'a> FilterCompiler<'a> {
         if !is_time || !matches!(filter.filter_operator(), FilterOperator::InDateRange) {
             return Ok(None);
         }
-        let time_dimension =
-            MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(member, None, None, None));
+        // The range's alignment decides which stored grain can serve it.
+        let date_range = match filter.values().as_slice() {
+            [FilterValue::Str(from), FilterValue::Str(to)] => {
+                Some((from.clone(), Self::inclusive_end_bound(to)?))
+            }
+            _ => None,
+        };
+        let time_dimension = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+            member, None, None, date_range,
+        ));
         Ok(Some(FilterItem::Item(BaseFilter::try_new(
             self.query_tools.clone(),
             time_dimension,
@@ -130,6 +139,17 @@ impl<'a> FilterCompiler<'a> {
             Some(filter.values().clone()),
             None,
         )?)))
+    }
+
+    // A model's bound like `23:59:59` covers that whole second, as a query's
+    // `dateRange` normalized to `.999` does.
+    fn inclusive_end_bound(to: &str) -> Result<String, CubeError> {
+        let to = QueryDateTimeHelper::format_to_date(to, 3)?;
+        let mut end = QueryDateTimeHelper::parse_native_date_time(&to)?;
+        if end.nanosecond() == 0 {
+            end = end.with_nanosecond(999_000_000).unwrap_or(end);
+        }
+        Ok(end.format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
     }
 
     /// Lifts the optional `date_range` of a time-dimension request

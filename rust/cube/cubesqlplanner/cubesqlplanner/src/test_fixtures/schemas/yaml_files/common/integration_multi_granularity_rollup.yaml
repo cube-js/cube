@@ -24,6 +24,36 @@ cubes:
         type: sum
         sql: amount
 
+      - name: amount_all_january
+        type: number
+        multi_stage: true
+        sql: "{amount}"
+        filter:
+          include:
+            - member: activity.cohort_date
+              operator: inDateRange
+              values: ["2025-01-01", "2025-01-31"]
+
+      - name: amount_january_to_last_second
+        type: number
+        multi_stage: true
+        sql: "{amount}"
+        filter:
+          include:
+            - member: activity.cohort_date
+              operator: inDateRange
+              values: ["2025-01-01T00:00:00", "2025-01-31T23:59:59"]
+
+      - name: amount_early_january
+        type: number
+        multi_stage: true
+        sql: "{amount}"
+        filter:
+          include:
+            - member: activity.cohort_date
+              operator: inDateRange
+              values: ["2025-01-04", "2025-01-06"]
+
     pre_aggregations:
       - name: all_grains
         type: rollup

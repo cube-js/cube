@@ -207,3 +207,55 @@ async fn day_query_in_a_non_utc_timezone_reads_the_day_column() {
         assert_eq!(rollup, source);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn include_window_without_granularity_reads_the_day_column() {
+    let query = indoc! {r#"
+        measures:
+          - activity.amount_early_january
+        dimensions:
+          - activity.app_name
+        time_dimensions:
+          - dimension: activity.cohort_date
+            dateRange:
+              - "2025-01-01"
+              - "2025-01-31"
+        order:
+          - id: activity.app_name
+    "#};
+    if let Some((rollup, source)) = rollup_vs_source(query, "month_then_day").await {
+        assert_eq!(rollup, source);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn include_windows_of_different_alignment_in_one_month_query() {
+    let query = indoc! {r#"
+        measures:
+          - activity.amount_all_january
+          - activity.amount_early_january
+        time_dimensions:
+          - dimension: activity.cohort_date
+            granularity: month
+        order:
+          - id: activity.cohort_date
+    "#};
+    if let Some((rollup, source)) = rollup_vs_source(query, "month_then_day").await {
+        assert_eq!(rollup, source);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn include_window_ending_on_a_whole_second_reads_the_day_column() {
+    let query = indoc! {r#"
+        measures:
+          - activity.amount_january_to_last_second
+        dimensions:
+          - activity.app_name
+        order:
+          - id: activity.app_name
+    "#};
+    if let Some((rollup, source)) = rollup_vs_source(query, "all_grains").await {
+        assert_eq!(rollup, source);
+    }
+}

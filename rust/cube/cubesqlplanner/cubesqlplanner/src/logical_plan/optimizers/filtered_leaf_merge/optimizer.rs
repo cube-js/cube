@@ -370,6 +370,11 @@ impl<'a> FilteredLeafMergeOptimizer<'a> {
         let (qa, qb) = (&a.leaf, &b.leaf);
         a.pre_aggregation.name() == b.pre_aggregation.name()
             && a.pre_aggregation.cube_name() == b.pre_aggregation.cube_name()
+            // Each usage reads the grain column its own filters need.
+            && same_members(
+                a.pre_aggregation.time_dimensions(),
+                b.pre_aggregation.time_dimensions(),
+            )
             && same_members(&qa.schema().dimensions, &qb.schema().dimensions)
             && same_members(&qa.schema().time_dimensions, &qb.schema().time_dimensions)
             && same_filter_items(
