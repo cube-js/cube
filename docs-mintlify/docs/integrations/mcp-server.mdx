@@ -649,9 +649,11 @@ each measure. The values, titles, and formats are the same as in a workbook repo
 
 Each entry takes:
 
-- `measure` — the measure to compare, as selected in the query.
-- `timeDimension` — the time dimension to shift. Select it in the query at the `day`, `week`,
-  `month`, `quarter`, or `year` granularity, or filter on it with a date range.
+- `measure` — the measure to compare. Pass its member name, e.g., `revenue` for
+  `MEASURE(revenue)`, or its alias in the query.
+- `timeDimension` — the time dimension to shift, by member name or alias. Select it in the
+  query at the `day`, `week`, `month`, `quarter`, or `year` granularity, or filter on it with
+  a date range.
 - `offset` — how far back the earlier period is, e.g., `{ "amount": 1, "unit": "month" }`.
   `unit` is one of `day`, `week`, `month`, `quarter`, or `year`.
 - `outputs` — the columns to add: `previous` (the value in the earlier period), `difference`,
@@ -659,7 +661,7 @@ Each entry takes:
 
 ```json
 {
-  "sqlQuery": "SELECT DATE_TRUNC('month', created_at) AS month, MEASURE(revenue) AS revenue FROM orders_view GROUP BY 1",
+  "sqlQuery": "SELECT DATE_TRUNC('month', created_at) AS month, MEASURE(revenue) AS total_revenue FROM orders_view GROUP BY 1",
   "periodComparisons": [
     {
       "measure": "revenue",
@@ -673,7 +675,8 @@ Each entry takes:
 
 The result lists the added columns in `periodComparisonColumns`, each with its `name`, `title`,
 `measure`, `timeDimension`, `offset`, and `output`. Column names follow the
-`<measure>__pop_<amount><unit>_<output>` pattern, e.g., `revenue__pop_1year_previous`.
+`<column>__pop_<amount><unit>_<output>` pattern, where `<column>` is the measure's column in
+the result, e.g., `total_revenue__pop_1year_previous`.
 
 Cube computes the comparison before it slices the page, so a row is compared correctly even
 when its earlier period is on another page. If the earlier period has no rows, an additive
