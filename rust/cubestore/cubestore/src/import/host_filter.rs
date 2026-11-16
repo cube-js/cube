@@ -59,6 +59,21 @@ impl IpSubnet {
                 )))
             }
         };
+        // Candidate addresses are unmapped before matching, so the network has to be as well.
+        if let IpAddr::V6(v6) = network {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                if prefix < 96 {
+                    return Some(Err(
+                        "an IPv4-mapped subnet needs a prefix length of at least 96, write it as an IPv4 subnet instead"
+                            .to_string(),
+                    ));
+                }
+                return Some(Ok(Self {
+                    network: IpAddr::V4(v4),
+                    prefix: prefix - 96,
+                }));
+            }
+        }
         Some(Ok(Self { network, prefix }))
     }
 
@@ -600,8 +615,32 @@ mod tests {
     }
 
     #[test]
+    fn ipv4_mapped_subnets_match_as_ipv4() {
+        for entry in ["::ffff:10.0.0.0/104", "[::ffff:a00:0]/104"] {
+            let f = filter(&[entry]);
+            assert!(f.check("http://10.1.2.3/a.csv").is_ok(), "{}", entry);
+            assert!(
+                f.check("http://[::ffff:10.0.0.1]/a.csv").is_ok(),
+                "{}",
+                entry
+            );
+            assert!(f.check("http://11.0.0.1/a.csv").is_err(), "{}", entry);
+        }
+        let f = filter(&["::ffff:10.0.0.5/128"]);
+        assert!(f.check("http://10.0.0.5/a.csv").is_ok());
+        assert!(f.check("http://10.0.0.6/a.csv").is_err());
+
+        let f = deny_private(&["*", "::ffff:10.0.0.0/104"]);
+        assert!(f.is_ip_permitted("10.0.0.5".parse().unwrap()));
+        assert!(f.is_ip_permitted("::ffff:10.0.0.5".parse().unwrap()));
+        assert!(!f.is_ip_permitted("192.168.0.1".parse().unwrap()));
+    }
+
+    #[test]
     fn invalid_subnets_are_rejected() {
         for entry in [
+            "::ffff:0:0/64",
+            "::ffff:10.0.0.0/95",
             "10.0.0.0/33",
             "fd00::/129",
             "10.0.0.0/",
