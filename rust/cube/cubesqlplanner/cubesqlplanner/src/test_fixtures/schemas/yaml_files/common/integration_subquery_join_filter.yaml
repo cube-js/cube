@@ -171,3 +171,76 @@ cubes:
           - name: code
             type: number
             sql: code
+
+    - name: MsOrders
+      sql: "SELECT * FROM sq_ms_orders"
+      joins:
+          - name: MsLines
+            relationship: one_to_many
+            sql: "{MsOrders}.id = {MsLines}.o_id"
+          - name: MsRegions
+            relationship: many_to_one
+            sql: "{MsOrders}.r_id = {MsRegions}.id AND {MsOrders.ms_tot} IS NOT NULL"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: ms_tot
+            type: number
+            sql: "{MsFacts.amt_ms}"
+            sub_query: true
+            propagate_filters_to_sub_query: true
+
+    - name: MsLines
+      sql: "SELECT * FROM sq_ms_lines"
+      joins:
+          - name: MsFacts
+            relationship: one_to_many
+            sql: "{MsLines}.id = {MsFacts}.m_id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+
+    - name: MsFacts
+      sql: "SELECT * FROM sq_ms_facts"
+      joins:
+          - name: MsOrders
+            relationship: many_to_one
+            sql: "{MsFacts}.o_id = {MsOrders}.id"
+          - name: MsRegions
+            relationship: many_to_one
+            sql: "{MsFacts}.r_id = {MsRegions}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: amt
+            type: sum
+            sql: amt
+          - name: amt_ms
+            type: number
+            multi_stage: true
+            sql: "{CUBE.amt}"
+            time_shift:
+                - interval: 1 year
+                  type: prior
+                  timeDimension: MsFacts.created_at
+
+    - name: MsRegions
+      sql: "SELECT * FROM sq_ms_regions"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name

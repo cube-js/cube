@@ -3,13 +3,14 @@ use crate::logical_plan::{DimensionInput, LogicalSchema, Subquery, SubqueryBody,
 use crate::planner::{InputId, MemberId};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// Plan-wide accumulator of subqueries: monotonic counters for generated
 /// subquery names (`cte_0`, `cte_1`, ...) and input ids, and the flat list
 /// of `Subquery`s in definition order (dependencies precede their
 /// dependents).
+#[derive(Clone)]
 struct SubqueryState {
     counter: usize,
     // Separate from `counter`: fixed-name subqueries (`time_series*`) take ids
@@ -108,14 +109,56 @@ pub struct PlanningScope {
     // `Some` while planning inside a multi-stage leaf scope; `None`
     // at the top level — there the ambient build context applies.
     evaluation_context: Option<EvaluationContext>,
+    // `sub_query` dimensions whose sub-queries are being planned, innermost
+    // last, and those found to need themselves.
+    sub_query_dimensions: Vec<MemberId>,
+    cyclic_sub_query_dimensions: HashSet<MemberId>,
 }
+
+/// The subqueries planned up to a point, to discard a failed planning attempt.
+pub struct ScopeCheckpoint(SubqueryState);
 
 impl PlanningScope {
     pub fn new() -> Self {
         Self {
             subquery_state: SubqueryState::new(),
             evaluation_context: None,
+            sub_query_dimensions: Vec::new(),
+            cyclic_sub_query_dimensions: HashSet::new(),
         }
+    }
+
+    pub fn checkpoint(&self) -> ScopeCheckpoint {
+        ScopeCheckpoint(self.subquery_state.clone())
+    }
+
+    pub fn restore(&mut self, checkpoint: ScopeCheckpoint) {
+        self.subquery_state = checkpoint.0;
+    }
+
+    /// Runs `plan` as the planning of the `sub_query` dimension `id`. Fails,
+    /// marking `id` cyclic, when `id` is already being planned: its value
+    /// would need itself.
+    pub fn with_sub_query_dimension<T>(
+        &mut self,
+        id: &MemberId,
+        plan: impl FnOnce(&mut Self) -> Result<T, CubeError>,
+    ) -> Result<T, CubeError> {
+        if self.sub_query_dimensions.contains(id) {
+            self.cyclic_sub_query_dimensions.insert(id.clone());
+            return Err(CubeError::user(
+                "Sub-query dimension needs its own value".to_string(),
+            ));
+        }
+        self.sub_query_dimensions.push(id.clone());
+        let result = plan(self);
+        self.sub_query_dimensions.pop();
+        result
+    }
+
+    /// Whether planning `id` was found to need itself; clears the mark.
+    pub fn take_cycle(&mut self, id: &MemberId) -> bool {
+        self.cyclic_sub_query_dimensions.remove(id)
     }
 
     /// The input id and the unique name (`cte_0`, `cte_1`, ...) of the next

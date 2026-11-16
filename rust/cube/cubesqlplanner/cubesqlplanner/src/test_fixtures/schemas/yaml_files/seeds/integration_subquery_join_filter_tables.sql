@@ -1,3 +1,7 @@
+DROP TABLE IF EXISTS sq_ms_facts CASCADE;
+DROP TABLE IF EXISTS sq_ms_lines CASCADE;
+DROP TABLE IF EXISTS sq_ms_orders CASCADE;
+DROP TABLE IF EXISTS sq_ms_regions CASCADE;
 DROP TABLE IF EXISTS sq_purchases CASCADE;
 DROP TABLE IF EXISTS sq_users CASCADE;
 DROP TABLE IF EXISTS sq_regions CASCADE;
@@ -117,3 +121,22 @@ INSERT INTO sq_purchases (id, user_id, region_id, channel_id) VALUES
     (1, 1, 2, 1),
     (2, 1, 2, 2),
     (3, 2, 1, 2);
+
+CREATE TABLE sq_ms_regions (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
+CREATE TABLE sq_ms_orders (id INTEGER PRIMARY KEY, r_id INTEGER NOT NULL);
+CREATE TABLE sq_ms_lines (id INTEGER PRIMARY KEY, o_id INTEGER NOT NULL);
+CREATE TABLE sq_ms_facts (
+    id INTEGER PRIMARY KEY,
+    o_id INTEGER NOT NULL,
+    m_id INTEGER,
+    r_id INTEGER NOT NULL,
+    amt INTEGER NOT NULL,
+    created_at TIMESTAMP NOT NULL
+);
+
+INSERT INTO sq_ms_regions VALUES (1, 'r'), (2, 's');
+INSERT INTO sq_ms_orders VALUES (1, 1), (2, 2);
+INSERT INTO sq_ms_facts VALUES
+    (1, 1, NULL, 1, 10, '2024-01-01'),
+    (2, 1, NULL, 2, 100, '2024-01-01'),
+    (3, 2, NULL, 1, 1000, '2024-01-01');

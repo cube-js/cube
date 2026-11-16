@@ -225,3 +225,32 @@ async fn test_filter_kept_when_sub_query_join_avoids_cyclic_edge() {
     )
     .await;
 }
+
+// A multi-stage sub-query is planned on its leaf's join, which reaches
+// `MsRegions` through `MsFacts`, not through the edge reading the dimension;
+// the filter stays in the sub-query, so `ms_tot` of order 1 is 10, not 110.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_sub_query_keeps_filter_off_cyclic_edge() {
+    let query = indoc! {r#"
+        dimensions:
+          - MsOrders.id
+          - MsOrders.ms_tot
+        filters:
+          - member: MsRegions.name
+            operator: equals
+            values:
+              - r
+        order:
+          - id: MsOrders.id
+    "#};
+
+    assert_matches_oracle(
+        query,
+        "SELECT o.id, (SELECT sum(f.amt) FROM sq_ms_facts f \
+             JOIN sq_ms_regions fr ON fr.id = f.r_id \
+             WHERE f.o_id = o.id AND fr.name = 'r') \
+         FROM sq_ms_orders o JOIN sq_ms_regions r ON r.id = o.r_id \
+         WHERE r.name = 'r' ORDER BY o.id",
+    )
+    .await;
+}
