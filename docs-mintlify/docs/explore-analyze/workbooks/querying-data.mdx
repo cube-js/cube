@@ -87,8 +87,8 @@ for dimensions:
 
 | Data type | Operators |
 | --- | --- |
-| String | is, is not, contains, not contains, starts with, not starts with, ends with, not ends with, is null, is not null, is empty, is not empty |
-| Number | is, is not, greater than, greater than or equal, less than, less than or equal, between, is null, is not null |
+| String | is, is not, contains, not contains, starts with, not starts with, ends with, not ends with, top, bottom, is null, is not null, is empty, is not empty |
+| Number | is, is not, greater than, greater than or equal, less than, less than or equal, between, top, bottom, is null, is not null |
 | Time | is, is not, after, after or on, before, before or on, between, in the month, not in the month, in the quarter, not in the quarter, in the year, not in the year, is null, is not null |
 | Boolean | is, is not, is null, is not null |
 
@@ -104,6 +104,9 @@ for dimensions:
 
 On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
 `<` and `≤`.
+
+**top** and **bottom** are offered on dimensions only, not on measures; see
+[Top N and Bottom N](#top-n-and-bottom-n).
 
 ### Values
 
@@ -136,6 +139,46 @@ On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
 - With a range set, the chip shows **is** and the range's name, for example
   *Created at* **is** *last month*, with the dates in a tooltip. A single date
   reads like *Created at* **before** *start of last month*.
+
+### Top N and Bottom N
+
+**top** and **bottom** keep the N members of a dimension with the highest or
+lowest value of a measure, such as the 10 cities with the most orders. They are
+offered on string and number dimensions of the semantic view, in their own
+section of the operator menu.
+
+The filter's popover has these settings:
+
+- **Number of values** — N, a whole number of at least 1. It starts at 10.
+- **Ranked by** — the measure to rank by. It is filled in when the view has a
+  single measure; otherwise, choose one.
+- **Ranked within** — other dimensions of the report, time dimensions at their
+  granularity included. Leave it on **Whole report** to rank across the whole
+  report, or pick dimensions to keep N members in each group, such as the top 3
+  products in each city.
+
+The filter runs once N and a measure are set and you click **Apply**. The chip
+reads like *City* **top** *10 by Count*, or *Product* **top** *3 by Count per
+City*.
+
+Members are ranked among the rows the report shows: every other filter in the
+bar, measure filters included, applies before the ranking. Ties are broken by
+the member's value in ascending order. A member with a null measure value never
+takes a slot, and neither does a null member, so **bottom** can return fewer
+than N members.
+
+The ranking keeps the same members everywhere in the report:
+
+- [Totals](#totals) and subtotals add up the ranked members only, and so do
+  [sparklines](/docs/explore-analyze/charts/chart-types/table#sparklines).
+- A [period-over-period comparison](#period-over-period-comparison) shows the
+  same members in the previous period, rather than ranking that period again.
+
+**top** and **bottom** are not offered on calculated fields, bins and value
+groups, or inside a filter group.
+To show the top N members and group the rest under one label, use a
+[Top N field][ref-calculated-fields-top-n] instead. A data model author can
+also seed a ranking with [`default_ui_filters`][ref-default-ui-filters].
 
 ### Combining filters
 
@@ -613,6 +656,7 @@ behaves as intended.
 [ref-time-filter-values]: /docs/explore-analyze/dashboards/widgets/controls#operators-by-dimension-type
 [ref-table-chart]: /docs/explore-analyze/charts/chart-types/table
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields
+[ref-calculated-fields-top-n]: /docs/explore-analyze/workbooks/calculated-fields#top-n-fields
 [ref-auto-run]: /reference/data-modeling/view#auto_run
 [ref-configuration-auto-run]: /docs/data-modeling/configuration#auto-run
 

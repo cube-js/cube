@@ -24,8 +24,8 @@ The available operators depend on the type of the underlying dimension:
 
 | Dimension type | Operators |
 |---|---|
-| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null`, `is empty`, `is not empty` |
-| **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, `is null`, `is not null` |
+| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, [`top`, `bottom`](#top-n-and-bottom-n), `is null`, `is not null`, `is empty`, `is not empty` |
+| **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, [`top`, `bottom`](#top-n-and-bottom-n), `is null`, `is not null` |
 | **Boolean** | `is` — no operator menu; the value picker's `is true` and `is false` set it |
 | **Time** | `is`, `is not`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `after`, `after or on`, `before`, `before or on`, `between`, `is null`, `is not null` |
 
@@ -58,6 +58,14 @@ The filter shows the range's name, such as "Last month, up to now", with its dat
 
 No tab offers a list of values: each field takes one, and a `between` filter's two fields fill its two-entry `value` array with one bound each rather than with alternatives. The [**Selection mode**](#single-vs-multiple-selection) switch is not offered for a time dimension either, so a time filter carries *several values* for one condition only when a hand-written [URL parameter](#sharing-the-current-selection) passes a list in its `value` — `f_orders.created_at={"type":"equals","value":["2026-01-01","2026-02-01"]}`.
 
+### Top N and Bottom N
+
+`top` and `bottom` keep the N members of the dimension with the highest or lowest value of a measure, such as the 10 cities with the most orders, on every chart the filter reaches. They work like the [Top N filter][ref-top-n-filter] in a workbook: every other filter applies before the ranking, ties are broken by the member's value, and a member with a null measure value never takes a slot. They are offered on string and number dimensions of the semantic view, not on [calculated dimensions](#calculated-dimensions), and only when the view has a measure.
+
+In the filter's edit sidebar, **Viewers can rank by** lists the measures of the view the filter may rank by. At least one must stay checked. The filter itself has two settings: **Number of values** and, when more than one measure is allowed, **Ranked by**. It reads like "10 by Count". With a single allowed measure, viewers set only the number.
+
+A [parent control](#parent)'s **Set to** can set a filter to `top` or `bottom`, with a number and a measure. When a filter ranks by a measure that is no longer in the semantic view, it says so; pick another measure in the filter.
+
 ### Single vs. multiple selection
 
 Filters can allow either a single value or multiple values. The filter's edit sidebar sets this under **Selection mode**, on a switch labelled **Enable multiple values** — offered on a string filter using `is`, and on no other combination. What each filter holds:
@@ -70,6 +78,7 @@ Filters can allow either a single value or multiple values. The filter's edit si
 | **Time** on any condition except `is null` and `is not null` | One per field in the UI; several only on `is` / `is not`, and only through a hand-written [URL parameter](#sharing-the-current-selection) |
 | **Boolean** | One, set by its `is true` / `is false` picker |
 | Substring conditions (`contains`, `starts with`, `ends with` and their negations) | One |
+| `top` / `bottom` | One: the number of members to keep |
 | `is null`, `is not null`, `is empty`, `is not empty` | None |
 
 ### Default values
@@ -756,6 +765,7 @@ For filter, time granularity, and field switcher controls — the three that map
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
 [ref-period-comparison]: /docs/explore-analyze/workbooks/querying-data#period-over-period-comparison
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields#promoting-to-a-workbook-field
+[ref-top-n-filter]: /docs/explore-analyze/workbooks/querying-data#top-n-and-bottom-n
 [ref-pre-aggregations]: /docs/pre-aggregations
 [ref-switch-dimensions]: /reference/data-modeling/dimensions#type
 [ref-granularities]: /docs/data-modeling/dimensions

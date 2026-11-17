@@ -300,7 +300,8 @@ or remove them entirely.
 
 Each entry has a `member` (a dimension or measure exposed by the view), an
 `operator`, and a list of `values` — or a single `value`, which is natural for
-single-value operators. The null and empty checks take no value.
+single-value operators. The null and empty checks take no value. A `top n` or
+`bottom n` entry also has a `measure`.
 
 <Info>
 
@@ -379,6 +380,12 @@ what you see in the filter bar is what you type:
   `ends with`, `not ends with`, `is empty`, `is not empty`.
 - Numbers: `greater than`, `greater than or equal`, `less than`,
   `less than or equal`, `between`.
+- String and number dimensions: `top n` and `bottom n` (shown as `top` and
+  `bottom` in the filter bar), which keep the N members with the highest or
+  lowest value of a measure. Set N in `value` and the measure of the same
+  view in `measure`, for example
+  `{ member: status, operator: top n, value: 3, measure: count }`. The ranking
+  is across the whole report; see the [Top N filter][ref-workbook-top-n].
 - Dates and times: `after`, `after or on`, `before`, `before or on`, `between`,
   and the period comparisons `in the month`, `not in the month`,
   `in the quarter`, `not in the quarter`, `in the year`, `not in the year`. A
@@ -449,9 +456,10 @@ that only that tab offers, and on **Presets** otherwise. A range that isn't a
 preset, such as the last row above, is listed above the presets.
 
 Values are case- and whitespace-insensitive. Entries are validated: an
-unrecognized operator or value, or a `between` filter without exactly two
-bounds, drops that filter entry with a browser-console warning — the remaining
-entries still apply, and view selection never breaks.
+unrecognized operator or value, a `between` filter without exactly two
+bounds, or a `top n` or `bottom n` filter without a whole-number N of at least 1
+or a `measure` of the same view drops that filter entry with a browser-console
+warning — the remaining entries still apply, and view selection never breaks.
 
 Unlike [`default_filters`](#default_filters), which are enforced on every query
 against the view, `default_ui_filters` only provide a starting point: they
@@ -1158,6 +1166,7 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-playground]: /docs/explore-analyze/playground#viewing-the-data-model
 [ref-viz-tools]: /admin/connect-to-data/visualization-tools
 [ref-workbook-filtering]: /docs/explore-analyze/workbooks/querying-data#filtering
+[ref-workbook-top-n]: /docs/explore-analyze/workbooks/querying-data#top-n-and-bottom-n
 [ref-workbook-running]: /docs/explore-analyze/workbooks/querying-data#running-queries
 [ref-extension]: /docs/data-modeling/extending-cubes#extending-views
 [ref-recipe-reuse-view-measures]: /recipes/data-modeling/reusing-view-measures
