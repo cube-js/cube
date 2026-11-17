@@ -77,8 +77,9 @@ message is optional:
   Git's default merge message, such as `Merge branch 'my-branch' into master`. The
   changes are sent either way.
 
-To write the message, Cube sends the diff of the branch against the target branch
-to the AI model of the agent.
+To write the message, Cube sends the diff of the changes against the target branch
+to the AI model of the agent. For **Commit**, that diff holds the changes you
+saved since your last commit.
 
 {/* TODO: screenshot — the Changes view with the Commit button, its menu, and the Message field */}
 
