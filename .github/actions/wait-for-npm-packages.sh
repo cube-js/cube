@@ -1,5 +1,5 @@
 #!/bin/bash
-# Waits until Yarn can resolve every public workspace package at the lerna.json version.
+# Waits until Yarn can resolve the core packages at the lerna.json version.
 # The registry CDN can lag behind `lerna publish` for minutes, and installs of the new
 # release then fail with YN0082 "No candidates found".
 set -eo pipefail
@@ -8,7 +8,20 @@ TIMEOUT_SECONDS=${NPM_WAIT_TIMEOUT_SECONDS:-1800}
 INTERVAL_SECONDS=${NPM_WAIT_INTERVAL_SECONDS:-15}
 
 VERSION=$(jq -r .version lerna.json)
-PENDING=($(yarn workspaces list --json --no-private | jq -r .name))
+# Lerna publishes in dependency order, so this covers both the first packages out
+# (shared, native) and the last ones (drivers, server, cli) the Docker images install
+PENDING=(
+  @cubejs-backend/shared
+  @cubejs-backend/native
+  @cubejs-backend/cubestore
+  @cubejs-backend/schema-compiler
+  @cubejs-backend/query-orchestrator
+  @cubejs-backend/api-gateway
+  @cubejs-backend/server-core
+  @cubejs-backend/server
+  @cubejs-backend/postgres-driver
+  cubejs-cli
+)
 echo "Waiting for ${#PENDING[@]} packages at ${VERSION}"
 
 DEADLINE=$((SECONDS + TIMEOUT_SECONDS))
