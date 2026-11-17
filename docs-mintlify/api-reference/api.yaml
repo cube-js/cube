@@ -10707,8 +10707,10 @@ components:
         value:
           description: >-
             Filter value. Omit for is_null / is_not_null / is_empty / is_not_empty; provide a
-            2-element [start, end] array for between. An empty array or empty string with no
-            operator renders the filter cleared; with an operator, the filter keeps that operator.
+            2-element [start, end] array for between; a whole number of members of at least 1
+            for top_n / bottom_n, which set a Top N control and rank by the measure it is
+            configured with. An empty array or empty string with no operator renders the filter
+            cleared; with an operator, the filter keeps that operator.
           oneOf:
             - oneOf:
                 - type: string
@@ -10745,6 +10747,8 @@ components:
         - is_empty
         - is_not_empty
         - between
+        - top_n
+        - bottom_n
         - custom
       type: string
     DashboardFilterOperator:
@@ -10772,6 +10776,8 @@ components:
         - is_empty
         - is_not_empty
         - between
+        - top_n
+        - bottom_n
         - custom
       type: string
     DashboardLayout:

@@ -215,6 +215,33 @@ filter's selection where possible — renaming a label moves the selection with
 it — but changing the number of buckets drops a selection that no longer
 matches, since the underlying structure changed.
 
+### Top N fields
+
+A Top N field keeps the N members of a string dimension with the highest or
+lowest value of a measure, and groups every other member under one label, such
+as the 5 biggest customers and an **Other** row. Choose **Top N…** in the
+dimension's menu in the field picker sidebar, or in its column header menu in
+the results.
+
+The panel has these settings:
+
+- **Show** — **Top** or **Bottom**, and N. N starts at 10.
+- **Ranked by** — the measure to rank by. It starts on the first measure the
+  report shows.
+- **Ranked within** — other dimensions of the report. Leave it on
+  **Whole report** to rank across the whole report, or pick dimensions to
+  keep N members in each group.
+- **Group remaining values as** — the label of the rest, **Other** by default.
+
+The field replaces the dimension in the report and is named like
+*Status, top 10*. To change it, choose **Edit Top N…** in its menu. Members are
+ranked the same way as by the [Top N filter][ref-top-n-filter]: after the
+report's other filters, with ties broken by the member's value.
+
+To hide the rest instead of grouping it, switch **Group remaining values as**
+off. The panel then adds a [Top N filter][ref-top-n-filter] to the report
+instead of a field.
+
 ### Durations between dates
 
 You can count the time between two time dimensions of a semantic view without
@@ -349,3 +376,4 @@ it; publish again to show your edits to viewers.
 [ref-model-agent]: /docs/getting-started/develop-in-ide#ai-assisted-development
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-deployment-permissions]: /admin/users-and-permissions/custom-roles#deployment-permissions
+[ref-top-n-filter]: /docs/explore-analyze/workbooks/querying-data#top-n-and-bottom-n
