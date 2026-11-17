@@ -13,9 +13,9 @@ to activate this feature for your account.
 
 Cube publishes selected, deployed Cube views as native Metric Views in your Databricks Unity
 Catalog. Databricks applications query those objects directly; they do not query Cube at runtime.
-Your Cube model remains the source of truth. Publication is **one-way and on demand**, through
-Console or the public REST API; it does not import Databricks definitions into Cube or run
-automatically after deployments.
+Your Cube model remains the source of truth. Publication is **one-way**: it does not import
+Databricks definitions into Cube. You start it from Console or the public REST API, or have Cube
+[publish after each deployment](#publish-after-each-deployment).
 
 <iframe
   width="100%"
@@ -103,7 +103,8 @@ Scope rules:
 - Each preview or sync resolves at most 128 views per data source, whether the scope is **all**,
   **selected**, or **pattern**. If **all** or **pattern** resolves more, preview and sync reject
   the request; narrow the scope and try again.
-- A newly deployed view enters an **all** or matching **pattern** scope on the next manual sync.
+- A newly deployed view enters an **all** or matching **pattern** scope on the next sync: the
+  deployment's own run when you [publish after each deployment](#publish-after-each-deployment).
   A **selected** scope changes only when you edit it.
 - Renaming a view or target creates a new target. The old one is kept, or dropped under
   **Delete the Metric View Cube created** (see [Removed views](#removed-views)).
@@ -156,9 +157,40 @@ Through the API, pass the credential as `connection` (`host`, `httpPath`, `clien
 [saving settings](/api-reference/databricks-metric-view-integration/create-or-update-databricks-metric-view-publication-settings).
 Omit it to keep the stored credential, or pass `null` to remove it.
 
+## Publish after each deployment {#publish-after-each-deployment}
+
+Cube can publish every time a build of the deployment succeeds, so Databricks follows your Cube
+model without a manual sync or a CI step. Set up publication as in [Publish a view](#publish-a-view),
+including **Preview**, **Test access**, and a first sync. Then turn on **Publish after each
+deployment** in the **Databricks Metric Views** card and save. Through the API, save
+`syncOnDeploy: true`. The setting is off by default, and a save that omits it turns it off.
+
+After each successful build, Cube starts a run for every Databricks data source of the deployment
+that has publication and this setting turned on. Changes in development mode publish nothing until
+they are deployed. Each run:
+
+- Converts the build that just succeeded, with the saved settings: scope, target, and what happens
+  when a view leaves the scope. Under **Delete the Metric View Cube created**, a deployment that
+  removes a view drops its Metric View (see [Removed views](#removed-views)).
+- Runs as the user who deployed. A build started by a Git push has no user, so the run uses
+  whoever last saved the settings. For a data model with [Jinja templates](#jinja-templates), that
+  user needs **Access SQL Runner**, or the build is not published.
+- Shows **Deployment** under **Triggered by** in run history (`trigger: DEPLOYMENT` in the API).
+  Runs you start from the card or the API show **Manual** (`MANUAL`).
+
+If another run is active, or the deployment is still rolling out a build with Jinja templates,
+the run retries for about 30 minutes. If a newer build succeeds first, only the newer build
+publishes. A build whose run can't start in that time is not published; sync manually or deploy
+again.
+
+A run that completes sends no notification. A run that fails, ends **Partial**, or withholds a
+measure notifies its user in the [Inbox](/docs/inbox).
+
 ## Trigger publication from CI
 
-Run publication from CI after a successful Cube deployment. First, configure **All views**, a
+Run publication from CI after a successful Cube deployment when CI should check the result. To
+just publish after each deployment, [turn on the setting](#publish-after-each-deployment) instead;
+don't do both for one deployment, or each build starts two runs. First, configure **All views**, a
 dedicated target catalog and schema, and publication enabled in **Settings → Data Sources**. With
 **When a view leaves the scope** set to **Delete the Metric View Cube created**, each CI run also
 drops the Metric Views the deployment made obsolete (see [Removed views](#removed-views)). Run
@@ -463,8 +495,10 @@ not manage. A failed conversion, validation, or write leaves that view's previou
 Databricks definition in place. Other views in the same run may still publish.
 
 You can request cancellation of an active run. It prevents further writes but does not undo
-views already published. To roll back a bad definition, restore the desired Cube model,
-deploy it, preview, and sync again. Inspect run history and the Databricks target afterward.
+views already published. To roll back a bad definition, restore the desired Cube model and
+deploy it. Then preview and sync again or, with [Publish after each deployment](#publish-after-each-deployment)
+on, check that the build's **Deployment** run completed and sync manually only if it didn't.
+Inspect run history and the Databricks target afterward.
 If publication is unavailable, contact [Cube support](/admin/account-billing/support) with
 the deployment, data source, run ID, and per-view issue codes. Do not send credentials or
 sensitive source data.
