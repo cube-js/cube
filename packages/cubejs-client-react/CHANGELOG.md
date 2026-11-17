@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
+
+### Bug Fixes
+
+- **client-react:** Accept string filter members in QueryBuilder ([#12804](https://github.com/cube-js/cube/issues/12804)) ([008a269](https://github.com/cube-js/cube/commit/008a2691050a668d363550362f3d4abf2c3d9fd3)), closes [#7383](https://github.com/cube-js/cube/issues/7383)
+
 ## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
 
 **Note:** Version bump only for package @cubejs-client/react

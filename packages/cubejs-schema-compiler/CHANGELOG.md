@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
+
+### Bug Fixes
+
+- **tesseract:** Build subquery dimension join aliases from sql_alias ([#12581](https://github.com/cube-js/cube/issues/12581)) ([8e85a2e](https://github.com/cube-js/cube/commit/8e85a2edec21bee7e1f1a52a723750cc8e96bd34)), closes [#8561](https://github.com/cube-js/cube/issues/8561)
+- **tesseract:** Keep every usage of a rollup that is also a rollupJoin leg ([#12593](https://github.com/cube-js/cube/issues/12593)) ([4d69632](https://github.com/cube-js/cube/commit/4d69632c9af26b30870ee04cd0b2366163e2481d)), closes [#11124](https://github.com/cube-js/cube/issues/11124)
+
 ## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
 
 ### Bug Fixes
