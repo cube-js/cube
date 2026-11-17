@@ -495,10 +495,10 @@ not manage. A failed conversion, validation, or write leaves that view's previou
 Databricks definition in place. Other views in the same run may still publish.
 
 You can request cancellation of an active run. It prevents further writes but does not undo
-views already published. To roll back a bad definition, restore the desired Cube model,
-deploy it, preview, and sync again. With [Publish after each deployment](#publish-after-each-deployment)
-on, the deployment publishes the restored model; don't sync again. Inspect run history and the
-Databricks target afterward.
+views already published. To roll back a bad definition, restore the desired Cube model and
+deploy it. Then preview and sync again or, with [Publish after each deployment](#publish-after-each-deployment)
+on, check that the build's **Deployment** run completed and sync manually only if it didn't.
+Inspect run history and the Databricks target afterward.
 If publication is unavailable, contact [Cube support](/admin/account-billing/support) with
 the deployment, data source, run ID, and per-view issue codes. Do not send credentials or
 sensitive source data.
