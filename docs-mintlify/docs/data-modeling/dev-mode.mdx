@@ -43,8 +43,9 @@ When you make changes to the data model, you can save them by clicking the "Save
 After saving changes, click the button in the actions bar or in the **Changes**
 view. Its label says what it does by default:
 
-- **Commit** commits the changes to the branch you're working on. The menu next
-  to the button shows that branch's name under **Commit**.
+- **Commit** commits the changes to the branch you're working on. It's the
+  default unless one of the cases below applies. The menu next to the button
+  shows that branch's name under **Commit**.
 - **Merge into …** merges a shared branch into the branch it was created from.
   It's the default on a shared branch, unless that branch was created from the
   deploy branch.
@@ -71,8 +72,8 @@ changed can take that long to show in the Changes view.
 Before the changes are sent, you can enter a **Message** for the commit. The
 message is optional:
 
-- Leave it empty, and the agent writes the message from the changes being sent
-  when they're sent.
+- Leave it empty, and the agent writes the message from the changes when they're
+  sent.
 - Click **Write the message with AI** to get the agent's message in the field, so
   you can read and edit it first.
 - If AI is not available, or the agent cannot write the message, the commit gets
