@@ -1139,6 +1139,24 @@ In the example above, the `country = US` filter is applied by default. However,
 if a query explicitly filters on `country` (e.g., `country = FR`), the default
 filter is released and the explicit filter is used instead.
 
+### `member_sets`
+
+The `member_sets` parameter defines named lists of view members to use in
+[drill queries][ref-drill-queries]. Other views use them by their qualified
+name, e.g., `customer_details.contact`.
+
+```yaml
+views:
+  - name: customer_details
+    member_sets:
+      - name: contact
+        members: [name, email, city]
+
+    cubes:
+      - join_path: users
+        includes: [name, email, city]
+```
+
 ### `access_policy`
 
 The `access_policy` parameter is used to configure [access policies][ref-ref-dap].
@@ -1167,3 +1185,4 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-dim-description]: /reference/data-modeling/dimensions#description
 [ref-dim-format]: /reference/data-modeling/dimensions#format
 [ref-dim-meta]: /reference/data-modeling/dimensions#meta
+[ref-drill-queries]: /reference/data-modeling/measures#drill_queries

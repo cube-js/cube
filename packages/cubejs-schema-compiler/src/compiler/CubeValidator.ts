@@ -490,6 +490,41 @@ const forbiddenCurrencyNonNumericMeasure = (value: string) => Joi.forbidden().me
   'any.unknown': `"currency" property can only be used with numeric measures, actual type: ${value}`,
 });
 
+const drillQueryNames = Joi.alternatives([Joi.func(), Joi.array().items(Joi.string())]);
+
+const DrillQuerySchema = Joi.object().keys({
+  name: identifier.required().description('Name of the drill query, unique per measure'),
+  title: Joi.string().description('Display title of the drill query; defaults to the humanized name'),
+  description: Joi.string().description('Description of the drill query'),
+  icon: Joi.string()
+    .pattern(/^[a-z0-9]+(-[a-z0-9]+)*$/)
+    .messages({
+      'string.pattern.base': '{{#label}} must be a Tabler icon name in kebab case, e.g. "users" or "chart-bar"',
+    })
+    .description('Tabler icon name shown next to the drill query title'),
+  members: drillQueryNames.required().description('Dimensions, measures and member sets listed in the drill'),
+  order: Joi.alternatives([
+    Joi.func(),
+    Joi.object().pattern(/./, Joi.string().valid('asc', 'desc')),
+    Joi.array().items(Joi.array().items(Joi.string()).length(2)),
+  ])
+    .description('Sort of the drill rows, as in a query: member to asc or desc. Each member must be in members'),
+  // An integer: checked when the drill query compiles, as the model schema has no `integer` rule
+  limit: Joi.number()
+    .strict()
+    .min(1)
+    .description('Maximum number of drill rows, a positive integer'),
+  filters: Joi.alternatives([Joi.func(), Joi.array().items(Joi.object())]).description('Filters added to the drill, in the query filter format'),
+});
+
+const DrillQueriesSchema = Joi.array().items(DrillQuerySchema)
+  .description('Named drill queries on this measure, each with its own members, sort, limit and filters');
+
+const MemberSetsSchema = Joi.array().items(Joi.object().keys({
+  name: identifier.required().description('Name of the member set'),
+  members: drillQueryNames.required().description('Members and member sets in the set'),
+})).description('Named lists of members, used in drill queries');
+
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()).description('Other names for this measure'),
   format: measureFormatSchema.description('How the measure is displayed. Use a named format (number, id, percent, currency, abbr, accounting) with optional _N suffix (N=0–6) for decimal precision on supported formats, or any valid d3-format specifier (e.g. $,.2f, .0%). See https://docs.cube.dev/reference/data-modeling/measures#format'),
@@ -534,6 +569,7 @@ const BaseMeasure = {
       sql: Joi.func().required().description('SQL condition for the drill-down rows')
     })
   ).description('Filters applied when drilling down into this measure'),
+  drillQueries: DrillQueriesSchema,
   meta: Joi.any().description('Additional metadata for the measure')
 };
 
@@ -1231,6 +1267,7 @@ const baseSchema = {
   preAggregations: PreAggregationsAlternatives.description('Pre-aggregation definitions for performance optimization'),
   accessPolicy: Joi.array().items(GroupPolicySchema.required()).description('Access policies that control who sees which members and rows'),
   hierarchies: hierarchySchema.description('Hierarchies for drill-down functionality'),
+  memberSets: MemberSetsSchema,
 };
 
 const cubeSchema = inherit(baseSchema, {
@@ -1358,6 +1395,7 @@ const viewSchema = inherit(baseSchema, {
             description: Joi.string().description('Override the description of the included member'),
             format: formatSchema.description('Override the display format of the included member'),
             meta: Joi.any().description('Override the metadata of the included member as a whole'),
+            drillQueries: DrillQueriesSchema.description('Drill queries of the included measure: one with the name of an inherited drill query replaces it'),
           })
         ]))
       ]).required().description("Specify which members to include from the cube. Use '*' for all members, or an array of member names/objects with aliases"),

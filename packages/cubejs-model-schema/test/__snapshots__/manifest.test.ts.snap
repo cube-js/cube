@@ -4,8 +4,9 @@ exports[`the generated manifest marks the same places where it differs from Core
 Object {
   "converts-string": 44,
   "custom": 268,
-  "function": 501,
+  "function": 524,
   "function-condition": 78,
+  "limit": 7,
   "list-of-either": 2,
 }
 `;
@@ -724,6 +725,14 @@ Object {
         },
         "^fileName$": Object {},
         "^file_name$": Object {},
+        "^memberSets$": Object {
+          "allOf": Array [
+            Object {
+              "$ref": "#/definitions/member_sets",
+            },
+          ],
+          "deprecated": true,
+        },
         "^preAggregations$": Object {
           "allOf": Array [
             Object {
@@ -871,6 +880,9 @@ Object {
             ],
           },
           "type": "array",
+        },
+        "member_sets": Object {
+          "$ref": "#/definitions/member_sets",
         },
         "meta": Object {
           "description": "Additional custom metadata",
@@ -3269,6 +3281,134 @@ Object {
       },
       "type": "array",
     },
+    "drill_querie": Object {
+      "additionalProperties": false,
+      "properties": Object {
+        "description": Object {
+          "description": "Description of the drill query",
+          "type": "string",
+        },
+        "filters": Object {
+          "anyOf": Array [
+            Object {
+              "items": Object {
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                ],
+              },
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+                "array",
+                "object",
+              ],
+            },
+            Object {
+              "items": Object {
+                "type": "object",
+              },
+              "type": "array",
+            },
+          ],
+          "description": "Filters added to the drill, in the query filter format",
+        },
+        "icon": Object {
+          "description": "Tabler icon name shown next to the drill query title",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "type": "string",
+        },
+        "limit": Object {
+          "description": "Maximum number of drill rows, a positive integer",
+          "type": "number",
+        },
+        "members": Object {
+          "anyOf": Array [
+            Object {
+              "items": Object {
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                ],
+              },
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+                "array",
+                "object",
+              ],
+            },
+            Object {
+              "items": Object {
+                "type": "string",
+              },
+              "type": "array",
+            },
+          ],
+          "description": "Dimensions, measures and member sets listed in the drill",
+        },
+        "name": Object {
+          "description": "Name of the drill query, unique per measure",
+          "pattern": "^[_a-zA-Z][_a-zA-Z0-9]*$",
+          "type": "string",
+        },
+        "order": Object {
+          "anyOf": Array [
+            Object {
+              "items": Object {
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                ],
+              },
+              "type": Array [
+                "string",
+                "number",
+                "boolean",
+                "array",
+                "object",
+              ],
+            },
+            Object {
+              "items": Object {
+                "enum": Array [
+                  "asc",
+                  "desc",
+                ],
+                "type": "string",
+              },
+              "type": "array",
+            },
+            Object {
+              "items": Object {
+                "items": Object {
+                  "type": "string",
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array",
+              },
+              "type": "array",
+            },
+          ],
+          "description": "Sort of the drill rows, as in a query: member to asc or desc. Each member must be in members",
+        },
+        "title": Object {
+          "description": "Display title of the drill query; defaults to the humanized name",
+          "type": "string",
+        },
+      },
+      "required": Array [
+        "name",
+        "members",
+      ],
+      "type": "object",
+    },
     "filter_member": Object {
       "additionalProperties": false,
       "allOf": Array [
@@ -4185,6 +4325,13 @@ Object {
                   },
                 ],
               },
+              "^drillQueries$": Object {
+                "allOf": Array [
+                  Object {
+                    "$ref": "#/definitions/measure_drill_queries",
+                  },
+                ],
+              },
               "^drill_member_references$": Object {
                 "items": Object {
                   "type": Array [
@@ -4248,6 +4395,17 @@ Object {
                   "array",
                   "object",
                 ],
+              },
+              "drill_queries": Object {
+                "description": "Named drill queries on this measure, each with its own members, sort, limit and filters",
+                "items": Object {
+                  "allOf": Array [
+                    Object {
+                      "$ref": "#/definitions/drill_querie",
+                    },
+                  ],
+                },
+                "type": "array",
               },
               "filters": Object {
                 "$ref": "#/definitions/measure_filters",
@@ -4474,6 +4632,13 @@ Object {
                 },
               ],
             },
+            "^drillQueries$": Object {
+              "allOf": Array [
+                Object {
+                  "$ref": "#/definitions/measure_drill_queries",
+                },
+              ],
+            },
             "^drill_member_references$": Object {
               "items": Object {
                 "type": Array [
@@ -4537,6 +4702,17 @@ Object {
                 "array",
                 "object",
               ],
+            },
+            "drill_queries": Object {
+              "description": "Named drill queries on this measure, each with its own members, sort, limit and filters",
+              "items": Object {
+                "allOf": Array [
+                  Object {
+                    "$ref": "#/definitions/drill_querie",
+                  },
+                ],
+              },
+              "type": "array",
             },
             "filters": Object {
               "$ref": "#/definitions/measure_filters",
@@ -4770,6 +4946,13 @@ Object {
               },
             ],
           },
+          "^drillQueries$": Object {
+            "allOf": Array [
+              Object {
+                "$ref": "#/definitions/measure_drill_queries",
+              },
+            ],
+          },
           "^drill_member_references$": Object {
             "items": Object {
               "type": Array [
@@ -4888,6 +5071,17 @@ Object {
               "array",
               "object",
             ],
+          },
+          "drill_queries": Object {
+            "description": "Named drill queries on this measure, each with its own members, sort, limit and filters",
+            "items": Object {
+              "allOf": Array [
+                Object {
+                  "$ref": "#/definitions/drill_querie",
+                },
+              ],
+            },
+            "type": "array",
           },
           "filter": Object {
             "additionalProperties": false,
@@ -5252,6 +5446,22 @@ Object {
             "array",
             "object",
           ],
+        },
+      ],
+      "deprecated": true,
+    },
+    "measure_drill_queries": Object {
+      "allOf": Array [
+        Object {
+          "description": "Named drill queries on this measure, each with its own members, sort, limit and filters",
+          "items": Object {
+            "allOf": Array [
+              Object {
+                "$ref": "#/definitions/drill_querie",
+              },
+            ],
+          },
+          "type": "array",
         },
       ],
       "deprecated": true,
@@ -5768,6 +5978,52 @@ Object {
         },
         "type": "array",
       },
+    },
+    "member_sets": Object {
+      "description": "Named lists of members, used in drill queries",
+      "items": Object {
+        "additionalProperties": false,
+        "properties": Object {
+          "members": Object {
+            "anyOf": Array [
+              Object {
+                "items": Object {
+                  "type": Array [
+                    "string",
+                    "number",
+                    "boolean",
+                  ],
+                },
+                "type": Array [
+                  "string",
+                  "number",
+                  "boolean",
+                  "array",
+                  "object",
+                ],
+              },
+              Object {
+                "items": Object {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+            ],
+            "description": "Members and member sets in the set",
+          },
+          "name": Object {
+            "description": "Name of the member set",
+            "pattern": "^[_a-zA-Z][_a-zA-Z0-9]*$",
+            "type": "string",
+          },
+        },
+        "required": Array [
+          "name",
+          "members",
+        ],
+        "type": "object",
+      },
+      "type": "array",
     },
     "nested_view_group": Object {
       "additionalProperties": false,
@@ -11824,6 +12080,14 @@ Object {
         "^file_name$": Object {},
         "^isView$": Object {},
         "^is_view$": Object {},
+        "^memberSets$": Object {
+          "allOf": Array [
+            Object {
+              "$ref": "#/definitions/member_sets",
+            },
+          ],
+          "deprecated": true,
+        },
         "^preAggregations$": Object {
           "allOf": Array [
             Object {
@@ -12008,6 +12272,9 @@ Object {
           },
           "type": "array",
         },
+        "member_sets": Object {
+          "$ref": "#/definitions/member_sets",
+        },
         "meta": Object {
           "description": "Additional custom metadata",
         },
@@ -12170,6 +12437,24 @@ Object {
                   },
                   Object {
                     "additionalProperties": false,
+                    "patternProperties": Object {
+                      "^drillQueries$": Object {
+                        "allOf": Array [
+                          Object {
+                            "description": "Drill queries of the included measure: one with the name of an inherited drill query replaces it",
+                            "items": Object {
+                              "allOf": Array [
+                                Object {
+                                  "$ref": "#/definitions/drill_querie",
+                                },
+                              ],
+                            },
+                            "type": "array",
+                          },
+                        ],
+                        "deprecated": true,
+                      },
+                    },
                     "properties": Object {
                       "alias": Object {
                         "description": "Name the member gets in the view",
@@ -12179,6 +12464,17 @@ Object {
                       "description": Object {
                         "description": "Override the description of the included member",
                         "type": "string",
+                      },
+                      "drill_queries": Object {
+                        "description": "Drill queries of the included measure: one with the name of an inherited drill query replaces it",
+                        "items": Object {
+                          "allOf": Array [
+                            Object {
+                              "$ref": "#/definitions/drill_querie",
+                            },
+                          ],
+                        },
+                        "type": "array",
                       },
                       "format": Object {
                         "anyOf": Array [
