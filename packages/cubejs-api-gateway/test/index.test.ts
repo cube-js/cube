@@ -1548,6 +1548,17 @@ describe('API Gateway', () => {
 
       expect(query.body.data).toBeUndefined();
       expect(query.body.errors[0].message).toContain('Cannot query field "cube"');
+
+      const reason = 'No cubes or views have members visible to you. Check the data model and the access policies that apply to your security context.';
+
+      const placeholder = await request(app)
+        .post('/cubejs-api/graphql')
+        .set('Authorization', jwt.sign({}, API_SECRET))
+        .send({ query: '{ no_queries_available __type(name: "Query") { fields { name description } } }' })
+        .expect(200);
+
+      expect(placeholder.body.data.no_queries_available).toEqual(reason);
+      expect(placeholder.body.data.__type.fields).toEqual([{ name: 'no_queries_available', description: reason }]);
     });
   });
 

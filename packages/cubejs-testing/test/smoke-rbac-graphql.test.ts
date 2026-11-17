@@ -79,6 +79,10 @@ describe('GraphQL Schema Caching and RBAC', () => {
     expect(typeNames).not.toContain('Result');
     expect(typeNames).not.toContain('OrdersMembers');
     expect(JSON.stringify(result)).not.toContain('internalCode');
+
+    const placeholder = await graphqlRequest('default', '{ no_queries_available }');
+    expect(placeholder.errors).toBeUndefined();
+    expect(placeholder.data.no_queries_available).toContain('No cubes or views have members visible to you');
   });
 
   test('tenant-a can query internalCode but not tier', async () => {

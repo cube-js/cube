@@ -494,6 +494,10 @@ export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, var
   return getJsonQuery(metaConfig, args, resolveInfo);
 }
 
+const NO_CUBES_REASON = 'The data model has no cubes or views.';
+const NO_VISIBLE_MEMBERS_REASON =
+  'No cubes or views have members visible to you. Check the data model and the access policies that apply to your security context.';
+
 export function makeSchema(metaConfig: any): GraphQLSchema {
   const types: any[] = [
     DateTimeScalar,
@@ -513,9 +517,20 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
   }
 
   // `Result` and `RootOrderByInput` would have no fields, which fails schema validation and
-  // turns every request into a 500. Without a `Query` type nexus adds a default `ok` field,
-  // so the caller gets a valid schema that lists no cubes.
+  // turns every request into a 500. `Query` still needs a field, so it carries the reason.
   if (!metaConfig.some(hasMembers)) {
+    const reason = metaConfig.length === 0 ? NO_CUBES_REASON : NO_VISIBLE_MEMBERS_REASON;
+
+    types.push(extendType({
+      type: 'Query',
+      definition(t) {
+        t.nonNull.string('no_queries_available', {
+          description: reason,
+          resolve: () => reason,
+        });
+      }
+    }));
+
     return nexusMakeSchema({ types });
   }
 
