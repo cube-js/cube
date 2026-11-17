@@ -14,6 +14,7 @@ rss: true
   - `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/name-suggestion` (`WorkbooksPublicController.suggestWorkbookName`) names a workbook created with a placeholder name from its content and returns the workbook. Requires edit access. New schema: `SuggestWorkbookNameInput`.
   - `nameSource` (`"default"`) on `CreateWorkbookInput` marks a workbook for name suggestions, and `renamed` on `UpdateWorkbookInput` stops them once a person has renamed it.
   - dbt sync reports the semantic metrics it imports as Cube measures: `importedMetrics` and `unsupportedMetrics` on `DbtSyncManifestStats` and `DbtSyncRunStats`, and `skippedMetrics` on `DbtSyncManifestStats` (the first 25 metrics that cannot be imported exactly, with the reason for each). New schema: `DbtSyncSkippedMetric`.
+  - `crossFilters` on `CreateNotificationInput`, `UpdateNotificationInput` and `Notification`: a scheduled refresh, delivery or alert of a dashboard renders with the given charts' cross-filter selections, each one a `sourceWidgetId`, the `view` it queries and its `dimensions`. On an update, a set replaces the stored one and `[]` clears it. New schemas: `DashboardCrossFilter`, `DashboardCrossFilterDimension`, `DashboardCrossFilterInput`, `DashboardCrossFilterDimensionInput`.
 
   ### Changed
 
