@@ -1498,6 +1498,57 @@ describe('API Gateway', () => {
         expect(options.skipVisibilityPatch).toBeFalsy();
       }
     });
+
+    test('serves a schema without cubes when no member is visible to the caller', async () => {
+      const schemas = new Map<string, any>();
+      const noVisibleMembersCompilerApi = async () => ({
+        async metaConfig() {
+          return {
+            compilerId: 'compiler-none',
+            cubes: [{
+              config: {
+                name: 'Orders',
+                measures: [{ name: 'Orders.count', type: 'number', isVisible: false }],
+                dimensions: [{ name: 'Orders.secret', type: 'string', isVisible: false }],
+                segments: [],
+              },
+            }],
+          };
+        },
+        getGraphQLSchema: (compilerId: string) => schemas.get(compilerId),
+        setGraphQLSchema: (compilerId: string, schema: any) => schemas.set(compilerId, schema),
+      });
+
+      const apiGateway = new ApiGateway(API_SECRET, noVisibleMembersCompilerApi, async () => new AdapterApiMock(), testLogger, {
+        standalone: true,
+        dataSourceStorage: new DataSourceStorageMock(),
+        basePath: '/cubejs-api',
+        refreshScheduler: {},
+      });
+      const app = express();
+      app.use(express.json());
+      apiGateway.initApp(app);
+
+      const introspection = await request(app)
+        .post('/cubejs-api/graphql')
+        .set('Authorization', jwt.sign({}, API_SECRET))
+        .send({ query: '{ __schema { types { name } } }' })
+        .expect(200);
+
+      const typeNames = introspection.body.data.__schema.types.map((t: any) => t.name);
+      expect(typeNames).toContain('Query');
+      expect(typeNames).not.toContain('Result');
+      expect(typeNames.filter((name: string) => name.startsWith('Orders'))).toEqual([]);
+
+      const query = await request(app)
+        .post('/cubejs-api/graphql')
+        .set('Authorization', jwt.sign({}, API_SECRET))
+        .send({ query: '{ cube { orders { count } } }' })
+        .expect(400);
+
+      expect(query.body.data).toBeUndefined();
+      expect(query.body.errors[0].message).toContain('Cannot query field "cube"');
+    });
   });
 
   describe('/v1/sql endpoint dataSource', () => {

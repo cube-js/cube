@@ -72,8 +72,12 @@ describe('GraphQL Schema Caching and RBAC', () => {
 
   test('introspection exposes nothing to a group that sees no members', async () => {
     const result = await graphqlRequest('default', '{ __schema { types { name } } }');
-    expect(result.data).toBeUndefined();
-    expect(result.errors).toBeDefined();
+    expect(result.errors).toBeUndefined();
+
+    const typeNames = result.data.__schema.types.map((t: any) => t.name);
+    expect(typeNames).toContain('Query');
+    expect(typeNames).not.toContain('Result');
+    expect(typeNames).not.toContain('OrdersMembers');
     expect(JSON.stringify(result)).not.toContain('internalCode');
   });
 
@@ -122,7 +126,7 @@ describe('GraphQL Schema Caching and RBAC', () => {
           orders { ${member} }
         }
       }`);
-      expect(result.errors).toBeDefined();
+      expect(result.errors[0].message).toContain('Cannot query field "cube"');
       expect(result.data).toBeUndefined();
     }
   });

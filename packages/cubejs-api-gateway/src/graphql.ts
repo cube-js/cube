@@ -512,6 +512,13 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
     return ([...cube.config.measures, ...cube.config.dimensions].filter((member) => member.isVisible)).length > 0;
   }
 
+  // `Result` and `RootOrderByInput` would have no fields, which fails schema validation and
+  // turns every request into a 500. Without a `Query` type nexus adds a default `ok` field,
+  // so the caller gets a valid schema that lists no cubes.
+  if (!metaConfig.some(hasMembers)) {
+    return nexusMakeSchema({ types });
+  }
+
   metaConfig.forEach(cube => {
     if (hasMembers(cube)) {
       types.push(objectType({
