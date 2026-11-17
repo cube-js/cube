@@ -79,6 +79,19 @@ describe('PostgresDriver materialized views fallback', () => {
     expect(driver.queries).toEqual(['with materialized views', 'information_schema only']);
   });
 
+  test('logs the fallback once, with the rejection', async () => {
+    const logger = jest.fn();
+    driver.setLogger(logger);
+    driver.catalogError = databaseError('42883');
+
+    await driver.tablesSchema();
+    await driver.getSchemas();
+
+    const fallbackLogs = logger.mock.calls.filter(([event]) => event === 'Materialized views query failed. Listing information_schema only');
+    expect(fallbackLogs).toHaveLength(1);
+    expect(fallbackLogs[0][1].error).toContain('rejected');
+  });
+
   test.each([
     ['a connection error', new ConnectionError(new Error('ECONNREFUSED'), 'postgres')],
     ['a pool error', new Error('ResourceRequest timed out')],

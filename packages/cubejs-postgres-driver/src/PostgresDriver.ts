@@ -223,6 +223,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       return fn();
     }
 
+    let rejection: unknown;
+
     try {
       const result = await fn();
       this.materializedViewsSupported = true;
@@ -231,17 +233,28 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       if (this.materializedViewsSupported || !isQueryRejectedError(e)) {
         throw e;
       }
+      rejection = e;
     }
 
     this.materializedViewsSupported = false;
 
+    let result: T;
+
     try {
-      return await fn();
+      result = await fn();
     } catch (e) {
       // The query without materialized views fails too, so the first failure wasn't about them
       this.materializedViewsSupported = undefined;
       throw e;
     }
+
+    if (this.logger) {
+      this.logger('Materialized views query failed. Listing information_schema only', {
+        error: ((rejection as Error)?.stack || String(rejection)).toString(),
+      });
+    }
+
+    return result;
   }
 
   // Mirrors the information_schema.tables row filter: tables the role owns or holds any privilege on.
