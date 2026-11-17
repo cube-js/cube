@@ -207,6 +207,14 @@ const EXCLUDE_OPERATIONS = new Set([
   'GET /api/v1/access-requests/mine',
   'POST /api/v1/access-requests/{id}/approve',
   'POST /api/v1/access-requests/{id}/decline',
+  'GET /api/v1/access-requests/{id}',
+  // Apps are flag-gated; these serve Apps frames and launches. Remove once Apps ship.
+  'GET /api/v1/app-theme/body-font',
+  'GET /api/v1/app-theme/logo',
+  'POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/app-launch',
+  'POST /api/v1/embed/dashboard/{publicId}/app-launch',
+  // Flag-gated settings token exchange for agent evaluations.
+  'POST /api/v1/ai-engineer/settings/console-server-token',
 ]);
 
 // Cube-staff-only operations (provisioning real cloud infrastructure — Regions,
