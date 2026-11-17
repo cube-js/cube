@@ -101,6 +101,8 @@ export interface DataSourceInfo {
   driverCapabilities?: DriverCapabilities;
 }
 
+type FilterNumber = { negative: boolean, int: string, frac: string };
+
 export class CompilerApi {
   protected readonly repository: SchemaFileRepository;
 
@@ -1024,14 +1026,35 @@ export class CompilerApi {
   }
 
   /**
-   * Parses a plain decimal bound, or null: Number() accepts hex, exponents and blanks the
-   * database reads differently, and loses order past 15 significant digits.
+   * Splits a numeric bound into its digits, or null for hex, exponents and blanks, which
+   * the database reads differently. The digits stay text: a number can be any length.
    */
-  protected parseFilterNumber(value: string): number | null {
-    if (!/^-?\d+(\.\d+)?$/.test(value) || value.replace(/[-.]/g, '').length > 15) {
+  protected parseFilterNumber(value: string): FilterNumber | null {
+    const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(value);
+    if (!match) {
       return null;
     }
-    return Number(value);
+    const int = match[2].replace(/^0+/, '');
+    const frac = (match[3] || '').replace(/0+$/, '');
+
+    return { negative: match[1] === '-' && int + frac !== '', int, frac };
+  }
+
+  protected compareFilterNumbers(a: FilterNumber, b: FilterNumber): number {
+    if (a.negative !== b.negative) {
+      return a.negative ? -1 : 1;
+    }
+    const sign = a.negative ? -1 : 1;
+    if (a.int.length !== b.int.length) {
+      return a.int.length < b.int.length ? -sign : sign;
+    }
+    const width = Math.max(a.frac.length, b.frac.length);
+    const left = a.int + a.frac.padEnd(width, '0');
+    const right = b.int + b.frac.padEnd(width, '0');
+    if (left === right) {
+      return 0;
+    }
+    return left < right ? -sign : sign;
   }
 
   /**
@@ -1081,21 +1104,20 @@ export class CompilerApi {
       const q = this.parseFilterNumber(qVals[0]);
       const t = this.parseFilterNumber(tVals[0]);
       if (q !== null && t !== null) {
+        const order = this.compareFilterNumbers(q, t);
+        // A float column rounds both bounds. Rounding keeps their order but can make two
+        // different bounds equal, so a strict order is only trusted up to 15 digits.
+        const distinct = q.int.length + q.frac.length <= 15 && t.int.length + t.frac.length <= 15;
+
         // Lower bounds: x > / >= value.
         if ((qOp === 'gt' || qOp === 'gte') && (tOp === 'gt' || tOp === 'gte')) {
           // target `x > t`: a `gt q` query needs q >= t, a `gte q` query needs q > t.
           // target `x >= t`: q >= t for both query operators.
-          if (tOp === 'gt') {
-            return qOp === 'gt' ? q >= t : q > t;
-          }
-          return q >= t;
+          return qOp === 'gte' && tOp === 'gt' ? distinct && order > 0 : order >= 0;
         }
         // Upper bounds: x < / <= value.
         if ((qOp === 'lt' || qOp === 'lte') && (tOp === 'lt' || tOp === 'lte')) {
-          if (tOp === 'lt') {
-            return qOp === 'lt' ? q <= t : q < t;
-          }
-          return q <= t;
+          return qOp === 'lte' && tOp === 'lt' ? distinct && order < 0 : order <= 0;
         }
       }
     }

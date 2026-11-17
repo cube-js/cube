@@ -1081,7 +1081,6 @@ describe('CompilerApi leafFilterImplies', () => {
     for (const value of loose) {
       expect(compilerApi.leafFilterImplies(leaf('gt', [value]), leaf('gt', ['100']))).toBe(false);
     }
-    // Doubles can't order these two.
     expect(compilerApi.leafFilterImplies(
       leaf('gt', ['9007199254740992']),
       leaf('gt', ['9007199254740993']),
@@ -1091,6 +1090,41 @@ describe('CompilerApi leafFilterImplies', () => {
     expect(compilerApi.leafFilterImplies(leaf('gte', ['100.5']), leaf('gt', ['100']))).toBe(true);
     expect(compilerApi.leafFilterImplies(leaf('lte', ['-3']), leaf('lt', ['-2.5']))).toBe(true);
     expect(compilerApi.leafFilterImplies(leaf('gt', ['50']), leaf('gt', ['100']))).toBe(false);
+  });
+
+  test('numeric bounds compare as numbers of any length', () => {
+    const implies = (qOp: string, q: string, tOp: string, t: string) => compilerApi.leafFilterImplies(leaf(qOp, [q]), leaf(tOp, [t]));
+
+    // Number() reads both of these as 9007199254740992.
+    expect(implies('gt', '9007199254740993', 'gt', '9007199254740992')).toBe(true);
+    expect(implies('lt', '9007199254740992', 'lt', '9007199254740993')).toBe(true);
+    expect(implies('lt', '9007199254740993', 'lt', '9007199254740992')).toBe(false);
+    expect(implies('gte', '12345678901234567890.123456789013', 'gte', '12345678901234567890.123456789012')).toBe(true);
+    expect(implies('gte', '12345678901234567890.123456789011', 'gte', '12345678901234567890.123456789012')).toBe(false);
+    expect(implies('lte', '-12345678901234567890.5', 'lte', '-12345678901234567890.4')).toBe(true);
+    expect(implies('gt', '-12345678901234567890.5', 'gt', '-12345678901234567890.4')).toBe(false);
+
+    expect(implies('gt', '100', 'gt', '99.999')).toBe(true);
+    expect(implies('gt', '0100.50', 'gte', '100.5')).toBe(true);
+    expect(implies('gt', '9', 'gt', '10')).toBe(false);
+    expect(implies('gt', '-0', 'gt', '0.0')).toBe(true);
+    expect(implies('lt', '-9', 'lt', '-10')).toBe(false);
+    expect(implies('lt', '-10', 'lt', '-9')).toBe(true);
+    expect(implies('gt', '-1', 'gt', '1')).toBe(false);
+  });
+
+  test('a strict order between long bounds is not trusted', () => {
+    // A double column rounds both bounds to 9007199254740992.
+    expect(compilerApi.leafFilterImplies(
+      leaf('gte', ['9007199254740993']),
+      leaf('gt', ['9007199254740992']),
+    )).toBe(false);
+    expect(compilerApi.leafFilterImplies(
+      leaf('lte', ['9007199254740992']),
+      leaf('lt', ['9007199254740993']),
+    )).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('gte', ['100']), leaf('gt', ['100']))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('lte', ['100']), leaf('lt', ['100']))).toBe(false);
   });
 
   test('numeric bounds only compare on number dimensions', () => {
