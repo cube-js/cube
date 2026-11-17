@@ -18,6 +18,7 @@ rss: true
   ### Changed
 
   - `MergeToDefaultBranchRequest.message` is optional, as on `MergeIntoParentBranchRequest`. When it is empty or missing, the agent writes the commit message from the branch's diff; without AI, Git's default merge message is used.
+  - `EmbedSessionSettings.allowChatWorkspaceAuthoring` on an embed session with an `externalId` lets the agent save workspace content only with `creatorMode: true`. Outside creator mode the agent never saves workspace content.
 </Update>
 
 <Update label="2026-11-07" description="v0.26.0" tags={["Added","Changed","Deprecated"]}>
