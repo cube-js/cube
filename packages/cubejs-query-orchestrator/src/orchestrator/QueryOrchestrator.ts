@@ -44,6 +44,11 @@ export interface QueryOrchestratorOptions {
   rollupOnlyMode?: boolean;
   continueWaitTimeout?: number;
   skipExternalCacheAndQueue?: boolean;
+  /**
+   * Prefix of the pre-aggregation build and load-cache queues. Defaults to the
+   * orchestrator's own prefix.
+   */
+  preAggregationsRedisPrefix?: string;
 }
 
 function detectQueueAndCacheDriver(options: QueryOrchestratorOptions): CacheAndQueryDriverType {
@@ -125,7 +130,7 @@ export class QueryOrchestrator {
       }
     );
     this.preAggregations = new PreAggregations(
-      this.redisPrefix,
+      options.preAggregationsRedisPrefix || this.redisPrefix,
       this.driverFactory,
       this.logger,
       this.queryCache,

@@ -69,6 +69,7 @@ import type {
   DriverConfig,
   ScheduledRefreshTimeZonesFn,
   ContextToCubeStoreRouterIdFn,
+  ContextToPreAggregationOrchestratorIdFn,
   LoggerFnParams,
 } from './types';
 import {
@@ -156,6 +157,8 @@ export class CubejsServerCore {
   protected readonly contextToOrchestratorId: ContextToOrchestratorIdFn;
 
   protected readonly contextToCubeStoreRouterId: ContextToCubeStoreRouterIdFn | null;
+
+  protected readonly contextToPreAggregationOrchestratorId: ContextToPreAggregationOrchestratorIdFn;
 
   protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
 
@@ -256,6 +259,7 @@ export class CubejsServerCore {
     this.contextToCubeStoreRouterId = this.options.contextToCubeStoreRouterId
       ? memoizeByObject(this.options.contextToCubeStoreRouterId)
       : this.options.contextToCubeStoreRouterId;
+    this.contextToPreAggregationOrchestratorId = this.resolveContextToPreAggregationOrchestratorId();
 
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
@@ -679,6 +683,18 @@ export class CubejsServerCore {
     this.startScheduledRefreshTimer();
   }
 
+  protected resolveContextToPreAggregationOrchestratorId(): ContextToPreAggregationOrchestratorIdFn {
+    if (this.options.contextToPreAggregationOrchestratorId) {
+      return memoizeByObject(this.options.contextToPreAggregationOrchestratorId);
+    }
+
+    if (this.contextToCubeStoreRouterId && getEnv('preAggregationsOrchestratorIdFromRouter')) {
+      return this.contextToCubeStoreRouterId;
+    }
+
+    return this.contextToOrchestratorId;
+  }
+
   public async getOrchestratorApi(context: RequestContext): Promise<OrchestratorApi> {
     const orchestratorId = await this.contextToOrchestratorId(context);
 
@@ -722,6 +738,9 @@ export class CubejsServerCore {
 
     const contextToDbType: DbTypeInternalFn = this.contextToDbType.bind(this);
     const externalDbType = this.contextToExternalDbType(context);
+    // An orchestrator is cached by its own id, so its pre-aggregation id comes from
+    // the context that built it, as its other per-context options do
+    const preAggregationOrchestratorId = `${await this.contextToPreAggregationOrchestratorId(context)}`;
     // Every query asks for the type of its data source, and the default `dbType` calls
     // `driverFactory` to answer, but the answer depends only on this orchestrator's context
     const dbTypeByDataSource = new Map<string, ReturnType<DbTypeInternalFn>>();
@@ -850,6 +869,11 @@ export class CubejsServerCore {
         // speedup with cache
         contextToExternalDbType: () => externalDbType,
         redisPrefix: orchestratorId,
+        // Left unset when it matches, so `orchestratorOptions.redisPrefix` still keys
+        // the pre-aggregation queues by default
+        preAggregationsRedisPrefix: preAggregationOrchestratorId !== orchestratorId
+          ? preAggregationOrchestratorId
+          : undefined,
         skipExternalCacheAndQueue: externalDbType === 'cubestore',
         cacheAndQueueDriver: this.options.cacheAndQueueDriver,
         ...orchestratorOptions,

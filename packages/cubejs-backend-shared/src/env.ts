@@ -456,6 +456,13 @@ const variables: Record<string, (...args: any) => any> = {
     });
   },
   preAggregationsBuilder: () => get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
+  /**
+   * Use `contextToCubeStoreRouterId` as the default `contextToPreAggregationOrchestratorId`,
+   * so orchestrators routed to one Cube Store share its pre-aggregation queues.
+   */
+  preAggregationsOrchestratorIdFromRouter: () => get('CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER')
+    .default('false')
+    .asBoolStrict(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
     .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
