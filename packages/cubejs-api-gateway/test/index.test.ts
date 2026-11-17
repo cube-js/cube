@@ -1445,6 +1445,61 @@ describe('API Gateway', () => {
     });
   });
 
+  describe('/graphql schema visibility', () => {
+    test('introspection lists only members visible to the caller', async () => {
+      const schemas = new Map<string, any>();
+      const metaConfigCalls: any[] = [];
+      const visibilityAwareCompilerApi = async () => ({
+        async metaConfig(ctx: any, options: any) {
+          metaConfigCalls.push(options);
+          const privileged = ctx.securityContext?.role === 'admin';
+          return {
+            compilerId: privileged ? 'compiler-admin' : 'compiler-user',
+            cubes: [{
+              config: {
+                name: 'Orders',
+                measures: [{ name: 'Orders.count', type: 'number', isVisible: true }],
+                dimensions: [{ name: 'Orders.secret', type: 'string', isVisible: privileged }],
+                segments: [],
+              },
+            }],
+          };
+        },
+        getGraphQLSchema: (compilerId: string) => schemas.get(compilerId),
+        setGraphQLSchema: (compilerId: string, schema: any) => schemas.set(compilerId, schema),
+      });
+
+      const apiGateway = new ApiGateway(API_SECRET, visibilityAwareCompilerApi, async () => new AdapterApiMock(), testLogger, {
+        standalone: true,
+        dataSourceStorage: new DataSourceStorageMock(),
+        basePath: '/cubejs-api',
+        refreshScheduler: {},
+      });
+      const app = express();
+      app.use(express.json());
+      apiGateway.initApp(app);
+
+      const fieldsFor = async (role: string) => {
+        const res = await request(app)
+          .post('/cubejs-api/graphql')
+          .set('Authorization', jwt.sign({ role }, API_SECRET))
+          .send({ query: '{ __type(name: "OrdersMembers") { fields { name } } }' })
+          .expect(200);
+        return res.body.data.__type.fields.map((f: any) => f.name);
+      };
+
+      expect(await fieldsFor('admin')).toEqual(['count', 'secret']);
+      expect(await fieldsFor('user')).toEqual(['count']);
+      expect(await fieldsFor('admin')).toEqual(['count', 'secret']);
+
+      expect([...schemas.keys()]).toEqual(['compiler-admin', 'compiler-user']);
+
+      for (const options of metaConfigCalls) {
+        expect(options.skipVisibilityPatch).toBeFalsy();
+      }
+    });
+  });
+
   describe('/v1/sql endpoint dataSource', () => {
     test('returns dataSource for single query', async () => {
       const { app } = await createApiGateway();
