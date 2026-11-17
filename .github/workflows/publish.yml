@@ -88,8 +88,6 @@ jobs:
           on_retry_command: git checkout -- .
 
   npm-wait:
-    # The registry CDN can lag behind `lerna publish` for minutes, and the Docker builds
-    # then fail with YN0082 "No candidates found" for the version that was just published
     needs: [npm]
     runs-on: ubuntu-24.04
     timeout-minutes: 35
