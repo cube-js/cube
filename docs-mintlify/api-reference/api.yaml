@@ -12071,12 +12071,33 @@ components:
       type: object
     DbtSyncManifestStats:
       properties:
+        importedMetrics:
+          description: Number of imported dbt semantic metrics, when import is enabled.
+          oneOf:
+            - type: integer
+            - type: 'null'
         macros:
           type: integer
         models:
           type: integer
+        skippedMetrics:
+          description: >-
+            The first 25 skipped metrics by unique ID, with the reason for each;
+            `unsupportedMetrics` counts them all.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DbtSyncSkippedMetric'
+              type: array
+            - type: 'null'
         sources:
           type: integer
+        unsupportedMetrics:
+          description: >-
+            Number of dbt semantic metrics skipped because they cannot be imported exactly, when
+            import is enabled.
+          oneOf:
+            - type: integer
+            - type: 'null'
       required:
         - models
         - sources
@@ -12292,6 +12313,11 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        importedMetrics:
+          description: Number of imported dbt semantic metrics, when import is enabled.
+          oneOf:
+            - type: integer
+            - type: 'null'
         macros:
           description: dbt macros found in the manifest.
           oneOf:
@@ -12312,6 +12338,13 @@ components:
             - type: 'null'
         sources:
           description: dbt sources found in the manifest.
+          oneOf:
+            - type: integer
+            - type: 'null'
+        unsupportedMetrics:
+          description: >-
+            Number of dbt semantic metrics skipped because they cannot be imported exactly, when
+            import is enabled.
           oneOf:
             - type: integer
             - type: 'null'
@@ -12347,6 +12380,22 @@ components:
         - agent
         - unknown
       type: string
+    DbtSyncSkippedMetric:
+      properties:
+        name:
+          description: The dbt metric name.
+          type: string
+        reason:
+          description: Why the metric cannot be imported exactly.
+          type: string
+        uniqueId:
+          description: The dbt metric unique ID.
+          type: string
+      required:
+        - name
+        - uniqueId
+        - reason
+      type: object
     DbtSyncStatusResponse:
       properties:
         error:

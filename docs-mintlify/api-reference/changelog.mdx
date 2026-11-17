@@ -13,6 +13,7 @@ rss: true
   - `GET /api/v1/audit-logs/export` (`AuditLogPublicController.exportAuditLog`) streams the account audit log for a date range as CSV. Parameters: `start`, `end` (required, `YYYY-MM-DD`), `search`, `eventName`, `userEmail`. Requires the `AuditLogManage` action; an API key scoped to specific deployments answers `403`.
   - `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/name-suggestion` (`WorkbooksPublicController.suggestWorkbookName`) names a workbook created with a placeholder name from its content and returns the workbook. Requires edit access. New schema: `SuggestWorkbookNameInput`.
   - `nameSource` (`"default"`) on `CreateWorkbookInput` marks a workbook for name suggestions, and `renamed` on `UpdateWorkbookInput` stops them once a person has renamed it.
+  - dbt sync reports the semantic metrics it imports as Cube measures: `importedMetrics` and `unsupportedMetrics` on `DbtSyncManifestStats` and `DbtSyncRunStats`, and `skippedMetrics` on `DbtSyncManifestStats` (the first 25 metrics that cannot be imported exactly, with the reason for each). New schema: `DbtSyncSkippedMetric`.
 
   ### Changed
 
