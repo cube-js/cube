@@ -287,16 +287,17 @@ class ApiGateway {
 
         const compilerApi = await this.getCompilerApi(req.context);
 
-        // Cache unfiltered schema - RBAC enforcement happens at query execution time
-        // via annotation-based validation in the Rust result transform layer
-        let schema = compilerApi.getGraphQLSchema();
+        // Built from the caller's visibility-patched meta so introspection doesn't list members
+        // their access policies hide. The compiler id carries the visibility mask, so callers
+        // with the same visible members share a schema.
+        const { cubes, compilerId } = await compilerApi.metaConfig(req.context, {
+          requestId: req.context.requestId,
+          includeCompilerId: true,
+        });
+        let schema = compilerApi.getGraphQLSchema(compilerId);
         if (!schema) {
-          const metaConfig = await compilerApi.metaConfig(req.context, {
-            requestId: req.context.requestId,
-            skipVisibilityPatch: true,
-          });
-          schema = makeSchema(metaConfig);
-          compilerApi.setGraphQLSchema(schema);
+          schema = makeSchema(cubes);
+          compilerApi.setGraphQLSchema(compilerId, schema);
         }
         return graphqlHTTP({
           schema,

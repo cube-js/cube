@@ -1278,6 +1278,123 @@ describe('API Gateway', () => {
     });
   });
 
+  describe('/graphql schema visibility', () => {
+    test('introspection lists only members visible to the caller', async () => {
+      const schemas = new Map<string, any>();
+      const metaConfigCalls: any[] = [];
+      const visibilityAwareCompilerApi = async () => ({
+        async metaConfig(ctx: any, options: any) {
+          metaConfigCalls.push(options);
+          const privileged = ctx.securityContext?.role === 'admin';
+          return {
+            compilerId: privileged ? 'compiler-admin' : 'compiler-user',
+            cubes: [{
+              config: {
+                name: 'Orders',
+                measures: [{ name: 'Orders.count', type: 'number', isVisible: true }],
+                dimensions: [{ name: 'Orders.secret', type: 'string', isVisible: privileged }],
+                segments: [],
+              },
+            }],
+          };
+        },
+        getGraphQLSchema: (compilerId: string) => schemas.get(compilerId),
+        setGraphQLSchema: (compilerId: string, schema: any) => schemas.set(compilerId, schema),
+      });
+
+      const apiGateway = new ApiGateway(API_SECRET, visibilityAwareCompilerApi, async () => new AdapterApiMock(), logger, {
+        standalone: true,
+        dataSourceStorage: new DataSourceStorageMock(),
+        basePath: '/cubejs-api',
+        refreshScheduler: {},
+      });
+      const app = express();
+      app.use(express.json());
+      apiGateway.initApp(app);
+
+      const fieldsFor = async (role: string) => {
+        const res = await request(app)
+          .post('/cubejs-api/graphql')
+          .set('Authorization', jwt.sign({ role }, API_SECRET))
+          .send({ query: '{ __type(name: "OrdersMembers") { fields { name } } }' })
+          .expect(200);
+        return res.body.data.__type.fields.map((f: any) => f.name);
+      };
+
+      expect(await fieldsFor('admin')).toEqual(['count', 'secret']);
+      expect(await fieldsFor('user')).toEqual(['count']);
+      expect(await fieldsFor('admin')).toEqual(['count', 'secret']);
+
+      expect([...schemas.keys()]).toEqual(['compiler-admin', 'compiler-user']);
+
+      for (const options of metaConfigCalls) {
+        expect(options.skipVisibilityPatch).toBeFalsy();
+      }
+    });
+
+    test('serves a schema without cubes when no member is visible to the caller', async () => {
+      const schemas = new Map<string, any>();
+      const noVisibleMembersCompilerApi = async () => ({
+        async metaConfig() {
+          return {
+            compilerId: 'compiler-none',
+            cubes: [{
+              config: {
+                name: 'Orders',
+                measures: [{ name: 'Orders.count', type: 'number', isVisible: false }],
+                dimensions: [{ name: 'Orders.secret', type: 'string', isVisible: false }],
+                segments: [],
+              },
+            }],
+          };
+        },
+        getGraphQLSchema: (compilerId: string) => schemas.get(compilerId),
+        setGraphQLSchema: (compilerId: string, schema: any) => schemas.set(compilerId, schema),
+      });
+
+      const apiGateway = new ApiGateway(API_SECRET, noVisibleMembersCompilerApi, async () => new AdapterApiMock(), logger, {
+        standalone: true,
+        dataSourceStorage: new DataSourceStorageMock(),
+        basePath: '/cubejs-api',
+        refreshScheduler: {},
+      });
+      const app = express();
+      app.use(express.json());
+      apiGateway.initApp(app);
+
+      const introspection = await request(app)
+        .post('/cubejs-api/graphql')
+        .set('Authorization', jwt.sign({}, API_SECRET))
+        .send({ query: '{ __schema { types { name } } }' })
+        .expect(200);
+
+      const typeNames = introspection.body.data.__schema.types.map((t: any) => t.name);
+      expect(typeNames).toContain('Query');
+      expect(typeNames).not.toContain('Result');
+      expect(typeNames.filter((name: string) => name.startsWith('Orders'))).toEqual([]);
+
+      const query = await request(app)
+        .post('/cubejs-api/graphql')
+        .set('Authorization', jwt.sign({}, API_SECRET))
+        .send({ query: '{ cube { orders { count } } }' })
+        .expect(400);
+
+      expect(query.body.data).toBeUndefined();
+      expect(query.body.errors[0].message).toContain('Cannot query field "cube"');
+
+      const reason = 'No cubes or views have members visible to you. Check the data model and the access policies that apply to your security context.';
+
+      const placeholder = await request(app)
+        .post('/cubejs-api/graphql')
+        .set('Authorization', jwt.sign({}, API_SECRET))
+        .send({ query: '{ no_queries_available __type(name: "Query") { fields { name description } } }' })
+        .expect(200);
+
+      expect(placeholder.body.data.no_queries_available).toEqual(reason);
+      expect(placeholder.body.data.__type.fields).toEqual([{ name: 'no_queries_available', description: reason }]);
+    });
+  });
+
   describe('/v1/sql endpoint dataSource', () => {
     test('returns dataSource for single query', async () => {
       const { app } = await createApiGateway();

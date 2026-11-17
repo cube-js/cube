@@ -51,21 +51,37 @@ describe('GraphQL Schema Caching and RBAC', () => {
     return res.json();
   }
 
-  test('all roles see the same unfiltered schema', async () => {
-    const introspectionQuery = '{ __type(name: "OrdersMembers") { fields { name } } }';
+  async function memberFields(group: string): Promise<string[] | undefined> {
+    const result = await graphqlRequest(group, '{ __type(name: "OrdersMembers") { fields { name } } }');
+    return result.data?.__type?.fields?.map((f: any) => f.name);
+  }
 
-    const resultA = await graphqlRequest('tenant-a', introspectionQuery);
-    const resultB = await graphqlRequest('tenant-b', introspectionQuery);
-    const resultDefault = await graphqlRequest('default', introspectionQuery);
-
-    const fieldsA = resultA.data?.__type?.fields?.map((f: any) => f.name) || [];
-    const fieldsB = resultB.data?.__type?.fields?.map((f: any) => f.name) || [];
-    const fieldsDefault = resultDefault.data?.__type?.fields?.map((f: any) => f.name) || [];
-
-    expect(fieldsA).toEqual(fieldsB);
-    expect(fieldsA).toEqual(fieldsDefault);
+  test('introspection lists only the members a group can see', async () => {
+    const fieldsA = await memberFields('tenant-a');
     expect(fieldsA).toContain('internalCode');
-    expect(fieldsA).toContain('tier');
+    expect(fieldsA).not.toContain('tier');
+
+    const fieldsB = await memberFields('tenant-b');
+    expect(fieldsB).toContain('tier');
+    expect(fieldsB).not.toContain('internalCode');
+
+    // Asked again after tenant-b, so a schema cached for one group can't be served to another
+    expect(await memberFields('tenant-a')).toEqual(fieldsA);
+  });
+
+  test('introspection exposes nothing to a group that sees no members', async () => {
+    const result = await graphqlRequest('default', '{ __schema { types { name } } }');
+    expect(result.errors).toBeUndefined();
+
+    const typeNames = result.data.__schema.types.map((t: any) => t.name);
+    expect(typeNames).toContain('Query');
+    expect(typeNames).not.toContain('Result');
+    expect(typeNames).not.toContain('OrdersMembers');
+    expect(JSON.stringify(result)).not.toContain('internalCode');
+
+    const placeholder = await graphqlRequest('default', '{ no_queries_available }');
+    expect(placeholder.errors).toBeUndefined();
+    expect(placeholder.data.no_queries_available).toContain('No cubes or views have members visible to you');
   });
 
   test('tenant-a can query internalCode but not tier', async () => {
@@ -84,7 +100,7 @@ describe('GraphQL Schema Caching and RBAC', () => {
       }
     }`);
     expect(restrictedResult.errors).toBeDefined();
-    expect(restrictedResult.errors[0].message).toContain('You requested hidden member');
+    expect(restrictedResult.errors[0].message).toContain('Cannot query field "tier"');
   });
 
   test('tenant-b can query tier but not internalCode', async () => {
@@ -103,32 +119,18 @@ describe('GraphQL Schema Caching and RBAC', () => {
       }
     }`);
     expect(restrictedResult.errors).toBeDefined();
-    expect(restrictedResult.errors[0].message).toContain('You requested hidden member');
+    expect(restrictedResult.errors[0].message).toContain('Cannot query field "internalCode"');
   });
 
-  test('default role cannot query any fields - complete denial returns errors', async () => {
-    const result1 = await graphqlRequest('default', `{
-      cube(where: { orders: {} }) {
-        orders { internalCode }
-      }
-    }`);
-    expect(result1.errors).toBeDefined();
-    expect(result1.errors[0].message).toContain('You requested hidden member');
-
-    const result2 = await graphqlRequest('default', `{
-      cube(where: { orders: {} }) {
-        orders { tier }
-      }
-    }`);
-    expect(result2.errors).toBeDefined();
-    expect(result2.errors[0].message).toContain('You requested hidden member');
-
-    const result3 = await graphqlRequest('default', `{
-      cube(where: { orders: {} }) {
-        orders { count }
-      }
-    }`);
-    expect(result3.errors).toBeDefined();
-    expect(result3.errors[0].message).toContain('You requested hidden member');
+  test('default group cannot query any fields - complete denial returns errors', async () => {
+    for (const member of ['internalCode', 'tier', 'count']) {
+      const result = await graphqlRequest('default', `{
+        cube(where: { orders: {} }) {
+          orders { ${member} }
+        }
+      }`);
+      expect(result.errors[0].message).toContain('Cannot query field "cube"');
+      expect(result.data).toBeUndefined();
+    }
   });
 });

@@ -363,6 +363,30 @@ describe('GraphQL Schema', () => {
       ]);
     });
   });
+
+  describe('without queryable members', () => {
+    const queryField = (cubes: any[]) => {
+      const fields = (makeSchema(cubes).getQueryType() as GraphQLObjectType).getFields();
+      expect(Object.keys(fields)).toEqual(['no_queries_available']);
+      return fields.no_queries_available;
+    };
+
+    test('says the data model is empty when there are no cubes', () => {
+      expect(queryField([]).description).toEqual('The data model has no cubes or views.');
+    });
+
+    test('points at access policies when every member is hidden', () => {
+      const field = queryField([{
+        config: {
+          name: 'Orders',
+          measures: [{ name: 'Orders.count', type: 'number', isVisible: false }],
+          dimensions: [],
+          segments: [],
+        },
+      }]);
+      expect(field.description).toContain('No cubes or views have members visible to you');
+    });
+  });
 });
 
 describe('getJsonQueryFromGraphQLQuery', () => {

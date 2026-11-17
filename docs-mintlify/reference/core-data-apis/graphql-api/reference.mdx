@@ -22,6 +22,22 @@ query {
 | `cubeQueryArgs` | [`CubeQueryArgs`](#cubequeryargs) | Options that apply to the entire query     |
 | `cubeArgs`      | [`CubeArgs`](#cubeargs)            | Options that apply only to a specific cube |
 
+## `no_queries_available`
+
+```graphql
+query {
+  no_queries_available
+}
+```
+
+This field replaces `cube` in the schema when there is nothing to query. It
+returns a `String!` with the reason, also given as the field description in
+introspection:
+
+- The data model has no cubes or views.
+- No cubes or views have members visible to the caller, e.g., because of
+  [access policies][ref-mls].
+
 ## Response extensions
 
 In addition to the `data` field, the GraphQL response includes an `extensions`
@@ -121,6 +137,7 @@ format, e.g., `America/Los_Angeles`.
 
 [ref-graphql-api]: /reference/core-data-apis/graphql-api
 [ref-rest-api]: /reference/core-data-apis/rest-api/reference
+[ref-mls]: /docs/data-modeling/access-control/member-level-security
 [ref-row-limit]: /reference/core-data-apis/queries#row-limit
 [ref-time-zone]: /reference/core-data-apis/queries#time-zone
 [ref-ungrouped-query]: /reference/core-data-apis/queries#ungrouped-query

@@ -81,16 +81,16 @@ describe('CompilerApi', () => {
       expect(() => queryFactory.createQuery).toThrow(/disposed CompilerApi instance/);
     });
 
-    test('should set graphqlSchema to undefined on dispose', async () => {
+    test('should drop cached GraphQL schemas on dispose', async () => {
       const mockSchema = {} as any;
-      compilerApi.setGraphQLSchema(mockSchema);
+      compilerApi.setGraphQLSchema('compiler-id', mockSchema);
 
-      expect(compilerApi.getGraphQLSchema()).toBe(mockSchema);
+      expect(compilerApi.getGraphQLSchema('compiler-id')).toBe(mockSchema);
+      expect(compilerApi.getGraphQLSchema('other-compiler-id')).toBeUndefined();
 
       compilerApi.dispose();
 
-      // Schema should be undefined
-      expect(compilerApi.getGraphQLSchema()).toBeUndefined();
+      expect(compilerApi.getGraphQLSchema('compiler-id')).toBeUndefined();
     });
 
     test('should be safe to call dispose multiple times', async () => {

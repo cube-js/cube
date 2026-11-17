@@ -39,6 +39,13 @@ and [CORS][ref-cors]. To disallow access to GraphQL API, disable the `graphql`
 scope, e.g., by setting the [`CUBEJS_DEFAULT_API_SCOPES`](/reference/configuration/environment-variables#cubejs_default_api_scopes) environment variable to
 `meta,data`.
 
+The GraphQL schema is built for each caller from the members that
+[access policies][ref-mls] make visible to them. Hidden members are absent from
+introspection, and querying one fails GraphQL validation with a
+`Cannot query field "<member>"` error (HTTP 400, no `data`). If no members are
+visible at all, the schema contains only the
+[`no_queries_available`][ref-no-queries-available] field.
+
 To find your GraphQL API endpoint in Cube Cloud, go to the **Overview**
 page, click **API credentials**, and choose the **GraphQL API** tab.
 
@@ -230,6 +237,8 @@ to our query as follows:
 [ref-rest-api]: /reference/core-data-apis/rest-api
 [ref-api-scopes]: /reference/core-data-apis/rest-api#configuration-api-scopes
 [ref-cors]: /reference/core-data-apis/rest-api#configuration-cors
+[ref-mls]: /docs/data-modeling/access-control/member-level-security
+[ref-no-queries-available]: /reference/core-data-apis/graphql-api/reference#no_queries_available
 [graphql]: https://graphql.org
 [cube-ea]: https://cube.dev/use-cases/embedded-analytics
 [ref-ref-graphql-api]: /reference/core-data-apis/graphql-api/reference
