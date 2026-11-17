@@ -7,6 +7,11 @@
 import { PostgresDriver, PgClient } from '@cubejs-backend/postgres-driver';
 
 export class CrateDriver extends PostgresDriver {
+  // CrateDB has no materialized views and only a partial pg_catalog
+  protected override listMaterializedViews(): boolean {
+    return false;
+  }
+
   protected async prepareConnection(conn: PgClient, _options: any) {
     // Not supported by Crate yet... https://github.com/crate/crate/issues/12356
     // await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);

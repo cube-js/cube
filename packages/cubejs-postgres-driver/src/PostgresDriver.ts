@@ -13,6 +13,7 @@ import {
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
   StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn, createPoolName,
+  TableColumnQueryResult,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 import { PgClient, PgClientConfig } from './PgClient';
@@ -41,6 +42,9 @@ const PostgresToGenericType: Record<string, GenericDataBaseType> = {
   // External mapping
   hll: 'HLL_POSTGRES',
 };
+
+// Same list as BaseDriver's information_schema queries
+const IGNORED_SCHEMAS = "'pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA'";
 
 const hllTypeParser = (val: string) => Buffer.from(
   // Postgres uses prefix as \x for encoding
@@ -184,6 +188,158 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
 
     return client;
+  }
+
+  /**
+   * information_schema doesn't list materialized views, so the schema listing adds them from pg_catalog.
+   * Postgres-compatible databases without Postgres' catalog (or that already list them) turn this off.
+   */
+  protected listMaterializedViews(): boolean {
+    return true;
+  }
+
+  // Mirrors the information_schema.tables row filter: tables the role owns or holds any privilege on.
+  protected materializedViewsQuery(): string {
+    return `SELECT n.nspname AS table_schema, c.relname AS table_name
+      FROM pg_catalog.pg_class c
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relkind = 'm'
+        AND (pg_catalog.pg_has_role(c.relowner, 'USAGE')
+          OR pg_catalog.has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+          OR pg_catalog.has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))`;
+  }
+
+  // Mirrors how information_schema.columns derives data_type, numeric_precision and numeric_scale,
+  // and its row filter, so a materialized view's columns match those of a view with the same definition.
+  protected materializedViewColumnsQuery(): string {
+    return `SELECT n.nspname AS table_schema, c.relname AS table_name, a.attname AS column_name,
+        a.attnum AS ordinal_position,
+        CASE
+          WHEN t.typtype = 'd' THEN CASE
+            WHEN bt.typelem <> 0 AND bt.typlen = -1 THEN 'ARRAY'
+            WHEN bn.nspname = 'pg_catalog' THEN pg_catalog.format_type(t.typbasetype, NULL)
+            ELSE 'USER-DEFINED'
+          END
+          ELSE CASE
+            WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+            WHEN tn.nspname = 'pg_catalog' THEN pg_catalog.format_type(a.atttypid, NULL)
+            ELSE 'USER-DEFINED'
+          END
+        END AS data_type,
+        information_schema._pg_numeric_precision(
+          information_schema._pg_truetypid(a, t), information_schema._pg_truetypmod(a, t)
+        ) AS numeric_precision,
+        information_schema._pg_numeric_scale(
+          information_schema._pg_truetypid(a, t), information_schema._pg_truetypmod(a, t)
+        ) AS numeric_scale
+      FROM pg_catalog.pg_class c
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid
+      JOIN pg_catalog.pg_type t ON t.oid = a.atttypid
+      JOIN pg_catalog.pg_namespace tn ON tn.oid = t.typnamespace
+      LEFT JOIN (pg_catalog.pg_type bt JOIN pg_catalog.pg_namespace bn ON bn.oid = bt.typnamespace)
+        ON t.typtype = 'd' AND bt.oid = t.typbasetype
+      WHERE c.relkind = 'm' AND a.attnum > 0 AND NOT a.attisdropped
+        AND (pg_catalog.pg_has_role(c.relowner, 'USAGE')
+          OR pg_catalog.has_column_privilege(c.oid, a.attnum, 'SELECT, INSERT, UPDATE, REFERENCES'))`;
+  }
+
+  // information_schema.tables plus materialized views
+  protected tablesSource(): string {
+    return `(
+      SELECT table_schema, table_name FROM information_schema.tables
+      UNION ALL
+      ${this.materializedViewsQuery()}
+    )`;
+  }
+
+  // information_schema.columns plus materialized view columns
+  protected columnsSource(): string {
+    return `(
+      SELECT table_schema, table_name, column_name, ordinal_position, data_type, numeric_precision, numeric_scale
+      FROM information_schema.columns
+      UNION ALL
+      ${this.materializedViewColumnsQuery()}
+    )`;
+  }
+
+  protected override informationSchemaQuery() {
+    if (!this.listMaterializedViews()) {
+      return super.informationSchemaQuery();
+    }
+
+    return `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM ${this.columnsSource()} AS columns
+      WHERE columns.table_schema NOT IN (${IGNORED_SCHEMAS})
+   `;
+  }
+
+  protected override getSchemasQuery() {
+    if (!this.listMaterializedViews()) {
+      return super.getSchemasQuery();
+    }
+
+    return `
+      SELECT tables.table_schema as ${this.quoteIdentifier('schema_name')}
+      FROM ${this.tablesSource()} AS tables
+      WHERE tables.table_schema NOT IN (${IGNORED_SCHEMAS})
+      GROUP BY tables.table_schema
+    `;
+  }
+
+  protected override getTablesForSpecificSchemasQuery(schemasPlaceholders: string) {
+    if (!this.listMaterializedViews()) {
+      return super.getTablesForSpecificSchemasQuery(schemasPlaceholders);
+    }
+
+    return `
+      SELECT tables.table_schema as ${this.quoteIdentifier('schema_name')},
+             tables.table_name as ${this.quoteIdentifier('table_name')}
+      FROM ${this.tablesSource()} AS tables
+      WHERE tables.table_schema IN (${schemasPlaceholders})
+    `;
+  }
+
+  protected override getColumnsForSpecificTablesQuery(conditionString: string) {
+    if (!this.listMaterializedViews()) {
+      return super.getColumnsForSpecificTablesQuery(conditionString);
+    }
+
+    return `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('schema_name')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM ${this.columnsSource()} AS columns
+      WHERE ${conditionString}
+    `;
+  }
+
+  public override async tableColumnTypesWithPrecision(table: string): Promise<TableStructure> {
+    if (!this.listMaterializedViews()) {
+      return super.tableColumnTypesWithPrecision(table);
+    }
+
+    const [schema, name] = table.split('.');
+
+    const columns = await this.query<TableColumnQueryResult>(
+      `SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type as ${this.quoteIdentifier('data_type')},
+             columns.numeric_precision as ${this.quoteIdentifier('numeric_precision')},
+             columns.numeric_scale as ${this.quoteIdentifier('numeric_scale')}
+      FROM ${this.columnsSource()} AS columns
+      WHERE columns.table_name = ${this.param(0)} AND columns.table_schema = ${this.param(1)}
+      ${getEnv('fetchColumnsByOrdinalPosition') ? 'ORDER BY columns.ordinal_position' : ''}`,
+      [name, schema]
+    );
+
+    return columns.map(c => ({ name: c.column_name, type: this.toGenericType(c.data_type, c.numeric_precision, c.numeric_scale) }));
   }
 
   // pg_catalog, not information_schema: constraint_column_usage hides tables the role doesn't own, and
