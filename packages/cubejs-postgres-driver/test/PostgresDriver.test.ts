@@ -357,6 +357,70 @@ describe('PostgresDriver', () => {
       expect(await driver.tableColumnTypes('mv_8337.orders_agg_view')).toEqual(expected);
       expect(await driver.tableColumnTypes('mv_8337.orders_agg_mv')).toEqual(expected);
     });
+
+    const connection = () => ({
+      host: container.getHost(),
+      port: container.getMappedPort(5432),
+      user: 'test',
+      password: 'test',
+      database: 'test',
+    });
+
+    // Postgres-compatible databases such as CockroachDB list materialized views in information_schema
+    // too. Stand in for one by reading tables from pg_catalog as well: none may come back twice.
+    test('skips relations information_schema already lists', async () => {
+      class TablesInCatalogDriver extends PostgresDriver {
+        protected materializedViewsQuery() {
+          return super.materializedViewsQuery().replace('c.relkind = \'m\'', 'c.relkind IN (\'m\', \'r\', \'v\')');
+        }
+
+        protected materializedViewColumnsQuery() {
+          return super.materializedViewColumnsQuery().replace('c.relkind = \'m\'', 'c.relkind IN (\'m\', \'r\', \'v\')');
+        }
+      }
+
+      const catalogDriver = new TablesInCatalogDriver(connection());
+
+      try {
+        expect(await catalogDriver.tablesSchema()).toEqual(await driver.tablesSchema());
+        expect(await catalogDriver.getTablesForSpecificSchemas([{ schema_name: 'mv_8337' }]))
+          .toEqual(await driver.getTablesForSpecificSchemas([{ schema_name: 'mv_8337' }]));
+        expect(await catalogDriver.tableColumnTypes('mv_8337.orders_agg_view'))
+          .toEqual(await driver.tableColumnTypes('mv_8337.orders_agg_view'));
+      } finally {
+        await catalogDriver.release();
+      }
+    });
+
+    // Postgres-compatible databases such as RisingWave lack the catalog functions the query uses
+    test('falls back to information_schema when the server rejects the catalog query', async () => {
+      class NoCatalogDriver extends PostgresDriver {
+        public catalogQueries = 0;
+
+        protected materializedViewsQuery() {
+          this.catalogQueries++;
+          return `${super.materializedViewsQuery()} AND pg_catalog.no_such_function()`;
+        }
+
+        protected materializedViewColumnsQuery() {
+          this.catalogQueries++;
+          return `${super.materializedViewColumnsQuery()} AND pg_catalog.no_such_function()`;
+        }
+      }
+
+      const noCatalogDriver = new NoCatalogDriver(connection());
+
+      try {
+        const schema = await noCatalogDriver.tablesSchema();
+        expect(Object.keys(schema.mv_8337).sort()).toEqual(['orders', 'orders_agg_view']);
+        expect(await noCatalogDriver.tableColumnTypes('mv_8337.orders_agg_view'))
+          .toEqual(await driver.tableColumnTypes('mv_8337.orders_agg_view'));
+        // Only the first query tried the catalog
+        expect(noCatalogDriver.catalogQueries).toEqual(1);
+      } finally {
+        await noCatalogDriver.release();
+      }
+    });
   });
 
   describe('primary and foreign keys', () => {

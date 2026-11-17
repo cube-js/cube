@@ -5,7 +5,7 @@
  */
 
 import { getEnv, assertDataSource, Pool, type PoolUserOptions } from '@cubejs-backend/shared';
-import { types, FieldDef } from 'pg';
+import { types, FieldDef, DatabaseError } from 'pg';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { TypeId, TypeFormat } from 'pg-types';
 import {
@@ -13,7 +13,7 @@ import {
   DownloadQueryResultsOptions, DownloadTableMemoryData, DriverInterface,
   GenericDataBaseType, IndexesSQL, TableStructure, StreamOptions,
   StreamTableDataWithTypes, QueryOptions, DownloadQueryResultsResult, DriverCapabilities, TableColumn, createPoolName,
-  TableColumnQueryResult,
+  TableColumnQueryResult, DatabaseStructure, QuerySchemasResult, QueryTablesResult, QueryColumnsResult,
 } from '@cubejs-backend/base-driver';
 import { QueryStream } from './QueryStream';
 import { PgClient, PgClientConfig } from './PgClient';
@@ -45,6 +45,14 @@ const PostgresToGenericType: Record<string, GenericDataBaseType> = {
 
 // Same list as BaseDriver's information_schema queries
 const IGNORED_SCHEMAS = "'pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA'";
+
+// SQLSTATE classes of errors that say nothing about whether the server supports a query: connection exception,
+// transaction rollback, insufficient resources, object not in prerequisite state, operator intervention, system error
+const TRANSIENT_SQLSTATE_CLASSES = ['08', '40', '53', '55', '57', '58'];
+
+// The server rejected the query itself, as opposed to a connection, pool or transient failure
+const isQueryRejectedError = (e: unknown): boolean => e instanceof DatabaseError &&
+  !TRANSIENT_SQLSTATE_CLASSES.includes((e.code || '').slice(0, 2));
 
 const hllTypeParser = (val: string) => Buffer.from(
   // Postgres uses prefix as \x for encoding
@@ -191,14 +199,53 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   /**
+   * Whether the pg_catalog query for materialized views works on this server: undefined until a schema
+   * query has run, false once it failed where the information_schema-only query works.
+   */
+  protected materializedViewsSupported: boolean | undefined = undefined;
+
+  /**
    * information_schema doesn't list materialized views, so the schema listing adds them from pg_catalog.
-   * Postgres-compatible databases without Postgres' catalog (or that already list them) turn this off.
+   * Postgres-compatible servers that connect through this driver and lack that catalog fall back to
+   * information_schema alone, see withMaterializedViews(). Subclasses that already know the answer override this.
    */
   protected listMaterializedViews(): boolean {
-    return true;
+    return this.materializedViewsSupported !== false;
+  }
+
+  /**
+   * Runs a schema query that includes materialized views. If the server rejects it, which Postgres-compatible
+   * databases such as RisingWave do, retries without them and keeps doing so for this driver. Connection, pool
+   * and transient errors are rethrown as they are, and so is any error once the query has worked.
+   */
+  protected async withMaterializedViews<T>(fn: () => Promise<T>): Promise<T> {
+    if (!this.listMaterializedViews()) {
+      return fn();
+    }
+
+    try {
+      const result = await fn();
+      this.materializedViewsSupported = true;
+      return result;
+    } catch (e) {
+      if (this.materializedViewsSupported || !isQueryRejectedError(e)) {
+        throw e;
+      }
+    }
+
+    this.materializedViewsSupported = false;
+
+    try {
+      return await fn();
+    } catch (e) {
+      // The query without materialized views fails too, so the first failure wasn't about them
+      this.materializedViewsSupported = undefined;
+      throw e;
+    }
   }
 
   // Mirrors the information_schema.tables row filter: tables the role owns or holds any privilege on.
+  // Skips relations information_schema already lists, as Postgres-compatible databases like CockroachDB do.
   protected materializedViewsQuery(): string {
     return `SELECT n.nspname AS table_schema, c.relname AS table_name
       FROM pg_catalog.pg_class c
@@ -206,7 +253,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       WHERE c.relkind = 'm'
         AND (pg_catalog.pg_has_role(c.relowner, 'USAGE')
           OR pg_catalog.has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
-          OR pg_catalog.has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))`;
+          OR pg_catalog.has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))
+        AND ${this.notInInformationSchema()}`;
   }
 
   // Mirrors how information_schema.columns derives data_type, numeric_precision and numeric_scale,
@@ -241,10 +289,18 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         ON t.typtype = 'd' AND bt.oid = t.typbasetype
       WHERE c.relkind = 'm' AND a.attnum > 0 AND NOT a.attisdropped
         AND (pg_catalog.pg_has_role(c.relowner, 'USAGE')
-          OR pg_catalog.has_column_privilege(c.oid, a.attnum, 'SELECT, INSERT, UPDATE, REFERENCES'))`;
+          OR pg_catalog.has_column_privilege(c.oid, a.attnum, 'SELECT, INSERT, UPDATE, REFERENCES'))
+        AND ${this.notInInformationSchema()}`;
   }
 
-  // information_schema.tables plus materialized views
+  // Condition on the pg_class row `c` and its pg_namespace row `n`
+  protected notInInformationSchema(): string {
+    return `NOT EXISTS (
+          SELECT 1 FROM information_schema.tables it
+          WHERE it.table_schema = n.nspname AND it.table_name = c.relname
+        )`;
+  }
+
   protected tablesSource(): string {
     return `(
       SELECT table_schema, table_name FROM information_schema.tables
@@ -253,7 +309,6 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     )`;
   }
 
-  // information_schema.columns plus materialized view columns
   protected columnsSource(): string {
     return `(
       SELECT table_schema, table_name, column_name, ordinal_position, data_type, numeric_precision, numeric_scale
@@ -319,11 +374,31 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     `;
   }
 
-  public override async tableColumnTypesWithPrecision(table: string): Promise<TableStructure> {
-    if (!this.listMaterializedViews()) {
-      return super.tableColumnTypesWithPrecision(table);
-    }
+  public override async tablesSchema(): Promise<DatabaseStructure> {
+    return this.withMaterializedViews(() => super.tablesSchema());
+  }
 
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
+    return this.withMaterializedViews(() => super.getSchemas());
+  }
+
+  public override async getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
+    return this.withMaterializedViews(() => super.getTablesForSpecificSchemas(schemas));
+  }
+
+  public override async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
+    return this.withMaterializedViews(() => super.getColumnsForSpecificTables(tables));
+  }
+
+  public override async tableColumnTypesWithPrecision(table: string): Promise<TableStructure> {
+    return this.withMaterializedViews(() => (
+      this.listMaterializedViews()
+        ? this.tableColumnTypesWithMaterializedViews(table)
+        : super.tableColumnTypesWithPrecision(table)
+    ));
+  }
+
+  protected async tableColumnTypesWithMaterializedViews(table: string): Promise<TableStructure> {
     const [schema, name] = table.split('.');
 
     const columns = await this.query<TableColumnQueryResult>(
