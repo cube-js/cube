@@ -276,33 +276,16 @@ impl EventSender {
         }
     }
 
-    pub async fn track_event(&self, event: String, properties: HashMap<String, String>) {
-        self.track_event_sync(event, properties)
-    }
-
-    pub fn track_event_sync(&self, event: String, properties: HashMap<String, String>) {
+    /// Only enqueues the event; `send_loop` sends it. Doesn't need a Tokio runtime.
+    pub fn track_event(&self, event: String, properties: HashMap<String, String>) {
         let mut obj = Map::new();
         for (k, v) in properties.iter() {
             obj.insert(k.to_string(), Value::String(v.to_string()));
         }
-        self.track_event_object_sync(event, obj, false)
+        self.track_event_object(event, obj, false)
     }
 
-    pub async fn track_event_object(
-        &self,
-        event: String,
-        obj: Map<String, Value>,
-        is_agent_event: bool,
-    ) {
-        self.track_event_object_sync(event, obj, is_agent_event)
-    }
-
-    pub fn track_event_object_sync(
-        &self,
-        event: String,
-        obj: Map<String, Value>,
-        is_agent_event: bool,
-    ) {
+    pub fn track_event_object(&self, event: String, obj: Map<String, Value>, is_agent_event: bool) {
         let mut properties = obj;
         if is_agent_event {
             properties.insert("msg".to_string(), Value::String(event));
@@ -368,21 +351,17 @@ impl EventSender {
     }
 }
 
-pub async fn track_event(event: String, properties: HashMap<String, String>) {
-    SENDER.track_event(event, properties).await;
+/// Doesn't need a Tokio runtime, so it is safe to call from plain threads (e.g. RWLoop).
+pub fn track_event(event: String, properties: HashMap<String, String>) {
+    SENDER.track_event(event, properties);
 }
 
-/// Never spawns, so it is safe to call from threads without a Tokio runtime (e.g. RWLoop).
-pub fn track_event_spawn(event: String, properties: HashMap<String, String>) {
-    SENDER.track_event_sync(event, properties);
-}
-
-/// Must not require a Tokio runtime. The write lock is only taken by `init_agent_sender` on
+/// Doesn't need a Tokio runtime. The write lock is only taken by `init_agent_sender` on
 /// startup, so the event is dropped if it is held.
-pub fn agent_event_spawn(event: String, properties: Map<String, Value>) {
+pub fn track_agent_event(event: String, properties: Map<String, Value>) {
     if let Ok(sender) = AGENT_SENDER.try_read() {
         if let Some(sender) = sender.as_ref() {
-            sender.track_event_object_sync(event, properties, true);
+            sender.track_event_object(event, properties, true);
         }
     }
 }
@@ -398,7 +377,7 @@ pub fn incoming_traffic_agent_event(trace_obj: &str, bytes: u64) -> Result<(), C
             "bytes".to_string(),
             Value::Number(Number::from_f64(bytes as f64).unwrap()),
         );
-        agent_event_spawn("Incoming network usage".to_string(), obj);
+        track_agent_event("Incoming network usage".to_string(), obj);
         Ok(())
     } else {
         Err(CubeError::user(format!(
@@ -412,7 +391,7 @@ pub fn suboptimal_query_plan_event(trace_obj: &str, flags: Value) -> Result<(), 
     let obj: Value = serde_json::from_str(trace_obj)?;
     if let Value::Object(mut obj) = obj {
         obj.insert("flags".to_string(), flags);
-        agent_event_spawn("Suboptimal Query Plan".to_string(), obj);
+        track_agent_event("Suboptimal Query Plan".to_string(), obj);
         Ok(())
     } else {
         Err(CubeError::user(format!(
@@ -498,7 +477,7 @@ impl Log for ReportingLogger {
     fn log<'a>(&self, record: &Record<'a>) {
         self.logger.log(record);
         if let Level::Error = record.metadata().level() {
-            track_event_spawn(
+            track_event(
                 "Cube Store Error".to_string(),
                 vec![("error".to_string(), format!("{}", record.args()))]
                     .into_iter()
@@ -587,12 +566,12 @@ mod tests {
     }
 
     #[test]
-    fn test_agent_event_spawn_outside_of_tokio_runtime() {
-        let res = std::thread::spawn(|| agent_event_spawn("test".to_string(), Map::new())).join();
+    fn test_track_agent_event_outside_of_tokio_runtime() {
+        let res = std::thread::spawn(|| track_agent_event("test".to_string(), Map::new())).join();
 
         assert!(
             res.is_ok(),
-            "agent_event_spawn must not panic outside of a Tokio runtime"
+            "track_agent_event must not panic outside of a Tokio runtime"
         );
     }
 
@@ -621,7 +600,7 @@ mod tests {
         let thread_sender = sender.clone();
         tokio::task::spawn_blocking(move || {
             std::thread::spawn(move || {
-                thread_sender.track_event_sync("test".to_string(), HashMap::new())
+                thread_sender.track_event("test".to_string(), HashMap::new())
             })
             .join()
             .unwrap()
