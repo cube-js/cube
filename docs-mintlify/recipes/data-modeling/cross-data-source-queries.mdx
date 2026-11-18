@@ -584,7 +584,7 @@ members, not only the cubes of those members. A query that uses only
 
 ### Expressions over both data sources
 
-The SQL API runs an expression such as `CASE`, `LOWER`, or `DATE_TRUNC` over a
+The SQL API runs an expression such as `CASE` or `LOWER` over a
 view through SQL pushdown, which sends the expression to the data source together
 with the query. Pushdown targets one data source, so an expression that reads
 members of both data sources fails:
