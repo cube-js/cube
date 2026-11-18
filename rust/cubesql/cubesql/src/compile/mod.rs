@@ -4146,6 +4146,84 @@ limit
     }
 
     #[tokio::test]
+    async fn test_null_semantics_in_case_aggregates_and_joins() -> Result<(), CubeError> {
+        init_testing_logger();
+
+        let t = "(SELECT 1 AS a UNION ALL SELECT 2 UNION ALL SELECT NULL)";
+        let queries = [
+            (
+                "all_null_case_group_by",
+                format!(
+                    "SELECT CASE WHEN a > 5 THEN NULL END AS c, COUNT(*) AS n, \
+                    COUNT(CASE WHEN a > 5 THEN NULL END) AS cn FROM {t} t GROUP BY 1"
+                ),
+            ),
+            (
+                "untyped_null_in_list",
+                format!(
+                    "SELECT a, a IN (n, 1) AS i, a NOT IN (n, 1) AS ni FROM \
+                    (SELECT a, NULL AS n FROM {t} t) s ORDER BY a"
+                ),
+            ),
+            (
+                "untyped_null_distinct_min_max",
+                format!(
+                    "SELECT COUNT(DISTINCT n) AS cn, COUNT(DISTINCT a) AS ca, MIN(n) AS mi, \
+                    MAX(n) AS ma FROM (SELECT a, NULL AS n FROM {t} t) s"
+                ),
+            ),
+            (
+                "case_constant_and_null_when",
+                format!(
+                    "SELECT a, CASE WHEN a = 1 THEN 'x' WHEN 1 = 1 THEN 'y' END AS c1, \
+                    CASE a WHEN 1 THEN 4 WHEN 1 THEN 5 ELSE 6 END AS c2, \
+                    CASE WHEN NULL THEN 1 ELSE 2 END AS c3, \
+                    CASE WHEN a = 2 THEN 1 WHEN NULL THEN 2 WHEN true THEN 3 END AS c4 \
+                    FROM {t} t ORDER BY a"
+                ),
+            ),
+            (
+                "boolean_case_null_when",
+                "SELECT c1, CASE WHEN c1 = 'a' THEN true END AS no_else, \
+                CASE WHEN c1 = 'a' THEN false ELSE true END AS null_when_else \
+                FROM (SELECT 'a' AS c1 UNION ALL SELECT 'b' UNION ALL SELECT NULL) t ORDER BY c1"
+                    .to_string(),
+            ),
+            (
+                "outer_join_padded_columns_nullable",
+                "SELECT l.id, r.rid / r.rid AS q, CASE WHEN r.b THEN false ELSE true END AS c \
+                FROM (SELECT 1 AS id UNION ALL SELECT 2) l \
+                LEFT JOIN (SELECT 1 AS rid, true AS b) r ON l.id = r.rid ORDER BY l.id"
+                    .to_string(),
+            ),
+        ];
+        for (name, query) in queries {
+            insta::assert_snapshot!(
+                name,
+                execute_query(query, DatabaseProtocol::PostgreSQL).await?
+            );
+        }
+
+        // EXISTS over an input of several batches must check every outer row
+        let exists = execute_query(
+            "SELECT COUNT(*) AS n FROM (SELECT oid FROM pg_catalog.pg_namespace \
+            UNION ALL SELECT oid FROM pg_catalog.pg_class) x WHERE EXISTS \
+            (SELECT 1 FROM pg_catalog.pg_namespace n2 WHERE n2.oid = x.oid)"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        let namespaces = execute_query(
+            "SELECT COUNT(*) AS n FROM pg_catalog.pg_namespace".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?;
+        assert_eq!(exists, namespaces);
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_ts_minus_date_postgres() {
         async fn check_ts_minus_date(left: &str, right: &str, expected: &str) {
             let column_name = "result";

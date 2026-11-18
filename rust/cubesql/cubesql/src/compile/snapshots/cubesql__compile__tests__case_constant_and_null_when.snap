@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(query, DatabaseProtocol::PostgreSQL).await?"
+---
++------+----+----+----+----+
+| a    | c1 | c2 | c3 | c4 |
++------+----+----+----+----+
+| 1    | x  | 4  | 2  | 3  |
+| 2    | y  | 6  | 2  | 1  |
+| NULL | y  | 6  | 2  | 3  |
++------+----+----+----+----+
