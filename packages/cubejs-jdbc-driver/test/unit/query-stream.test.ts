@@ -94,4 +94,48 @@ describe('QueryStream', () => {
 
     expect(onData).not.toHaveBeenCalled();
   });
+
+  it('close waits for the batch being fetched', async () => {
+    const pending: ((rows: Row[]) => void)[] = [];
+    const next = jest.fn(() => new Promise<Row[]>((resolve) => { pending.push(resolve); }));
+    const stream = new QueryStream(next, 16);
+
+    stream.read(0);
+    await new Promise((resolve) => { setImmediate(resolve); });
+    expect(pending).toHaveLength(1);
+
+    let closed = false;
+    const closing = stream.close().then(() => { closed = true; });
+    await new Promise((resolve) => { setImmediate(resolve); });
+
+    expect(stream.destroyed).toBe(true);
+    expect(closed).toBe(false);
+
+    pending[0]([{ id: 1 }]);
+    await closing;
+
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it('close waits for a batch that fails', async () => {
+    let reject: (err: Error) => void = () => undefined;
+    const next = () => new Promise<Row[]>((_, r) => { reject = r; });
+    const stream = new QueryStream(next, 16);
+
+    stream.read(0);
+    await new Promise((resolve) => { setImmediate(resolve); });
+
+    const closing = stream.close();
+    reject(new Error('fetch failed'));
+
+    await expect(closing).resolves.toBeUndefined();
+  });
+
+  it('close resolves right away when nothing is being fetched', async () => {
+    const { next } = batches([[{ id: 1 }]]);
+    const stream = new QueryStream(next, 16);
+
+    await collect(stream);
+    await expect(stream.close()).resolves.toBeUndefined();
+  });
 });

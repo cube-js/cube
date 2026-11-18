@@ -14,11 +14,19 @@ jest.mock('@cubejs-backend/jdbc/lib/jinst', () => ({ isJvmCreated: () => true })
 jest.mock('@cubejs-backend/node-java-maven', () => () => { /* stub */ }, { virtual: true });
 
 // eslint-disable-next-line import/first
+import type { StreamTableData } from '@cubejs-backend/base-driver';
+// eslint-disable-next-line import/first
 import { JDBCDriver } from '../../src/JDBCDriver';
+// eslint-disable-next-line import/first
+import { QueryStream } from '../../src/QueryStream';
 
 class TestJDBCDriver extends JDBCDriver {
   public override executeStatement(conn: any, query: any, cancelObj?: any) {
     return super.executeStatement(conn, query, cancelObj);
+  }
+
+  public override escapeDialect() {
+    return 'ansi' as const;
   }
 
   public override jdbcTypeName(jdbcType: number, getterNames: (string | undefined)[]) {
@@ -100,5 +108,70 @@ describe('JDBCDriver row batches', () => {
     expect(driver.jdbcTypeName(12, getterNames)).toEqual('string');
     // a type node-jdbc has no getter for
     expect(driver.jdbcTypeName(2003, getterNames)).toEqual('string');
+  });
+
+  it('releases a streamed connection only after the batch being fetched and the statement are done', async () => {
+    const events: string[] = [];
+    let resolveBatch: (rows: unknown[]) => void = () => undefined;
+    const resultSet = {
+      _types: [],
+      toObjectBatchIter: async () => ({
+        labels: ['id'],
+        types: [4],
+        next: () => new Promise((resolve) => { resolveBatch = resolve; }),
+      }),
+    };
+    const statement = {
+      cancel: (cb: Function) => cb(null),
+      execute: (_query: string, cb: Function) => cb(null, resultSet),
+      close: (cb: Function) => { events.push('statement.close'); cb(null); },
+    };
+    const conn = { createStatement: (cb: Function) => cb(null, statement) };
+    const streamDriver: TestJDBCDriver = Object.create(TestJDBCDriver.prototype, {
+      config: { value: { batchSize: 1024 } },
+      pool: {
+        value: {
+          acquire: async () => conn,
+          release: async () => { events.push('pool.release'); },
+        },
+      },
+    });
+
+    const { rowStream, release } = await streamDriver.stream('SELECT 1', [], { highWaterMark: 16 }) as StreamTableData;
+    (rowStream as QueryStream).read(0);
+    await new Promise((resolve) => { setImmediate(resolve); });
+
+    const releasing = release!();
+    await new Promise((resolve) => { setImmediate(resolve); });
+    expect(events).toEqual([]);
+
+    events.push('batch');
+    resolveBatch([{ id: 1 }]);
+    await releasing;
+
+    expect(events).toEqual(['batch', 'statement.close', 'pool.release']);
+  });
+
+  it('releases a streamed connection when closing the statement fails', async () => {
+    const released = jest.fn();
+    const resultSet = {
+      _types: [],
+      toObjectBatchIter: async () => ({ labels: ['id'], types: [4], next: async () => null }),
+    };
+    const statement = {
+      cancel: (cb: Function) => cb(null),
+      execute: (_query: string, cb: Function) => cb(null, resultSet),
+      close: (cb: Function) => cb(new Error('close failed')),
+    };
+    const conn = { createStatement: (cb: Function) => cb(null, statement) };
+    const streamDriver: TestJDBCDriver = Object.create(TestJDBCDriver.prototype, {
+      config: { value: { batchSize: 1024 } },
+      pool: { value: { acquire: async () => conn, release: released } },
+    });
+
+    const { release } = await streamDriver.stream('SELECT 1', [], { highWaterMark: 16 });
+
+    await expect(release!()).rejects.toThrow('close failed');
+    expect(released).toHaveBeenCalledWith(conn);
   });
 });

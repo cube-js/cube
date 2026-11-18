@@ -327,9 +327,23 @@ export class JDBCDriver extends BaseDriver {
       const resultSet = await executeQuery(query);
       const iter = await this.rowBatchIter(resultSet);
 
+      const rowStream = new QueryStream(iter.next, highWaterMark);
+
       return {
-        rowStream: new QueryStream(iter.next, highWaterMark),
-        release: () => this.pool.release(conn),
+        rowStream,
+        // Called when either side of the pipe closes, possibly while a batch is still being
+        // fetched; handing the connection to another query then would use it concurrently.
+        release: async () => {
+          try {
+            try {
+              await rowStream.close();
+            } finally {
+              await promisify(statement.close.bind(statement))();
+            }
+          } finally {
+            await this.pool.release(conn);
+          }
+        },
         types: iter.types.map(
           (t, i) => ({
             name: iter.labels[i],

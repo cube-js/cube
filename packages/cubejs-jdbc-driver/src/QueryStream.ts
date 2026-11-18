@@ -12,7 +12,10 @@ export type NextBatchFn = () => Promise<Row[] | null>;
 export class QueryStream extends Readable {
   protected nextBatch: null | NextBatchFn;
 
-  protected reading: boolean = false;
+  /**
+   * The batch being fetched on a JVM worker thread. The connection can't be reused until it settles.
+   */
+  protected pending: Promise<void> | null = null;
 
   /**
    * @constructor
@@ -30,14 +33,13 @@ export class QueryStream extends Readable {
    */
   public _read(): void {
     // A batch is fetched on a JVM worker thread and the result set is not thread-safe.
-    if (this.reading || !this.nextBatch) {
+    if (this.pending || !this.nextBatch) {
       return;
     }
 
-    this.reading = true;
-    this.nextBatch().then(
+    this.pending = this.nextBatch().then(
       (rows) => {
-        this.reading = false;
+        this.pending = null;
 
         if (!this.nextBatch) {
           return;
@@ -58,10 +60,22 @@ export class QueryStream extends Readable {
         }
       },
       (err) => {
-        this.reading = false;
+        this.pending = null;
         this.destroy(err);
       }
     );
+  }
+
+  /**
+   * Destroys the stream and resolves once no batch is being fetched, so the result set
+   * and its connection can be closed or reused.
+   */
+  public async close(): Promise<void> {
+    this.destroy();
+
+    if (this.pending) {
+      await this.pending;
+    }
   }
 
   /**
