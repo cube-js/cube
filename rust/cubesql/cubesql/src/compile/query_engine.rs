@@ -31,6 +31,7 @@ use crate::{
     transport::{LoadRequestMeta, MetaContext, SpanId, TransportService},
     CubeError, CubeErrorCauseType,
 };
+use chrono::{SecondsFormat, Utc};
 use datafusion::{
     error::DataFusionError,
     execution::context::{
@@ -114,7 +115,6 @@ pub trait QueryEngine {
     ) -> CompilationResult<(QueryPlan, Self::PlanMetadataType)> {
         let cache_entry = self.get_cache_entry(state.clone()).await?;
 
-        let planning_start = SystemTime::now();
         let query_planning_id = Uuid::new_v4();
         if let Some(span_id) = span_id.as_ref() {
             if let Some(auth_context) = state.auth_context() {
@@ -132,6 +132,8 @@ pub trait QueryEngine {
                     .await?;
             }
         }
+        // Started once Cube has taken the event above: waiting for it is not planning
+        let planning_start = SystemTime::now();
 
         let ctx = self.create_session_ctx(state.clone())?;
         let cube_ctx = self.create_cube_ctx(state.clone(), meta.clone(), ctx.clone())?;
@@ -199,7 +201,6 @@ pub trait QueryEngine {
             )
             .map_err(|e| CompilationError::rewrite(e.to_string()))?;
 
-        let rewriting_start = SystemTime::now();
         if let Some(span_id) = span_id.as_ref() {
             if let Some(auth_context) = state.auth_context() {
                 self.transport_ref()
@@ -215,6 +216,8 @@ pub trait QueryEngine {
                     .await?;
             }
         }
+        // Started once Cube has taken the event above: waiting for it is not rewriting
+        let rewriting_start = SystemTime::now();
 
         let mut finalized_graph = self
             .compiler_cache_ref()
@@ -283,6 +286,9 @@ pub trait QueryEngine {
                         serde_json::json!({
                             "planningId": query_planning_id.to_string(),
                             "duration": rewriting_start.elapsed().unwrap().as_millis() as u64,
+                            // Cube stamps an event when it gets to it, which a busy event
+                            // loop delays, so the end of the rewrite is stamped here
+                            "timestamp": Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
                         }),
                     )
                     .await?;
@@ -317,6 +323,8 @@ pub trait QueryEngine {
                             "query": span_id.query_key.clone(),
                             "planningId": query_planning_id.to_string(),
                             "duration": planning_start.elapsed().unwrap().as_millis() as u64,
+                            // Stamped here for the same reason as the end of the rewrite
+                            "timestamp": Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
                         }),
                     )
                     .await?;
