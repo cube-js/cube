@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+### Bug Fixes
+
+- **cubestore:** Don't kill RWLoop threads when telemetry tracks errors outside of a Tokio runtime ([#12416](https://github.com/cube-js/cube/issues/12416)), closes [#12415](https://github.com/cube-js/cube/issues/12415)
+
+### BREAKING CHANGES
+
+- **cubestore:** cubestore::telemetry::agent_event_spawn is renamed to
+  track_agent_event; track_event and EventSender::track_event(\_object) are no
+  longer async.
+
 ## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
 
 ### Features

@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+### Bug Fixes
+
+- **bigquery-driver:** Test the connection with one dataset, not all of them ([#12854](https://github.com/cube-js/cube/issues/12854)) ([3009c60](https://github.com/cube-js/cube/commit/3009c60b86951c8d1b71c8cf2fb9b1df3d09fd2a)), closes [#12750](https://github.com/cube-js/cube/issues/12750)
+
 ## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
 
 **Note:** Version bump only for package @cubejs-backend/bigquery-driver

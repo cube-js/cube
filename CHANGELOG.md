@@ -3,6 +3,31 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+### Bug Fixes
+
+- **api-gateway:** Build the GraphQL schema from members visible to the caller ([#12833](https://github.com/cube-js/cube/issues/12833)) ([974dc5a](https://github.com/cube-js/cube/commit/974dc5a9c880916c0206bf0eefc4f0c6ecdfbcda)), closes [#10590](https://github.com/cube-js/cube/issues/10590)
+- **api-gateway:** Run extendContext on pre-aggregation job contexts ([#12579](https://github.com/cube-js/cube/issues/12579)) ([0373cfc](https://github.com/cube-js/cube/commit/0373cfc0cfe8916f328883e5fe12c2feb1a2d501))
+- **bigquery-driver:** Test the connection with one dataset, not all of them ([#12854](https://github.com/cube-js/cube/issues/12854)) ([3009c60](https://github.com/cube-js/cube/commit/3009c60b86951c8d1b71c8cf2fb9b1df3d09fd2a)), closes [#12750](https://github.com/cube-js/cube/issues/12750)
+- **cubesql:** Plan SELECT \* over wide views without per-member rewrites ([#12722](https://github.com/cube-js/cube/issues/12722)) ([989e114](https://github.com/cube-js/cube/commit/989e114572d0f7c19b126982ca0849895b44d25a)), closes [#12669](https://github.com/cube-js/cube/issues/12669)
+- **cubestore:** Don't kill RWLoop threads when telemetry tracks errors outside of a Tokio runtime ([#12416](https://github.com/cube-js/cube/issues/12416)), closes [#12415](https://github.com/cube-js/cube/issues/12415)
+- **server-core:** Time out data source connection tests in health probes ([#12750](https://github.com/cube-js/cube/issues/12750)) ([0ad7027](https://github.com/cube-js/cube/commit/0ad7027b01b51ef53ec9f23bfc0d3b20204ae527))
+- **tesseract:** Don't propagate a filter into a sub_query dimension whose join it needs ([#12586](https://github.com/cube-js/cube/issues/12586)) ([0d0bd95](https://github.com/cube-js/cube/commit/0d0bd95756bf2098f977963cd76f882e47c0aace)), closes [#8081](https://github.com/cube-js/cube/issues/8081)
+- **tesseract:** Don't serve non-additive rolling windows from rollups ([#12584](https://github.com/cube-js/cube/issues/12584)) ([0aeb908](https://github.com/cube-js/cube/commit/0aeb908a8fcaf64356259e74118d7fde29aa478c)), closes [#7730](https://github.com/cube-js/cube/issues/7730)
+- **tesseract:** Read the matching column of a rollup storing several granularities ([#12578](https://github.com/cube-js/cube/issues/12578)) ([3a80bb9](https://github.com/cube-js/cube/commit/3a80bb90d093322eb3a1a6d0d88243f9f35b809b)), closes [#9495](https://github.com/cube-js/cube/issues/9495)
+
+### Features
+
+- **schema-compiler:** QUERY_CONTEXT conditions in measure case ([#12473](https://github.com/cube-js/cube/issues/12473)) ([8441639](https://github.com/cube-js/cube/commit/8441639c7a5d42aefaaa5156b0aed8d35adb2fb2))
+- **server-core:** Add contextToPreAggregationOrchestratorId ([#12808](https://github.com/cube-js/cube/issues/12808)) ([2ae7d97](https://github.com/cube-js/cube/commit/2ae7d97b9b284132b69afed1a62f6ecd3a89b31c))
+
+### BREAKING CHANGES
+
+- **cubestore:** cubestore::telemetry::agent_event_spawn is renamed to
+  track_agent_event; track_event and EventSender::track_event(\_object) are no
+  longer async.
+
 ## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
 
 ### Bug Fixes

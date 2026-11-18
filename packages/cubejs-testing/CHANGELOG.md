@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+### Bug Fixes
+
+- **api-gateway:** Build the GraphQL schema from members visible to the caller ([#12833](https://github.com/cube-js/cube/issues/12833)) ([974dc5a](https://github.com/cube-js/cube/commit/974dc5a9c880916c0206bf0eefc4f0c6ecdfbcda)), closes [#10590](https://github.com/cube-js/cube/issues/10590)
+
 ## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
 
 **Note:** Version bump only for package @cubejs-backend/testing
