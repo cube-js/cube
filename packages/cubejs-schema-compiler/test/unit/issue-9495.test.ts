@@ -27,9 +27,9 @@ cube('daily_analysis', {
 `;
 
 async function buildSql(granularities: string[], query: any, useNativeSqlPlanner: boolean) {
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model(granularities));
-  await compiler.compile();
-  const q = new BigqueryQuery({ joinGraph, cubeEvaluator, compiler }, {
+  const compilers = prepareJsCompiler(model(granularities));
+  await compilers.compiler.compile();
+  const q = new BigqueryQuery(compilers, {
     ...query,
     timezone: 'UTC',
     useNativeSqlPlanner,
