@@ -454,6 +454,7 @@ Preview **blocks** a view when it finds any of these conditions:
 - JavaScript or TypeScript models: use YAML.
 - A referenced cube that `extends` a cube outside the YAML model, such as a JavaScript cube:
   extend a YAML cube instead, or flatten the inherited definitions.
+- A view that `extends` another view: define its cubes and members in the view itself.
 - A Cube access policy on the view or a referenced cube, including one a cube inherits through
   `extends`: keep that governed view in Cube; the policy cannot be transferred to a Databricks
   Metric View.
