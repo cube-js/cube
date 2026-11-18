@@ -180,7 +180,7 @@ they are deployed. Each run:
 
 If another run is active, or the deployment is still rolling out a build with Jinja templates,
 the run retries for about 30 minutes. If a newer build succeeds first, only the newer build
-publishes. A build whose run can't start in that time is not published.
+publishes.
 
 A run that can't start leaves no entry in run history. This happens when no user can render the
 model's Jinja templates, when the data source has no Databricks connection, or when the retry runs
@@ -530,9 +530,11 @@ the deployed build; the warning clears once that run publishes it. A **Partial**
 clears the warning, but its **Blocked**, **Rejected by Databricks**, and **Write failed** views
 keep their earlier definitions, so check run history for them.
 
-The warning doesn't show while publication is turned off, while a run is active, or before the
-first run publishes. It can show briefly after a deployment with
-[Publish after each deployment](#publish-after-each-deployment) on, until that run starts.
+The warning doesn't show while publication is turned off, while a run is active, before the
+first run publishes, or when the last run to publish predates build tracking. In that last case,
+check run history to confirm a run published the deployed build. It can show briefly after a
+deployment with [Publish after each deployment](#publish-after-each-deployment) on, until that run
+starts.
 
 Through the API, [reading the settings](/api-reference/databricks-metric-view-integration/get-databricks-metric-view-publication-settings)
 returns `deployedBuild`, the deployment's newest successful build, and `publishedBuild`, the build
