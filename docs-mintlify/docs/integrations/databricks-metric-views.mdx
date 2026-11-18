@@ -534,9 +534,12 @@ first run publishes. It can show briefly after a deployment with
 Through the API, [reading the settings](/api-reference/databricks-metric-view-integration/get-databricks-metric-view-publication-settings)
 returns `deployedBuild`, the deployment's newest successful build, and `publishedBuild`, the build
 the newest **Completed** or **Partial** run converted. Each has a `buildJobId` and a `commit`.
-Databricks is behind while the two `buildJobId` values differ. `deployedBuild` is `null` when the
-deployment has no successful build, and `publishedBuild` is `null` until a run publishes. When run
-history can't be read, the response leaves out `publishedBuild`.
+`deployedBuild` is `null` when the deployment has no successful build. `publishedBuild` is `null`
+until a run publishes, or when that run recorded no build, as a run from before these fields
+existed does. When run history can't be read, the response leaves out `publishedBuild`.
+Databricks is behind when both fields hold a build and their `buildJobId` values differ. The card
+doesn't show the warning when either field is `null` or missing, so automation can apply the same
+rule.
 
 ### Take over an existing Metric View
 
