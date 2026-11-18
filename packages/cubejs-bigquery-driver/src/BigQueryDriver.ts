@@ -11,6 +11,7 @@ import {
   pausePromise,
   Required,
 } from '@cubejs-backend/shared';
+import { pipeline } from 'stream';
 import R from 'ramda';
 import {
   BigQuery,
@@ -351,7 +352,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     });
 
     const rowStream = new HydrationStream();
-    stream.pipe(rowStream);
+    // pipe() forwards neither source errors nor destroy(); an unhandled source
+    // 'error' would take the process down
+    pipeline(stream, rowStream, () => {
+      // consumers observe the failure via rowStream's 'error' event
+    });
 
     return {
       rowStream,
