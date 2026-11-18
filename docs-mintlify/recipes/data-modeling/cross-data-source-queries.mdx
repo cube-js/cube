@@ -38,7 +38,7 @@ sources.
 | [`JOIN` of grouped subqueries](#joining-grouped-results) | Works, in post-processing |
 | [`JOIN` of ungrouped subqueries](#joining-grouped-results) | Fails |
 | [Join of cubes in one Cube query](#joining-cubes-in-one-query) | Fails, unless a `rollup_join` covers the query |
-| [View query with members of one data source](#querying-a-view-that-spans-data-sources) | Works, as one Cube query |
+| [View query whose members and join path use one data source](#querying-a-view-that-spans-data-sources) | Works, as one Cube query |
 | [View query with members of both data sources](#querying-a-view-that-spans-data-sources) | Fails, unless a `rollup_join` covers the query |
 | [Pushed-down expression over both data sources](#expressions-over-both-data-sources) | Fails, unless a `rollup_join` covers the query |
 
@@ -664,9 +664,13 @@ The plan names each cube, not its data source. Read it together with the
 
 - **Each Cube query is capped by the [row limit][ref-row-limit].** Post-processing
   combines the results of separate Cube queries, and each of them returns at most
-  [`CUBEJS_DB_QUERY_LIMIT`][ref-query-limit] rows, `50,000` by default. The cap
-  applies before the results are combined. Aggregate inside each `SELECT` or
-  subquery, as in the examples above. Do not union or join raw rows.
+  [`CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT`][ref-sql-row-limit] rows. It
+  defaults to [`CUBEJS_DB_QUERY_LIMIT`][ref-query-limit], which is `50,000`. The
+  cap applies before the results are combined. With [streaming
+  mode][ref-stream-mode] enabled, a query with no `LIMIT` is streamed and not
+  capped, unless Cube Store serves it from a pre-aggregation. Either way,
+  aggregate inside each `SELECT` or subquery, as in the examples above. Do not
+  union or join raw rows.
 - **SQL pushdown targets one data source.** A union, a join, or an expression
   cannot be pushed down across data sources. A union and a join of grouped results
   run in post-processing instead. An expression over both data sources needs a
@@ -696,4 +700,6 @@ See [Joining data from multiple data sources][ref-rollup-join-recipe] for a
 [ref-cube-store]: /docs/pre-aggregations/running-in-production
 [ref-row-limit]: /docs/data-modeling/configuration#maximum-row-limit
 [ref-query-limit]: /reference/configuration/environment-variables#cubejs_db_query_limit
+[ref-sql-row-limit]: /reference/configuration/environment-variables#cubesql_non_streaming_query_max_row_limit
+[ref-stream-mode]: /reference/configuration/environment-variables#cubesql_stream_mode
 [ref-inspecting-queries]: /docs/explore-analyze/workbooks/querying-data#inspecting-queries
