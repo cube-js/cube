@@ -1397,9 +1397,9 @@ The number of rows that JDBC-based drivers, e.g., [Databricks][ref-config-db-dat
 read from a result set in one batch. A larger batch takes more memory per query
 and blocks the event loop for longer while it is parsed.
 
-| Possible Values                   | Default in Development | Default in Production |
-| --------------------------------- | ---------------------- | --------------------- |
-| A number between `16` and `32768` | `1024`                 | `1024`                |
+| Possible Values                         | Default in Development | Default in Production |
+| --------------------------------------- | ---------------------- | --------------------- |
+| A power of two between `16` and `32768` | `1024`                 | `1024`                |
 
 [ref-config-db-databricks]: /admin/connect-to-data/data-sources/databricks-jdbc
 

@@ -1089,8 +1089,9 @@ const variables: Record<string, (...args: any) => any> = {
     const key = keyByDataSource('CUBEJS_JDBC_BATCH_SIZE', dataSource, preAggregations);
     const value = get(key).default(1024).asIntPositive();
 
-    if (value < 16 || value > 32768) {
-      throw new InvalidConfiguration(key, value, 'Must be a number between 16 and 32768.');
+    // eslint-disable-next-line no-bitwise
+    if (value < 16 || value > 32768 || (value & (value - 1)) !== 0) {
+      throw new InvalidConfiguration(key, value, 'Must be a power of two between 16 and 32768.');
     }
 
     return value;
