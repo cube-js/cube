@@ -22,13 +22,9 @@ Write the prompt as if you were briefing an analyst — describe the audience, t
 
 ## Caching
 
-Once generated, the summary is **cached** with the widget. Viewers loading the dashboard see the cached response immediately — they don't pay for regeneration on every page load.
+Generated summaries are **cached per dashboard state** — the queries behind each chart, the active control values, and the chart configuration. Viewers loading the dashboard, or changing a control, see the cached response for that state immediately instead of paying for regeneration; switching to a state with no cached summary generates one automatically. Because each state caches separately, one viewer's filter selection never overwrites the summary another viewer sees.
 
-## Staleness detection
-
-The widget keeps a checksum of the dashboard state at the time of generation: the queries behind each chart, the active control values, and the chart configuration. When any of those change, the widget marks the cached summary as **stale** and shows a refresh prompt so viewers know the narrative may no longer match the data.
-
-Click the refresh icon (or open the widget menu and choose **Refresh**) to regenerate using the saved prompt against the latest state.
+Click the refresh icon (or open the widget menu and choose **Refresh**) to regenerate using the saved prompt against the current state. The widget shows how long ago its summary was generated, alongside the same freshness indicator used by chart widgets.
 
 ## Choosing the agent
 
