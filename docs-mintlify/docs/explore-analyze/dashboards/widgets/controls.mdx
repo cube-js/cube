@@ -755,9 +755,20 @@ Each control's picker offers only the members it can actually be resolved agains
 
 For filter, time granularity, and field switcher controls — the three that map onto a member — the [Workbook Agent][ref-workbook-agent] can set the same per-chart overrides you would from **Controls mapping**: exclude a chart from a filter, or remap any of the three onto a different member for one chart. That lets it wire these controls across charts on different semantic views without you revisiting each chart manually.
 
+#### Filters that fill a parameter {#parameter-filters}
+
+A [filter](#filter) with **Parameter** picked under **Filter by** fills a workbook SQL parameter instead of targeting a member. It reaches every chart whose SQL uses that parameter (`:name`), whatever semantic view the chart is built on, so it needs no mapping. Its card in **Controls mapping** reads **Fills parameter** and the parameter, or **Fills parameters** and both of them for a filter that fills the start and the end of a range. Charts whose SQL doesn't use the parameter get no card.
+
+The card has no member picker. To opt the chart out, open the card's ⋮ menu and choose **Disable**: the chart runs with its own value of the parameter, and the card shows **Disabled**. **Enable** in the same menu brings the filter back. **Edit** opens the filter's settings.
+
+On a chart built on an [advanced semantic query][ref-advanced-queries], member controls don't apply, and their cards are greyed out under the notice *Member filters are currently not supported for advanced query. Parameter filters still apply.* Cards of filters that fill a parameter stay usable there.
+
+The controls icon on a chart counts these filters along with the other controls, as in *1 of 2 controls apply to this report*. Clicking it opens the chart's **Controls mapping**.
+
 [ref-embed-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
 [ref-relative-date-values]: /reference/data-modeling/view#default_ui_filters
 [ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
+[ref-advanced-queries]: /docs/explore-analyze/workbooks/querying-data#advanced-semantic-queries
 [ref-print-version]: /docs/explore-analyze/dashboards#print-version
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
