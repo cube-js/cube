@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS hll;
+
 DROP TABLE IF EXISTS rcd_sessions CASCADE;
 
 CREATE TABLE rcd_sessions (
