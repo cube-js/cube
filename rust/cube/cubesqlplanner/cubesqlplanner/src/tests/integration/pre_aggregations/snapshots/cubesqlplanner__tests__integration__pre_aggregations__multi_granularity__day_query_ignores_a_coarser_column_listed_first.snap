@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/multi_granularity.rs
+assertion_line: 111
+expression: result
+---
+activity__app_name | activity__cohort_date_day | activity__count | activity__amount
+-------------------+---------------------------+-----------------+-----------------
+alpha              | 2025-01-30T00:00:00.000Z  | 1               | 67              
+beta               | 2025-01-30T00:00:00.000Z  | 1               | 6700            
+alpha              | 2025-01-31T00:00:00.000Z  | 1               | 68              
+beta               | 2025-01-31T00:00:00.000Z  | 1               | 6800            
+alpha              | 2025-02-01T00:00:00.000Z  | 1               | 69              
+beta               | 2025-02-01T00:00:00.000Z  | 1               | 6900            
+alpha              | 2025-02-02T00:00:00.000Z  | 1               | 70              
+beta               | 2025-02-02T00:00:00.000Z  | 1               | 7000

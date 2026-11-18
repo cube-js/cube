@@ -739,8 +739,9 @@ impl TestContext {
         let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         let (raw_sql, pre_aggregations) = planner.plan().expect("Failed to plan query");
 
+        // Rollups are built per query timezone, so grain columns hold local time.
         if !pre_aggregations.is_empty() {
-            self.create_pre_agg_tables(&client, &pre_aggregations).await;
+            ctx.create_pre_agg_tables(&client, &pre_aggregations).await;
         }
 
         let templates = ctx
@@ -854,12 +855,27 @@ impl TestContext {
                             }
                         }
                     }
+                    // Each usage keeps only the time-dimension columns it reads.
+                    let mut union_time_dimensions: Vec<Rc<MemberSymbol>> = Vec::new();
+                    let mut seen_time_dimensions = std::collections::HashSet::new();
+                    for u in usages {
+                        for td in u.pre_aggregation.time_dimensions() {
+                            let key = match td.as_time_dimension() {
+                                Ok(t) => (t.base_symbol().full_name(), t.granularity().clone()),
+                                Err(_) => (td.full_name(), None),
+                            };
+                            if seen_time_dimensions.insert(key) {
+                                union_time_dimensions.push(td.clone());
+                            }
+                        }
+                    }
                     let build_range = self
                         .pre_agg_build_range(client, pre_agg.cube_name(), pre_agg.name())
                         .await;
                     let yaml = Self::build_pre_agg_query_yaml(
                         pre_agg,
                         &union_measures,
+                        &union_time_dimensions,
                         build_range.as_ref(),
                     );
                     let inlined_sql = self.build_pre_agg_table_sql(&yaml);
@@ -900,8 +916,11 @@ impl TestContext {
     /// parameters inlined so it can run as `CREATE TABLE ... AS (...)`.
     #[cfg(feature = "integration-postgres")]
     fn build_pre_agg_table_sql(&self, yaml: &str) -> String {
-        let pa_ctx = Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false, false)
-            .expect("Failed to create pre-agg context");
+        let timezone = self.query_tools.query_tools().timezone();
+        let pa_ctx =
+            Self::new_with_options(self.schema.clone(), timezone, None, None, false, false)
+                .expect("Failed to create pre-agg context");
+        let yaml = &format!("{yaml}timezone: {timezone}\n");
 
         // Planned and resolved in one context, so the params a build range
         // allocates are the ones its placeholders refer to.
@@ -1015,6 +1034,7 @@ impl TestContext {
     fn build_pre_agg_query_yaml(
         pre_agg: &PreAggregation,
         measures: &[String],
+        time_dimensions: &[Rc<MemberSymbol>],
         build_range: Option<&(String, String)>,
     ) -> String {
         let mut yaml = String::new();
@@ -1040,9 +1060,9 @@ impl TestContext {
             }
         }
 
-        if !pre_agg.time_dimensions().is_empty() {
+        if !time_dimensions.is_empty() {
             yaml.push_str("time_dimensions:\n");
-            for td in pre_agg.time_dimensions() {
+            for td in time_dimensions {
                 if let Ok(td_sym) = td.as_time_dimension() {
                     yaml.push_str(&format!(
                         "  - dimension: {}\n",
@@ -1217,10 +1237,10 @@ impl TestContext {
             "CubeStore execution requires all matched pre-aggregations to be external"
         );
 
-        self.create_pre_agg_tables(&client, &pre_aggregations).await;
+        ctx.create_pre_agg_tables(&client, &pre_aggregations).await;
 
         let (mut conn, cs_schema) = super::cubestore_service::connect_with_schema().await;
-        let table_names = self
+        let table_names = ctx
             .upload_pre_agg_tables_to_cubestore(&client, &mut conn, &cs_schema, &pre_aggregations)
             .await;
 
