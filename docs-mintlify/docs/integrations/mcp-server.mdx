@@ -41,14 +41,14 @@ Cube hosts an MCP server endpoint. MCP clients connect over HTTPS and authentica
 - **Endpoint:** `https://cubecloud.dev/mcp`
 - **OAuth flow:** Authorization Code + PKCE, scope = `mcp-agent-access`. Most clients discover OAuth automatically and use the public client ID `cube-mcp-client`. Microsoft 365 Copilot requires a separate [OAuth setup](#connect-to-microsoft-365-copilot). Backend apps can [authenticate with an API key](#authenticate-with-an-api-key) instead.
 - **Account selection:** You sign in to Cube as part of the OAuth flow and, if you belong to more than one account, choose which one to connect.
-- **Sessions:** With the [2026-07-28 MCP specification](https://modelcontextprotocol.io/specification/2026-07-28), the single endpoint is stateless. Clients negotiating `2025-11-25` use a session header instead — see [Call the MCP server](#call-the-mcp-server).
-- **Deployment selection:** On connect, the client lands on the tenant **default deployment** set by your admin (or the first deployment you can access). Clients can also target a specific deployment and agent per request — see [Select a deployment and agent](#select-a-deployment-and-agent).
+- **Sessions:** The server opens a session on `initialize` and returns an `mcp-session-id` header. Send it on every later request — see [Call the MCP server](#call-the-mcp-server).
+- **Deployment selection:** On connect, the client lands on the tenant **default deployment** set by your admin (or the first deployment you can access). Clients can also target a specific deployment and agent per request — see [Select a deployment and agent](#select-a-deployment-and-agent). One connection reaches the deployments of one region — see [Deployments in more than one region](#deployments-in-more-than-one-region).
 
 ### One endpoint for everyone
 
-`https://cubecloud.dev/mcp` is the same URL for every account, deployment and region. Cube
-identifies your account from the OAuth token and routes each request to whichever
-deployment serves it, so there is no per-tenant host to look up before you can connect.
+`https://cubecloud.dev/mcp` is the same URL for every account and region. Cube identifies
+your account from the OAuth token and routes the connection to the region that serves your
+default deployment, so there is no per-tenant host to look up before you can connect.
 
 <Note>
 
@@ -58,8 +58,25 @@ instead — `https://<your-console-domain>/mcp`.
 </Note>
 
 Each deployment also keeps a **region-specific endpoint**, shown under
-**Admin → MCP Server**. Both work. Prefer the single endpoint above unless you need a
-client to reach a deployment's region directly without passing through the control plane.
+**Admin → MCP Server**. Prefer the single endpoint above unless you need a client to reach
+a region directly without passing through the control plane, or your deployments are in
+more than one region.
+
+### Deployments in more than one region
+
+If your deployments are in more than one region, each region may serve MCP from its own
+endpoint. One MCP connection reaches only the deployments of one region: the single
+endpoint connects you to your default deployment's region, and a region-specific endpoint
+to its own region.
+
+To work with deployments in another region, add a second connector with that region's
+endpoint, copied from **Admin → MCP Server**, which lists every endpoint with the
+deployments it serves. Signing in on a region-specific endpoint opens a deployment in
+that region. Give each connector a distinct name, such as **Cube** and **Cube EU**.
+
+If a client asks one connection for a deployment in another region, `listDeployments`
+marks that deployment as not reachable from the connection, and the request returns an
+error that names the endpoint to connect to instead.
 
 ## Admin setup
 
@@ -76,6 +93,10 @@ Before enabling MCP, make sure you have:
 Go to **Admin → MCP Server**. The page shows the endpoint to hand to clients along with
 ready-made setup snippets for each supported client. If it reads “MCP configuration is
 unavailable,” the MCP server host isn’t configured for the account yet.
+
+If your deployments are served by more than one endpoint, the page also lists each
+endpoint with the deployments it serves. Add one connector per endpoint — see
+[Deployments in more than one region](#deployments-in-more-than-one-region).
 
 ### 2) Configure deployment access
 
@@ -466,12 +487,14 @@ console.log(tools.map((tool) => tool.name));
 | `invalid_request` | 400 | `subject_token` is missing or unknown, or `subject_token_type` is wrong. |
 | `invalid_scope` | 400 | `scope` was sent more than once. |
 | `access_denied` | 403 | The request isn't allowed — for example, a non-admin key naming a user, a key limited to particular deployments or to specific endpoints, or a deactivated user. |
+| `invalid_target` | 400 | `resource` isn't a Cube MCP endpoint, or no deployment you can reach is served by it. |
 
 ## Select a deployment and agent
 
 An MCP client is not locked to a single deployment for the whole session. After
 connecting, it can discover the deployments and agents you can access and target a
-specific one on each request.
+specific one on each request, among the deployments of the connection's region — see
+[Deployments in more than one region](#deployments-in-more-than-one-region).
 
 <iframe
   width="100%"
@@ -520,6 +543,10 @@ Requests are always validated against the admin's deployment-access settings. A 
 that is outside the allow-list — or that you don't have permission to see — is rejected
 with a **403 Forbidden** (`Deployment <id> is not available via MCP for this account`), so
 neither `listDeployments` nor the `chat` selection can reach an excluded deployment.
+
+A deployment in another region is listed with the endpoint that serves it. A request that
+names it returns an error naming that endpoint instead of running; add a connector for
+that endpoint to use it.
 
 ### Pin an agent for the session
 
