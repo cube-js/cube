@@ -5,13 +5,18 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::sync::Arc;
 
-use crate::compile::{
-    test::{
-        convert_select_to_query_plan, init_testing_logger, utils::LogicalPlanTestUtils, TestContext,
-    },
-    DatabaseProtocol, Rewriter,
-};
 use crate::config::ConfigObjImpl;
+use crate::{
+    compile::{
+        test::{
+            convert_select_to_query_plan, convert_sql_to_cube_query, get_test_session,
+            get_test_tenant_ctx_with_meta, init_testing_logger, utils::LogicalPlanTestUtils,
+            TestContext,
+        },
+        DatabaseProtocol, Rewriter,
+    },
+    transport::{CubeMeta, CubeMetaDimension, CubeMetaMeasure},
+};
 
 /// LIMIT n OFFSET m should be pushed to CubeScan
 #[tokio::test]
@@ -880,4 +885,70 @@ async fn cubescan_projection_pushed_under_aggregate_and_join() {
         .find_cube_scan_wrapped_sql()
         .request;
     assert_eq!(request.subquery_joins.unwrap().len(), 1);
+}
+
+/// BI tools read the columns of a table with `SELECT *`, which expands to one column per
+/// member: on a wide view the rewrite must not grow with the member count, or it hits the
+/// node limit
+#[tokio::test]
+async fn select_star_from_wide_view() {
+    init_testing_logger();
+
+    let members = 1000;
+    let meta = get_test_tenant_ctx_with_meta(vec![CubeMeta {
+        name: "wide".to_string(),
+        dimensions: (0..members)
+            .map(|i| CubeMetaDimension {
+                name: format!("wide.dim{i}"),
+                r#type: "string".to_string(),
+                ..CubeMetaDimension::default()
+            })
+            .collect(),
+        measures: (0..members)
+            .map(|i| CubeMetaMeasure {
+                name: format!("wide.measure{i}"),
+                r#type: "number".to_string(),
+                agg_type: Some("sum".to_string()),
+                ..CubeMetaMeasure::default()
+            })
+            .collect(),
+        ..CubeMeta::default()
+    }]);
+
+    for (sql, limit) in [
+        ("SELECT * FROM wide WHERE 1 = 0", Some(0)),
+        ("SELECT * FROM wide LIMIT 0", Some(0)),
+        ("SELECT * FROM wide", None),
+    ] {
+        let session = get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await;
+        let query_plan = convert_sql_to_cube_query(&sql.to_string(), meta.clone(), session)
+            .await
+            .unwrap_or_else(|e| panic!("{}: {}", sql, e));
+        let request = query_plan.as_logical_plan().find_cube_scan().request;
+        assert_eq!(request.measures.unwrap().len(), members, "{sql}");
+        assert_eq!(request.dimensions.unwrap().len(), members, "{sql}");
+        assert_eq!(request.limit, limit, "{sql}");
+    }
+}
+
+/// A `SELECT *` filtered in SQL is still one wrapped query, with no post-processing above it
+#[tokio::test]
+async fn select_star_with_sql_filter_is_wrapped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT * FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'female' LIMIT 10"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.limit, Some(10));
 }
