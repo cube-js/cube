@@ -38,7 +38,7 @@ sources.
 | [`JOIN` of grouped subqueries](#joining-grouped-results) | Works, in post-processing |
 | [`JOIN` of ungrouped subqueries](#joining-grouped-results) | Fails |
 | [Join of cubes in one Cube query](#joining-cubes-in-one-query) | Fails, unless a `rollup_join` covers the query |
-| [View query with members of one data source](#querying-a-view-that-spans-data-sources) | Works, with SQL pushdown |
+| [View query with members of one data source](#querying-a-view-that-spans-data-sources) | Works, as one Cube query |
 | [View query with members of both data sources](#querying-a-view-that-spans-data-sources) | Fails, unless a `rollup_join` covers the query |
 | [Pushed-down expression over both data sources](#expressions-over-both-data-sources) | Fails, unless a `rollup_join` covers the query |
 
