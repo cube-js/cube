@@ -88,13 +88,13 @@ describe('Multi-stage members of a cube that another cube extends', () => {
 
   const compile = async (withChild: boolean) => {
     const compilers = prepareYamlCompiler(model(withChild));
-    await compilers.compiler.compile();
+    await compilers.compile();
     return compilers;
   };
 
   const buildSql = async (withChild: boolean, query: any, useNativeSqlPlanner: boolean) => {
     const compilers = await compile(withChild);
-    return new PostgresQuery(compilers, {
+    return compilers.createQuery(PostgresQuery, {
       timezone: 'UTC',
       useNativeSqlPlanner,
       ...query,
@@ -102,20 +102,20 @@ describe('Multi-stage members of a cube that another cube extends', () => {
   };
 
   it('resolves grain references against the cube that declares the member', async () => {
-    const { cubeEvaluator } = await compile(true);
+    const compilers = await compile(true);
 
-    expect(cubeEvaluator.evaluatedCubes.base_fact.measures.linked.grain?.includeReferences)
+    expect(compilers.cubeEvaluator.evaluatedCubes.base_fact.measures.linked.grain?.includeReferences)
       .toEqual(['base_fact.d']);
-    expect(cubeEvaluator.evaluatedCubes.child_fact.measures.linked.grain?.includeReferences)
+    expect(compilers.cubeEvaluator.evaluatedCubes.child_fact.measures.linked.grain?.includeReferences)
       .toEqual(['child_fact.d']);
   });
 
   it('resolves filter references against the cube that declares the member', async () => {
-    const { cubeEvaluator } = await compile(true);
+    const compilers = await compile(true);
 
-    expect(cubeEvaluator.evaluatedCubes.base_fact.measures.v_sum_all_dates.filter?.excludeReferences)
+    expect(compilers.cubeEvaluator.evaluatedCubes.base_fact.measures.v_sum_all_dates.filter?.excludeReferences)
       .toEqual(['base_fact.d']);
-    expect(cubeEvaluator.evaluatedCubes.child_fact.measures.v_sum_all_dates.filter?.excludeReferences)
+    expect(compilers.cubeEvaluator.evaluatedCubes.child_fact.measures.v_sum_all_dates.filter?.excludeReferences)
       .toEqual(['child_fact.d']);
   });
 
@@ -195,12 +195,12 @@ views:
 `;
 
   it('resolves the filter member against the view that declares the filter', async () => {
-    const { compiler, cubeEvaluator } = prepareYamlCompiler(model);
-    await compiler.compile();
+    const compilers = prepareYamlCompiler(model);
+    await compilers.compile();
 
-    expect(cubeEvaluator.evaluatedCubes.base_view.defaultFilters?.map(f => f.memberReference))
+    expect(compilers.cubeEvaluator.evaluatedCubes.base_view.defaultFilters?.map(f => f.memberReference))
       .toEqual(['base_view.currency']);
-    expect(cubeEvaluator.evaluatedCubes.child_view.defaultFilters?.map(f => f.memberReference))
+    expect(compilers.cubeEvaluator.evaluatedCubes.child_view.defaultFilters?.map(f => f.memberReference))
       .toEqual(['child_view.currency']);
   });
 });
@@ -243,10 +243,10 @@ cubes:
 `;
 
   it('resolves output column names against the cube that declares the pre-aggregation', async () => {
-    const { compiler, cubeEvaluator } = prepareYamlCompiler(model);
-    await compiler.compile();
+    const compilers = prepareYamlCompiler(model);
+    await compilers.compile();
 
-    const names = (cube: string) => (cubeEvaluator.evaluatedCubes[cube].preAggregations.main as any)
+    const names = (cube: string) => (compilers.cubeEvaluator.evaluatedCubes[cube].preAggregations.main as any)
       .outputColumnTypes.map((c: any) => c.name);
 
     expect(names('base')).toEqual(['base.id']);

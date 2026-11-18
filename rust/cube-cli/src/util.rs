@@ -7,14 +7,19 @@ use serde_json::{Map, Value};
 use crate::client::Query;
 use crate::output;
 
-/// Parse a `--data` argument into a JSON object.
-///
-/// Accepts inline JSON (`'{"name": "x"}'`), `@path/to/file.json`, or `-`
-/// to read from stdin — the same convention as `gh api` / `curl -d`.
+/// Parse a `--data` argument into a JSON object; see [`parse_json_object`].
 pub fn parse_data(data: Option<&str>) -> Result<Map<String, Value>> {
     let Some(data) = data else {
         return Ok(Map::new());
     };
+    parse_json_object("--data", data)
+}
+
+/// Parse a JSON-object flag value, naming `flag` in errors.
+///
+/// Accepts inline JSON (`'{"name": "x"}'`), `@path/to/file.json`, or `-`
+/// to read from stdin — the same convention as `gh api` / `curl -d`.
+pub fn parse_json_object(flag: &str, data: &str) -> Result<Map<String, Value>> {
     let raw = if data == "-" {
         let mut buf = String::new();
         std::io::stdin().read_to_string(&mut buf)?;
@@ -24,10 +29,11 @@ pub fn parse_data(data: Option<&str>) -> Result<Map<String, Value>> {
     } else {
         data.to_string()
     };
-    let value: Value = serde_json::from_str(&raw).context("--data is not valid JSON")?;
+    let value: Value =
+        serde_json::from_str(&raw).with_context(|| format!("{flag} is not valid JSON"))?;
     match value {
         Value::Object(map) => Ok(map),
-        _ => bail!("--data must be a JSON object"),
+        _ => bail!("{flag} must be a JSON object"),
     }
 }
 
@@ -42,6 +48,26 @@ pub fn set<T: serde::Serialize>(body: &mut Map<String, Value>, key: &str, value:
 pub fn push<T: ToString>(query: &mut Query, key: &str, value: &Option<T>) {
     if let Some(v) = value {
         query.push((key.to_string(), v.to_string()));
+    }
+}
+
+/// A `--branch` value, trimmed, or `None` for a blank one (an unset CI variable).
+pub fn requested_branch(branch: &Option<String>) -> Option<&str> {
+    branch
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+}
+
+/// Query that points the data-model upload endpoints at `branch`. The server reads
+/// the branch only from the query string, and ignores it unless `live=true`.
+pub fn upload_branch_query(branch: Option<&str>) -> Query {
+    match branch {
+        Some(name) => vec![
+            ("branchName".to_string(), name.to_string()),
+            ("live".to_string(), "true".to_string()),
+        ],
+        None => Vec::new(),
     }
 }
 
@@ -196,7 +222,7 @@ pub fn nonempty_path(s: &str) -> Result<String, String> {
 pub fn nonempty_repo_path(s: &str) -> Result<String, String> {
     if s.trim().is_empty() {
         return Err(format!(
-            "{EMPTY_VALUE_REFUSED} names no file in the deployment's data model repository"
+            "{EMPTY_VALUE_REFUSED} names no path in the deployment's data model repository"
         ));
     }
 
@@ -681,6 +707,32 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn a_named_branch_travels_in_the_upload_query_with_live() {
+        assert_eq!(
+            upload_branch_query(Some("dev-feature")),
+            vec![
+                ("branchName".to_string(), "dev-feature".to_string()),
+                ("live".to_string(), "true".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn no_branch_keeps_the_upload_query_empty() {
+        assert!(upload_branch_query(None).is_empty());
+    }
+
+    #[test]
+    fn requested_branch_trims_and_drops_blanks() {
+        assert_eq!(requested_branch(&Some(String::new())), None);
+        assert_eq!(requested_branch(&Some("  ".to_string())), None);
+        assert_eq!(
+            requested_branch(&Some(" dev-x ".to_string())),
+            Some("dev-x")
+        );
+    }
+
+    #[test]
     fn parse_kv_accepts_key_value_pairs() {
         assert_eq!(parse_kv("A=1").unwrap(), ("A".to_string(), "1".to_string()));
         assert_eq!(
@@ -699,6 +751,17 @@ mod tests {
         assert!(parse_data(Some("[1, 2]")).is_err());
         assert!(parse_data(Some("not json")).is_err());
         assert!(parse_data(None).unwrap().is_empty());
+    }
+
+    #[test]
+    fn parse_json_object_errors_name_the_flag() {
+        let not_object = parse_json_object("--security-context", "[1]").unwrap_err();
+        assert_eq!(
+            not_object.to_string(),
+            "--security-context must be a JSON object"
+        );
+        let not_json = parse_json_object("--security-context", "nope").unwrap_err();
+        assert_eq!(not_json.to_string(), "--security-context is not valid JSON");
     }
 
     #[test]

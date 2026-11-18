@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, LocalResult, NaiveDate, NaiveDateTime, TimeZone};
+use chrono::{DateTime, Duration, LocalResult, NaiveDate, NaiveDateTime, TimeZone, Timelike};
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
@@ -15,6 +15,12 @@ lazy_static! {
 }
 
 impl QueryDateTimeHelper {
+    /// A partitioned pre-aggregation's date range bound, substituted by the
+    /// orchestrator in the bound params only, never in the SQL text.
+    pub fn is_partition_range(value: &str) -> bool {
+        value == "__FROM_PARTITION_RANGE" || value == "__TO_PARTITION_RANGE"
+    }
+
     pub fn parse_native_date_time(date: &str) -> Result<NaiveDateTime, CubeError> {
         let formats = &[
             "%Y-%m-%d %H:%M:%S",
@@ -95,6 +101,29 @@ impl QueryDateTimeHelper {
         }
     }
 
+    /// The overlap of two date ranges; bounds are compared normalized but kept
+    /// as given.
+    pub fn intersect_date_ranges(
+        a: &(String, String),
+        b: &(String, String),
+        precision: u32,
+    ) -> Result<(String, String), CubeError> {
+        let from = if Self::format_from_date(&a.0, precision)?
+            >= Self::format_from_date(&b.0, precision)?
+        {
+            a.0.clone()
+        } else {
+            b.0.clone()
+        };
+        let to = if Self::format_to_date(&a.1, precision)? <= Self::format_to_date(&b.1, precision)?
+        {
+            a.1.clone()
+        } else {
+            b.1.clone()
+        };
+        Ok((from, to))
+    }
+
     pub fn format_from_date(date: &str, precision: u32) -> Result<String, CubeError> {
         if precision == 3 {
             if DATE_TIME_LOCAL_MS_RE.is_match(date) {
@@ -121,6 +150,17 @@ impl QueryDateTimeHelper {
             ));
         }
         Ok(date.to_string())
+    }
+
+    /// An inclusive end bound at millisecond precision: one written to the
+    /// second, like `23:59:59`, covers that whole second.
+    pub fn inclusive_to_date(date: &str) -> Result<String, CubeError> {
+        let to = Self::format_to_date(date, 3)?;
+        let mut end = Self::parse_native_date_time(&to)?;
+        if end.nanosecond() == 0 {
+            end = end.with_nanosecond(999_000_000).unwrap_or(end);
+        }
+        Ok(end.format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
     }
 
     pub fn format_to_date(date: &str, precision: u32) -> Result<String, CubeError> {

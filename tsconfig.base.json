@@ -10,6 +10,7 @@
     "lib": ["es2023"],
     "target": "es2022",
     "module": "nodenext",
+    "isolatedModules": true,
     "moduleResolution": "nodenext",
     "types": ["node"],
     "composite": true,

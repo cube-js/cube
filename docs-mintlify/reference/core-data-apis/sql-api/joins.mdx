@@ -230,8 +230,61 @@ The `JOIN` type (`INNER`, `LEFT`, `RIGHT`, `FULL`) controls which keys are
 kept. This only applies to grouped queries whose `GROUP BY` is the join key. See
 [multi-fact views][ref-multi-fact-views] for the full explanation.
 
+## Multi-fact queries across views
+
+Joins between views in the SQL API are for multi-fact queries: measures from
+different views, each aggregated on a dimension the views share, combined into
+one result. They are not a way to navigate the data model. A dimension you want
+next to a measure belongs in the view through its [join path][ref-join-paths],
+not in a join between views.
+
+Write a multi-fact query as one common table expression (CTE) per view,
+aggregated by the shared dimension, and join the CTEs on it:
+
+```sql
+WITH o AS (
+  SELECT city, MEASURE(total_amount) AS total_amount
+  FROM orders_view
+  WHERE status = 'completed'
+  GROUP BY 1
+),
+r AS (
+  SELECT city, MEASURE(total_refund) AS total_refund
+  FROM returns_view
+  GROUP BY 1
+)
+SELECT o.city, o.total_amount, r.total_refund
+FROM o
+FULL JOIN r ON r.city = o.city
+```
+
+Each CTE is a [regular query][ref-queries-regular] against one view, so every
+measure is aggregated before the join and nothing fans out. [Joining views on a
+shared dimension](#joining-views-on-a-shared-dimension) produces the same
+subquery-then-join query from a single `SELECT`.
+
+- Put filters inside the CTE they apply to, as `WHERE status = 'completed'`
+  above. There they are part of that view's query. A `WHERE` on the outer
+  query is applied after the join.
+- The `JOIN` type works as in SQL: `FULL JOIN` keeps every city from both
+  views, `LEFT JOIN` keeps the cities of the left view, `INNER JOIN` keeps the
+  cities present in both.
+- Aggregating the joined result again, for example `SUM(total_amount)` by a
+  coarser dimension, is only correct for additive measures. For non-additive
+  measures, group each CTE at the grain you need.
+
+With [query pushdown][ref-queries-wpd] enabled, which is the default, Cube
+generates a single SQL statement for the data source, with one aggregating
+subquery per view. With pushdown disabled via
+[`CUBESQL_SQL_PUSH_DOWN`][ref-env-push-down], Cube runs each CTE as its own
+query and joins the results as [post-processing][ref-queries-wpp].
+
 
 [ref-views]: /docs/data-modeling/views
 [ref-join-paths]: /docs/data-modeling/joins#join-paths
 [ref-join-hints]: /docs/data-modeling/joins#join-hints
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
+[ref-queries-regular]: /reference/core-data-apis/queries#regular-query
+[ref-queries-wpp]: /reference/core-data-apis/queries#query-with-post-processing
+[ref-queries-wpd]: /reference/core-data-apis/queries#query-with-pushdown
+[ref-env-push-down]: /reference/configuration/environment-variables#cubesql_sql_push_down

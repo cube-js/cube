@@ -3,17 +3,10 @@
   "version": "0.1.0",
   "description": "",
   "private": true,
-  "workspaces": {
-    "packages": [
-      "rust/*",
-      "packages/*"
-    ],
-    "nohoist": [
-      "packages/cubejs-client-ngx/*",
-      "**/vue/*",
-      "**/inquirer"
-    ]
-  },
+  "workspaces": [
+    "rust/*",
+    "packages/*"
+  ],
   "scripts": {
     "build": "yarn lerna run build:client-core && tsc --build packages/cubejs-client-react && rollup -c",
     "watch": "rollup -c -w",
@@ -23,13 +16,13 @@
     "lint:fix": "oxlint --fix",
     "tsc": "tsc --build",
     "tsc:watch": "tsc --build --watch",
-    "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist} packages/cubejs-testing/cypress/{tsconfig.tsbuildinfo,dist}",
+    "clean": "rimraf 'packages/*/{tsconfig.tsbuildinfo,lib,dist}' 'packages/cubejs-testing/cypress/{tsconfig.tsbuildinfo,dist}'",
     "lint:js": "oxlint"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
     "core-js": "^3.34.0",
-    "lerna": "^10.0.1"
+    "lerna": "^10.1.1"
   },
   "files": [
     "src",
@@ -69,9 +62,10 @@
     "es5-ext": "0.10.53",
     "lodash": "^4.18.0",
     "@types/node": "^22",
-    "@types/ramda": "0.27.40",
-    "thrift": "0.23.0"
+    "thrift": "0.23.0",
+    "nx/undici": "^7.29.1",
+    "moment-timezone": "^0.6.5"
   },
   "license": "MIT",
-  "packageManager": "yarn@1.22.19"
+  "packageManager": "yarn@4.18.1"
 }

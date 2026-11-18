@@ -9,7 +9,7 @@ export class LargeStreamWarning extends stream.Transform {
 
     super({
       objectMode: true,
-      transform(row: any, encoding: BufferEncoding, callback: TransformCallback) {
+      transform(row: unknown, encoding: BufferEncoding, callback: TransformCallback) {
         count++;
 
         if (count === THRESHOLD_LIMIT) {

@@ -1,0 +1,213 @@
+---
+title: dbt pull with the Cube CLI
+description: Copy-paste Cube CLI pipelines for dbt pull — several dbt projects in one deployment, cubes committed through your own pull requests, CLI-mode deployments, and promoting a sync once it compiles.
+---
+
+[dbt pull](/docs/integrations/dbt) converts dbt models into cubes. The
+[Cube CLI](/reference/cli#dbt-sync) drives it from any pipeline: it uploads the
+`target/manifest.json` your dbt job produced, so Cube needs no access to your dbt
+repository. These recipes cover the common setups.
+
+| You want to… | Recipe |
+| --- | --- |
+| Pull several dbt projects into one deployment | [Multiple dbt projects](#multiple-dbt-projects) |
+| Commit the generated cubes through your own repository's pull requests | [Commit through your own pull requests](#commit-through-your-own-pull-requests) |
+| Fail a pull request whose committed cubes are out of date | [Gate pull requests on generated cubes](#gate-pull-requests-on-generated-cubes) |
+| Deploy a CLI-mode deployment with fresh cubes | [CLI-mode deployments](#cli-mode-deployments) |
+| Merge a sync to production once it compiles | [Promote a sync once it compiles](#promote-a-sync-once-it-compiles) |
+
+Every recipe assumes the CLI is installed and authenticated through environment
+variables, which is the usual setup in CI:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/install-cli.sh | sh
+export CUBE_API_URL=https://your-tenant.cubecloud.dev
+export CUBE_API_KEY=sk-YOUR_API_KEY   # in CI, read it from a secret
+export DEPLOYMENT_ID=123
+```
+
+Each recipe also needs a dbt manifest. Any dbt command that parses the project writes
+one to `target/manifest.json`: `dbt parse`, `dbt compile`, `dbt run`, or `dbt build`.
+
+## Multiple dbt projects
+
+Give every dbt project its own output folder and name prefix, and pull each one as
+an uploaded manifest. [Multiple dbt
+projects](/docs/integrations/dbt#multiple-dbt-projects) explains why both are needed.
+
+When each project has its own repository and pipeline, add a job like this to each
+one, changing only `PROJECT`:
+
+```yaml
+name: Pull the dbt project into Cube
+on:
+  push:
+    branches: [main]
+
+jobs:
+  cube:
+    runs-on: ubuntu-latest
+    env:
+      CUBE_API_URL: https://your-tenant.cubecloud.dev
+      CUBE_API_KEY: ${{ secrets.CUBE_API_KEY }}
+      DEPLOYMENT_ID: ${{ vars.CUBE_DEPLOYMENT_ID }}
+      PROJECT: sales   # unique per dbt project
+    steps:
+      - uses: actions/checkout@v4
+
+      # Set up Python, your dbt adapter, and profiles.yml here.
+      - run: dbt parse
+
+      - name: Install the Cube CLI
+        run: curl -fsSL https://raw.githubusercontent.com/cube-js/cube/master/install-cli.sh | sh
+
+      - name: Pull into the project's own folder
+        run: |
+          cube dbt sync "$DEPLOYMENT_ID" --manifest target/manifest.json \
+            --output-path "model/cubes/dbt/$PROJECT" --name-prefix "${PROJECT}_" --wait
+```
+
+When the projects live in one repository, loop over them:
+
+```bash
+set -euo pipefail
+
+for project in sales finance; do
+  (cd "dbt/$project" && dbt parse)
+  cube dbt sync "$DEPLOYMENT_ID" --manifest "dbt/$project/target/manifest.json" \
+    --output-path "model/cubes/dbt/$project" --name-prefix "${project}_" --wait
+done
+```
+
+Each sync creates its own review branch, so a person can approve each project's update
+separately. The branches change different folders and merge in any order.
+
+## Commit through your own pull requests
+
+If your data model lives in your own Git repository, let your CI commit the cubes
+instead of Cube. `cube dbt generate` converts a manifest and writes the files into your
+working copy; it creates no Cube branch and commits nothing.
+
+`generate` never deletes files, so clear each project's folder first. Its folder holds
+only generated cubes, so a cube whose dbt model was deleted disappears too:
+
+```bash
+set -euo pipefail
+
+# One manifest per project, e.g. downloaded from each dbt pipeline's artifacts.
+for project in sales finance; do
+  rm -rf "model/cubes/dbt/$project"
+  cube dbt generate "$DEPLOYMENT_ID" --manifest "/tmp/manifests/$project.json" --out . \
+    --output-path "model/cubes/dbt/$project" --name-prefix "${project}_"
+done
+
+git add -A model/cubes/dbt
+if git diff --cached --quiet; then
+  echo "dbt cubes are up to date"
+  exit 0
+fi
+
+git switch -c "dbt-cubes/$(date -u +%Y%m%d%H%M%S)"
+git -c user.name=ci -c user.email=ci@example.com commit -m "chore: regenerate dbt cubes"
+git push -u origin HEAD
+gh pr create --fill   # needs contents: write and pull-requests: write
+```
+
+Run it from the root of your data model repository: `--out .` is the project root, and
+`--output-path` is relative to it. With a single dbt project, drop the loop and the
+two flags; the cubes go to the deployment's saved **Output path**. Clear only the files
+directly in that folder, as a pull does, so any per-project subfolders survive:
+`find model/cubes/dbt -maxdepth 1 -type f -delete`.
+
+## Gate pull requests on generated cubes
+
+To fail a pull request whose committed cubes no longer match its dbt project,
+regenerate them in the checkout and fail if anything changed:
+
+```bash
+set -euo pipefail
+
+for project in sales finance; do
+  rm -rf "model/cubes/dbt/$project"
+  cube dbt generate "$DEPLOYMENT_ID" --manifest "/tmp/manifests/$project.json" --out . \
+    --output-path "model/cubes/dbt/$project" --name-prefix "${project}_"
+done
+
+if [ -n "$(git status --porcelain -- model/cubes/dbt)" ]; then
+  git status --short -- model/cubes/dbt
+  echo "Generated cubes are out of date; regenerate and commit them." >&2
+  exit 1
+fi
+```
+
+Clearing the folder first is what makes this catch a cube left behind by a deleted dbt
+model. [`generate --check`](/reference/cli#generate-cubes-without-committing-them)
+writes nothing, but it only compares the files the run generated, so it misses those.
+
+Neither `generate` recipe sends a "dbt sync is ready for review" email, so both can run
+on every pull request.
+
+## CLI-mode deployments
+
+A deployment in CLI deploy mode takes its data model from
+[`cube deploy`](/reference/cli#deploy-a-project) rather than from Git. Regenerate the
+cubes in your project directory, then deploy it:
+
+```bash
+set -euo pipefail
+
+for project in sales finance; do
+  rm -rf "model/cubes/dbt/$project"
+  cube dbt generate "$DEPLOYMENT_ID" --manifest "/tmp/manifests/$project.json" --out . \
+    --output-path "model/cubes/dbt/$project" --name-prefix "${project}_"
+done
+
+cube deploy "$DEPLOYMENT_ID" --directory . -m "Regenerate dbt cubes"
+cube deployments build-status "$DEPLOYMENT_ID" --wait
+cube validate "$DEPLOYMENT_ID"
+```
+
+`cube deploy` uploads the **whole** directory and removes remote files that aren't in
+it, so run it from a complete checkout of your data model, and keep the manifests
+outside that directory. Switch the deployment to CLI deploy mode once with
+`cube deployments update DEPLOYMENT_ID -d '{"deployMode":"cli"}'`.
+
+## Promote a sync once it compiles
+
+When the dbt pipeline is already your review step, a sync can merge itself to
+production once its cubes compile:
+
+```bash
+set -euo pipefail
+
+cube dbt sync "$DEPLOYMENT_ID" --manifest target/manifest.json \
+  --output-path model/cubes/dbt/sales --name-prefix sales_ --wait --json > sync.json
+BRANCH=$(jq -er '.branchName | select(length > 0)' sync.json)
+
+# Compile the sync branch in a personal dev-mode fork, released however the script ends.
+trap 'cube data-model exit-dev-mode "$DEPLOYMENT_ID" || true' EXIT
+DEV=$(cube data-model dev-mode "$DEPLOYMENT_ID" "$BRANCH" --json | jq -er '.branchName | select(length > 0)')
+cube deployments build-status "$DEPLOYMENT_ID" --branch "$DEV" --wait
+cube validate "$DEPLOYMENT_ID" --dev-mode
+cube data-model exit-dev-mode "$DEPLOYMENT_ID"
+cube data-model delete-branch "$DEPLOYMENT_ID" "$DEV"
+
+# Merge into the deploy branch, rebuild production, and delete the sync branch.
+cube data-model merge-to-default "$DEPLOYMENT_ID" --branch "$BRANCH" -m "Pull dbt project sales"
+```
+
+A failed compile stops the script before the merge and keeps the sync branch for
+inspection. Without the `--output-path` and `--name-prefix` flags, this works the same
+for a deployment with a single dbt project.
+
+<Warning>
+
+This merges without a human review. Use it only when your dbt pipeline is the review
+gate, and give the job its own API key: dev mode is per credential, so concurrent
+runs sharing a key can re-point each other's session. The key needs `SchemaUpdate`,
+`SchemaRead`, `SchemaUpdateDevBranches`, and `DeploymentRead` on the deployment.
+
+</Warning>
+
+To compile **and query** the generated cubes before merging, see [dbt sync as a CI
+test gate](/reference/cli#dbt-sync-as-a-ci-test-gate).

@@ -143,6 +143,15 @@ along their join paths. End-users see a flat list of fields — `status`,
 `created_date`, `product`, `users_city`, etc. — without being exposed to
 the underlying cube structure.
 
+### Views and data sources
+
+A view can include cubes from different [data sources][ref-data-sources]. Each
+view member takes the data source of its cube. A query to the view works when its
+members, and every cube on the join path to them, use one data source. A query
+that reads more than one data source needs a [`rollup_join`][ref-rollup-join]
+pre-aggregation that covers its members. See [Querying across data
+sources][ref-cross-data-source] for the query shapes that work.
+
 ## Designing effective views
 
 ### Build for your audience
@@ -524,3 +533,6 @@ parameters.
 [wiki-dry]: https://en.wikipedia.org/wiki/Don%27t_repeat_yourself
 [ref-extending-views]: /docs/data-modeling/extending-cubes#extending-views
 [ref-recipe-reuse-view-measures]: /recipes/data-modeling/reusing-view-measures
+[ref-data-sources]: /admin/connect-to-data/multiple-data-sources
+[ref-rollup-join]: /reference/data-modeling/pre-aggregations#rollup_join
+[ref-cross-data-source]: /recipes/data-modeling/cross-data-source-queries

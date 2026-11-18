@@ -1,10 +1,9 @@
-use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::planner::collectors::{
     collect_join_hints, collect_multiplied_measures, has_expression_or_calculated_members,
     has_multi_stage_members,
 };
 use crate::planner::filter::FilterItem;
-use crate::planner::join_hints::JoinHints;
+use crate::planner::join_hints::{JoinHint, JoinHints};
 use crate::planner::planners::JoinTreeBuilder;
 use crate::planner::query_tools::JoinKey;
 use crate::planner::state::State;
@@ -45,20 +44,23 @@ impl MeasuresJoinHintsBuilder {
 
     pub fn build(self, measures: &[Rc<MemberSymbol>]) -> Result<MeasuresJoinHints, CubeError> {
         let mut base_hints = self.initial_hints;
+        let mut member_paths = Vec::new();
 
-        for sym in self.dimensions.iter() {
-            base_hints.extend(&collect_join_hints(sym)?);
-        }
-
-        let mut filter_symbols = Vec::new();
+        let mut members = self.dimensions;
         for item in self.filters.iter() {
-            item.find_all_member_evaluators(&mut filter_symbols);
+            item.find_all_member_evaluators(&mut members);
         }
-        for sym in filter_symbols.iter() {
-            base_hints.extend(&collect_join_hints(sym)?);
+        for sym in members.iter() {
+            let hints = collect_join_hints(sym)?;
+            for hint in hints.iter() {
+                if let JoinHint::Vector(path) = hint {
+                    member_paths.push((sym.full_name().clone(), path.clone()));
+                }
+            }
+            base_hints.extend(&hints);
         }
 
-        MeasuresJoinHints::from_base_hints(base_hints, measures, None)
+        MeasuresJoinHints::from_base_hints(base_hints, member_paths, measures, None)
     }
 }
 
@@ -85,9 +87,12 @@ impl MeasuresJoinHintsBuilder {
 ///   unrelated view still pulls a hint-less member expression into its join.
 /// - `query_hints` — `base_hints` plus every measure's hints: the single tree over all
 ///   members, for a measure whose own hints have no root. Inherited like `hints_by_cube`.
+/// - `member_paths` — the join paths dimensions and filters bring in (a view's
+///   `fact.dim`), by member, to name in a no-join-path error.
 #[derive(Clone, Debug)]
 pub struct MeasuresJoinHints {
     base_hints: JoinHints,
+    member_paths: Vec<(String, Vec<CubeId>)>,
     measure_hints: Vec<MeasureJoinHints>,
     hints_by_cube: HashMap<CubeId, JoinHints>,
     query_hints: JoinHints,
@@ -109,6 +114,7 @@ impl MeasuresJoinHints {
     pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
         Self::from_base_hints(
             self.base_hints.clone(),
+            self.member_paths.clone(),
             measures,
             Some((self.hints_by_cube.clone(), self.query_hints.clone())),
         )
@@ -118,6 +124,7 @@ impl MeasuresJoinHints {
     /// the measures add nothing to it; without it they are grouped from scratch.
     fn from_base_hints(
         base_hints: JoinHints,
+        member_paths: Vec<(String, Vec<CubeId>)>,
         measures: &[Rc<MemberSymbol>],
         inherited: Option<(HashMap<CubeId, JoinHints>, JoinHints)>,
     ) -> Result<Self, CubeError> {
@@ -157,6 +164,7 @@ impl MeasuresJoinHints {
 
         Ok(Self {
             base_hints,
+            member_paths,
             measure_hints,
             hints_by_cube,
             query_hints,
@@ -180,6 +188,16 @@ impl MeasuresJoinHints {
             .find(|mh| mh.measure.id() == measure.id())
             .map(|mh| mh.hints.clone())
     }
+}
+
+/// Whether and how `build_groups` folds nested groups together.
+#[derive(Clone, Copy, PartialEq)]
+enum NestedMerge {
+    Off,
+    /// The query aggregates: replication is fine for a measure immune to it.
+    Aggregated,
+    /// The query returns raw rows: any replication reaches the result.
+    RawRows,
 }
 
 /// One group while it is still being assembled: the measures gathered so far
@@ -220,7 +238,7 @@ impl MultiFactJoinGroups {
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Self, CubeError> {
-        Self::build(query_tools, measures_join_hints, false)
+        Self::build(query_tools, measures_join_hints, NestedMerge::Off)
     }
 
     /// Like `try_new`, but additionally folds a group into another one whose
@@ -235,7 +253,16 @@ impl MultiFactJoinGroups {
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Self, CubeError> {
-        Self::build(query_tools, measures_join_hints, true)
+        Self::build(query_tools, measures_join_hints, NestedMerge::Aggregated)
+    }
+
+    /// Like `try_new_merging_nested`, for an ungrouped query: the rows are those
+    /// of the wider tree, so a group moves into it even where it replicates rows.
+    pub fn try_new_merging_nested_raw_rows(
+        query_tools: Rc<State>,
+        measures_join_hints: MeasuresJoinHints,
+    ) -> Result<Self, CubeError> {
+        Self::build(query_tools, measures_join_hints, NestedMerge::RawRows)
     }
 
     /// Like `try_new`, but tells apart members the join graph has no path for:
@@ -244,30 +271,26 @@ impl MultiFactJoinGroups {
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
     ) -> Result<Result<Self, CubeError>, CubeError> {
-        Ok(
-            Self::build_if_joinable(query_tools, measures_join_hints, false)?
-                .map_err(|hints| Self::no_join_path_error(&hints)),
-        )
+        Self::build_if_joinable(query_tools, measures_join_hints, NestedMerge::Off)
     }
 
     fn build(
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> Result<Self, CubeError> {
         Self::build_if_joinable(query_tools, measures_join_hints, merge_nested)?
-            .map_err(|hints| Self::no_join_path_error(&hints))
     }
 
-    /// The inner error is the hint set the join graph has no path for.
+    /// The inner error is the user error for members the join graph has no path for.
     fn build_if_joinable(
         query_tools: Rc<State>,
         measures_join_hints: MeasuresJoinHints,
-        merge_nested: bool,
-    ) -> Result<Result<Self, JoinHints>, CubeError> {
+        merge_nested: NestedMerge,
+    ) -> Result<Result<Self, CubeError>, CubeError> {
         let groups = match Self::build_groups(&query_tools, &measures_join_hints, merge_nested)? {
             Ok(groups) => groups,
-            Err(hints) => return Ok(Err(hints)),
+            Err(error) => return Ok(Err(error)),
         };
         let (dimension_paths, measure_paths) = Self::precompute_paths(&groups);
         Ok(Ok(Self {
@@ -283,25 +306,22 @@ impl MultiFactJoinGroups {
     /// the shared `base_hints`.
     pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
         let new_hints = self.measures_join_hints.for_measures(measures)?;
-        Self::build(self.query_tools.clone(), new_hints, false)
+        Self::build(self.query_tools.clone(), new_hints, NestedMerge::Off)
     }
 
-    /// The inner error is the hint set the join graph has no path for.
+    /// The inner error is the user error for members the join graph has no path for.
     fn build_groups(
         query_tools: &Rc<State>,
         hints: &MeasuresJoinHints,
-        merge_nested: bool,
-    ) -> Result<Result<Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>, JoinHints>, CubeError> {
+        merge_nested: NestedMerge,
+    ) -> Result<Result<Vec<(Rc<JoinTree>, Vec<Rc<MemberSymbol>>)>, CubeError>, CubeError> {
         let join_tree_builder = JoinTreeBuilder::new(query_tools.clone());
         let try_resolve =
             |join_hints: &JoinHints| -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError> {
                 query_tools
                     .join_tree_cache()
                     .get_or_try_build(join_hints, || {
-                        let Some((key, join)) = query_tools.try_join_for_hints(join_hints)? else {
-                            return Ok(None);
-                        };
-                        Ok(Some((key, join_tree_builder.build(join)?)))
+                        join_tree_builder.try_build_for_hints(join_hints)
                     })
             };
 
@@ -309,7 +329,11 @@ impl MultiFactJoinGroups {
         if hints.measure_hints.is_empty() {
             if !hints.base_hints.is_empty() {
                 let Some((key, join_tree)) = try_resolve(&hints.base_hints)? else {
-                    return Ok(Err(hints.base_hints.clone()));
+                    return Ok(Err(Self::no_join_path_error(
+                        &hints.base_hints,
+                        None,
+                        &try_resolve,
+                    )?));
                 };
                 measures_to_join.push((Vec::new(), key, join_tree, hints.base_hints.clone()));
             }
@@ -336,7 +360,13 @@ impl MultiFactJoinGroups {
                     Some((key, join_tree)) => (key, join_tree, measure_hints),
                     None => match try_resolve(&hints.query_hints)? {
                         Some((key, join_tree)) => (key, join_tree, hints.query_hints.clone()),
-                        None => return Ok(Err(measure_hints)),
+                        None => {
+                            return Ok(Err(Self::no_join_path_error(
+                                &measure_hints,
+                                Some((&mh.measure, &hints.member_paths)),
+                                &try_resolve,
+                            )?))
+                        }
                     },
                 };
                 measures_to_join.push((vec![mh.measure.clone()], key, join_tree, join_hints));
@@ -370,11 +400,18 @@ impl MultiFactJoinGroups {
 
         // Cheapest question first: without a nested pair there is nothing to
         // merge, and the pre-aggregation scan crosses the bridge once per cube.
-        if merge_nested
-            && Self::has_nested_pair(&groups)
-            && !Self::any_cube_has_pre_aggregations(query_tools, &groups)?
-        {
-            Self::merge_nested_groups(&mut groups, &try_resolve)?;
+        // Raw rows merge regardless of rollups: groups kept apart would answer
+        // a different set of rows, not just cost more.
+        let merge = match merge_nested {
+            NestedMerge::Off => false,
+            NestedMerge::Aggregated => {
+                Self::has_nested_pair(&groups, merge_nested)
+                    && !Self::any_cube_has_pre_aggregations(query_tools, &groups)?
+            }
+            NestedMerge::RawRows => Self::has_nested_pair(&groups, merge_nested),
+        };
+        if merge {
+            Self::merge_nested_groups(&mut groups, &try_resolve, merge_nested)?;
         }
 
         Ok(Ok(groups
@@ -383,25 +420,67 @@ impl MultiFactJoinGroups {
             .collect()))
     }
 
-    fn no_join_path_error(hints: &JoinHints) -> CubeError {
+    /// With `measure`, names the member paths that break a measure whose own
+    /// hints join: a view's `fact.dim` path the measure's fact has no join to.
+    fn no_join_path_error(
+        hints: &JoinHints,
+        measure: Option<(&Rc<MemberSymbol>, &[(String, Vec<CubeId>)])>,
+        try_resolve: &impl Fn(&JoinHints) -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError>,
+    ) -> Result<CubeError, CubeError> {
         let cubes = hints
             .iter()
             .map(|item| match item {
-                JoinHintItem::Single(cube) => format!("'{}'", cube),
-                JoinHintItem::Vector(path) => format!("'{}'", path.join(",")),
+                JoinHint::Single(cube) => format!("'{}'", cube),
+                JoinHint::Vector(path) => format!("'{}'", path.iter().join(",")),
             })
             .join(", ");
-        CubeError::user(format!("Can't find join path to join {}", cubes))
+        let mut foreign = Vec::new();
+        if let Some((measure, member_paths)) = measure {
+            let own = collect_join_hints(measure)?;
+            if !own.is_empty() && try_resolve(&own)?.is_some() {
+                for (member, path) in member_paths.iter().filter(|(_, path)| path.len() > 1) {
+                    let mut with_path = own.clone();
+                    with_path.push(JoinHint::Vector(path.clone()));
+                    if try_resolve(&with_path)?.is_none() {
+                        foreign.push(format!(
+                            "'{}' is joined through '{}', which '{}' has no join to",
+                            member,
+                            path[..path.len() - 1].iter().join("."),
+                            measure.full_name()
+                        ));
+                    }
+                }
+            }
+        }
+        let foreign = foreign.into_iter().unique().join("; ");
+        let explanation = if foreign.is_empty() {
+            String::new()
+        } else {
+            format!(": {foreign}")
+        };
+        Ok(CubeError::user(format!(
+            "Can't find join path to join {}{}",
+            cubes, explanation
+        )))
     }
 
     /// Whether any group's join tree is contained in another's - the only
     /// shape `merge_nested_groups` can do anything with.
-    fn has_nested_pair(groups: &[GroupBuild]) -> bool {
+    fn has_nested_pair(groups: &[GroupBuild], mode: NestedMerge) -> bool {
         groups.iter().any(|group| {
             groups
                 .iter()
-                .any(|other| group.key.is_nested_in(&other.key))
+                .any(|other| Self::is_nested(&group.key, &other.key, mode))
         })
+    }
+
+    /// Raw rows come from the wider tree whatever cube it walks from, so for
+    /// them containing every cube is enough; aggregates also need the same root.
+    fn is_nested(key: &JoinKey, other: &JoinKey, mode: NestedMerge) -> bool {
+        match mode {
+            NestedMerge::RawRows => key.cubes_within(other),
+            NestedMerge::Off | NestedMerge::Aggregated => key.is_nested_in(other),
+        }
     }
 
     /// Whether any cube these groups read defines a pre-aggregation.
@@ -425,7 +504,7 @@ impl MultiFactJoinGroups {
                     .iter()
                     .map(|item| item.cube().cube_id().clone()),
             );
-            for cube_name in cubes {
+            for cube_name in cubes.filter(|cube| !cube.is_joined()) {
                 if !seen.insert(cube_name.clone()) {
                     continue;
                 }
@@ -449,6 +528,9 @@ impl MultiFactJoinGroups {
     /// both, provided that replication either does not reach it or does not
     /// change what it computes - which is what `group_survives_join` decides.
     ///
+    /// Raw rows may also fold into a wider tree rooted at another cube: the
+    /// result is then that tree's rows, and narrower-root rows it lacks drop out.
+    ///
     /// The wider tree is rebuilt from both groups' join hints before that
     /// question is asked. A tree only knows whether it multiplies the cubes its
     /// own hints named, and the cube a moving measure sits on may be in the
@@ -464,12 +546,13 @@ impl MultiFactJoinGroups {
     fn merge_nested_groups(
         groups: &mut Vec<GroupBuild>,
         try_resolve: &impl Fn(&JoinHints) -> Result<Option<(JoinKey, Rc<JoinTree>)>, CubeError>,
+        mode: NestedMerge,
     ) -> Result<(), CubeError> {
         loop {
             let mut merged = None;
             'outer: for (i, group) in groups.iter().enumerate() {
                 for (j, other) in groups.iter().enumerate() {
-                    if i == j || !group.key.is_nested_in(&other.key) {
+                    if i == j || !Self::is_nested(&group.key, &other.key, mode) {
                         continue;
                     }
                     let mut hints = other.hints.clone();
@@ -483,7 +566,7 @@ impl MultiFactJoinGroups {
                     if key != other.key {
                         continue;
                     }
-                    if Self::group_survives_join(&group.measures, &tree)? {
+                    if Self::group_survives_join(&group.measures, &tree, mode)? {
                         merged = Some((i, j, tree));
                         break 'outer;
                     }
@@ -518,14 +601,22 @@ impl MultiFactJoinGroups {
     /// is a member of nothing, so no leaf accounts for it. A bare reference -
     /// every measure of a view is one - writes nothing, and is followed into the
     /// member it references.
+    ///
+    /// Raw rows have no aggregation to protect, so only multi-stage measures stay
+    /// apart; kept apart, the groups would be joined back on the dimensions and pair rows.
     fn group_survives_join(
         measures: &[Rc<MemberSymbol>],
         join: &Rc<JoinTree>,
+        mode: NestedMerge,
     ) -> Result<bool, CubeError> {
         for measure in measures.iter() {
-            if has_multi_stage_members(measure, false)?
-                || has_expression_or_calculated_members(measure)?
-            {
+            if has_multi_stage_members(measure, false)? {
+                return Ok(false);
+            }
+            if mode == NestedMerge::RawRows {
+                continue;
+            }
+            if has_expression_or_calculated_members(measure)? {
                 return Ok(false);
             }
             // `join` is only a candidate here, not the tree the query will
@@ -603,8 +694,8 @@ impl MultiFactJoinGroups {
             .and_then(|cube| cube.static_data().is_view)
             .unwrap_or(false);
         if !is_view {
-            return Ok(JoinHints::from_items(vec![JoinHintItem::Single(
-                cube_name.target().to_string(),
+            return Ok(JoinHints::from_items(vec![JoinHint::Single(
+                cube_name.clone(),
             )]));
         }
 
@@ -643,9 +734,9 @@ impl MultiFactJoinGroups {
         };
 
         match roots.as_slice() {
-            [root_cube] => Ok(JoinHints::from_items(vec![JoinHintItem::Single(
+            [root_cube] => Ok(JoinHints::from_items(vec![JoinHint::Single(CubeId::cube(
                 (*root_cube).clone(),
-            )])),
+            ))])),
             // Every path of the join map is headed by a cube some other path
             // reaches, so the paths lead in a circle and none of them starts at
             // the view's root.
@@ -811,6 +902,7 @@ mod tests {
     use crate::planner::{MemberExpressionExpression, MemberExpressionSymbol};
     use crate::test_fixtures::cube_bridge::{MockMemberSql, MockSchema};
     use crate::test_fixtures::test_utils::{member_id, TestContext};
+    use indoc::indoc;
 
     #[test]
     fn test_single_fact_one_group() {
@@ -1091,7 +1183,7 @@ mod tests {
 
     fn nested_trees_groups(
         measure_paths: &[&str],
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> (usize, Vec<Vec<String>>) {
         let ctx = nested_trees_context();
         let measures = measure_paths
@@ -1105,7 +1197,7 @@ mod tests {
     fn nested_trees_groups_of(
         ctx: &TestContext,
         measures: Vec<Rc<MemberSymbol>>,
-        merge_nested: bool,
+        merge_nested: NestedMerge,
     ) -> (usize, Vec<Vec<String>>) {
         let country = ctx.create_symbol("sites.country").unwrap();
 
@@ -1114,11 +1206,8 @@ mod tests {
             .build(&measures)
             .unwrap();
 
-        let groups = if merge_nested {
-            MultiFactJoinGroups::try_new_merging_nested(ctx.query_tools().clone(), hints).unwrap()
-        } else {
-            MultiFactJoinGroups::try_new(ctx.query_tools().clone(), hints).unwrap()
-        };
+        let groups =
+            MultiFactJoinGroups::build(ctx.query_tools().clone(), hints, merge_nested).unwrap();
 
         let grouped_measures = groups
             .groups()
@@ -1134,8 +1223,10 @@ mod tests {
         // measure is contained in the tree of a `checkouts` one. Both measures
         // are distinct counts, which the fan-out of the wider tree cannot
         // change, so one group answers both.
-        let (num_groups, measures) =
-            nested_trees_groups(&["carts.unique_msid", "checkouts.unique_msid"], true);
+        let (num_groups, measures) = nested_trees_groups(
+            &["carts.unique_msid", "checkouts.unique_msid"],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 1);
         assert_eq!(
@@ -1149,8 +1240,10 @@ mod tests {
 
     #[test]
     fn test_nested_trees_are_kept_apart_without_merging() {
-        let (num_groups, _) =
-            nested_trees_groups(&["carts.unique_msid", "checkouts.unique_msid"], false);
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.unique_msid", "checkouts.unique_msid"],
+            NestedMerge::Off,
+        );
 
         assert_eq!(num_groups, 2);
     }
@@ -1159,7 +1252,10 @@ mod tests {
     fn test_nested_trees_plain_count_does_not_merge() {
         // The wider tree splits every `carts` row into one row per checkout, so
         // a plain count over it would answer the number of checkouts.
-        let (num_groups, _) = nested_trees_groups(&["carts.count", "checkouts.unique_msid"], true);
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.count", "checkouts.unique_msid"],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 2);
     }
@@ -1201,8 +1297,11 @@ mod tests {
             make_expression_measure(&ctx, "net_carts", "carts", "COUNT(*) - {carts.unique_msid}");
         let checkouts_unique = ctx.create_symbol("checkouts.unique_msid").unwrap();
 
-        let (num_groups, _) =
-            nested_trees_groups_of(&ctx, vec![expression, checkouts_unique], true);
+        let (num_groups, _) = nested_trees_groups_of(
+            &ctx,
+            vec![expression, checkouts_unique],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 2);
     }
@@ -1212,8 +1311,10 @@ mod tests {
         // The measure writes its own `COUNT(*)` around the reference, and that
         // count is a member of nothing - the referenced distinct count is the
         // only leaf, and it says nothing about the count beside it.
-        let (num_groups, _) =
-            nested_trees_groups(&["carts.repeated_msid", "checkouts.unique_msid"], true);
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.repeated_msid", "checkouts.unique_msid"],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 2);
     }
@@ -1225,7 +1326,7 @@ mod tests {
         // paths get.
         let (num_groups, measures) = nested_trees_groups(
             &["funnel.unique_msid", "funnel.checkouts_unique_msid"],
-            true,
+            NestedMerge::Aggregated,
         );
 
         assert_eq!(num_groups, 1);
@@ -1240,10 +1341,104 @@ mod tests {
 
     #[test]
     fn test_nested_trees_sum_does_not_merge() {
-        let (num_groups, _) =
-            nested_trees_groups(&["carts.total_value", "checkouts.total_amount"], true);
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.total_value", "checkouts.total_amount"],
+            NestedMerge::Aggregated,
+        );
 
         assert_eq!(num_groups, 2);
+    }
+
+    #[test]
+    fn test_nested_trees_raw_rows_merge_into_a_multiplying_tree() {
+        // Raw rows are those of the wider tree: a plain count is not refused
+        // over the fan-out of `checkouts` as it is when aggregating.
+        let (num_groups, _) = nested_trees_groups(
+            &["carts.count", "checkouts.unique_msid"],
+            NestedMerge::RawRows,
+        );
+
+        assert_eq!(num_groups, 1);
+    }
+
+    // `orders` joins `customers` many_to_one, so the tree of a `customers`
+    // measure contains the tree of an `orders` one without replicating
+    // `orders` rows.
+    fn many_to_one_groups(pre_aggregations: &str, merge_nested: NestedMerge) -> usize {
+        let schema = MockSchema::from_yaml(&format!(
+            indoc! {"
+                cubes:
+                  - name: orders
+                    sql: SELECT * FROM orders
+                    joins:
+                      - name: customers
+                        relationship: many_to_one
+                        sql: \"{{orders}}.customer_id = {{customers.id}}\"
+                    dimensions:
+                      - name: id
+                        type: number
+                        sql: id
+                        primary_key: true
+                      - name: status
+                        type: string
+                        sql: status
+                    measures:
+                      - name: count
+                        type: count
+                {}
+                  - name: customers
+                    sql: SELECT * FROM customers
+                    dimensions:
+                      - name: id
+                        type: number
+                        sql: id
+                        primary_key: true
+                    measures:
+                      - name: count
+                        type: count
+            "},
+            pre_aggregations
+        ))
+        .unwrap();
+        let ctx = TestContext::new(schema).unwrap();
+        let measures = vec![
+            ctx.create_symbol("orders.count").unwrap(),
+            ctx.create_symbol("customers.count").unwrap(),
+        ];
+        let status = ctx.create_symbol("orders.status").unwrap();
+        let hints = MeasuresJoinHints::builder(&JoinHints::new())
+            .add_dimensions(&[status])
+            .build(&measures)
+            .unwrap();
+
+        MultiFactJoinGroups::build(ctx.query_tools().clone(), hints, merge_nested)
+            .unwrap()
+            .num_groups()
+    }
+
+    const ORDERS_ROLLUP: &str = "    pre_aggregations:
+      - name: by_status
+        type: rollup
+        measures:
+          - count
+        dimensions:
+          - status";
+
+    #[test]
+    fn test_raw_rows_merge_into_a_tree_that_keeps_their_rows() {
+        assert_eq!(many_to_one_groups("", NestedMerge::Off), 2);
+        assert_eq!(many_to_one_groups("", NestedMerge::RawRows), 1);
+    }
+
+    #[test]
+    fn test_raw_rows_merge_regardless_of_pre_aggregations() {
+        // Aggregated groups stay apart so each can be served by its own
+        // rollup; raw rows kept apart would be paired up on the dimensions.
+        assert_eq!(
+            many_to_one_groups(ORDERS_ROLLUP, NestedMerge::Aggregated),
+            2
+        );
+        assert_eq!(many_to_one_groups(ORDERS_ROLLUP, NestedMerge::RawRows), 1);
     }
 
     #[test]

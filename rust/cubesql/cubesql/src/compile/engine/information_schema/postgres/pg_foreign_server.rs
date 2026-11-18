@@ -31,15 +31,15 @@ impl PgCatalogForeignServerBuilder {
         let capacity = 1;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            srvname: StringBuilder::new(capacity),
-            srvowner: UInt32Builder::new(capacity),
-            srvfdw: UInt32Builder::new(capacity),
-            srvtype: StringBuilder::new(capacity),
-            srvversion: StringBuilder::new(capacity),
-            srvacl: ListBuilder::new(StringBuilder::new(capacity)),
-            srvoptions: ListBuilder::new(StringBuilder::new(capacity)),
-            xmin: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            srvname: StringBuilder::with_capacity(capacity, capacity),
+            srvowner: UInt32Builder::with_capacity(capacity),
+            srvfdw: UInt32Builder::with_capacity(capacity),
+            srvtype: StringBuilder::with_capacity(capacity, capacity),
+            srvversion: StringBuilder::with_capacity(capacity, capacity),
+            srvacl: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            srvoptions: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 
@@ -95,12 +95,12 @@ impl TableProvider for PgCatalogForeignServerProvider {
             Field::new("srvversion", DataType::Utf8, true),
             Field::new(
                 "srvacl",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new(
                 "srvoptions",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new("xmin", DataType::UInt32, false),

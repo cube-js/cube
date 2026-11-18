@@ -89,7 +89,7 @@ type ContextToApiScopesFn =
   (securityContext?: any, scopes?: ApiScopesTuple) =>
   Promise<ApiScopesTuple>;
 
-export {
+export type {
   CheckAuthInternalOptions,
   JWTOptions,
   CheckAuthFn,

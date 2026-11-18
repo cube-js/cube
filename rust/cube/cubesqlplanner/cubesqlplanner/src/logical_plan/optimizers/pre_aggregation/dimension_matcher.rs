@@ -1,12 +1,18 @@
 use super::CompiledPreAggregation;
-use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem};
+use crate::cube_bridge::base_query_options::FilterValue;
+use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem, FilterOperator};
 use crate::planner::query_tools::QueryTools;
+use crate::planner::time_dimension::{
+    Granularity, QueryDateTime, QueryDateTimeHelper, SqlInterval,
+};
 use crate::planner::DimensionSymbol;
 use crate::planner::GranularityHelper;
 use crate::planner::TimeDimensionSymbol;
 use crate::planner::{MemberId, MemberSymbol};
+use chrono::{Duration, NaiveDateTime};
+use chrono_tz::Tz;
 use cubenativeutils::CubeError;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -28,12 +34,22 @@ impl MatchState {
     }
 }
 
+struct StoredTimeDimension {
+    index: usize,
+    symbol: Rc<TimeDimensionSymbol>,
+    matched: bool,
+}
+
 pub struct DimensionMatcher<'a> {
     query_tools: Rc<QueryTools>,
     pre_aggregation: &'a CompiledPreAggregation,
     pre_aggregation_dimensions: HashMap<MemberId, bool>,
-    pre_aggregation_time_dimensions: HashMap<MemberId, Vec<(Rc<TimeDimensionSymbol>, bool)>>,
+    pre_aggregation_time_dimensions: HashMap<MemberId, Vec<StoredTimeDimension>>,
+    // Per stored entry of a time dimension: whether its column serves every
+    // read of that dimension so far.
+    readable_time_columns: HashMap<MemberId, Vec<bool>>,
     pre_aggregation_segments: HashMap<MemberId, bool>,
+    projects_stored_dimension: bool,
     result: MatchState,
 }
 
@@ -45,14 +61,18 @@ impl<'a> DimensionMatcher<'a> {
             .map(|d| (d.peel_refs().id().clone(), false))
             .collect();
         let mut pre_aggregation_time_dimensions =
-            HashMap::<MemberId, Vec<(Rc<TimeDimensionSymbol>, bool)>>::new();
-        for dim in pre_aggregation.time_dimensions.iter() {
-            if let Ok(td) = dim.as_time_dimension() {
-                let key = td.base_symbol().peel_refs().id().clone();
+            HashMap::<MemberId, Vec<StoredTimeDimension>>::new();
+        for (index, dim) in pre_aggregation.time_dimensions.iter().enumerate() {
+            if let Ok(symbol) = dim.as_time_dimension() {
+                let key = symbol.base_symbol().peel_refs().id().clone();
                 pre_aggregation_time_dimensions
                     .entry(key)
                     .or_default()
-                    .push((td, false));
+                    .push(StoredTimeDimension {
+                        index,
+                        symbol,
+                        matched: false,
+                    });
             }
         }
         let pre_aggregation_segments = pre_aggregation
@@ -65,7 +85,9 @@ impl<'a> DimensionMatcher<'a> {
             pre_aggregation,
             pre_aggregation_dimensions,
             pre_aggregation_time_dimensions,
+            readable_time_columns: HashMap::new(),
             pre_aggregation_segments,
+            projects_stored_dimension: false,
             result: MatchState::Full,
         }
     }
@@ -93,6 +115,13 @@ impl<'a> DimensionMatcher<'a> {
             }
         }
 
+        self.projects_stored_dimension = self.pre_aggregation_dimensions.values().any(|v| *v)
+            || self
+                .pre_aggregation_time_dimensions
+                .values()
+                .flatten()
+                .any(|entry| entry.matched);
+
         for filter in filters.iter() {
             let filter_match = self.try_match_filter_item(filter, true)?;
             self.result = self.result.combine(&filter_match);
@@ -119,6 +148,11 @@ impl<'a> DimensionMatcher<'a> {
         Ok(())
     }
 
+    /// Whether a selected dimension or time dimension reads a rollup column.
+    pub fn projects_stored_dimension(&self) -> bool {
+        self.projects_stored_dimension
+    }
+
     pub fn result(mut self) -> MatchState {
         let dimension_coverage_result = if self.pre_aggregation_dimensions.values().all(|v| *v) {
             MatchState::Full
@@ -129,7 +163,7 @@ impl<'a> DimensionMatcher<'a> {
         let time_dimension_coverage_result = if self
             .pre_aggregation_time_dimensions
             .values()
-            .all(|entries| entries.iter().all(|(_, matched)| *matched))
+            .all(|entries| entries.iter().all(|entry| entry.matched))
         {
             MatchState::Full
         } else {
@@ -143,6 +177,51 @@ impl<'a> DimensionMatcher<'a> {
         };
         self.result = self.result.combine(&segment_coverage_result);
         self.result
+    }
+
+    /// The pre-aggregation's time dimensions, each one stored at several grains
+    /// narrowed to the finest column serving all its reads. `None` when no
+    /// single column serves them all.
+    pub fn read_time_dimensions(&self) -> Option<Vec<Rc<MemberSymbol>>> {
+        let mut unread = HashSet::new();
+        for (base, serves) in self.readable_time_columns.iter() {
+            let entries = &self.pre_aggregation_time_dimensions[base];
+            let mut chosen: Option<&StoredTimeDimension> = None;
+            for (entry, _) in entries.iter().zip(serves).filter(|(_, serves)| **serves) {
+                if chosen.is_none_or(|best| Self::is_finer(entry, best)) {
+                    chosen = Some(entry);
+                }
+            }
+            let chosen = chosen?;
+            unread.extend(
+                entries
+                    .iter()
+                    .filter(|entry| entry.index != chosen.index)
+                    .map(|entry| entry.index),
+            );
+        }
+        Some(
+            self.pre_aggregation
+                .time_dimensions
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| !unread.contains(index))
+                .map(|(_, td)| td.clone())
+                .collect(),
+        )
+    }
+
+    // Unrelated grains are not ordered, so the earlier listed one is kept.
+    fn is_finer(a: &StoredTimeDimension, b: &StoredTimeDimension) -> bool {
+        let (a, b) = (&a.symbol, &b.symbol);
+        if a.granularity().is_none() || a.granularity() == b.granularity() {
+            return false;
+        }
+        GranularityHelper::min_granularity_for_time_dimensions(
+            (a.granularity(), a),
+            (b.granularity(), b),
+        )
+        .is_ok_and(|min| min == *a.granularity())
     }
 
     /// Whether the pre-aggregation can provide the member, without marking
@@ -161,7 +240,7 @@ impl<'a> DimensionMatcher<'a> {
                 self.try_match_dimension(dimension, add_to_matched_dimension)
             }
             MemberSymbol::TimeDimension(time_dimension) => {
-                self.try_match_time_dimension(time_dimension, add_to_matched_dimension)
+                self.try_match_time_dimension(time_dimension, add_to_matched_dimension, false)
             }
             MemberSymbol::MemberExpression(me) => {
                 if let Some(found) = self.pre_aggregation_segments.get_mut(me.id()) {
@@ -169,6 +248,9 @@ impl<'a> DimensionMatcher<'a> {
                         *found = true;
                     }
                     Ok(MatchState::Full)
+                } else if let Some(referenced) = me.reference_member() {
+                    // A bare `{member}` adds nothing on top of the member.
+                    self.try_match_symbol(&referenced, add_to_matched_dimension)
                 } else {
                     let dependencies = me.get_dependencies();
                     if dependencies.is_empty() {
@@ -210,7 +292,14 @@ impl<'a> DimensionMatcher<'a> {
         dimension: &DimensionSymbol,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
-        if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
+        if self
+            .pre_aggregation_time_dimensions
+            .contains_key(dimension.id())
+        {
+            // Its reads resolve to a stored grain column, which holds the value
+            // truncated and in the query timezone, not the raw value.
+            Ok(MatchState::NotMatched)
+        } else if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
             if add_to_matched_dimension {
                 *found = true;
             }
@@ -251,11 +340,15 @@ impl<'a> DimensionMatcher<'a> {
         }
     }
 
+    // `strict_range` keeps the range alignment check under a non-strict
+    // pre-aggregation, whose opt-in covers a time dimension's own date range.
     fn try_match_time_dimension(
         &mut self,
         time_dimension: &TimeDimensionSymbol,
         add_to_matched_dimension: bool,
+        strict_range: bool,
     ) -> Result<MatchState, CubeError> {
+        let non_strict = self.pre_aggregation.allow_non_strict_date_range_match && !strict_range;
         // Read from a stored column rather than computed, so nothing derives
         // it from another bucket.
         let is_sql_granularity = |td: &TimeDimensionSymbol| {
@@ -265,7 +358,7 @@ impl<'a> DimensionMatcher<'a> {
         };
         let is_sql_defined_granularity = is_sql_granularity(time_dimension);
 
-        let granularity = if self.pre_aggregation.allow_non_strict_date_range_match {
+        let granularity = if non_strict {
             time_dimension.granularity().clone()
         } else {
             time_dimension.rollup_granularity(self.query_tools.clone())?
@@ -276,6 +369,7 @@ impl<'a> DimensionMatcher<'a> {
             return Ok(MatchState::NotMatched);
         }
 
+        let tz = self.query_tools.timezone();
         // Stored time dimensions are keyed by the member a view member
         // references.
         let base_symbol_id = time_dimension.base_symbol().peel_refs().id().clone();
@@ -284,53 +378,86 @@ impl<'a> DimensionMatcher<'a> {
             .pre_aggregation_time_dimensions
             .get_mut(&base_symbol_id)
         {
-            // Stored columns are addressed by the member alone, so several
-            // granularities of one dimension are indistinguishable here, and
-            // whichever is left standing may be a `sql` one read as is.
+            // A `sql` grain is read as is and never derived, so it is only
+            // served from a rollup storing that dimension at one grain.
             if entries.len() > 1
                 && (is_sql_defined_granularity
-                    || entries.iter().any(|(td, _)| is_sql_granularity(td)))
+                    || entries
+                        .iter()
+                        .any(|entry| is_sql_granularity(&entry.symbol)))
             {
                 return Ok(MatchState::NotMatched);
             }
-            // First, look for exact granularity match. A stored `sql` grain is
-            // only ever itself: a default grain sharing its name is not it.
-            let exact_match = entries.iter_mut().find(|(td, _)| {
+            // A stored `sql` grain is only ever itself: a default grain sharing
+            // its name is not it.
+            let is_exact = |td: &TimeDimensionSymbol| {
                 granularity.is_none()
                     || (td.granularity() == &granularity
                         && is_sql_granularity(td) == is_sql_defined_granularity)
-            });
-            if let Some((_, matched)) = exact_match {
-                if add_to_matched_dimension {
-                    *matched = true;
+            };
+            // A range read without a granularity is served by a column whose
+            // grain both its bounds fall on.
+            let range = match time_dimension.date_range_vec().as_deref() {
+                Some([from, to]) if time_dimension.granularity().is_none() && !non_strict => {
+                    Some((from.clone(), to.clone()))
                 }
-                return Ok(MatchState::Full);
-            }
-
-            if is_sql_defined_granularity {
-                return Ok(MatchState::NotMatched);
-            }
-
-            // No exact match — find the finest pre-agg granularity that covers the query
-            let mut best_match = MatchState::NotMatched;
-            for (pre_agg_td, matched) in entries.iter_mut() {
-                let pre_aggr_granularity = pre_agg_td.granularity();
-                if pre_aggr_granularity.is_none() || is_sql_granularity(pre_agg_td) {
-                    continue;
-                }
-                let min_granularity = GranularityHelper::min_granularity_for_time_dimensions(
-                    (&granularity, time_dimension),
-                    (pre_aggr_granularity, pre_agg_td),
-                )?;
-                if min_granularity == *pre_aggr_granularity {
-                    if add_to_matched_dimension {
-                        *matched = true;
+                _ => None,
+            };
+            let exact = entries.iter().position(|entry| is_exact(&entry.symbol));
+            let mut serves = Vec::with_capacity(entries.len());
+            for entry in entries.iter() {
+                let td = &entry.symbol;
+                let derives = if let Some((from, to)) = &range {
+                    !is_sql_granularity(td)
+                        && td.granularity_obj().as_ref().is_some_and(|grain| {
+                            Self::range_on_grain(grain, from, to, tz).unwrap_or(false)
+                        })
+                } else if is_exact(td) {
+                    true
+                } else if is_sql_defined_granularity
+                    || td.granularity().is_none()
+                    || is_sql_granularity(td)
+                {
+                    false
+                } else {
+                    let min = GranularityHelper::min_granularity_for_time_dimensions(
+                        (&granularity, time_dimension),
+                        (td.granularity(), td),
+                    );
+                    // With an exact column at hand, an unrelated grain just doesn't serve.
+                    match min {
+                        Err(_) if exact.is_some() => false,
+                        min => min? == *td.granularity(),
                     }
-                    best_match = MatchState::Partial;
-                    break;
-                }
+                };
+                serves.push(derives);
             }
-            Ok(best_match)
+
+            let exact = entries
+                .iter()
+                .zip(serves.iter())
+                .position(|(entry, serves)| *serves && is_exact(&entry.symbol));
+            let served_by = exact.map(|i| (i, MatchState::Full)).or_else(|| {
+                serves
+                    .iter()
+                    .position(|serves| *serves)
+                    .map(|i| (i, MatchState::Partial))
+            });
+            self.readable_time_columns
+                .entry(base_symbol_id)
+                .and_modify(|seen| {
+                    for (seen, serves) in seen.iter_mut().zip(serves.iter()) {
+                        *seen &= *serves;
+                    }
+                })
+                .or_insert(serves);
+            let Some((index, state)) = served_by else {
+                return Ok(MatchState::NotMatched);
+            };
+            if add_to_matched_dimension {
+                entries[index].matched = true;
+            }
+            Ok(state)
         } else {
             if time_dimension.owned_by_cube() {
                 Ok(MatchState::NotMatched)
@@ -391,14 +518,94 @@ impl<'a> DimensionMatcher<'a> {
         filter: &Rc<BaseFilter>,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
+        let add_to_matched_dimension = add_to_matched_dimension && filter.is_single_value_equal();
         let symbol = if let Some(time_dimension) = filter.time_dimension_symbol() {
             time_dimension
+        } else if let Some(read) = self.date_filter_as_time_dimension(filter) {
+            // The rollup holds no raw value to stand for a misaligned range.
+            return self.try_match_time_dimension(&read, add_to_matched_dimension, true);
         } else {
             filter.member_evaluator().clone()
         };
-        let add_to_matched_dimension = add_to_matched_dimension && filter.is_single_value_equal();
         let res = self.try_match_symbol(&symbol, add_to_matched_dimension)?;
         Ok(res)
+    }
+
+    fn range_on_grain(
+        grain: &Granularity,
+        from: &str,
+        to: &str,
+        tz: Tz,
+    ) -> Result<bool, CubeError> {
+        let on_grain = |date: QueryDateTime| -> Result<bool, CubeError> {
+            if grain.is_predefined_granularity() {
+                date.is_start_of(grain.granularity())
+            } else if Self::has_time_part(grain.granularity_interval()) {
+                // Its buckets follow the wall clock, which origin stepping does
+                // not across a DST change.
+                Ok(false)
+            } else {
+                Ok(grain.align_date_to_origin(date.clone())? == date)
+            }
+        };
+        let start =
+            QueryDateTime::from_date_str(tz, &QueryDateTimeHelper::format_from_date(from, 3)?)?;
+        let end = QueryDateTime::from_date_str(tz, &QueryDateTimeHelper::format_to_date(to, 3)?)?
+            .add_duration(Duration::milliseconds(1))?;
+        Ok(on_grain(start)? && on_grain(end)?)
+    }
+
+    fn has_time_part(interval: &SqlInterval) -> bool {
+        interval.hour != 0 || interval.minute != 0 || interval.second != 0
+    }
+
+    // A grain column holds no raw value, but serves a date filter on the raw
+    // member whose bounds fall on its grain, as it would a time dimension's
+    // range. `None` leaves the filter a raw read.
+    fn date_filter_as_time_dimension(
+        &self,
+        filter: &BaseFilter,
+    ) -> Option<Rc<TimeDimensionSymbol>> {
+        let member = filter.member_evaluator();
+        let id = member.peel_refs().id().clone();
+        if !self.pre_aggregation_time_dimensions.contains_key(&id)
+            || !self.pre_aggregation_dimensions.contains_key(&id)
+        {
+            return None;
+        }
+        let values: Vec<&str> = filter
+            .values()
+            .iter()
+            .filter_map(|value| match value {
+                FilterValue::Str(value) => Some(value.as_str()),
+                _ => None,
+            })
+            .collect();
+        let date_range = match (filter.filter_operator(), values.as_slice()) {
+            (FilterOperator::Set | FilterOperator::NotSet, _) => None,
+            (FilterOperator::InDateRange | FilterOperator::NotInDateRange, [from, to]) => Some((
+                QueryDateTimeHelper::format_from_date(from, 3).ok()?,
+                QueryDateTimeHelper::inclusive_to_date(to).ok()?,
+            )),
+            (FilterOperator::BeforeDate | FilterOperator::AfterOrOnDate, [at]) => Some(
+                Self::boundary_at(&QueryDateTimeHelper::format_from_date(at, 3).ok()?, 0)?,
+            ),
+            (FilterOperator::BeforeOrOnDate | FilterOperator::AfterDate, [at]) => Some(
+                Self::boundary_at(&QueryDateTimeHelper::inclusive_to_date(at).ok()?, 1)?,
+            ),
+            _ => return None,
+        };
+        Some(TimeDimensionSymbol::new(member, None, None, date_range))
+    }
+
+    // An empty range whose alignment is that of the single bound starting
+    // `shift_ms` after `at`.
+    fn boundary_at(at: &str, shift_ms: i64) -> Option<(String, String)> {
+        let start = QueryDateTimeHelper::parse_native_date_time(at).ok()?
+            + Duration::milliseconds(shift_ms);
+        let end = start - Duration::milliseconds(1);
+        let format = |date: NaiveDateTime| date.format("%Y-%m-%dT%H:%M:%S%.3f").to_string();
+        Some((format(start), format(end)))
     }
 }
 
@@ -411,7 +618,7 @@ mod tests {
     use crate::logical_plan::optimizers::pre_aggregation::{
         PreAggregationFullName, PreAggregationsCompiler,
     };
-    use crate::planner::CubeId;
+    use crate::planner::{CubeId, MemberExpressionExpression, MemberExpressionSymbol};
     use crate::test_fixtures::cube_bridge::{
         MockMemberExpressionDefinition, MockMemberSql, MockSchema,
     };
@@ -818,6 +1025,34 @@ mod tests {
     }
 
     #[test]
+    fn test_reference_member_expression_segment_full_match() {
+        let ctx = create_test_context();
+        // A query expression that only references a rollup's segment, as the
+        // SQL API sends a segment filter, matches like the segment itself.
+        assert_eq!(
+            match_pre_agg_with_segments(
+                &ctx,
+                "segment_rollup",
+                indoc! {"
+                    measures:
+                      - orders.count
+                    dimensions:
+                      - orders.status
+                    time_dimensions:
+                      - dimension: orders.created_at
+                        granularity: day
+                "},
+                vec![const_expr_segment(
+                    "high_priority",
+                    "orders",
+                    "{orders.high_priority}"
+                )],
+            ),
+            MatchState::Full,
+        );
+    }
+
+    #[test]
     fn test_segment_partial_match_unused_segment() {
         let ctx = create_test_context();
         // No segment in query, but pre-agg has segment => partial (unused segment coverage)
@@ -836,6 +1071,61 @@ mod tests {
                 "},
             ),
             MatchState::Partial,
+        );
+    }
+
+    fn match_expression_dimension(ctx: &TestContext, sql: &str) -> MatchState {
+        let cube = CubeId::cube("orders");
+        let mut compiler = ctx.query_tools().compiler().borrow_mut();
+        let sql_call = compiler
+            .compile_sql_call(&cube, Rc::new(MockMemberSql::new(sql).unwrap()))
+            .unwrap();
+        let cube_symbol = compiler
+            .add_cube_table_evaluator(cube.clone(), vec![])
+            .unwrap();
+        let city = compiler
+            .add_dimension_evaluator("orders.city".to_string())
+            .unwrap();
+        drop(compiler);
+        let expression = MemberSymbol::new_member_expression(
+            MemberExpressionSymbol::try_new(
+                cube_symbol,
+                "status_expression".to_string(),
+                MemberExpressionExpression::SqlCall(sql_call),
+                None,
+                None,
+                vec![cube.clone()],
+            )
+            .unwrap(),
+        );
+
+        let mut pre_aggregations =
+            PreAggregationsCompiler::try_new(ctx.query_tools().clone(), &vec![cube]).unwrap();
+        let pre_agg = pre_aggregations
+            .compile_pre_aggregation(&PreAggregationFullName::new(
+                "orders".to_string(),
+                "main_rollup".to_string(),
+            ))
+            .unwrap();
+        let mut matcher = DimensionMatcher::new(ctx.query_tools().query_tools().clone(), &pre_agg);
+        matcher
+            .try_match(&vec![expression, city], &vec![], &vec![], &vec![], &vec![])
+            .unwrap();
+        matcher.result()
+    }
+
+    #[test]
+    fn test_reference_member_expression_dimension_full_match() {
+        let ctx = create_test_context();
+        // A bare reference reads the rollup column as it is; any other
+        // expression over it may merge the rollup's groups.
+        assert_eq!(
+            match_expression_dimension(&ctx, "{orders.status}"),
+            MatchState::Full
+        );
+        assert_eq!(
+            match_expression_dimension(&ctx, "UPPER({orders.status})"),
+            MatchState::Partial
         );
     }
 

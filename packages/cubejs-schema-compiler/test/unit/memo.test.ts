@@ -61,15 +61,15 @@ describe.each([
 ])('memo, shared VM context %s', (_name, sharedVmContext) => {
   it('invokes the function once per key across all compile stages', async () => {
     const { calls, api } = mockApi();
-    const { compiler, cubeEvaluator } = prepareCompiler(fetchFiles(), {
+    const compilers = prepareCompiler(fetchFiles(), {
       compileContext: { api },
       sharedVmContext,
     });
-    await compiler.compile();
+    await compilers.compile();
 
     expect(calls.sort()).toEqual(['columns', 'table']);
-    const orders = cubeEvaluator.cubeFromPath('orders');
-    const orderItems = cubeEvaluator.cubeFromPath('order_items');
+    const orders = compilers.cubeEvaluator.cubeFromPath('orders');
+    const orderItems = compilers.cubeEvaluator.cubeFromPath('order_items');
     // Every stage saw the same results
     expect(Object.keys(orders.dimensions)).toEqual(Object.keys(orderItems.dimensions));
     expect(orders.sqlTable!()).toMatch(/^orders_\d$/);
@@ -77,15 +77,15 @@ describe.each([
 
   it('does not share results between compiles', async () => {
     const { calls, api } = mockApi();
-    await prepareCompiler(fetchFiles(), { compileContext: { api }, sharedVmContext }).compiler.compile();
-    await prepareCompiler(fetchFiles(), { compileContext: { api }, sharedVmContext }).compiler.compile();
+    await prepareCompiler(fetchFiles(), { compileContext: { api }, sharedVmContext }).compile();
+    await prepareCompiler(fetchFiles(), { compileContext: { api }, sharedVmContext }).compile();
 
     expect(calls.sort()).toEqual(['columns', 'columns', 'table', 'table']);
   });
 
   it('works outside asyncModule', async () => {
     const calls: string[] = [];
-    const { compiler, cubeEvaluator } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'orders.js',
       content: `
         const table = memo('table', () => COMPILE_CONTEXT.tableFor('orders'));
@@ -104,15 +104,15 @@ describe.each([
       },
       sharedVmContext,
     });
-    await compiler.compile();
+    await compilers.compile();
 
     expect(calls).toEqual(['orders']);
-    expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('orders_table');
+    expect(compilers.cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('orders_table');
   });
 
   it('caches a synchronous throw like an async rejection', async () => {
     const calls: string[] = [];
-    const { compiler } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'orders.js',
       content: `
         let table;
@@ -136,7 +136,7 @@ describe.each([
       },
       sharedVmContext,
     });
-    await compiler.compile();
+    await compilers.compile();
 
     expect(calls).toEqual(['orders']);
   });
@@ -152,7 +152,7 @@ describe.each([
       fileName: 'orders.js',
       content: `memo('defs', () => { ${call}; });`,
     }], { sharedVmContext });
-    await expect(sync.compiler.compile()).rejects.toThrow(`${globalName}() can't be called from the function passed to memo("defs")`);
+    await expect(sync.compile()).rejects.toThrow(`${globalName}() can't be called from the function passed to memo("defs")`);
 
     const async = prepareCompiler([{
       fileName: 'orders.js',
@@ -165,12 +165,12 @@ describe.each([
         });
       `,
     }], { sharedVmContext });
-    await expect(async.compiler.compile()).rejects.toThrow(`${globalName}() can't be called from the function passed to memo("defs")`);
+    await expect(async.compile()).rejects.toThrow(`${globalName}() can't be called from the function passed to memo("defs")`);
   });
 
   it('generates the key when it is omitted', async () => {
     const { calls, api } = mockApi();
-    const { compiler, cubeEvaluator } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'orders.js',
       content: `
         asyncModule(async () => {
@@ -198,11 +198,11 @@ describe.each([
         });
       `,
     }], { compileContext: { api }, sharedVmContext });
-    await compiler.compile();
+    await compilers.compile();
 
     // Once per call site for the whole compile
     expect(calls.sort()).toEqual(['columns', 'columns', 'table']);
-    expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toMatch(/^orders_\d$/);
+    expect(compilers.cubeEvaluator.cubeFromPath('orders').sqlTable!()).toMatch(/^orders_\d$/);
   });
 
   it.each([
@@ -217,17 +217,17 @@ describe.each([
       }
     `],
   ])('rejects a keyless memo() in %s', async (_place, content) => {
-    const { compiler } = prepareCompiler([{ fileName: 'orders.js', content }], {
+    const compilers = prepareCompiler([{ fileName: 'orders.js', content }], {
       compileContext: { tableFor: (name: string) => name },
       sharedVmContext,
     });
 
-    await expect(compiler.compile()).rejects.toThrow(/memo\(\) at orders\.js:\d+:\d+ is called more than once per compile stage/);
+    await expect(compilers.compile()).rejects.toThrow(/memo\(\) at orders\.js:\d+:\d+ is called more than once per compile stage/);
   });
 
   it('allows a keyless memo() in a function called once per stage', async () => {
     const calls: string[] = [];
-    const { compiler, cubeEvaluator } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'orders.js',
       content: `
         const tableFor = (name) => memo(() => COMPILE_CONTEXT.tableFor(name));
@@ -244,15 +244,15 @@ describe.each([
       },
       sharedVmContext,
     });
-    await compiler.compile();
+    await compilers.compile();
 
     expect(calls).toEqual(['orders']);
-    expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('orders_table');
+    expect(compilers.cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('orders_table');
   });
 
   it('calls the function each time from members evaluated after the compile', async () => {
     const calls: string[] = [];
-    const { compiler, cubeEvaluator } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'orders.js',
       content: `
         cube('orders', {
@@ -269,10 +269,10 @@ describe.each([
       },
       sharedVmContext,
     });
-    await compiler.compile();
+    await compilers.compile();
     const callsAfterCompile = calls.length;
 
-    const orders = cubeEvaluator.cubeFromPath('orders');
+    const orders = compilers.cubeEvaluator.cubeFromPath('orders');
     expect(orders.sqlTable!()).toEqual('orders_table');
     expect(orders.sqlTable!()).toEqual('orders_table');
     expect(calls.length).toEqual(callsAfterCompile + 2);
@@ -288,7 +288,7 @@ describe.each([
         dimensions: { id: { sql: 'id', type: 'number', primary_key: true } },
       });
     `;
-    const { compiler } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'users.js',
       content: `
         cube('users', {
@@ -314,12 +314,12 @@ describe.each([
       sharedVmContext,
     });
 
-    await compiler.compile();
+    await compilers.compile();
     expect(calls.length).toBeGreaterThanOrEqual(2);
   });
 
   it('treats an explicit { callSite } key as a plain key', async () => {
-    const { compiler, cubeEvaluator } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'orders.js',
       content: `
         const tableFor = (name) => memo({ callSite: name }, () => name + '_table');
@@ -331,33 +331,33 @@ describe.each([
         });
       `,
     }], { sharedVmContext });
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('orders_table_users_table');
+    expect(compilers.cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('orders_table_users_table');
   });
 
   it('names the call site of a keyless memo() in errors', async () => {
-    const { compiler } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'orders.js',
       content: `memo(() => { cube('orders', { sql_table: 'orders' }); });`,
     }], { sharedVmContext });
 
-    await expect(compiler.compile()).rejects.toThrow("cube() can't be called from the function passed to memo() at orders.js:1:0");
+    await expect(compilers.compile()).rejects.toThrow("cube() can't be called from the function passed to memo() at orders.js:1:0");
   });
 
   it('reports invalid arguments', async () => {
-    const { compiler } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'orders.js',
       content: `
         memo('table', 'orders');
       `,
     }], { sharedVmContext });
 
-    await expect(compiler.compile()).rejects.toThrow('memo() expects a function as its second argument');
+    await expect(compilers.compile()).rejects.toThrow('memo() expects a function as its second argument');
   });
 
   it('keeps string keys apart from other keys', async () => {
-    const { compiler, cubeEvaluator } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'orders.js',
       content: `
         const table = [memo(1, () => 'a'), memo('1', () => 'b'), memo(['x'], () => 'c'), memo('["x"]', () => 'd')].join('_');
@@ -368,13 +368,13 @@ describe.each([
         });
       `,
     }], { sharedVmContext });
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('a_b_c_d');
+    expect(compilers.cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('a_b_c_d');
   });
 
   it('matches object keys whatever their property order', async () => {
-    const { compiler, cubeEvaluator } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'orders.js',
       content: `
         const table = [
@@ -391,9 +391,9 @@ describe.each([
         });
       `,
     }], { sharedVmContext });
-    await compiler.compile();
+    await compilers.compile();
 
-    expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('a_a_c_d_e');
+    expect(compilers.cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('a_a_c_d_e');
   });
 
   it.each([
@@ -401,16 +401,16 @@ describe.each([
     ['a BigInt', '10n'],
     ['a cyclic structure', '(() => { const o = {}; o.o = o; return o; })()'],
   ])('reports %s key', async (_kind, key) => {
-    const { compiler } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'orders.js',
       content: `memo(${key}, () => 1);`,
     }], { sharedVmContext });
 
-    await expect(compiler.compile()).rejects.toThrow('memo() expects a string or a JSON-serializable key as its first argument');
+    await expect(compilers.compile()).rejects.toThrow('memo() expects a string or a JSON-serializable key as its first argument');
   });
 
   it('reports memo(fn) that the transpiler did not give a key', async () => {
-    const { compiler } = prepareCompiler([{
+    const compilers = prepareCompiler([{
       fileName: 'orders.js',
       content: `
         const fn = () => 'orders';
@@ -419,7 +419,7 @@ describe.each([
       `,
     }], { sharedVmContext });
 
-    await expect(compiler.compile()).rejects.toThrow('memo() expects a key as its first argument: memo(key, fn)');
+    await expect(compilers.compile()).rejects.toThrow('memo() expects a key as its first argument: memo(key, fn)');
   });
 });
 
@@ -454,10 +454,10 @@ cubes:
   }))];
 
   it('calls a memoized globals.py function once per arguments across model files', async () => {
-    const { compiler, cubeEvaluator } = prepareCompiler(files());
-    await compiler.compile();
+    const compilers = prepareCompiler(files());
+    await compilers.compile();
 
-    expect(cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('shared_1');
-    expect(cubeEvaluator.cubeFromPath('users').sqlTable!()).toEqual('shared_1');
+    expect(compilers.cubeEvaluator.cubeFromPath('orders').sqlTable!()).toEqual('shared_1');
+    expect(compilers.cubeEvaluator.cubeFromPath('users').sqlTable!()).toEqual('shared_1');
   });
 });

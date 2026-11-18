@@ -520,6 +520,16 @@ macro_rules! variant_field_struct {
         );
     };
 
+    ($variant:ident, $var_field:ident, ScanWrapping) => {
+        $crate::variant_field_struct!(
+            @enum_struct $variant, $var_field, { ScanWrapping } -> {
+                ScanWrapping::None => "None",
+                ScanWrapping::DataSource => "DataSource",
+                ScanWrapping::PreAggregation => "PreAggregation",
+            }
+        );
+    };
+
     ($variant:ident, $var_field:ident, GroupingSetType) => {
         $crate::variant_field_struct!(
             @enum_struct $variant, $var_field, { GroupingSetType } -> {
@@ -1218,7 +1228,7 @@ mod tests {
 
     #[test]
     fn test_timestamp_timezones_match_every_unit() {
-        let utc = Some("UTC".to_string());
+        let utc: Option<std::sync::Arc<str>> = Some("UTC".into());
         for (with_tz, without_tz) in [
             (
                 ScalarValue::TimestampNanosecond(Some(0), utc.clone()),

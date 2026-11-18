@@ -158,6 +158,22 @@ describe('Cube RBAC Engine', () => {
       expect(ids).toEqual([1, 10]);
     });
 
+    test('a cursor reads the rows the access policies allow', async () => {
+      // Tableau reads results through a cursor: FETCH runs the plan DECLARE built
+      await connection.query('BEGIN');
+
+      try {
+        await connection.query('DECLARE "rbac_cursor" CURSOR FOR SELECT id FROM orders_two_layer_test ORDER BY id');
+        const first = await connection.query('FETCH 1 IN "rbac_cursor"');
+        const rest = await connection.query('FETCH 10 IN "rbac_cursor"');
+        await connection.query('CLOSE "rbac_cursor"');
+        const ids = [...first.rows, ...rest.rows].map(row => Number(row.id));
+        expect(ids).toEqual([1, 10]);
+      } finally {
+        await connection.query('COMMIT');
+      }
+    });
+
     test('SELECT * from users', async () => {
       const res = await connection.query('SELECT * FROM users limit 10');
       // Querying a cube with nested filters and mixed values should not cause any issues

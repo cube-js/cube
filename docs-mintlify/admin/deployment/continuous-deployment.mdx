@@ -10,11 +10,11 @@ Each Cube deployment is configured to use one of the following deploy modes:
   (or merges performed from the Cube Cloud UI) to automatically trigger a
   production build.
 - **Deploy with CLI** — you push your project to Cube Cloud from your local
-  machine or CI/CD pipeline by running the `cubejs-cli deploy` command. The
-  production deployment is **not** updated by GitHub pushes or UI merges; it
-  changes when somebody explicitly runs `cubejs-cli deploy`.
+  machine or CI/CD pipeline by running the `cube deploy` command of the
+  [Cube CLI][ref-cli]. The production deployment is **not** updated by GitHub
+  pushes or UI merges; it changes when somebody explicitly runs `cube deploy`.
 
-You can change the deploy mode at any time on the **Build & Deploy** tab of
+You can change the deploy mode at any time on the **Build & deploy** tab of
 the **Settings** screen.
 
 Independently of the deploy mode, you can [connect a GitHub
@@ -27,7 +27,7 @@ the deploy mode: it auto-deploys in Git mode and stays manual in CLI mode.
 Continuous deployment works by connecting a Git repository to a Cube Cloud
 deployment and keeping the two in sync.
 
-First, go to the **Build & Deploy** tab on the **Settings** screen and
+First, go to the **Build & deploy** tab on the **Settings** screen and
 select **Deploy with Git** under **Deploy with**. From the same screen you
 can pick the production branch, connect a Git repository, and copy the
 commands that set up Cube Cloud as a Git remote:
@@ -63,7 +63,7 @@ repository instead.
 ## Deploy with GitHub
 
 You can connect a GitHub repository to your deployment by clicking the
-**Connect to GitHub** button on the **Build & Deploy** tab of the
+**Connect to GitHub** button on the **Build & deploy** tab of the
 **Settings** screen and selecting your repository. This works with both the
 **Deploy with Git** and **Deploy with CLI** deploy modes.
 
@@ -81,13 +81,17 @@ What happens after connecting depends on the deploy mode:
 - In **Deploy with CLI** mode, production deployment remains manual. See
   [Connecting GitHub on a CLI deployment](#connecting-github-on-a-cli-deployment).
 
+If GitHub branch protection or a ruleset requires pull requests on the production
+branch, development mode doesn't publish to it directly. Open a pull request in
+GitHub instead. See [Commit, merge or publish changes](/docs/data-modeling/dev-mode#merge-or-create-a-pull-request).
+
 ### GitHub App permissions
 
 Install the **Cube Cloud GitHub App** on the account that owns the repository:
 your personal account for a personal repository, or the organization for an
 organization repository. Authorizing your GitHub login alone does not give the
 app access to an organization's repositories. If the account is missing in
-**Connect to GitHub**, choose **Add new organization** in the account selector
+**Connect to GitHub**, choose **Add organization** in the account selector
 to open GitHub's app installation dialog.
 
 Grant the installation access to the repository you want to connect, either
@@ -126,7 +130,7 @@ For example, for `analytics/model/cubes/orders.yml`, set the project directory t
 `analytics`, not `analytics/model`. Leave it empty for a project at the repository
 root.
 
-If you see **"Data Model folder not found at this location."** or **"Data Model
+If you see **"Data model folder not found at this location."** or **"Data model
 folder not found at root location."**, check the selected branch and project
 directory. An empty repository cannot pass this validation. Commit and push your
 model first, or create a project from scratch in Cube and connect a new repository
@@ -153,7 +157,7 @@ changes pushed to GitHub.
 If a pushed change does not appear:
 
 - Check the repository, branch, and project directory in **Settings → Build &
-  Deploy** and confirm the deploy mode.
+  deploy** and confirm the deploy mode.
 - In GitHub's repository **Settings → Webhooks**, check that the Cube webhook is
   active and inspect the push delivery and response. Fix any access or delivery
   error before redelivering a failed event.
@@ -166,32 +170,27 @@ For generic SSH integrations, rapid pushes can receive `429` responses. See
 
 ## Deploy with CLI
 
-<Warning>
-
-`cubejs-cli` is deprecated. Use the new [Cube CLI][ref-cli] instead. In CI,
-authenticate with an API key rather than the deploy token — set `CUBE_API_URL`
-and `CUBE_API_KEY` (or run `cube login --api-key <KEY> --url <URL>`), then run
-`cube deploy <deployment-id> --directory .` (find the id with
-`cube deployments list`).
-
-</Warning>
-
 When a deployment is configured to deploy with CLI, production builds are
 **only** triggered when you (or your CI/CD pipeline) push the project to
-Cube Cloud by running:
+Cube Cloud with the [Cube CLI][ref-cli]. Run the following command from your
+project directory:
 
 ```bash
-npx cubejs-cli deploy --token <TOKEN>
+cube deploy <DEPLOYMENT_ID> --directory .
 ```
 
-You can find your Deploy Token, along with copy-paste instructions and an
-example CI/CD pipeline config (such as a GitHub Actions workflow), on the
-**Build & Deploy** tab of the **Settings** screen. The same screen lets you
-regenerate the token if it needs to be rotated.
+Run `cube deployments list` to find the deployment ID. In CI, authenticate
+with an [API key][ref-api-keys]: set the `CUBE_API_URL` and `CUBE_API_KEY`
+environment variables, or run `cube login --api-key <API_KEY> --url <URL>`.
+See [authentication][ref-cli-auth] for details.
 
-<Frame>
-  <img src="https://static.cube.dev/docs/admin/deployment/continuous-deployment/cli-deploy-token.png" alt="Build & Deploy settings tab with Deploy with CLI selected, showing the Deploy Token and a sample GitHub Actions workflow" />
-</Frame>
+<Note>
+
+The `cubejs-cli deploy` command is deprecated. It authenticates with the
+Deploy Token from the **Build & deploy** tab of the **Settings** screen:
+`npx cubejs-cli deploy --token <TOKEN>`. Use `cube deploy` instead.
+
+</Note>
 
 <Note>
 
@@ -212,7 +211,7 @@ deployment. When you do:
   the GitHub webhook and automatically synced.
 - Pushes to the **production branch** are intentionally **not**
   auto-deployed in CLI mode. Production deployment only changes when
-  somebody runs `cubejs-cli deploy` against the deployment.
+  somebody runs `cube deploy` against the deployment.
 
 This gives you GitHub-driven previews for feature work while keeping the
 production deploy gated on an explicit CLI invocation (for example, from your
@@ -233,14 +232,14 @@ redeploy**. Specifically:
 - Merging a branch into the production branch from the Cube Cloud UI updates
   the production branch in the internal repository but **does not** rebuild
   or redeploy the [production environment][ref-environments-prod].
-- The next `cubejs-cli deploy` builds from your local project. Include any
+- The next `cube deploy` builds from your local project. Include any
   changes made through the UI in that local project if you want them in
   production.
 
 In other words, a CLI-mode deployment will not change production just because
-somebody pressed **Enter Development Mode** and merged a work-in-progress
+somebody turned on **Dev mode** and merged a work-in-progress
 branch — production only changes when somebody (or some pipeline) explicitly
-runs `cubejs-cli deploy` against the deployment.
+runs `cube deploy` against the deployment.
 
 If you want changes made in the Cube Cloud UI to flow to production
 automatically, switch the deployment to [Deploy with Git](#deploy-with-git).
@@ -250,6 +249,8 @@ automatically, switch the deployment to [Deploy with Git](#deploy-with-git).
 [ref-environments-dev]: /admin/deployment/environments#development-environments
 [ref-environments-prod]: /admin/deployment/environments#production-environment
 [ref-cli]: /reference/cli
+[ref-cli-auth]: /reference/cli#authentication
+[ref-api-keys]: /admin/account-billing/api-keys
 [ref-import-ssh]: /docs/getting-started/migrate-from-core/import-git-repository-via-ssh
 [ref-import-ssh-webhooks]: /docs/getting-started/migrate-from-core/import-git-repository-via-ssh#webhook-format
 [ref-support]: /admin/account-billing/support

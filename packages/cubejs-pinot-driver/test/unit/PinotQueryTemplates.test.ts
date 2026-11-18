@@ -33,11 +33,11 @@ const FILTER_MODEL = `
 `;
 
 const buildQuery = async (query: Record<string, unknown> = {}) => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(FILTER_MODEL);
+  const compilers = prepareCompiler(FILTER_MODEL);
 
-  await compiler.compile();
+  await compilers.compile();
 
-  return new PinotQuery({ joinGraph, cubeEvaluator, compiler }, {
+  return compilers.createQuery(PinotQuery, {
     measures: ['orders.count'],
     ...query,
   });
@@ -72,7 +72,7 @@ const COLD_START_TIMEOUT = 60 * 1000;
 
 describe('PinotQuery SQL templates', () => {
   it('renders Tesseract sql_table queries with a prepared FROM source', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler(`
+    const compilers = prepareCompiler(`
       cube('orders', {
         sql_table: 'orders',
 
@@ -92,9 +92,9 @@ describe('PinotQuery SQL templates', () => {
       });
     `);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PinotQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PinotQuery, {
       measures: ['orders.count'],
       timeDimensions: [],
       filters: [],

@@ -85,10 +85,10 @@ cubes:
     timeDimension: Record<string, any> = { granularity: 'month', dateRange: ['2024-06-01', '2024-06-30'] },
     preAggregationId = 'orders.monthly',
   ) => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model);
-    await compiler.compile();
+    const compilers = prepareYamlCompiler(model);
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures,
       dimensions: ['orders.status'],
       timeDimensions: [{ dimension: 'orders.created_at', ...timeDimension }],
@@ -194,10 +194,10 @@ ${preAggregation}
 `;
 
   const descriptionFor = async (preAggregation: string, query: Record<string, any>) => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(model(preAggregation));
-    await compiler.compile();
+    const compilers = prepareYamlCompiler(model(preAggregation));
+    await compilers.compile();
 
-    const pgQuery = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const pgQuery = compilers.createQuery(PostgresQuery, {
       measures: ['orders.amount'],
       dimensions: ['orders.status'],
       ...query,

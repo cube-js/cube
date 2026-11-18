@@ -1,6 +1,7 @@
 import { SnowflakeDriver } from './SnowflakeDriver';
 
 export { SnowflakeDriver } from './SnowflakeDriver';
+export * from './errors';
 
 export type {
   SnowflakeDriverOptions,

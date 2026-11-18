@@ -388,6 +388,9 @@ const variables: Record<string, (...args: any) => any> = {
   rollupOnlyMode: () => get('CUBEJS_ROLLUP_ONLY')
     .default('false')
     .asBoolStrict(),
+  sqlIncludeTraceId: () => get('CUBEJS_SQL_INCLUDE_TRACE_ID')
+    .default('false')
+    .asBoolStrict(),
   schemaPath: () => get('CUBEJS_SCHEMA_PATH')
     .default('model')
     .asString(),
@@ -453,6 +456,13 @@ const variables: Record<string, (...args: any) => any> = {
     });
   },
   preAggregationsBuilder: () => get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
+  /**
+   * Use `contextToCubeStoreRouterId` as the default `contextToPreAggregationOrchestratorId`,
+   * so orchestrators routed to one Cube Store share its pre-aggregation queues.
+   */
+  preAggregationsOrchestratorIdFromRouter: () => get('CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER')
+    .default('false')
+    .asBoolStrict(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
     .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
@@ -496,6 +506,27 @@ const variables: Record<string, (...args: any) => any> = {
     return size;
   },
   /**
+   * Total measures/dimensions/segments the compiler cache may hold; unset leaves only CUBEJS_COMPILER_CACHE_SIZE.
+   */
+  maxCompiledMembers: (): number | undefined => {
+    if (!get('CUBEJS_MAX_COMPILED_MEMBERS').asString()) {
+      return undefined;
+    }
+
+    const members = get('CUBEJS_MAX_COMPILED_MEMBERS').asIntPositive();
+
+    // asIntPositive() lets 0 through; reject it rather than read it as "unset".
+    if (members === 0) {
+      throw new InvalidConfiguration(
+        'CUBEJS_MAX_COMPILED_MEMBERS',
+        members,
+        'Must be a positive integer. Unset it to disable the member budget.',
+      );
+    }
+
+    return members;
+  },
+  /**
    * Experimental: compiled apps share one VM realm, process-wide script/YAML caches and interned strings.
    */
   compilerMultiTenantSharing: () => get('CUBEJS_COMPILER_MULTI_TENANT_SHARING')
@@ -517,7 +548,18 @@ const variables: Record<string, (...args: any) => any> = {
   tesseractMultiStageLeafMerge: () => get('CUBEJS_TESSERACT_MULTI_STAGE_LEAF_MERGE')
     .default('true')
     .asBoolStrict(),
+  /**
+   * In queries served by Cube Store pre-aggregations, multi-stage leaves reading
+   * the same rows share one scan, and calculations over the same inputs at one
+   * grain become one calculation.
+   */
+  tesseractMultiStageScanSharing: () => get('CUBEJS_TESSERACT_MULTI_STAGE_SCAN_SHARING')
+    .default('true')
+    .asBoolStrict(),
   tesseractCubeStoreUnionFullKeyAggregate: () => get('CUBEJS_TESSERACT_CUBESTORE_UNION_FULL_KEY_AGGREGATE')
+    .default('true')
+    .asBoolStrict(),
+  tesseractTrinoUnionFullKeyAggregate: () => get('CUBEJS_TESSERACT_TRINO_UNION_FULL_KEY_AGGREGATE')
     .default('true')
     .asBoolStrict(),
   transpilationWorkerThreads: () => {
@@ -2277,6 +2319,8 @@ const variables: Record<string, (...args: any) => any> = {
     .default(200000)
     .asInt(),
   convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('true').asBoolStrict(),
+  // Read by cubesql too: whether pushed down SQL may read Cube Store pre-aggregations
+  sqlPushDownPreAggregations: () => get('CUBESQL_SQL_PUSH_DOWN_PRE_AGGREGATIONS').default('true').asBoolStrict(),
   // Deprecated section
 
   // Support for Redis as queue & cache driver was removed in 0.36

@@ -53,10 +53,10 @@ describe('Join hints compilerCache pollution through views', () => {
 
   it('does not leak join hints from one query to another via compilerCache', async () => {
     const compilers = prepareYamlCompiler(schema);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
     // Query 1 (poisoner): legitimately joins `layout` because it filters on v.bucket
-    const poisoner = new PostgresQuery(compilers, {
+    const poisoner = compilers.createQuery(PostgresQuery, {
       dimensions: ['v.flag'],
       filters: [{ member: 'v.bucket', operator: 'equals', values: ['x'] }],
       timezone: 'UTC',
@@ -65,7 +65,7 @@ describe('Join hints compilerCache pollution through views', () => {
     expect(poisonerSql).toContain('layout_tbl');
 
     // Query 2 (victim): does not reference layout at all — must not join it
-    const victim = new PostgresQuery(compilers, {
+    const victim = compilers.createQuery(PostgresQuery, {
       dimensions: ['v.flag'],
       filters: [{ member: 'v.category', operator: 'equals', values: ['y'] }],
       timezone: 'UTC',
@@ -76,16 +76,16 @@ describe('Join hints compilerCache pollution through views', () => {
 
   it('reverse order: query needing the join still gets it after a cached query without it', async () => {
     const compilers = prepareYamlCompiler(schema);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const victim = new PostgresQuery(compilers, {
+    const victim = compilers.createQuery(PostgresQuery, {
       dimensions: ['v.flag'],
       filters: [{ member: 'v.category', operator: 'equals', values: ['y'] }],
       timezone: 'UTC',
     });
     expect(victim.buildSqlAndParams()[0]).not.toContain('layout_tbl');
 
-    const poisoner = new PostgresQuery(compilers, {
+    const poisoner = compilers.createQuery(PostgresQuery, {
       dimensions: ['v.flag'],
       filters: [{ member: 'v.bucket', operator: 'equals', values: ['x'] }],
       timezone: 'UTC',
@@ -96,9 +96,9 @@ describe('Join hints compilerCache pollution through views', () => {
   it('control: victim query alone does not join layout', async () => {
     // Fresh compilers → fresh compilerCache → correct SQL
     const compilers = prepareYamlCompiler(schema);
-    await compilers.compiler.compile();
+    await compilers.compile();
 
-    const victim = new PostgresQuery(compilers, {
+    const victim = compilers.createQuery(PostgresQuery, {
       dimensions: ['v.flag'],
       filters: [{ member: 'v.category', operator: 'equals', values: ['y'] }],
       timezone: 'UTC',

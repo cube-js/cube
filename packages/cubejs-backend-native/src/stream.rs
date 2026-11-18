@@ -1,10 +1,11 @@
 use cubesql::compile::engine::df::scan::{
-    transform_response, JsonColumnarValueObject, MemberField, RecordBatch, SchemaRef,
+    deserialize_columnar_chunk, MemberField, RecordBatch, SchemaRef,
 };
 
 use std::cell::RefCell;
 use std::future::Future;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use std::vec;
@@ -158,7 +159,9 @@ pub struct JsWriteStream {
     ready_sender: Mutex<Option<oneshot::Sender<Result<(), CubeError>>>>,
     tokio_handle: tokio::runtime::Handle,
     schema: SchemaRef,
-    member_fields: Vec<MemberField>,
+    member_fields: Arc<Vec<MemberField>>,
+    /// Row count of the last chunk: JS sends full chunks of one size, so it sizes the next one
+    rows_hint: Arc<AtomicUsize>,
 }
 
 impl Finalize for JsWriteStream {}
@@ -189,11 +192,25 @@ impl JsWriteStream {
         Ok(obj)
     }
 
-    fn push_chunk(&self, chunk: RecordBatch) -> impl Future<Output = Result<(), CubeError>> {
+    /// Parsing and the Arrow conversion run inside the returned future on a tokio worker,
+    /// so the JS main thread only pays for copying the chunk out of the JS buffer.
+    fn push_chunk(&self, chunk: Vec<u8>) -> impl Future<Output = Result<(), CubeError>> {
         let sender = self.sender.clone();
+        let schema = self.schema.clone();
+        let member_fields = self.member_fields.clone();
+        let rows_hint = self.rows_hint.clone();
         async move {
+            let batch = deserialize_columnar_chunk(
+                &chunk,
+                schema,
+                &member_fields,
+                rows_hint.load(Ordering::Relaxed),
+            )?;
+            drop(chunk);
+            rows_hint.store(batch.num_rows(), Ordering::Relaxed);
+
             sender
-                .send(Some(Ok(chunk)))
+                .send(Some(Ok(batch)))
                 .await
                 .map_err(|e| CubeError::internal(format!("Can't send to channel: {}", e)))
         }
@@ -263,19 +280,9 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
     let callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
 
-    let chunk_buffer = cx.argument::<JsBuffer>(0)?;
-    let mut value_object =
-        match serde_json::from_slice::<JsonColumnarValueObject>(chunk_buffer.as_slice(&cx)) {
-            Ok(v) => v,
-            Err(e) => return cx.throw_error(format!("Can't parse columnar chunk JSON: {}", e)),
-        };
-    let value =
-        match transform_response(&mut value_object, this.schema.clone(), &this.member_fields) {
-            Ok(value) => value,
-            Err(e) => return cx.throw_error(e.message),
-        };
+    let chunk = cx.argument::<JsBuffer>(0)?.as_slice(&cx).to_vec();
 
-    let future = this.push_chunk(value);
+    let future = this.push_chunk(chunk);
     wait_for_future_and_execute_callback(this.tokio_handle.clone(), cx.channel(), callback, future);
 
     Ok(cx.undefined())
@@ -349,7 +356,8 @@ pub async fn call_js_with_stream_as_callback(
                 ready_sender: Mutex::new(Some(ready_sender)),
                 tokio_handle,
                 schema,
-                member_fields,
+                member_fields: Arc::new(member_fields),
+                rows_hint: Arc::new(AtomicUsize::new(0)),
             };
             let this = cx.undefined();
             let args: Vec<Handle<_>> = vec![

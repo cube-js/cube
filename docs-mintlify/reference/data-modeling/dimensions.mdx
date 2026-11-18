@@ -821,6 +821,15 @@ cube(`products`, {
 
 </CodeGroup>
 
+<Info>
+
+A filter that needs a join whose condition reads this dimension itself can't be
+evaluated inside its subquery, so it isn't passed there; the query still applies
+it. If the subquery needs such a join even without filters, the query fails with
+an error.
+
+</Info>
+
 ### `sql`
 
 `sql` is a required parameter. It can take any valid SQL expression depending on
@@ -965,6 +974,10 @@ a dimension. A dimension can only have one type.
 engine][link-tesseract]. In versions before v1.7.0, it was not enabled by default.
 
 </Warning>
+
+The [`/v1/meta` API endpoint][ref-meta-api] reports a `switch` dimension with
+`type: string` and lists its declared values, in declaration order, under `values`.
+This also applies when the dimension is exposed through a view.
 
 <CodeGroup>
 

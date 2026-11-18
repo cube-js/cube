@@ -1,4 +1,4 @@
-import SqlString from 'sqlstring';
+import { inspect } from 'util';
 import R from 'ramda';
 
 import type { LogLevel, LoggerFn, LoggerFnParams } from '@cubejs-backend/shared';
@@ -32,9 +32,8 @@ const format = ({ requestId, duration, allSqlLines, query, values, showRestParam
 
   if (query && values) {
     const queryMaxLines = 50;
-    let queryStr = typeof query === 'string' ? query : JSON.stringify(query);
-    queryStr = queryStr.replaceAll(/\$(\d+)/g, '?');
-    let formatted = SqlString.format(queryStr, values).split('\n');
+    const queryStr = typeof query === 'string' ? query : JSON.stringify(query);
+    let formatted = queryStr.split('\n');
 
     if (formatted.length > queryMaxLines && !allSqlLines) {
       formatted = R.take(queryMaxLines / 2, formatted)
@@ -42,7 +41,11 @@ const format = ({ requestId, duration, allSqlLines, query, values, showRestParam
         .concat(R.takeLast(queryMaxLines / 2, formatted));
     }
 
-    return `${prefix}\n--\n  ${formatted.join('\n')}\n--${showRestParams ? `\n${restParams}` : ''}`;
+    // Placeholders are dialect-specific (`?`, `$1` reused, `@_1`), so values are
+    // printed next to the SQL instead of being substituted into it.
+    const valuesLine = values.length ? `\nvalues: ${inspect(values, { depth: null, breakLength: Infinity })}` : '';
+
+    return `${prefix}\n--\n  ${formatted.join('\n')}\n--${valuesLine}${showRestParams ? `\n${restParams}` : ''}`;
   } else if (query) {
     return `${prefix}\n--\n${JSON.stringify(query, null, 2)}\n--${showRestParams ? `\n${restParams}` : ''}`;
   }

@@ -395,6 +395,25 @@ mod tests {
     }
 
     #[test]
+    fn canadian_zones_stay_on_daylight_time_after_2026_11_01() {
+        // tzdb 2026b-2026e cancel the 2026-11-01 fall-back; a stale bundled tzdb is an hour late.
+        for (zone, day, utc) in [
+            ("America/Vancouver", "2026-11-02", "2026-11-02T07:00:00"),
+            ("America/Edmonton", "2026-11-02", "2026-11-02T06:00:00"),
+            ("America/Inuvik", "2026-11-02", "2026-11-02T06:00:00"),
+            ("America/Winnipeg", "2026-11-02", "2026-11-02T05:00:00"),
+            ("America/Vancouver", "2025-11-03", "2025-11-03T08:00:00"),
+        ] {
+            let d = QueryDateTime::from_date_str(zone.parse::<Tz>().unwrap(), day).unwrap();
+            assert_eq!(
+                d.naive_utc().format("%Y-%m-%dT%H:%M:%S").to_string(),
+                utc,
+                "{zone} {day}"
+            );
+        }
+    }
+
+    #[test]
     fn is_start_of_still_rejects_a_real_time_component() {
         let tz = "America/Asuncion".parse::<Tz>().unwrap();
         // 2023-10-02 has an ordinary midnight, so 01:00 on it is genuinely mid-day.

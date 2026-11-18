@@ -73,6 +73,23 @@ const MAGIC: u32 = 94107;
 const NETWORK_MESSAGE_VERSION: u32 = 1;
 
 impl NetworkMessage {
+    /// The failure a response message carries. A metastore call result is not looked into.
+    pub fn error(&self) -> Option<&CubeError> {
+        match self {
+            NetworkMessage::SelectResult(Err(e))
+            | NetworkMessage::ExplainAnalyzeResult(Err(e))
+            | NetworkMessage::RouterSelectDetailedResult(Err(e))
+            | NetworkMessage::SelectDetailedResult(Err(e))
+            | NetworkMessage::SelectResultSchema(Err(e))
+            | NetworkMessage::SelectResultBatch(Err(e))
+            | NetworkMessage::WarmupDownloadResult(Err(e))
+            | NetworkMessage::AddMemoryChunkResult(Err(e))
+            | NetworkMessage::FreeMemoryChunkResult(Err(e))
+            | NetworkMessage::FreeDeletedMemoryChunksResult(Err(e)) => Some(e),
+            _ => None,
+        }
+    }
+
     pub fn is_streaming_request(&self) -> bool {
         match self {
             NetworkMessage::SelectStart(..) => true,

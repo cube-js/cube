@@ -36,31 +36,30 @@ impl PgCatalogDescriptionBuilder {
         let capacity = 10;
 
         Self {
-            objoid: UInt32Builder::new(capacity),
-            classoid: UInt32Builder::new(capacity),
-            objsubid: Int32Builder::new(capacity),
-            description: StringBuilder::new(capacity),
-            xmin: UInt32Builder::new(capacity),
+            objoid: UInt32Builder::with_capacity(capacity),
+            classoid: UInt32Builder::with_capacity(capacity),
+            objsubid: Int32Builder::with_capacity(capacity),
+            description: StringBuilder::with_capacity(capacity, capacity),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 
     fn add_table(&mut self, table_oid: u32, description: impl AsRef<str>) {
-        self.objoid.append_value(table_oid).unwrap();
-        self.classoid.append_value(PG_CLASS_CLASS_OID).unwrap();
-        self.objsubid.append_value(0).unwrap();
-        self.description.append_value(description).unwrap();
-        self.xmin.append_value(1).unwrap();
+        self.objoid.append_value(table_oid);
+        self.classoid.append_value(PG_CLASS_CLASS_OID);
+        self.objsubid.append_value(0);
+        self.description.append_value(description);
+        self.xmin.append_value(1);
     }
 
     fn add_column(&mut self, table_oid: u32, column_idx: usize, description: impl AsRef<str>) {
-        self.objoid.append_value(table_oid).unwrap();
-        self.classoid.append_value(PG_CLASS_CLASS_OID).unwrap();
+        self.objoid.append_value(table_oid);
+        self.classoid.append_value(PG_CLASS_CLASS_OID);
         // Column subids starts with 1
         self.objsubid
-            .append_value(i32::try_from(column_idx).unwrap() + 1)
-            .unwrap();
-        self.description.append_value(description).unwrap();
-        self.xmin.append_value(1).unwrap();
+            .append_value(i32::try_from(column_idx).unwrap() + 1);
+        self.description.append_value(description);
+        self.xmin.append_value(1);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

@@ -18,9 +18,14 @@ use crate::{
 use egg::{Subst, Var};
 
 impl WrapperRules {
-    pub fn projection_rules(&self, rules: &mut Vec<CubeRewrite>) {
-        rules.extend(vec![transforming_rewrite(
-            "wrapper-push-down-projection-to-cube-scan",
+    fn projection_to_cube_scan_rule(
+        &self,
+        name: &str,
+        split: &str,
+        pre_aggregation_only: bool,
+    ) -> CubeRewrite {
+        transforming_rewrite(
+            name,
             projection(
                 "?expr",
                 cube_scan_wrapper(
@@ -39,7 +44,7 @@ impl WrapperRules {
                     "CubeScanWrapperFinalized:false",
                 ),
                 "?projection_alias",
-                "ProjectionSplit:false",
+                split,
             ),
             cube_scan_wrapper(
                 wrapped_select(
@@ -162,15 +167,37 @@ impl WrapperRules {
                 ),
                 "CubeScanWrapperFinalized:false",
             ),
-            self.transform_projection(
-                "?expr",
-                "?projection_alias",
-                "?push_to_cube",
-                "?ungrouped_scan",
-                "?select_alias",
-                "?select_push_to_cube",
-                "?select_ungrouped_scan",
+            Self::transform_for_pre_aggregation_only(
+                pre_aggregation_only,
+                "?input_data_source",
+                self.transform_projection(
+                    "?expr",
+                    "?projection_alias",
+                    "?push_to_cube",
+                    "?ungrouped_scan",
+                    "?select_alias",
+                    "?select_push_to_cube",
+                    "?select_ungrouped_scan",
+                ),
             ),
+        )
+    }
+
+    pub fn projection_rules(&self, rules: &mut Vec<CubeRewrite>) {
+        if self.pre_aggregations_enabled() {
+            // The split rules take the post processing of a scan apart from the scan: a
+            // plan over a pre-aggregation is worth having for it, as Cube Store runs the
+            // post processing over the rollup, see `wrapper-cube-scan-wrap-split-pre-aggregation`
+            rules.push(self.projection_to_cube_scan_rule(
+                "wrapper-push-down-projection-to-cube-scan-split-pre-aggregation",
+                "ProjectionSplit:true",
+                true,
+            ));
+        }
+        rules.extend(vec![self.projection_to_cube_scan_rule(
+            "wrapper-push-down-projection-to-cube-scan",
+            "ProjectionSplit:false",
+            false,
         )]);
 
         if self.config_obj.push_down_pull_up_split() {

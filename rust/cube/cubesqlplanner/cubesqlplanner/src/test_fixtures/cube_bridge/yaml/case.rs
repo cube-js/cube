@@ -1,7 +1,7 @@
 use crate::cube_bridge::string_or_sql::StringOrSql;
 use crate::test_fixtures::cube_bridge::{
     MockCaseDefinition, MockCaseElseItem, MockCaseItem, MockCaseSwitchDefinition,
-    MockCaseSwitchElseItem, MockCaseSwitchItem,
+    MockCaseSwitchElseItem, MockCaseSwitchItem, MockStructWithSqlMember,
 };
 use serde::Deserialize;
 use std::rc::Rc;
@@ -16,12 +16,30 @@ pub struct YamlCaseDefinition {
 #[derive(Debug, Deserialize)]
 pub struct YamlCaseItem {
     sql: String,
-    label: String,
+    label: YamlCaseLabel,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct YamlCaseElseItem {
-    label: String,
+    label: YamlCaseLabel,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum YamlCaseLabel {
+    String(String),
+    Sql { sql: String },
+}
+
+impl YamlCaseLabel {
+    fn build(self) -> StringOrSql {
+        match self {
+            Self::String(s) => StringOrSql::String(s),
+            Self::Sql { sql } => {
+                StringOrSql::MemberSql(Rc::new(MockStructWithSqlMember::builder().sql(sql).build()))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,7 +77,7 @@ impl YamlCaseDefinition {
                 Rc::new(
                     MockCaseItem::builder()
                         .sql(item.sql)
-                        .label(StringOrSql::String(item.label))
+                        .label(item.label.build())
                         .build(),
                 )
             })
@@ -67,7 +85,7 @@ impl YamlCaseDefinition {
 
         let else_item = Rc::new(
             MockCaseElseItem::builder()
-                .label(StringOrSql::String(self.else_label.label))
+                .label(self.else_label.label.build())
                 .build(),
         );
 

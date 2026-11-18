@@ -5,19 +5,28 @@ import {
   ContinueWaitError,
   DriverFactoryByDataSource,
   DriverType,
+  PreAggregationDescription,
   Query,
   QueryBody,
   QueryOrchestrator,
   QueryOrchestratorOptions,
 } from '@cubejs-backend/query-orchestrator';
 
-import { DatabaseType, RequestContext } from './types';
+import { DatabaseType, LoggerFn, RequestContext } from './types';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   contextToDbType: (dataSource: string) => Promise<DatabaseType>;
   contextToExternalDbType: () => DatabaseType;
   redisPrefix?: string;
 }
+
+/**
+ * The shortest time a connection test gets before it counts as timed out.
+ * BaseDriver's own default (10 s) is too short for warehouses such as BigQuery,
+ * whose metadata calls can take tens of seconds without anything being wrong.
+ * Drivers that ask for longer (JDBC: 60 s) keep their own value.
+ */
+const MIN_TEST_CONNECTION_TIMEOUT = 45000;
 
 export class OrchestratorApi {
   private seenDataSources: Record<string, boolean> = {};
@@ -28,7 +37,7 @@ export class OrchestratorApi {
 
   public constructor(
     protected readonly driverFactory: DriverFactoryByDataSource,
-    protected readonly logger,
+    protected readonly logger: LoggerFn,
     protected readonly options: OrchestratorApiOptions
   ) {
     this.continueWaitTimeout = this.options.continueWaitTimeout || 10;
@@ -120,7 +129,7 @@ export class OrchestratorApi {
       data.extDbType = this.options.contextToExternalDbType();
 
       return data;
-    } catch (err) {
+    } catch (err: any) {
       if (err instanceof pt.TimeoutError || err instanceof ContinueWaitError) {
         this.logger('Continue wait', {
           duration: ((new Date()).getTime() - startQueryTime),
@@ -164,7 +173,7 @@ export class OrchestratorApi {
       this.logger('Error querying db', {
         query: queryForLog,
         params: query.values,
-        error: ((err as Error).stack || err),
+        error: err.stack || err,
         requestId: query.requestId
       });
 
@@ -195,7 +204,11 @@ export class OrchestratorApi {
 
   /**
    * Tests connection to the data source specified by the driver factory
-   * function and data source name.
+   * function and data source name. The test is bounded by the driver's
+   * `testConnectionTimeout()`, but never less than 45 s: some drivers' test calls
+   * have no timeout of their own (BigQuery's `getDatasets()`), and the /livez and
+   * /readyz handlers hold a lock while they run, so one hung test would otherwise
+   * hang every probe.
    */
   public async testDriverConnection(
     driverFn?: DriverFactoryByDataSource,
@@ -205,7 +218,21 @@ export class OrchestratorApi {
     if (driverFn) {
       try {
         const driver = await driverFn(dataSource);
-        await driver.testConnection();
+        const driverTimeout = typeof driver.testConnectionTimeout === 'function'
+          ? driver.testConnectionTimeout()
+          : 0;
+        const timeout = Math.max(driverTimeout, MIN_TEST_CONNECTION_TIMEOUT);
+
+        try {
+          await pt.timeout(driver.testConnection(), timeout);
+        } catch (e: any) {
+          if (e instanceof pt.TimeoutError) {
+            throw new Error(`Connection test for data source '${dataSource}' timed out after ${timeout}ms`);
+          }
+
+          throw e;
+        }
+
         this.logger('Connection test completed successfully', {
           driverType,
           dataSource,
@@ -269,11 +296,15 @@ export class OrchestratorApi {
     }
   }
 
-  public addDataSeenSource(dataSource) {
+  public addDataSeenSource(dataSource: string) {
     this.seenDataSources[dataSource] = true;
   }
 
-  public getPreAggregationVersionEntries(context: RequestContext, preAggregations, preAggregationsSchema): Promise<any> {
+  public getPreAggregationVersionEntries(
+    context: RequestContext,
+    preAggregations: Parameters<QueryOrchestrator['getPreAggregationVersionEntries']>[0],
+    preAggregationsSchema: string,
+  ): Promise<any> {
     return this.orchestrator.getPreAggregationVersionEntries(
       preAggregations,
       preAggregationsSchema,
@@ -281,7 +312,7 @@ export class OrchestratorApi {
     );
   }
 
-  public getPreAggregationPreview(context: RequestContext, preAggregation) {
+  public getPreAggregationPreview(context: RequestContext, preAggregation: PreAggregationDescription) {
     return this.orchestrator.getPreAggregationPreview(context.requestId, preAggregation);
   }
 

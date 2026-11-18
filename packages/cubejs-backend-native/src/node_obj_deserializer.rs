@@ -272,7 +272,8 @@ impl<'de> Deserializer<'de> for JsValueDeserializer<'_, '_> {
 struct JsObjectDeserializer<'a, 'b> {
     cx: &'a mut FunctionContext<'b>,
     js_object: Handle<'a, JsObject>,
-    keys: Vec<String>,
+    // The JS handle is kept to read the value without re-creating the key string.
+    keys: Vec<(String, Handle<'a, JsString>)>,
     index: usize,
 }
 
@@ -300,9 +301,9 @@ impl<'a, 'b> JsObjectDeserializer<'a, 'b> {
             .filter_map(|k| {
                 k.downcast::<JsString, _>(cx)
                     .ok()
-                    .map(|js_string| js_string.value(cx))
+                    .map(|js_string| (js_string.value(cx), js_string))
             })
-            .collect::<Vec<String>>();
+            .collect::<Vec<_>>();
 
         Ok(Self {
             cx,
@@ -325,7 +326,7 @@ impl<'de> MapAccess<'de> for JsObjectDeserializer<'_, '_> {
         if self.index >= self.keys.len() {
             return Ok(None);
         }
-        let key = &self.keys[self.index];
+        let (key, _) = &self.keys[self.index];
         self.index += 1;
         seed.deserialize(key.as_str().into_deserializer()).map(Some)
     }
@@ -334,10 +335,11 @@ impl<'de> MapAccess<'de> for JsObjectDeserializer<'_, '_> {
     where
         V: de::DeserializeSeed<'de>,
     {
-        let key = self.keys[self.index - 1].clone();
+        let (key, js_key) = &self.keys[self.index - 1];
+        let js_key = *js_key;
 
         let js_object = self.js_object;
-        let value = match self.cx.try_catch(|cx| js_object.get(cx, key.as_str())) {
+        let value = match self.cx.try_catch(|cx| js_object.get(cx, js_key)) {
             Ok(v) => v,
             Err(js_err) => {
                 return Err(JsDeserializationError(format!(

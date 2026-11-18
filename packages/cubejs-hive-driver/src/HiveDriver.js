@@ -8,9 +8,9 @@ const {
   getEnv,
   assertDataSource,
   Pool,
+  formatSparkSql,
 } = require('@cubejs-backend/shared');
 const jshs2 = require('jshs2');
-const SqlString = require('sqlstring');
 const { BaseDriver, createPoolName } = require('@cubejs-backend/base-driver');
 const Connection = require('jshs2/lib/Connection');
 const IDLFactory = require('jshs2/lib/common/IDLFactory');
@@ -159,7 +159,7 @@ class HiveDriver extends BaseDriver {
 
   async handleQuery(query, values, conn) {
     values = values || [];
-    const sql = SqlString.format(query, values);
+    const sql = formatSparkSql(query, values);
     const connection = conn || await this.pool.acquire();
 
     try {

@@ -22,6 +22,9 @@ pre-aggregations, configuration, APIs, and AI.
   <Card title="Using Cube with dbt" icon="cube" href="/recipes/data-modeling/dbt">
     Layer Cube on dbt-built warehouse models, aligning documentation patterns with your semantic layer.
   </Card>
+  <Card title="dbt pull with the Cube CLI" icon="terminal-2" href="/recipes/data-modeling/dbt-cli">
+    Pull several dbt projects into one deployment, commit generated cubes through your own pull requests, and promote syncs from CI.
+  </Card>
   <Card title="Dynamic data models" icon="schema" href="/recipes/data-modeling/using-dynamic-measures">
     Generate measures programmatically from changing reference data.
   </Card>
@@ -29,7 +32,7 @@ pre-aggregations, configuration, APIs, and AI.
     Combine multiple database tables that relate to the same entity into a single cube.
   </Card>
   <Card title="Querying across data sources" icon="arrow-merge" href="/recipes/data-modeling/cross-data-source-queries">
-    Append rows from cubes in different databases into one result set with a UNION ALL query.
+    Union, join, and query views over cubes in different databases through the SQL API.
   </Card>
   <Card title="Custom ordering" icon="sort-ascending-shapes" href="/recipes/data-modeling/custom-order">
     Define a custom sort order for categorical values like pipeline stages that don't sort alphabetically.

@@ -260,7 +260,8 @@ async fn test_multi_stage_pre_agg_with_filter_multiplied_leaf() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multi_stage_pre_agg_covering_multiplying_filter() {
     // Same query, but the pre-aggregation also stores returns.customer_id —
-    // the dimension the multiplying filter applies to.
+    // the dimension the multiplying filter applies to, below the one_to_many
+    // edge where one order carries several of its values.
     let schema = MockSchema::from_yaml_file(YAML)
         .only_pre_aggregations(&["orders_amount_by_month_and_return_customer"]);
     let ctx = TestContext::new(schema).unwrap();
@@ -281,35 +282,13 @@ async fn test_multi_stage_pre_agg_covering_multiplying_filter() {
     "#};
 
     let (_sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
-    let names: Vec<&str> = pre_aggrs.iter().map(|u| u.name().as_str()).collect();
-    assert_eq!(
-        pre_aggrs.len(),
-        2,
-        "Expected 2 usages (shifted + unshifted leaf); got {:?}",
-        names
-    );
     assert!(
-        names
+        pre_aggrs.is_empty(),
+        "A multiplied rollup must not be summed across a filter-only member; got {:?}",
+        pre_aggrs
             .iter()
-            .all(|n| *n == "orders_amount_by_month_and_return_customer"),
-        "Both usages must be orders_amount_by_month_and_return_customer; got {:?}",
-        names
-    );
-    let shifted_range = Some((
-        "2023-12-01T00:00:00.000".to_string(),
-        "2024-02-29T23:59:59.999".to_string(),
-    ));
-    let original_range = Some((
-        "2024-01-01T00:00:00.000".to_string(),
-        "2024-03-31T23:59:59.999".to_string(),
-    ));
-    assert!(
-        pre_aggrs.iter().any(|u| u.date_range == shifted_range),
-        "Expected a usage with shifted date_range"
-    );
-    assert!(
-        pre_aggrs.iter().any(|u| u.date_range == original_range),
-        "Expected a usage with original date_range"
+            .map(|u| u.name().clone())
+            .collect::<Vec<_>>()
     );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
@@ -726,4 +705,71 @@ fn test_multi_stage_union_combine_can_be_turned_off() {
     let join_sql = ctx.build_sql(&query(false)).unwrap();
     assert!(!union_sql.contains("JOIN"), "{union_sql}");
     assert!(join_sql.contains("JOIN"), "{join_sql}");
+}
+
+fn union_combine_query(options: &str) -> String {
+    format!(
+        indoc! {"
+            measures:
+              - orders.amount_total
+              - orders.amount_mid_week
+            dimensions:
+              - orders.status
+              - orders.size
+            order:
+              - id: orders.status
+              - id: orders.size
+            {}
+        "},
+        options
+    )
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_union_combine_on_data_source_matches_join() {
+    // Served from the source tables, so the data source's own dialect combines the
+    // branches. Two branches only: Postgres types a bare NULL as text once two
+    // branches in a row pad the same column, which Trino does not.
+    const MULTI_FACT_SEED: &str = "integration_multi_fact_tables.sql";
+    let schema =
+        MockSchema::from_yaml_file("common/integration_multi_stage_value_types_pre_agg.yaml")
+            .only_pre_aggregations(&[]);
+    let ctx = TestContext::new_with_union_full_key_aggregate(schema).unwrap();
+
+    let union_query = union_combine_query("");
+    let join_query = union_combine_query("union_full_key_aggregate: false");
+    let union_sql = ctx.build_sql(&union_query).unwrap();
+    let join_sql = ctx.build_sql(&join_query).unwrap();
+    assert!(
+        union_sql.contains("UNION ALL") && !union_sql.contains("JOIN"),
+        "{union_sql}"
+    );
+    assert!(join_sql.contains("JOIN"), "{join_sql}");
+
+    let union_result = ctx.try_execute(&union_query, MULTI_FACT_SEED).await;
+    let join_result = ctx.try_execute(&join_query, MULTI_FACT_SEED).await;
+    assert_eq!(union_result, join_result);
+}
+
+#[test]
+fn test_multi_stage_union_combine_switches_are_independent() {
+    let yaml = "common/integration_multi_stage_value_types_pre_agg.yaml";
+
+    let data_source = TestContext::new_with_union_full_key_aggregate(
+        MockSchema::from_yaml_file(yaml).only_pre_aggregations(&[]),
+    )
+    .unwrap();
+    let sql = data_source
+        .build_sql(&union_combine_query(
+            "cubestore_union_full_key_aggregate: false",
+        ))
+        .unwrap();
+    assert!(!sql.contains("JOIN"), "{sql}");
+
+    let cubestore =
+        TestContext::new_with_external_cubestore(MockSchema::from_yaml_file(yaml)).unwrap();
+    let sql = cubestore
+        .build_sql(&union_combine_query("union_full_key_aggregate: false"))
+        .unwrap();
+    assert!(!sql.contains("JOIN"), "{sql}");
 }

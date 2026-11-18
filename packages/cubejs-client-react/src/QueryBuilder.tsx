@@ -38,7 +38,6 @@ import type {
   AvailableMembers,
   ChartType,
   CubeContextProps,
-  FilterUpdateFields,
   FilterUpdateInput,
   GranularityOption,
   IndexedDimension,
@@ -66,7 +65,7 @@ import type {
 } from './types';
 
 // A change to any of these query fields can change the dry run response
-const DRY_RUN_QUERY_FIELDS = ['measures', 'dimensions', 'timeDimensions', 'segments', 'filters'];
+const DRY_RUN_QUERY_FIELDS: (keyof Query)[] = ['measures', 'dimensions', 'timeDimensions', 'segments', 'filters'];
 
 const granularities: GranularityOption[] = [
   { name: undefined, title: 'w/o grouping' },
@@ -368,11 +367,18 @@ export default class QueryBuilder extends React.Component<QueryBuilderProps, Que
       });
     };
 
-    const toFilter = (member: FilterUpdateInput) => ({
-      member: member.member?.name || member.dimension?.name,
-      operator: member.operator,
-      ...(['set', 'notSet'].includes(member.operator) ? {} : { values: member.values }),
-    });
+    const toFilter = ({ member, dimension, operator, values }: FilterUpdateInput) => {
+      // Editing a resolved filter can supply a new dimension alongside the previous member name.
+      const memberName = typeof member === 'string'
+        ? dimension?.name || member
+        : member?.name || dimension?.name;
+
+      return {
+        member: memberName,
+        operator,
+        ...(['set', 'notSet'].includes(operator) ? {} : { values }),
+      };
+    };
 
     const updateMethods: MemberUpdaterFactory = (memberType, toQuery = getName) => ({
       add: (member) => {
@@ -527,7 +533,7 @@ export default class QueryBuilder extends React.Component<QueryBuilderProps, Que
       updateSegments: updateMethods<TCubeSegment>('segments'),
       updateTimeDimensions: updateMethods<TimeDimensionUpdateInput>('timeDimensions', toTimeDimension) as
         MemberUpdater<TimeDimensionRangedUpdateFields | TimeDimensionComparisonUpdateFields>,
-      updateFilters: updateMethods<FilterUpdateInput>('filters', toFilter) as MemberUpdater<FilterUpdateFields>,
+      updateFilters: updateMethods('filters', toFilter),
       updateChartType: (newChartType: ChartType) => this.updateVizState({ chartType: newChartType }),
       updateOrder: {
         set: (memberId: string, newOrder: QueryOrder | 'none' = 'asc') => {

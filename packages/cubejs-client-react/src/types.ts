@@ -736,11 +736,12 @@ export type TimeDimensionUpdater = MemberUpdater<
 >;
 
 export type FilterUpdateFields = {
-  member?: string;
   operator: BinaryOperator | UnaryOperator;
   values?: string[];
-  dimension: TCubeDimension | TCubeMeasure;
-};
+} & (
+  | { member: string; dimension?: TCubeDimension | TCubeMeasure }
+  | { member?: string; dimension: TCubeDimension | TCubeMeasure }
+);
 
 export type FilterUpdater = MemberUpdater<FilterUpdateFields>;
 
@@ -758,14 +759,12 @@ export type TimeDimensionUpdateInput = {
 };
 
 /**
- * The fields `toFilter` reads off a member. Unlike `FilterUpdateFields`, where
- * `member` is declared as a string, the resolved member object is what is read
- * here.
+ * The filter updater also accepts resolved member objects at runtime.
  *
  * @hidden
  */
 export type FilterUpdateInput = {
-  member?: TCubeDimension | TCubeMeasure;
+  member?: string | TCubeDimension | TCubeMeasure;
   dimension?: TCubeDimension | TCubeMeasure;
   operator: BinaryOperator | UnaryOperator;
   values?: string[];

@@ -154,6 +154,15 @@ type QueryConvertRequest = BaseRequest & {
 type SqlApiRequest = BaseRequest & {
   query: Record<string, any>;
   sqlQuery?: [string, string[]];
+  /**
+   * `sqlQuery` reads Cube Store pre-aggregations, so it has to run on Cube Store.
+   */
+  external?: boolean;
+  /**
+   * Descriptions of the pre-aggregations `sqlQuery` reads, as the `sql` calls it was
+   * built on reported them.
+   */
+  preAggregations?: any[];
   apiType?: ApiType;
   queryKey: any;
   streaming?: boolean;
@@ -223,7 +232,7 @@ type PreAggJobStatusResponse =
   | PreAggJobStatusItem[]
   | PreAggJobStatusObject;
 
-export {
+export type {
   ConvertQuery,
   RequestContext,
   RequestExtension,

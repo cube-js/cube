@@ -3,7 +3,10 @@ use log::trace;
 use rand::Rng;
 use std::{
     collections::HashMap,
-    sync::{Arc, LazyLock, RwLock as RwLockSync, Weak},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, LazyLock, RwLock as RwLockSync, Weak,
+    },
     time::{Duration, SystemTime},
 };
 use tokio_util::sync::CancellationToken;
@@ -71,6 +74,8 @@ pub struct SessionState {
 
     // session db variables
     variables: RwLockSync<Option<DatabaseVariables>>,
+    // Changes with every SET, so a plan built under the previous settings can tell
+    variables_version: AtomicU64,
 
     // session temporary tables
     temp_tables: Arc<TempTableManager>,
@@ -119,6 +124,7 @@ impl SessionState {
             client_port,
             protocol,
             variables: RwLockSync::new(None),
+            variables_version: AtomicU64::new(0),
             temp_tables: Arc::new(TempTableManager::new(session_manager)),
             properties: RwLockSync::new(SessionProperties::new(None, None)),
             auth_context: RwLockSync::new((auth_context, SystemTime::now())),
@@ -375,7 +381,17 @@ impl SessionState {
         }
     }
 
+    /// Changes whenever the session state a plan reads changes: its variables (time zone and
+    /// cache mode among them) or its temporary tables
+    pub fn planning_state(&self) -> (u64, u64) {
+        (
+            self.variables_version.load(Ordering::SeqCst),
+            self.temp_tables.version(),
+        )
+    }
+
     pub fn set_variables(&self, variables: DatabaseVariablesToUpdate) {
+        self.variables_version.fetch_add(1, Ordering::SeqCst);
         let mut to_override = false;
         let mut current_variables = self.all_variables();
 
@@ -428,6 +444,33 @@ pub struct Session {
     pub state: Arc<SessionState>,
 }
 
+impl SessionState {
+    /// A principal is user + security context: user names repeat across tenants and all
+    /// `/v1/cubesql` sessions share one placeholder user, so without a context nothing matches.
+    pub fn can_observe_session(&self, other: &SessionState) -> bool {
+        if self.connection_id == other.connection_id {
+            return true;
+        }
+
+        let Some(viewer) = self.auth_context() else {
+            return false;
+        };
+
+        if viewer.superuser() {
+            return true;
+        }
+
+        let Some(target) = other.auth_context() else {
+            return false;
+        };
+
+        viewer.user().is_some()
+            && viewer.security_context().is_some()
+            && viewer.user() == target.user()
+            && viewer.security_context() == target.security_context()
+    }
+}
+
 /// Specific representation of session for PostgreSQL
 #[derive(Debug)]
 pub struct SessionStatActivity {
@@ -438,10 +481,23 @@ pub struct SessionStatActivity {
     pub usesysid: Option<u32>,
     pub usename: Option<String>,
     pub application_name: Option<String>,
-    pub client_addr: String,
+    pub client_addr: Option<String>,
     pub client_hostname: Option<String>,
-    pub client_port: u16,
+    pub client_port: Option<u16>,
     pub query: Option<String>,
+}
+
+impl SessionStatActivity {
+    /// Hides what PostgreSQL hides from a role that may not observe the backend
+    pub fn insufficient_privilege(self) -> Self {
+        Self {
+            client_addr: None,
+            client_hostname: None,
+            client_port: None,
+            query: Some("<insufficient privilege>".to_string()),
+            ..self
+        }
+    }
 }
 
 impl From<&Session> for SessionStatActivity {
@@ -465,9 +521,9 @@ impl From<&Session> for SessionStatActivity {
             usesysid: None,
             usename: session.state.user(),
             application_name,
-            client_addr: session.state.client_ip.clone(),
+            client_addr: Some(session.state.client_ip.clone()),
             client_hostname: None,
-            client_port: session.state.client_port,
+            client_port: Some(session.state.client_port),
             query,
         }
     }

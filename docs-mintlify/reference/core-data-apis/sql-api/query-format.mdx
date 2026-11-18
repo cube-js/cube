@@ -218,6 +218,11 @@ If direct conversion is not possible, different SQL transformation rewrite rules
 Please refer to the [SQL API reference][ref-ref-sql-api] for the list of supported SQL functions and clauses.
 Support varies based on the target database.
 
+Query pushdown also covers set operations. If all queries in a `UNION` or
+`UNION ALL` read cubes of the same data source, the whole union runs in that
+data source, except with Druid, ksqlDB and SQLite. See [`UNION`][ref-sql-api-union]
+for details.
+
 ## Top-down and bottom-up evaluation
 
 Fundamentally, every SQL operation results in a tabular data set.
@@ -463,6 +468,7 @@ If a query of yours has that shape, you can:
 [ref-env-cubesql-stream-mode]: /reference/configuration/environment-variables#cubesql_stream_mode
 [ref-env-non-streaming-limit]: /reference/configuration/environment-variables#cubesql_non_streaming_query_max_row_limit
 [ref-ref-sql-api]: /reference/core-data-apis/sql-api/reference
+[ref-sql-api-union]: /reference/core-data-apis/sql-api/reference#union
 [ref-env-var-push-down]: /reference/configuration/environment-variables#cubesql_sql_push_down
 [link-postgres-boolean]: https://www.postgresql.org/docs/current/datatype-boolean.html
 [link-selection-projection]: https://stackoverflow.com/a/1031101

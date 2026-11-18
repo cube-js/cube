@@ -1,4 +1,3 @@
-import R from 'ramda';
 import fs from 'fs-extra';
 import path from 'path';
 import { executeCommand } from '@cubejs-backend/shared';
@@ -121,7 +120,7 @@ export class AppContainer {
   }
 
   public async ensureDependencies() {
-    const dependencies = this.sourceContainer?.importDependencies || [];
+    const dependencies = this.sourceContainer?.importDependencies || {};
     let packageJson;
 
     try {
@@ -134,7 +133,7 @@ export class AppContainer {
       return [];
     }
 
-    const toInstall = <string[]>R.toPairs(dependencies)
+    const toInstall = <string[]>Object.entries(dependencies)
       .map(([dependency, version]) => {
         const currentDependency = version !== 'latest' ? `${dependency}@${version}` : dependency;
         if (!packageJson.dependencies[dependency] || version !== 'latest') {

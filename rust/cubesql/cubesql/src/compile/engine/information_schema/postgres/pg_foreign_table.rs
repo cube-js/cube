@@ -25,9 +25,9 @@ impl PgCatalogForeignTableBuilder {
         let capacity = 1;
 
         Self {
-            ftrelid: UInt32Builder::new(capacity),
-            ftserver: UInt32Builder::new(capacity),
-            ftoptions: ListBuilder::new(StringBuilder::new(capacity)),
+            ftrelid: UInt32Builder::with_capacity(capacity),
+            ftserver: UInt32Builder::with_capacity(capacity),
+            ftoptions: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
         }
     }
 
@@ -73,7 +73,7 @@ impl TableProvider for PgCatalogForeignTableProvider {
             Field::new("ftserver", DataType::UInt32, false),
             Field::new(
                 "ftoptions",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
         ]))

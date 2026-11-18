@@ -6,7 +6,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('View default value filters', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql: >
@@ -99,11 +99,8 @@ views:
       return;
     }
 
-    await compiler.compile();
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      { ...q, timezone: 'UTC', preAggregationsSchema: '' }
-    );
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, { ...q, timezone: 'UTC', preAggregationsSchema: '' });
 
     const qp = query.buildSqlAndParams();
     const res = await dbRunner.testQuery(qp);

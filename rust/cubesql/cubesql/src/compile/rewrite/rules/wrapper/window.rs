@@ -2,12 +2,18 @@ use egg::{EGraph, Subst};
 
 use crate::{
     compile::rewrite::{
-        cube_scan_wrapper, rewrite, rewriter::CubeRewrite, rules::wrapper::WrapperRules,
-        transforming_rewrite, window, wrapped_select, wrapped_select_window_expr_empty_tail,
-        wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType, LogicalPlanAnalysis,
-        LogicalPlanLanguage,
+        cube_scan, cube_scan_wrapper, rewrite, rewriter::CubeRewrite, rules::wrapper::WrapperRules,
+        transforming_rewrite, window, wrapped_select, wrapped_select_aggr_expr_empty_tail,
+        wrapped_select_filter_expr_empty_tail, wrapped_select_group_expr_empty_tail,
+        wrapped_select_having_expr_empty_tail, wrapped_select_joins_empty_tail,
+        wrapped_select_order_expr_empty_tail, wrapped_select_projection_expr_empty_tail,
+        wrapped_select_subqueries_empty_tail, wrapped_select_window_expr_empty_tail,
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, wrapper_replacer_context, ListType,
+        LogicalPlanAnalysis, LogicalPlanLanguage, WrappedSelectPushToCube,
+        WrappedSelectUngroupedScan, WrapperReplacerContextPushToCube,
+        WrapperReplacerContextUngroupedScan,
     },
-    var,
+    copy_flag, var,
 };
 
 impl WrapperRules {
@@ -19,7 +25,7 @@ impl WrapperRules {
                     cube_scan_wrapper(
                         wrapper_pullup_replacer(
                             wrapped_select(
-                                "?select_type",
+                                "WrappedSelectSelectType:Projection",
                                 "?projection_expr",
                                 "?subqueries",
                                 "?group_expr",
@@ -45,7 +51,7 @@ impl WrapperRules {
                 ),
                 cube_scan_wrapper(
                     wrapped_select(
-                        "?select_type",
+                        "WrappedSelectSelectType:Projection",
                         wrapper_pullup_replacer("?projection_expr", "?context"),
                         wrapper_pullup_replacer("?subqueries", "?context"),
                         wrapper_pullup_replacer("?group_expr", "?context"),
@@ -127,6 +133,101 @@ impl WrapperRules {
             ),
         ]);
 
+        // A window over a grouped select or a scan, which the rules above don't merge into, goes
+        // into a select over it. In a grouped select it would repeat GROUP BY expressions, and
+        // some dialects (BigQuery) reject columns inside them as neither grouped nor aggregated
+        let context = wrapper_replacer_context(
+            "?alias_to_cube",
+            "?push_to_cube",
+            "?in_projection",
+            "?cube_members",
+            "?grouped_subqueries",
+            "?ungrouped_scan",
+            "?input_data_source",
+        );
+        for (name, input) in [
+            (
+                "wrapper-push-down-window-over-aggregate",
+                wrapped_select(
+                    "WrappedSelectSelectType:Aggregate",
+                    "?i_projection_expr",
+                    "?i_subqueries",
+                    "?i_group_expr",
+                    "?i_aggr_expr",
+                    "?i_window_expr",
+                    "?i_cube_scan_input",
+                    "?i_joins",
+                    "?i_filter_expr",
+                    "?i_having_expr",
+                    "?i_limit",
+                    "?i_offset",
+                    "?i_order_expr",
+                    "?i_alias",
+                    "?i_distinct",
+                    "?i_push_to_cube",
+                    "?i_ungrouped_scan",
+                ),
+            ),
+            (
+                "wrapper-push-down-window-over-cube-scan",
+                cube_scan(
+                    "?s_alias_to_cube",
+                    "?s_members",
+                    "?s_filters",
+                    "?s_order",
+                    "?s_limit",
+                    "?s_offset",
+                    "?s_split",
+                    "?s_can_pushdown_join",
+                    "?s_wrapped",
+                    "?s_ungrouped",
+                    "?s_join_hints",
+                ),
+            ),
+        ] {
+            rules.push(transforming_rewrite(
+                name,
+                window(
+                    cube_scan_wrapper(
+                        wrapper_pullup_replacer(&input, &context),
+                        "CubeScanWrapperFinalized:false",
+                    ),
+                    "?window_expr",
+                ),
+                cube_scan_wrapper(
+                    wrapped_select(
+                        "WrappedSelectSelectType:Projection",
+                        wrapper_pullup_replacer(
+                            wrapped_select_projection_expr_empty_tail(),
+                            &context,
+                        ),
+                        wrapper_pullup_replacer(wrapped_select_subqueries_empty_tail(), &context),
+                        wrapper_pullup_replacer(wrapped_select_group_expr_empty_tail(), &context),
+                        wrapper_pullup_replacer(wrapped_select_aggr_expr_empty_tail(), &context),
+                        wrapper_pushdown_replacer("?window_expr", &context),
+                        wrapper_pullup_replacer(&input, &context),
+                        wrapper_pullup_replacer(wrapped_select_joins_empty_tail(), &context),
+                        wrapper_pullup_replacer(wrapped_select_filter_expr_empty_tail(), &context),
+                        wrapped_select_having_expr_empty_tail(),
+                        "WrappedSelectLimit:None",
+                        "WrappedSelectOffset:None",
+                        wrapper_pullup_replacer(wrapped_select_order_expr_empty_tail(), &context),
+                        "WrappedSelectAlias:None",
+                        "WrappedSelectDistinct:false",
+                        "?select_push_to_cube",
+                        "?select_ungrouped_scan",
+                    ),
+                    "CubeScanWrapperFinalized:false",
+                ),
+                self.transform_window_over_cube_scan(
+                    "?push_to_cube",
+                    "?ungrouped_scan",
+                    "?select_push_to_cube",
+                    "?select_ungrouped_scan",
+                ),
+            ));
+        }
+
         if self.config_obj.push_down_pull_up_split() {
             Self::flat_list_pushdown_pullup_rules(
                 rules,
@@ -141,6 +242,36 @@ impl WrapperRules {
                 "WindowWindowExpr",
                 "WrappedSelectWindowExpr",
             );
+        }
+    }
+
+    fn transform_window_over_cube_scan(
+        &self,
+        push_to_cube_var: &'static str,
+        ungrouped_scan_var: &'static str,
+        select_push_to_cube_var: &'static str,
+        select_ungrouped_scan_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let push_to_cube_var = var!(push_to_cube_var);
+        let ungrouped_scan_var = var!(ungrouped_scan_var);
+        let select_push_to_cube_var = var!(select_push_to_cube_var);
+        let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
+        move |egraph, subst| {
+            copy_flag!(
+                egraph,
+                subst,
+                push_to_cube_var,
+                WrapperReplacerContextPushToCube,
+                select_push_to_cube_var,
+                WrappedSelectPushToCube
+            ) && copy_flag!(
+                egraph,
+                subst,
+                ungrouped_scan_var,
+                WrapperReplacerContextUngroupedScan,
+                select_ungrouped_scan_var,
+                WrappedSelectUngroupedScan
+            )
         }
     }
 

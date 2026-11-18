@@ -4,7 +4,7 @@ import { PostgresQuery } from '../../src';
 describe('Yaml Schema Testing', () => {
   describe('Duplicate member detection', () => {
     it('detects duplicate measures', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -21,7 +21,7 @@ cubes:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate measure 'count' in cube 'orders'");
@@ -29,7 +29,7 @@ cubes:
     });
 
     it('detects duplicate dimensions', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -44,7 +44,7 @@ cubes:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate dimension 'id' in cube 'orders'");
@@ -52,7 +52,7 @@ cubes:
     });
 
     it('detects duplicate segments', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -69,7 +69,7 @@ cubes:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate segment 'active' in cube 'orders'");
@@ -77,7 +77,7 @@ cubes:
     });
 
     it('detects multiple duplicates', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -100,7 +100,7 @@ cubes:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate measure 'count' in cube 'orders'");
@@ -109,7 +109,7 @@ cubes:
     });
 
     it('detects duplicate pre-aggregation indexes', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -140,7 +140,7 @@ cubes:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate preAggregation.index 'status_idx' in pre-aggregation 'main' in cube 'orders'");
@@ -148,7 +148,7 @@ cubes:
     });
 
     it('detects duplicate cube names', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -168,7 +168,7 @@ cubes:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate cube name 'orders'");
@@ -176,7 +176,7 @@ cubes:
     });
 
     it('detects duplicate view names', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -203,7 +203,7 @@ views:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate view name 'orders_view'");
@@ -211,7 +211,7 @@ views:
     });
 
     it('detects duplicate dimension granularities', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -236,7 +236,7 @@ cubes:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate dimension.granularity 'fiscal_year' in time dimension 'created_at' in cube 'orders'");
@@ -244,7 +244,7 @@ cubes:
     });
 
     it('detects duplicate folder names in views', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -275,7 +275,7 @@ views:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain(
@@ -285,7 +285,7 @@ views:
     });
 
     it('detects duplicate dimension time shifts', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: fiscal_calendar
     sql: "SELECT 1"
@@ -306,7 +306,7 @@ cubes:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain(
@@ -317,7 +317,7 @@ cubes:
   });
 
   it('members must be defined as arrays', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       `
       cubes:
       - name: Products
@@ -330,7 +330,7 @@ cubes:
     );
 
     try {
-      await compiler.compile();
+      await compilers.compile();
 
       throw new Error('compile must return an error');
     } catch (e: any) {
@@ -339,7 +339,7 @@ cubes:
   });
 
   it('pre-aggregations - success', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       `
       cubes:
       - name: Orders
@@ -373,11 +373,11 @@ cubes:
       `
     );
 
-    await compiler.compile();
+    await compilers.compile();
   });
 
   it('commented file crash', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       `
       #cubes:
       #- name: Products
@@ -389,40 +389,40 @@ cubes:
       `
     );
 
-    await compiler.compile();
+    await compilers.compile();
   });
 
   it('empty file', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       '   '
     );
 
-    await compiler.compile();
+    await compilers.compile();
   });
 
   it('empty cubes in file', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       'cubes:   '
     );
 
-    await compiler.compile();
+    await compilers.compile();
   });
 
   it('empty views in file', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       'views:   '
     );
 
-    await compiler.compile();
+    await compilers.compile();
   });
 
   it('Unexpected keys', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       'circles:   '
     );
 
     try {
-      await compiler.compile();
+      await compilers.compile();
 
       throw new Error('compile must return an error');
     } catch (e: any) {
@@ -431,7 +431,7 @@ cubes:
   });
 
   it('can\'t parse error', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       `cubes:
       - name: Products
         sql: select { "string"+123 } as a1, { 123abc } as a2 from tbl
@@ -440,7 +440,7 @@ cubes:
     );
 
     try {
-      await compiler.compile();
+      await compilers.compile();
 
       throw new Error('compile must return an error');
     } catch (e: any) {
@@ -452,7 +452,7 @@ cubes:
     ['a null list item', 'drill_members: [id, ~]'],
     ['a number list item', 'drill_members: [id, 1]'],
   ])('reports %s as a parse error in the file', async (_, member) => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       `cubes:
       - name: Products
         sql: select * from tbl
@@ -463,11 +463,11 @@ cubes:
     `
     );
 
-    await expect(compiler.compile()).rejects.toThrow(/main\.yml[\s\S]*Failed to parse Python expression/);
+    await expect(compilers.compile()).rejects.toThrow(/main\.yml[\s\S]*Failed to parse Python expression/);
   });
 
   it('unnamed measure', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       `cubes:
   - name: Users
     sql: SELECT * FROM e2e.users
@@ -479,7 +479,7 @@ cubes:
     );
 
     try {
-      await compiler.compile();
+      await compilers.compile();
 
       throw new Error('compile must return an error');
     } catch (e: any) {
@@ -489,7 +489,7 @@ cubes:
 
   describe('Escaping and quoting', () => {
     it('escapes backticks', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `cubes:
   - name: Users
     sql: SELECT * FROM e2e.users
@@ -504,11 +504,11 @@ cubes:
       `
       );
 
-      await compiler.compile();
+      await compilers.compile();
     });
 
     it('escape double quotes', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `cubes:
   - name: Users
     sql: SELECT * FROM e2e.users
@@ -523,11 +523,11 @@ cubes:
       `
       );
 
-      await compiler.compile();
+      await compilers.compile();
     });
 
     it('escape curly braces', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `cubes:
   - name: Users
     sql: SELECT 1 AS id, CAST('\\{"key":"value"\\}'::JSON AS TEXT) AS json_col
@@ -539,20 +539,20 @@ cubes:
       `
       );
 
-      await compiler.compile();
+      await compilers.compile();
     });
   });
 
   describe('Parsing edge cases: ', () => {
     it('empty string - issue#7126', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `cubes:
     - name: Users
       title: ''`
       );
 
       try {
-        await compiler.compile();
+        await compilers.compile();
 
         throw new Error('compile must return an error');
       } catch (e: any) {
@@ -563,14 +563,14 @@ cubes:
     });
 
     it('null for string field', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `cubes:
     - name: Users
       title: null`
       );
 
       try {
-        await compiler.compile();
+        await compilers.compile();
 
         throw new Error('compile must return an error');
       } catch (e: any) {
@@ -579,7 +579,7 @@ cubes:
     });
 
     it('empty (null) dimensions', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `cubes:
     - name: Users
       sql: SELECT * FROM e2e.users
@@ -587,11 +587,11 @@ cubes:
       `
       );
 
-      await compiler.compile();
+      await compilers.compile();
     });
 
     it('empty (null) measures', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `cubes:
     - name: Users
       sql: SELECT * FROM e2e.users
@@ -599,11 +599,11 @@ cubes:
       `
       );
 
-      await compiler.compile();
+      await compilers.compile();
     });
 
     it('empty (null) segments', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `cubes:
     - name: Users
       sql: SELECT * FROM e2e.users
@@ -611,11 +611,11 @@ cubes:
       `
       );
 
-      await compiler.compile();
+      await compilers.compile();
     });
 
     it('empty (null) preAggregations', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `cubes:
     - name: Users
       sql: SELECT * FROM e2e.users
@@ -628,11 +628,11 @@ cubes:
       `
       );
 
-      await compiler.compile();
+      await compilers.compile();
     });
 
     it('empty (null) joins', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `cubes:
     - name: Users
       sql: SELECT * FROM e2e.users
@@ -640,11 +640,11 @@ cubes:
       `
       );
 
-      await compiler.compile();
+      await compilers.compile();
     });
 
     it('empty (null) hierarchies', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `cubes:
     - name: Users
       sql: SELECT * FROM e2e.users
@@ -652,12 +652,12 @@ cubes:
       `
       );
 
-      await compiler.compile();
+      await compilers.compile();
     });
   });
 
   it('accepts cube meta', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       `
       cubes:
       - name: Users
@@ -685,11 +685,11 @@ cubes:
       `
     );
 
-    await compiler.compile();
+    await compilers.compile();
   });
 
   it('descriptions', async () => {
-    const { compiler, metaTransformer } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       `
       cubes:
       - name: CubeA
@@ -711,9 +711,9 @@ cubes:
       `
     );
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const { description, dimensions, measures, segments } = metaTransformer.cubes[0].config;
+    const { description, dimensions, measures, segments } = compilers.metaTransformer.cubes[0].config;
 
     expect(description).toBe('YAML schema test cube');
 
@@ -732,7 +732,7 @@ cubes:
 
   describe('Custom dimension granularities: ', () => {
     it('no granularity name', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `
         cubes:
         - name: Orders
@@ -753,7 +753,7 @@ cubes:
       );
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain('name isn\'t defined for dimension.granularity');
@@ -761,7 +761,7 @@ cubes:
     });
 
     it('incorrect granularity name', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `
         cubes:
         - name: Orders
@@ -782,7 +782,7 @@ cubes:
       );
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain('(dimensions.created_at.granularities.6_months = [object Object]) is not allowed');
@@ -790,7 +790,7 @@ cubes:
     });
 
     it('granularities as object ', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `
         cubes:
         - name: Orders
@@ -811,7 +811,7 @@ cubes:
       );
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain('must be defined as array');
@@ -819,7 +819,7 @@ cubes:
     });
 
     it('4 correct granularities', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `
         cubes:
         - name: Orders
@@ -852,13 +852,13 @@ cubes:
         `
       );
 
-      await compiler.compile();
+      await compilers.compile();
     });
   });
 
   describe('Access policy: ', () => {
     it('defines a correct accessPolicy', async () => {
-      const { compiler } = prepareYamlCompiler(
+      const compilers = prepareYamlCompiler(
         `
         cubes:
         - name: Orders
@@ -913,12 +913,12 @@ cubes:
         `
       );
 
-      await compiler.compile();
+      await compilers.compile();
     });
   });
 
   it('calling cube\'s sql()', async () => {
-    const { compiler } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       `cubes:
   - name: simple_orders
     sql: >
@@ -962,12 +962,12 @@ cubes:
     `
     );
 
-    await compiler.compile();
+    await compilers.compile();
   });
 
   describe('Currency property', () => {
     it('measure with currency in YAML', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
       cubes:
       - name: Orders
         sql: "select * from tbl"
@@ -984,9 +984,9 @@ cubes:
           currency: usd
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      const { measures } = metaTransformer.cubes[0].config;
+      const { measures } = compilers.metaTransformer.cubes[0].config;
       const totalAmount = measures.find((m) => m.name === 'Orders.total_amount');
       expect(totalAmount).toBeDefined();
       expect(totalAmount!.currency).toBe('USD');
@@ -994,7 +994,7 @@ cubes:
     });
 
     it('number dimension with currency in YAML', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
       cubes:
       - name: Orders
         sql: "select * from tbl"
@@ -1009,16 +1009,16 @@ cubes:
           currency: eur
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      const { dimensions } = metaTransformer.cubes[0].config;
+      const { dimensions } = compilers.metaTransformer.cubes[0].config;
       const price = dimensions.find((d) => d.name === 'Orders.price');
       expect(price).toBeDefined();
       expect(price!.currency).toBe('EUR');
     });
 
     it('non-number dimension with currency in YAML - error', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
       cubes:
       - name: Orders
         sql: "select * from tbl"
@@ -1034,7 +1034,7 @@ cubes:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain('"currency" property can only be used with dimensions of type "number"');
@@ -1044,7 +1044,7 @@ cubes:
 
   describe('Named numeric formats', () => {
     it('measure with named format in YAML', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
       cubes:
       - name: Orders
         sql: "select * from tbl"
@@ -1064,9 +1064,9 @@ cubes:
           format: abbr_3
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      const { measures } = metaTransformer.cubes[0].config;
+      const { measures } = compilers.metaTransformer.cubes[0].config;
       const totalAmount = measures.find((m) => m.name === 'Orders.total_amount');
       expect(totalAmount).toBeDefined();
       expect(totalAmount!.format).toEqual({ type: 'custom-numeric', value: '(,.2~f', alias: 'accounting_2' });
@@ -1077,7 +1077,7 @@ cubes:
     });
 
     it('number dimension with named format in YAML', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
       cubes:
       - name: Orders
         sql: "select * from tbl"
@@ -1096,9 +1096,9 @@ cubes:
           format: abbr
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      const { dimensions } = metaTransformer.cubes[0].config;
+      const { dimensions } = compilers.metaTransformer.cubes[0].config;
       const price = dimensions.find((d) => d.name === 'Orders.price');
       expect(price).toBeDefined();
       expect(price!.format).toEqual({ type: 'custom-numeric', value: '$,.1~f', alias: 'currency_1' });
@@ -1109,7 +1109,7 @@ cubes:
     });
 
     it('formatDescription for all format variants', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
       cubes:
       - name: Orders
         sql: "select * from tbl"
@@ -1163,9 +1163,9 @@ cubes:
           format: "$,.0f"
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      const { measures, dimensions } = metaTransformer.cubes[0].config;
+      const { measures, dimensions } = compilers.metaTransformer.cubes[0].config;
 
       const pick = (list: any[], name: string) => {
         const m = list.find((x) => x.name === name);
@@ -1193,7 +1193,7 @@ cubes:
     });
 
     it('invalid named format in YAML - error', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
       cubes:
       - name: Orders
         sql: "select * from tbl"
@@ -1210,7 +1210,7 @@ cubes:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain('format');
@@ -1220,7 +1220,7 @@ cubes:
 
   describe('View groups', () => {
     it('standalone view_groups definition', async () => {
-      const { compiler, metaTransformer, viewGroupEvaluator } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1247,10 +1247,10 @@ view_groups:
       - revenue
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      expect(viewGroupEvaluator.viewGroupList).toEqual(['sales']);
-      expect(metaTransformer.viewGroups).toEqual([{
+      expect(compilers.viewGroupEvaluator.viewGroupList).toEqual(['sales']);
+      expect(compilers.metaTransformer.viewGroups).toEqual([{
         name: 'sales',
         title: 'Sales',
         description: 'Sales related views',
@@ -1258,12 +1258,12 @@ view_groups:
         includes: ['revenue'],
       }]);
 
-      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
       expect(revenueView?.config.viewGroups).toEqual(['sales']);
     });
 
     it('view_group property on individual views', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1287,20 +1287,20 @@ view_groups:
   - name: sales
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      expect(metaTransformer.viewGroups).toEqual([{
+      expect(compilers.metaTransformer.viewGroups).toEqual([{
         name: 'sales',
         views: ['revenue'],
         includes: ['revenue'],
       }]);
 
-      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
       expect(revenueView?.config.viewGroups).toEqual(['sales']);
     });
 
     it('merges standalone view_groups with view-level view_group', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1344,9 +1344,9 @@ view_groups:
       - customers_view
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+      const salesGroup = compilers.metaTransformer.viewGroups.find(g => g.name === 'sales');
       expect(salesGroup).toBeDefined();
       expect(salesGroup?.title).toBe('Sales');
       expect(salesGroup?.description).toBe('Sales related views');
@@ -1355,7 +1355,7 @@ view_groups:
     });
 
     it('multiple view_groups', async () => {
-      const { compiler, metaTransformer, viewGroupEvaluator } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1402,23 +1402,23 @@ view_groups:
       - users_view
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      expect(viewGroupEvaluator.viewGroupList).toEqual(['sales', 'people']);
-      expect(metaTransformer.viewGroups).toHaveLength(2);
+      expect(compilers.viewGroupEvaluator.viewGroupList).toEqual(['sales', 'people']);
+      expect(compilers.metaTransformer.viewGroups).toHaveLength(2);
 
-      const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+      const salesGroup = compilers.metaTransformer.viewGroups.find(g => g.name === 'sales');
       expect(salesGroup?.title).toBe('Sales');
       expect(salesGroup?.views).toEqual(['revenue']);
 
-      const peopleGroup = metaTransformer.viewGroups.find(g => g.name === 'people');
+      const peopleGroup = compilers.metaTransformer.viewGroups.find(g => g.name === 'people');
       expect(peopleGroup?.title).toBe('People');
       expect(peopleGroup?.description).toBe('People related views');
       expect(peopleGroup?.views).toEqual(['users_view']);
     });
 
     it('detects duplicate view group names', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1438,7 +1438,7 @@ view_groups:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain("Found duplicate view group name 'sales'");
@@ -1446,7 +1446,7 @@ view_groups:
     });
 
     it('empty view_groups section', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1459,12 +1459,12 @@ cubes:
 view_groups:
       `);
 
-      await compiler.compile();
-      expect(metaTransformer.viewGroups).toEqual([]);
+      await compilers.compile();
+      expect(compilers.metaTransformer.viewGroups).toEqual([]);
     });
 
     it('view_group without title or description', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1489,9 +1489,9 @@ view_groups:
       - revenue
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      expect(metaTransformer.viewGroups).toEqual([{
+      expect(compilers.metaTransformer.viewGroups).toEqual([{
         name: 'sales',
         views: ['revenue'],
         includes: ['revenue'],
@@ -1499,7 +1499,7 @@ view_groups:
     });
 
     it('cubes are not assigned to view groups', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1524,14 +1524,14 @@ view_groups:
       - revenue
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      const ordersCube = metaTransformer.cubes.find(c => c.config.name === 'orders');
+      const ordersCube = compilers.metaTransformer.cubes.find(c => c.config.name === 'orders');
       expect(ordersCube?.config.viewGroups).toBeUndefined();
     });
 
     it('plural view_groups property on view in YAML', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1560,22 +1560,22 @@ view_groups:
     title: Finance
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      const salesGroup = metaTransformer.viewGroups.find(g => g.name === 'sales');
+      const salesGroup = compilers.metaTransformer.viewGroups.find(g => g.name === 'sales');
       expect(salesGroup?.title).toBe('Sales');
       expect(salesGroup?.views).toContain('revenue');
 
-      const financeGroup = metaTransformer.viewGroups.find(g => g.name === 'finance');
+      const financeGroup = compilers.metaTransformer.viewGroups.find(g => g.name === 'finance');
       expect(financeGroup?.title).toBe('Finance');
       expect(financeGroup?.views).toContain('revenue');
 
-      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
       expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
     });
 
     it('singular view_group sets viewGroups', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1599,16 +1599,16 @@ view_groups:
   - name: sales
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      expect(metaTransformer.viewGroups).toHaveLength(1);
+      expect(compilers.metaTransformer.viewGroups).toHaveLength(1);
 
-      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
       expect(revenueView?.config.viewGroups).toEqual(['sales']);
     });
 
     it('merges singular view_group and plural view_groups in YAML', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1635,18 +1635,18 @@ view_groups:
   - name: finance
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      expect(metaTransformer.viewGroups).toHaveLength(2);
+      expect(compilers.metaTransformer.viewGroups).toHaveLength(2);
 
-      const revenueView = metaTransformer.cubes.find(c => c.config.name === 'revenue');
+      const revenueView = compilers.metaTransformer.cubes.find(c => c.config.name === 'revenue');
       expect(revenueView?.config.viewGroups).toEqual(['sales', 'finance']);
-      expect(metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
-      expect(metaTransformer.viewGroups.find(g => g.name === 'finance')?.views).toContain('revenue');
+      expect(compilers.metaTransformer.viewGroups.find(g => g.name === 'sales')?.views).toContain('revenue');
+      expect(compilers.metaTransformer.viewGroups.find(g => g.name === 'finance')?.views).toContain('revenue');
     });
 
     it('nested view groups via includes in YAML', async () => {
-      const { compiler, metaTransformer } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1681,9 +1681,9 @@ view_groups:
           - enterprise_deals
       `);
 
-      await compiler.compile();
+      await compilers.compile();
 
-      expect(metaTransformer.viewGroups).toEqual([{
+      expect(compilers.metaTransformer.viewGroups).toEqual([{
         name: 'sales',
         title: 'Sales',
         views: ['revenue'],
@@ -1699,12 +1699,12 @@ view_groups:
         ],
       }]);
 
-      const entView = metaTransformer.cubes.find(c => c.config.name === 'enterprise_deals');
+      const entView = compilers.metaTransformer.cubes.find(c => c.config.name === 'enterprise_deals');
       expect(entView?.config.viewGroups).toEqual(['ent_sales']);
     });
 
     it('fails when a view group uses both views and includes in YAML', async () => {
-      const { compiler } = prepareYamlCompiler(`
+      const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql_table: orders
@@ -1732,7 +1732,7 @@ view_groups:
       `);
 
       try {
-        await compiler.compile();
+        await compilers.compile();
         throw new Error('compile must return an error');
       } catch (e: any) {
         expect(e.message).toContain('View group must use either "views" or "includes", but not both');
@@ -1767,7 +1767,7 @@ cubes:
           includes: "*"
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const dim = compilers.cubeEvaluator.cubeFromPath('orders').dimensions.status;
       const maskSql = (dim as any).mask.sql.toString();
@@ -1775,17 +1775,14 @@ cubes:
       expect(maskSql).toContain('CUBE');
       expect(maskSql).not.toMatch(/[^.}]userAttributes\.hasStatusAccess/);
 
-      const query = new PostgresQuery(
-        compilers,
-        {
-          measures: ['orders.count'],
-          dimensions: ['orders.status'],
-          maskedMembers: [{ member: 'orders.status' }],
-          contextSymbols: {
-            securityContext: { cubeCloud: { userAttributes: { hasStatusAccess: true } } }
-          }
+      const query = compilers.createQuery(PostgresQuery, {
+        measures: ['orders.count'],
+        dimensions: ['orders.status'],
+        maskedMembers: [{ member: 'orders.status' }],
+        contextSymbols: {
+          securityContext: { cubeCloud: { userAttributes: { hasStatusAccess: true } } }
         }
-      );
+      });
       const sql = query.buildSqlAndParams();
       expect(sql[0]).toContain('"orders".status');
       expect(sql[0]).toContain('CASE WHEN');
@@ -1817,7 +1814,7 @@ cubes:
           includes: "*"
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const dim = compilers.cubeEvaluator.cubeFromPath('orders').dimensions.status;
       const maskSql = (dim as any).mask.sql.toString();
@@ -1850,7 +1847,7 @@ cubes:
           includes: "*"
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const dim = compilers.cubeEvaluator.cubeFromPath('orders').dimensions.secret;
       const maskSql = (dim as any).mask.sql.toString();
@@ -1917,8 +1914,8 @@ views:
 
       const runBaseQuery = async (maskThen: string, groups: string[], useNativeSqlPlanner: boolean) => {
         const compilers = buildMaskViewCompilers(maskThen);
-        await compilers.compiler.compile();
-        const query = new PostgresQuery(compilers, {
+        await compilers.compile();
+        const query = compilers.createQuery(PostgresQuery, {
           measures: ['users_secure_view.users_count'],
           dimensions: ['users_secure_view.users_city_sensitive_masked'],
           maskedMembers: [{ member: 'users_secure_view.users_city_sensitive_masked' }],
@@ -1983,9 +1980,9 @@ cubes:
         type: count
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['users.count'],
         dimensions: ['users.city'],
         maskedMembers: [{
@@ -2026,9 +2023,9 @@ cubes:
         type: count
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['users.count'],
         dimensions: ['users.city'],
         maskedMembers: [{
@@ -2077,9 +2074,9 @@ cubes:
         type: count
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['users.count'],
         dimensions: ['users.city'],
         maskedMembers: [{
@@ -2114,9 +2111,9 @@ cubes:
         type: count
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['users.count'],
         dimensions: ['users.city'],
         maskedMembers: [{ member: 'users.city' }],
@@ -2148,9 +2145,9 @@ cubes:
         type: sum
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['transactions.total_cost'],
         dimensions: ['transactions.org_id'],
         maskedMembers: [{
@@ -2193,9 +2190,9 @@ cubes:
         mask: -1
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['transactions.total_cost'],
         dimensions: ['transactions.org_id'],
         maskedMembers: [{
@@ -2236,9 +2233,9 @@ cubes:
         type: sum
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['transactions.total_cost'],
         dimensions: ['transactions.org_id', 'transactions.owner_id'],
         maskedMembers: [{
@@ -2277,9 +2274,9 @@ cubes:
         type: sum
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['transactions.total_cost'],
         dimensions: ['transactions.org_id', 'transactions.owner_id'],
         maskedMembers: [{
@@ -2319,9 +2316,9 @@ cubes:
         type: count
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['items.count'],
         dimensions: ['items.product_id', 'items.price'],
         maskedMembers: [
@@ -2363,9 +2360,9 @@ cubes:
         type: count
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
-      const query = new PostgresQuery(compilers, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: ['items.count'],
         dimensions: ['items.product_id', 'items.price'],
         maskedMembers: [
@@ -2428,7 +2425,7 @@ cubes:
                 - "2024-01-01"
       `);
 
-      await compilers.compiler.compile();
+      await compilers.compile();
 
       const measure = compilers.cubeEvaluator.cubeFromPath('orders').measures.revenue_filtered as any;
       expect(measure.multiStage).toBe(true);

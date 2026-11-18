@@ -7,7 +7,7 @@ import { dbRunner } from './PostgresDBRunner';
 describe('Multi-Stage', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql: >
@@ -231,7 +231,7 @@ views:
         orders__revenue_1_y_ago: '5',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
     it('multi stage measure filter', async () => dbRunner.runQueryTest({
       dimensions: ['orders.status'],
       timeDimensions: [
@@ -250,7 +250,7 @@ views:
         orders__status: 'completed',
       },
     ],
-    { joinGraph, cubeEvaluator, compiler }));
+    compilers));
   } else {
     // This test is working only in tesseract
     test.skip('multi stage over sub query', () => { expect(1).toBe(1); });
@@ -260,7 +260,7 @@ views:
 describe('Multi-Stage Rolling Window with multiplied leaf', () => {
   jest.setTimeout(200000);
 
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: rw_orders
     sql: >
@@ -355,7 +355,7 @@ cubes:
           rw_orders__amount_ytd: '1000',
         },
       ],
-      { joinGraph, cubeEvaluator, compiler });
+      compilers);
 
       const cteNames = [...sql.matchAll(/(\w+) AS \(/g)].map(m => m[1]);
       expect(new Set(cteNames).size).toBe(cteNames.length);

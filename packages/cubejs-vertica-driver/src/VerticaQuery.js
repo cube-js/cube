@@ -48,16 +48,18 @@ class VerticaQuery extends BaseQuery {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
 
-  escapeColumnName(name) {
-    return `"${name}"`;
-  }
-
   seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `SELECT '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
 
     return `SELECT dates.f::TIMESTAMP date_from, dates.t::TIMESTAMP date_to FROM (${values}) AS dates`;
+  }
+
+  sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.functions.APPROXDISTINCT = 'APPROXIMATE_COUNT_DISTINCT({{ args_concat }})';
+    return templates;
   }
 
   concatStringsSql(strings) {

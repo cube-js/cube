@@ -65,7 +65,7 @@ cubes:
         type: sum
 `);
 
-  const query = (options: any = {}) => new ClickHouseQuery(compilers, { timezone: 'UTC', ...options });
+  const query = (options: any = {}) => compilers.createQuery(ClickHouseQuery, { timezone: 'UTC', ...options });
 
   // A value each type can hold, so that the cast under test is what a failure is about
   const CASTABLE_VALUE: Record<string, string> = {
@@ -89,7 +89,7 @@ cubes:
   let types: Record<string, string>;
 
   beforeAll(async () => {
-    await compilers.compiler.compile();
+    await compilers.compile();
     types = query().sqlTemplates().types;
   });
 

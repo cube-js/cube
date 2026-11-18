@@ -5,6 +5,7 @@ import express from 'express';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import { testLogger } from '@cubejs-backend/shared';
 
 import * as console from 'console';
 import { ApiGateway, ApiGatewayOptions, Query, QueryRequest, Request } from '../src';
@@ -29,8 +30,6 @@ jest.mock('@cubejs-backend/native', () => {
     get: (target, prop) => (prop === 'redactSqlLiterals' ? redactSqlLiterals : target[prop]),
   });
 });
-
-const logger = (type, message) => console.log({ type, ...message });
 
 async function requestBothGetAndPost(app, { url, query, body }, assert) {
   {
@@ -63,7 +62,7 @@ async function createApiGateway(
 ) {
   process.env.NODE_ENV = 'production';
 
-  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, logger, {
+  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, testLogger, {
     standalone: true,
     dataSourceStorage,
     basePath: '/cubejs-api',
@@ -95,7 +94,7 @@ describe('enforceSecurityChecks resolution', () => {
     API_SECRET,
     compilerApi,
     async () => new AdapterApiMock(),
-    logger,
+    testLogger,
     {
       standalone: true,
       dataSourceStorage: new DataSourceStorageMock(),
@@ -568,6 +567,30 @@ describe('API Gateway', () => {
     expect(res.body.error).toMatch(/Values required for filter/);
   });
 
+  test('queryRewrite that returns no query is a user error', async () => {
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            jwt.verify(authorization, API_SECRET);
+            req.authInfo = authorization;
+          }
+        },
+        // A user's queryRewrite that forgets to return on one of its paths
+        queryRewrite: async () => undefined as unknown as Query,
+      }
+    );
+
+    const res = await request(app)
+      .get('/cubejs-api/v1/load?query={"measures":["Foo.bar"]}')
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(400);
+
+    expect(res.body.error).toEqual('queryRewrite must return the query, but it returned undefined');
+  });
+
   test('normalize queryRewrite limit', async () => {
     const { app } = await createApiGateway(
       new AdapterApiMock(),
@@ -768,6 +791,7 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
     expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
     expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.timeCalc').values).toEqual(['selection', 'last_year', 'ytd']);
   });
 
   test('meta endpoint returns view groups', async () => {
@@ -817,6 +841,7 @@ describe('API Gateway', () => {
     expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
     expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
     expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.timeCalc').values).toEqual(['selection', 'last_year', 'ytd']);
   });
 
   test('meta endpoint with onlyViews=true returns only views and their groups', async () => {
@@ -962,7 +987,7 @@ describe('API Gateway', () => {
         // eslint-disable-next-line @typescript-eslint/no-empty-function
         res(message) {
           const errorMessage = message as { error: string };
-          expect(errorMessage.error).toEqual('Error: Expressions are not allowed in this context');
+          expect(errorMessage.error).toEqual('Expressions are not allowed in this context');
         },
         query,
         expressionParams: [],
@@ -1103,6 +1128,267 @@ describe('API Gateway', () => {
     });
   });
 
+  describe('query validation', () => {
+    const TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M';
+
+    const patchMeasure = {
+      cubeName: 'Foo',
+      name: 'x',
+      expressionName: 'x" FROM (SELECT 1) t --',
+      expression: {
+        type: 'PatchMeasure',
+        sourceMeasure: 'Foo.bar',
+        replaceAggregationType: null,
+        addFilters: [],
+      },
+    };
+    const sqlFunction = {
+      cubeName: 'Foo',
+      name: 'x',
+      expressionName: 'x',
+      definition: 'x',
+      // eslint-disable-next-line no-template-curly-in-string
+      expression: ['Foo', 'return `${Foo.bar}`'],
+    };
+    // eslint-disable-next-line no-template-curly-in-string
+    const serializedSqlFunction = '{"cubeName":"Foo","alias":"x","expr":{"type":"SqlFunction","cubeParams":["Foo"],"sql":"${Foo.a} + ${Foo.b}"},"groupingSet":null}';
+    // eslint-disable-next-line no-template-curly-in-string
+    const serializedPatchMeasure = '{"cubeName":"Foo","alias":"pm","expr":{"type":"PatchMeasure","sourceMeasure":"Foo.bar","replaceAggregationType":null,"addFilters":[{"cubeParams":["Foo"],"sql":"${Foo.status} = \'done\'"}]}}';
+
+    const postError = async (url: string, query: unknown) => {
+      const { app } = await createApiGateway();
+      const res = await request(app)
+        .post(url)
+        .set('Content-type', 'application/json')
+        .set('Authorization', TOKEN)
+        .send({ query });
+      return res.body?.error;
+    };
+
+    const notAllowed = (label: string) => `Invalid query format: "${label}" is a member expression, which is not allowed in this context`;
+
+    test('rejects an object-form PatchMeasure in /load', async () => {
+      expect(await postError('/cubejs-api/v1/load', { measures: [patchMeasure] })).toStrictEqual(notAllowed('measures[0]'));
+    });
+
+    test('rejects an object-form SqlFunction in /load dimensions', async () => {
+      expect(await postError('/cubejs-api/v1/load', { measures: ['Foo.bar'], dimensions: [sqlFunction] })).toStrictEqual(notAllowed('dimensions[0]'));
+    });
+
+    test('rejects an object-form member expression in /load segments', async () => {
+      expect(await postError('/cubejs-api/v1/load', { measures: ['Foo.bar'], segments: [sqlFunction] })).toStrictEqual(notAllowed('segments[0]'));
+    });
+
+    test('rejects an object-form member expression passed in the GET query param', async () => {
+      const { app } = await createApiGateway();
+      const res = await request(app)
+        .get('/cubejs-api/v1/load')
+        .query({ query: JSON.stringify({ measures: [patchMeasure] }) })
+        .set('Authorization', TOKEN);
+
+      expect(res.body.error).toStrictEqual(notAllowed('measures[0]'));
+    });
+
+    test('rejects a serialized member expression in /load', async () => {
+      expect(await postError('/cubejs-api/v1/load', { measures: [serializedPatchMeasure] })).toStrictEqual(
+        'Expressions are not allowed in this context'
+      );
+    });
+
+    test('rejects an object-form member expression in /v1/sql', async () => {
+      expect(await postError('/cubejs-api/v1/sql', { measures: [patchMeasure] })).toStrictEqual(notAllowed('measures[0]'));
+    });
+
+    test('rejects an object-form member expression in /v1/dry-run', async () => {
+      expect(await postError('/cubejs-api/v1/dry-run', { measures: [patchMeasure] })).toStrictEqual(notAllowed('measures[0]'));
+    });
+
+    test('rejects an object-form member expression in any query of a blending query', async () => {
+      expect(await postError('/cubejs-api/v1/sql', [
+        { measures: ['Foo.bar'], timeDimensions: [{ dimension: 'Foo.time', granularity: 'day' }] },
+        { measures: [patchMeasure], timeDimensions: [{ dimension: 'Foo.time', granularity: 'day' }] },
+      ])).toStrictEqual(notAllowed('measures[0]'));
+    });
+
+    test('rejects an object-form member expression in a compare date range query', async () => {
+      expect(await postError('/cubejs-api/v1/load', {
+        measures: [patchMeasure],
+        timeDimensions: [{ dimension: 'Foo.time', compareDateRange: ['2020-01-01', '2020-02-01'] }],
+      })).toStrictEqual(notAllowed('measures[0]'));
+    });
+
+    test('rejects a compiled member expression passed as an array', async () => {
+      expect(await postError('/cubejs-api/v1/load', { measures: [['Foo', 'return `1`']] })).toStrictEqual(
+        'Invalid query format: "measures[0]" must be a string'
+      );
+    });
+
+    test('rejects an object-form member expression in timeDimensions and filters', async () => {
+      expect(await postError('/cubejs-api/v1/load', {
+        measures: ['Foo.bar'],
+        timeDimensions: [{ dimension: patchMeasure }],
+      })).toStrictEqual('Invalid query format: "timeDimensions[0].dimension" must be a string');
+
+      expect(await postError('/cubejs-api/v1/load', {
+        measures: ['Foo.bar'],
+        filters: [{ member: patchMeasure, operator: 'set' }],
+      })).toStrictEqual('Invalid query format: "filters[0]" does not match any of the allowed types');
+    });
+
+    test('rejects subqueryJoins in /load', async () => {
+      expect(await postError('/cubejs-api/v1/load', {
+        measures: ['Foo.bar'],
+        subqueryJoins: [{ sql: 'SELECT 1', on: 'Foo.id', joinType: 'LEFT', alias: 't' }],
+      })).toStrictEqual('Invalid query format: "subqueryJoins" are not allowed in this context');
+    });
+
+    test('rejects an object that is not a member expression with a string error', async () => {
+      // A bare `{}` or an unrelated object must not be mistaken for a member
+      // expression, or the error message misleads the caller.
+      expect(await postError('/cubejs-api/v1/load', { measures: [{}] })).toStrictEqual(
+        'Invalid query format: "measures[0]" must be a string'
+      );
+      expect(await postError('/cubejs-api/v1/load', { measures: ['Foo.bar'], dimensions: [{ foo: 1 }] })).toStrictEqual(
+        'Invalid query format: "dimensions[0]" must be a string'
+      );
+    });
+
+    test('/v1/cubesql accepts only SQL', async () => {
+      const { app, apiGateway } = await createApiGateway();
+      const execSql = jest.fn();
+      apiGateway.getSQLServer().execSql = execSql;
+
+      const postCubeSql = async (body: object) => {
+        const res = await request(app)
+          .post('/cubejs-api/v1/cubesql')
+          .set('Content-type', 'application/json')
+          .set('Authorization', TOKEN)
+          .send(body)
+          .expect(400);
+        return res.body.error;
+      };
+
+      expect(await postCubeSql({ query: { measures: [patchMeasure] } })).toStrictEqual(
+        'Invalid query format: "query" must be a string'
+      );
+      expect(await postCubeSql({ query: 'SELECT 1', memberExpressions: true })).toStrictEqual(
+        'Invalid query format: "memberExpressions" is not allowed'
+      );
+      expect(execSql).not.toHaveBeenCalled();
+    });
+
+    test('accepts member expressions queryRewrite adds to a /load query', async () => {
+      const { app } = await createApiGateway(new AdapterApiMock(), new DataSourceStorageMock(), {
+        queryRewrite: async (query: Query) => ({
+          ...query,
+          segments: [{ cubeName: 'Foo', name: 'rewritten', expressionName: 'rewritten', definition: 'rewritten', expression: () => '1 = 1' }],
+        }),
+      });
+
+      const res = await request(app)
+        .post('/cubejs-api/v1/load')
+        .set('Content-type', 'application/json')
+        .set('Authorization', TOKEN)
+        .send({ query: { measures: ['Foo.bar'] } })
+        .expect(200);
+
+      expect(res.body.error).toBeUndefined();
+    });
+
+    describe('in the SQL API', () => {
+      const sqlApiQuery = async (query: Query) => {
+        const queries: any[] = [];
+        const recordingCompilerApi = async (ctx: any) => {
+          const api = await compilerApi(ctx);
+          return {
+            ...api,
+            getSql: (q: any) => {
+              queries.push(q);
+              return api.getSql();
+            },
+          };
+        };
+        const apiGateway = new ApiGateway(API_SECRET, recordingCompilerApi, async () => new AdapterApiMock(), testLogger, {
+          standalone: true,
+          dataSourceStorage: new DataSourceStorageMock(),
+          basePath: '/cubejs-api',
+          refreshScheduler: {},
+        });
+
+        let response: any;
+        await apiGateway.sql({
+          res(message) {
+            response = message;
+          },
+          query,
+          expressionParams: [],
+          exportAnnotatedSql: true,
+          memberExpressions: true,
+          disableExternalPreAggregations: true,
+          queryType: 'multi',
+          disableLimitEnforcing: true,
+          context: {
+            securityContext: {},
+            signedWithPlaygroundAuthSecret: false,
+            requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
+            protocol: 'postgres',
+            apiType: 'sql',
+            appName: 'NULL'
+          },
+          apiType: 'sql'
+        });
+
+        return { response, queries };
+      };
+
+      test('keeps a serialized member expression whose SQL has two member references a dimension', async () => {
+        const { response, queries } = await sqlApiQuery({ measures: ['Foo.bar'], dimensions: [serializedSqlFunction] });
+
+        expect(response.error).toBeUndefined();
+        expect(queries[0].timeDimensions).toEqual([]);
+        expect(queries[0].dimensions).toEqual([
+          expect.objectContaining({ cubeName: 'Foo', name: 'x', expressionName: 'x', expression: expect.any(Function) }),
+        ]);
+      });
+
+      test('parses a serialized PatchMeasure and evaluates its filters', async () => {
+        const { response, queries } = await sqlApiQuery({ measures: [serializedPatchMeasure] });
+
+        expect(response.error).toBeUndefined();
+        expect(queries[0].measures).toEqual([
+          expect.objectContaining({
+            cubeName: 'Foo',
+            expressionName: 'pm',
+            expression: {
+              type: 'PatchMeasure',
+              sourceMeasure: 'Foo.bar',
+              replaceAggregationType: null,
+              addFilters: [{ sql: expect.any(Function) }],
+            },
+          }),
+        ]);
+      });
+
+      test('parses the member expression of a subquery join', async () => {
+        const { response, queries } = await sqlApiQuery({
+          measures: ['Foo.bar'],
+          subqueryJoins: [{ sql: 'SELECT 1', on: serializedSqlFunction, joinType: 'LEFT', alias: 't' }],
+        });
+
+        expect(response.error).toBeUndefined();
+        expect(queries[0].subqueryJoins).toEqual([
+          expect.objectContaining({ sql: 'SELECT 1', alias: 't', on: expect.objectContaining({ expression: expect.any(Function) }) }),
+        ]);
+      });
+
+      test('rejects a member path that is not one', async () => {
+        const { response } = await sqlApiQuery({ measures: ['Foo'] });
+
+        expect(response.error).toMatch(/^Invalid query format: "measures\[0\]"/);
+      });
+    });
+  });
+
   describe('transformed query', () => {
     const PLAYGROUND_SECRET = 'playgroundSecret';
     const DEFAULT_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M';
@@ -1119,7 +1405,7 @@ describe('API Gateway', () => {
           },
         };
       };
-      const apiGateway = new ApiGateway(API_SECRET, recordingCompilerApi, async () => new AdapterApiMock(), logger, {
+      const apiGateway = new ApiGateway(API_SECRET, recordingCompilerApi, async () => new AdapterApiMock(), testLogger, {
         standalone: true,
         dataSourceStorage: new DataSourceStorageMock(),
         basePath: '/cubejs-api',
@@ -1156,6 +1442,123 @@ describe('API Gateway', () => {
     test.each(['sql', 'dry-run'])('is computed for /%s', async (endpoint) => {
       expect(await recordSqlOptions(false, DEFAULT_TOKEN, endpoint))
         .toEqual([expect.objectContaining({ includeTransformedQuery: true })]);
+    });
+  });
+
+  describe('/graphql schema visibility', () => {
+    test('introspection lists only members visible to the caller', async () => {
+      const schemas = new Map<string, any>();
+      const metaConfigCalls: any[] = [];
+      const visibilityAwareCompilerApi = async () => ({
+        async metaConfig(ctx: any, options: any) {
+          metaConfigCalls.push(options);
+          const privileged = ctx.securityContext?.role === 'admin';
+          return {
+            compilerId: privileged ? 'compiler-admin' : 'compiler-user',
+            cubes: [{
+              config: {
+                name: 'Orders',
+                measures: [{ name: 'Orders.count', type: 'number', isVisible: true }],
+                dimensions: [{ name: 'Orders.secret', type: 'string', isVisible: privileged }],
+                segments: [],
+              },
+            }],
+          };
+        },
+        getGraphQLSchema: (compilerId: string) => schemas.get(compilerId),
+        setGraphQLSchema: (compilerId: string, schema: any) => schemas.set(compilerId, schema),
+      });
+
+      const apiGateway = new ApiGateway(API_SECRET, visibilityAwareCompilerApi, async () => new AdapterApiMock(), testLogger, {
+        standalone: true,
+        dataSourceStorage: new DataSourceStorageMock(),
+        basePath: '/cubejs-api',
+        refreshScheduler: {},
+      });
+      const app = express();
+      app.use(express.json());
+      apiGateway.initApp(app);
+
+      const fieldsFor = async (role: string) => {
+        const res = await request(app)
+          .post('/cubejs-api/graphql')
+          .set('Authorization', jwt.sign({ role }, API_SECRET))
+          .send({ query: '{ __type(name: "OrdersMembers") { fields { name } } }' })
+          .expect(200);
+        return res.body.data.__type.fields.map((f: any) => f.name);
+      };
+
+      expect(await fieldsFor('admin')).toEqual(['count', 'secret']);
+      expect(await fieldsFor('user')).toEqual(['count']);
+      expect(await fieldsFor('admin')).toEqual(['count', 'secret']);
+
+      expect([...schemas.keys()]).toEqual(['compiler-admin', 'compiler-user']);
+
+      for (const options of metaConfigCalls) {
+        expect(options.skipVisibilityPatch).toBeFalsy();
+      }
+    });
+
+    test('serves a schema without cubes when no member is visible to the caller', async () => {
+      const schemas = new Map<string, any>();
+      const noVisibleMembersCompilerApi = async () => ({
+        async metaConfig() {
+          return {
+            compilerId: 'compiler-none',
+            cubes: [{
+              config: {
+                name: 'Orders',
+                measures: [{ name: 'Orders.count', type: 'number', isVisible: false }],
+                dimensions: [{ name: 'Orders.secret', type: 'string', isVisible: false }],
+                segments: [],
+              },
+            }],
+          };
+        },
+        getGraphQLSchema: (compilerId: string) => schemas.get(compilerId),
+        setGraphQLSchema: (compilerId: string, schema: any) => schemas.set(compilerId, schema),
+      });
+
+      const apiGateway = new ApiGateway(API_SECRET, noVisibleMembersCompilerApi, async () => new AdapterApiMock(), testLogger, {
+        standalone: true,
+        dataSourceStorage: new DataSourceStorageMock(),
+        basePath: '/cubejs-api',
+        refreshScheduler: {},
+      });
+      const app = express();
+      app.use(express.json());
+      apiGateway.initApp(app);
+
+      const introspection = await request(app)
+        .post('/cubejs-api/graphql')
+        .set('Authorization', jwt.sign({}, API_SECRET))
+        .send({ query: '{ __schema { types { name } } }' })
+        .expect(200);
+
+      const typeNames = introspection.body.data.__schema.types.map((t: any) => t.name);
+      expect(typeNames).toContain('Query');
+      expect(typeNames).not.toContain('Result');
+      expect(typeNames.filter((name: string) => name.startsWith('Orders'))).toEqual([]);
+
+      const query = await request(app)
+        .post('/cubejs-api/graphql')
+        .set('Authorization', jwt.sign({}, API_SECRET))
+        .send({ query: '{ cube { orders { count } } }' })
+        .expect(400);
+
+      expect(query.body.data).toBeUndefined();
+      expect(query.body.errors[0].message).toContain('Cannot query field "cube"');
+
+      const reason = 'No cubes or views have members visible to you. Check the data model and the access policies that apply to your security context.';
+
+      const placeholder = await request(app)
+        .post('/cubejs-api/graphql')
+        .set('Authorization', jwt.sign({}, API_SECRET))
+        .send({ query: '{ no_queries_available __type(name: "Query") { fields { name description } } }' })
+        .expect(200);
+
+      expect(placeholder.body.data.no_queries_available).toEqual(reason);
+      expect(placeholder.body.data.__type.fields).toEqual([{ name: 'no_queries_available', description: reason }]);
     });
   });
 
@@ -1324,6 +1727,33 @@ describe('API Gateway', () => {
           test('wrong params', wrongPayloadsTestFactory(config));
         } */
       });
+    });
+
+    test('pre-aggregations reads refresh SQL without expanding partitions', async () => {
+      const listSpy = jest.spyOn(RefreshSchedulerMock.prototype, 'preAggregationsWithRefreshSql');
+      const partitionsSpy = jest.spyOn(RefreshSchedulerMock.prototype, 'preAggregationPartitions');
+
+      try {
+        const { app, token } = await appPrepareFactory(['']);
+
+        const res = await request(app).get('/cubejs-system/v1/pre-aggregations?cacheOnly=true')
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200);
+
+        expect(res.body).toEqual({ preAggregations: preAggregationsResultFactory() });
+        expect(partitionsSpy).not.toHaveBeenCalled();
+        expect(listSpy).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({
+            timezones: scheduledRefreshTimeZonesFactory(),
+            preAggregations: preAggregationsResultFactory().map(({ id }) => ({ id, cacheOnly: true, metaOnly: false })),
+          })
+        );
+      } finally {
+        listSpy.mockRestore();
+        partitionsSpy.mockRestore();
+      }
     });
 
     test('pre-aggregations/partitions passes Joi-converted flags to the refresh scheduler', async () => {
@@ -1761,7 +2191,78 @@ describe('API Gateway', () => {
         undefined,
         undefined,
         expect.any(String),
+        undefined,
+        undefined,
       );
+    });
+
+    test('params are passed to execSql and described by /v1/cubesql/params', async () => {
+      const { app, apiGateway } = await createApiGateway();
+      const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M';
+      const query = 'SELECT id FROM test WHERE id > :min';
+
+      const execSqlMock = jest.fn(async (_query, stream) => {
+        stream.end();
+      });
+      const describeMock = jest.fn(async (): Promise<{ params: { name: string, type: 'number' }[] } | { error: string }> => ({ params: [{ name: 'min', type: 'number' }] }));
+      apiGateway.getSQLServer().execSql = execSqlMock;
+      apiGateway.getSQLServer().describeSqlParams = describeMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', token)
+        .send({ query, params: [{ name: 'min', value: '1 + 1', type: 'expr' }, { name: 'max', value: 10, type: 'number' }, { name: 'none', value: null, type: 'string' }, { name: 'empty', value: '', type: 'string' }] })
+        .responseType('text')
+        .expect(200);
+      expect(execSqlMock).toHaveBeenCalledWith(
+        query,
+        expect.anything(),
+        {},
+        undefined,
+        undefined,
+        undefined,
+        expect.any(String),
+        undefined,
+        [{ name: 'min', value: '1 + 1', type: 'expr' }, { name: 'max', value: 10, type: 'number' }, { name: 'none', value: null, type: 'string' }, { name: 'empty', value: '', type: 'string' }],
+      );
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', token)
+        .send({ query, params: { min: '1' } })
+        .expect(400);
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', token)
+        .send({ query, params: [{ name: 'min', value: 1, type: 'integer' }] })
+        .expect(400);
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', token)
+        .send({ query, params: [{ name: 'min', value: '1' }] })
+        .expect(400);
+
+      const res = await request(app)
+        .post('/cubejs-api/v1/cubesql/params')
+        .set('Content-type', 'application/json')
+        .set('Authorization', token)
+        .send({ query })
+        .expect(200);
+      expect(res.body).toEqual({ params: [{ name: 'min', type: 'number' }] });
+      expect(describeMock).toHaveBeenCalledWith(query, {});
+
+      describeMock.mockResolvedValueOnce({ error: 'Unable to parse' });
+      const bad = await request(app)
+        .post('/cubejs-api/v1/cubesql/params')
+        .set('Content-type', 'application/json')
+        .set('Authorization', token)
+        .send({ query: 'SELEC' })
+        .expect(400);
+      expect(bad.body.error).toBe('Unable to parse');
     });
 
     test('timezone can be passed', async () => {
@@ -1802,7 +2303,67 @@ describe('API Gateway', () => {
         'America/Los_Angeles',
         undefined,
         expect.any(String),
+        undefined,
+        undefined,
       );
+    });
+
+    test('responseFormat can be passed', async () => {
+      const { app, apiGateway } = await createApiGateway();
+
+      const execSqlMock = jest.fn(async (query, stream) => {
+        stream.write(`${JSON.stringify({
+          schema: [{ name: 'id', column_type: 'Int' }]
+        })}\n`);
+        stream.write(`${JSON.stringify({
+          data: [[1, 2, 3]]
+        })}\n`);
+        stream.end();
+      });
+
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 3',
+          responseFormat: 'columnar',
+        })
+        .responseType('text')
+        .expect(200);
+
+      expect(execSqlMock).toHaveBeenCalledWith(
+        'SELECT id FROM test LIMIT 3',
+        expect.anything(),
+        {},
+        undefined,
+        undefined,
+        undefined,
+        expect.any(String),
+        'columnar',
+        undefined,
+      );
+    });
+
+    test('an unsupported responseFormat is a 400', async () => {
+      const { app, apiGateway } = await createApiGateway();
+      const execSqlMock = jest.fn();
+      apiGateway.getSQLServer().execSql = execSqlMock;
+
+      const res = await request(app)
+        .post('/cubejs-api/v1/cubesql')
+        .set('Content-type', 'application/json')
+        .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+        .send({
+          query: 'SELECT id FROM test LIMIT 3',
+          responseFormat: 'compact',
+        })
+        .expect(400);
+
+      expect(res.body.error).toMatch(/Invalid query format.*responseFormat/);
+      expect(execSqlMock).not.toHaveBeenCalled();
     });
 
     test('throwContinueWait can be passed', async () => {
@@ -1839,6 +2400,8 @@ describe('API Gateway', () => {
         undefined,
         true,
         expect.any(String),
+        undefined,
+        undefined,
       );
     });
 
@@ -1876,6 +2439,8 @@ describe('API Gateway', () => {
         undefined,
         undefined,
         'test-request-id-12345',
+        undefined,
+        undefined,
       );
     });
 

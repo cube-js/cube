@@ -6,7 +6,7 @@ describe('YAMLCompiler', () => {
   jest.setTimeout(200000);
 
   it('simple', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: ActiveUsers
     sql: "SELECT 1 as user_id, '2022-01-01' as timestamp"
@@ -24,9 +24,9 @@ cubes:
         sql: "{CUBE}.timestamp"
         type: time
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['ActiveUsers.weeklyActive'],
       timeDimensions: [{
         dimension: 'ActiveUsers.time',
@@ -58,7 +58,7 @@ cubes:
   });
 
   it('simple with json/curly in sql', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: ActiveUsers
     sql: SELECT 1 as user_id, '2022-01-01'::TIMESTAMP as timestamp, CAST('\\{"key":"value"\\}'::JSON AS TEXT) AS json_col
@@ -71,9 +71,9 @@ cubes:
         sql: json_col
         type: string
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       dimensions: ['ActiveUsers.time', 'ActiveUsers.json_col'],
       timezone: 'UTC'
     });
@@ -92,7 +92,7 @@ cubes:
   });
 
   it('missed sql', async () => {
-    const { compiler } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: ActiveUsers
     sql: "SELECT 1 as user_id, '2022-01-01' as timestamp"
@@ -109,11 +109,11 @@ cubes:
       - name: time
         type: time
     `);
-    expect(() => compiler.compile()).rejects.toThrow(/sql.*is required/);
+    expect(() => compilers.compile()).rejects.toThrow(/sql.*is required/);
   });
 
   it('with filter', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: ActiveUsers
     sql: "SELECT 1 as user_id, '2022-01-01'::timestamptz as timestamp"
@@ -130,9 +130,9 @@ cubes:
         sql: "{CUBE}.timestamp"
         type: time
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['ActiveUsers.withFilter'],
       timeDimensions: [{
         dimension: 'ActiveUsers.time',
@@ -156,7 +156,7 @@ cubes:
   });
 
   it('member reference', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: ActiveUsers
     sql: "SELECT 1 as user_id, '2022-01-01' as timestamp"
@@ -177,9 +177,9 @@ cubes:
         sql: "{CUBE}.timestamp"
         type: time
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['ActiveUsers.weeklyActive'],
       timeDimensions: [{
         dimension: 'ActiveUsers.time',
@@ -211,7 +211,7 @@ cubes:
   });
 
   it('pre-aggregations', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: ActiveUsers
     sql: "SELECT 1 as user_id, '2022-01-01' as timestamp"
@@ -243,9 +243,9 @@ cubes:
               - weeklyActive
         granularity: day
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['ActiveUsers.weeklyActive'],
       timeDimensions: [{
         dimension: 'ActiveUsers.time',
@@ -278,7 +278,7 @@ cubes:
   });
 
   it('filter params', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: active_users
     sql: "SELECT * FROM (SELECT 1 as user_id, '2022-01-01'::timestamptz as \\"timestamp\\") t WHERE {FILTER_PARAMS.active_users.time.filter(\\"timestamp\\")} AND {FILTER_PARAMS.active_users.time.filter(lambda a,b : f'timestamp >= {a}::timestamptz AND timestamp <= {b}::timestamptz')}"
@@ -299,9 +299,9 @@ cubes:
         sql: "{CUBE}.timestamp"
         type: time
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['active_users.weekly_active'],
       timeDimensions: [{
         dimension: 'active_users.time',
@@ -334,7 +334,7 @@ cubes:
   });
 
   it('joins 1', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: orders
     sql: "SELECT *
@@ -436,9 +436,9 @@ views:
           - name: name
             alias: full_name
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['line_items_view.count'],
       dimensions: ['line_items_view.aliased_customers_full_name'],
       timeDimensions: [{
@@ -462,7 +462,7 @@ views:
   });
 
   it('extends', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: BaseUsers
     sql: "SELECT 1"
@@ -483,9 +483,9 @@ cubes:
           trailing: 7 day
           offset: start
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['ActiveUsers.weeklyActive'],
       timeDimensions: [{
         dimension: 'ActiveUsers.time',
@@ -517,7 +517,7 @@ cubes:
   });
 
   it('COMPILE_CONTEXT', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
     cubes:
       - name: orders
         sql: "SELECT 1 as id, 'completed' as status"
@@ -535,9 +535,9 @@ cubes:
       }
     });
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'orders.count'
       ],
@@ -553,7 +553,7 @@ cubes:
   });
 
   it('view join ambiguity', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+    const compilers = prepareYamlCompiler(`
 cubes:
   - name: W
     sql: |
@@ -657,9 +657,9 @@ views:
         prefix: true
         alias: w_z
     `);
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['m_view.count'],
       dimensions: ['m_view.w_z_country'],
       timezone: 'UTC',
@@ -677,7 +677,7 @@ views:
   });
 
   it('calling cube\'s sql() (yaml-yaml)', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(
+    const compilers = prepareYamlCompiler(
       `cubes:
   - name: simple_orders
     sql: >
@@ -729,9 +729,9 @@ views:
     `
     );
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['simple_orders_sql_ext.count'],
       timeDimensions: [{
         dimension: 'simple_orders_sql_ext.created_at',
@@ -759,7 +759,7 @@ views:
   });
 
   it('calling cube\'s sql() (yaml-js)', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareCompiler([
+    const compilers = prepareCompiler([
       {
         content: `
 cube('simple_orders', {
@@ -825,9 +825,9 @@ cube('simple_orders', {
       },
     ]);
 
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: ['simple_orders_sql_ext.count'],
       timeDimensions: [{
         dimension: 'simple_orders_sql_ext.created_at',

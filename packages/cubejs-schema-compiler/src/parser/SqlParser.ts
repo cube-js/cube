@@ -1,6 +1,9 @@
 /* eslint-disable no-underscore-dangle */
 import R from 'ramda';
-import { ErrorListener, CommonTokenStream, CharStream, RuleNode, ParseTree } from 'antlr4';
+import {
+  ErrorListener, CommonTokenStream, CharStream, RuleNode, ParseTree,
+  Recognizer, RecognitionException, DFA, ATNConfigSet,
+} from 'antlr4';
 
 import GenericSqlLexer from './GenericSqlLexer';
 import GenericSqlParser, {
@@ -61,9 +64,9 @@ export class SqlParser {
     this.ast = this.parse();
   }
 
-  protected static sqlUpperCase(sql) {
+  protected static sqlUpperCase(sql: string) {
     let result = '';
-    let openChar;
+    let openChar: string | null | undefined;
     let commentType: ('--' | '/*' | '') = '';
 
     for (let i = 0; i < sql.length; i++) {
@@ -127,22 +130,51 @@ export class SqlParser {
 
     const { errors } = this;
 
-    class ExprErrorListener implements ErrorListener<number> {
-      public syntaxError(recognizer, offendingSymbol, line, column, msg, err) {
+    class ExprErrorListener<TSymbol> implements ErrorListener<TSymbol> {
+      public syntaxError(
+        recognizer: Recognizer<TSymbol>,
+        offendingSymbol: TSymbol,
+        line: number,
+        column: number,
+        msg: string,
+        err: RecognitionException | undefined
+      ) {
         errors.push({
           msg, column, err, line, recognizer, offendingSymbol
         });
       }
 
-      public reportAmbiguity(recognizer, dfa, startIndex, stopIndex, exact, ambigAlts, configs) {
+      public reportAmbiguity(
+        recognizer: Recognizer<TSymbol>,
+        dfa: DFA,
+        startIndex: number,
+        stopIndex: number,
+        exact: boolean,
+        ambigAlts: unknown,
+        configs: ATNConfigSet
+      ) {
         // Optional: log ambiguity warnings if needed
       }
 
-      public reportAttemptingFullContext(recognizer, dfa, startIndex, stopIndex, conflictingAlts, configs) {
+      public reportAttemptingFullContext(
+        recognizer: Recognizer<TSymbol>,
+        dfa: DFA,
+        startIndex: number,
+        stopIndex: number,
+        conflictingAlts: unknown,
+        configs: ATNConfigSet
+      ) {
         // Optional: log full context attempts if needed
       }
 
-      public reportContextSensitivity(recognizer, dfa, startIndex, stopIndex, prediction, configs) {
+      public reportContextSensitivity(
+        recognizer: Recognizer<TSymbol>,
+        dfa: DFA,
+        startIndex: number,
+        stopIndex: number,
+        prediction: number,
+        configs: ATNConfigSet
+      ) {
         // Optional: log context sensitivity if needed
       }
     }
@@ -194,7 +226,7 @@ export class SqlParser {
     return result;
   }
 
-  public extractWhereConditions(tableAlias): string {
+  public extractWhereConditions(tableAlias: string): string {
     this.throwErrorsIfAny();
 
     let result = '';
@@ -203,7 +235,7 @@ export class SqlParser {
 
     let cursor = 0;
     let end = 0;
-    let originalAlias;
+    let originalAlias: string | undefined;
 
     const whereBuildingVisitor = nodeVisitor({
       visitNode(ctx) {

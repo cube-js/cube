@@ -12,7 +12,12 @@ impl FilterOperationSql for LikeOp {
                 let escaped = escape_char
                     .map(|character| escape_like_pattern(value, character))
                     .unwrap_or_else(|| value.clone());
-                ctx.allocate_and_cast_str(&escaped, &self.member_type)
+                // A pattern is a string even against a time member, so it is never parsed
+                if self.member_type.as_deref() == Some("time") {
+                    Ok(ctx.allocate_param(&escaped))
+                } else {
+                    ctx.allocate_and_cast_str(&escaped, &self.member_type)
+                }
             })
             .collect::<Result<Vec<_>, _>>()?;
 

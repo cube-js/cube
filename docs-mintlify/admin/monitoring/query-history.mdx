@@ -59,8 +59,8 @@ switching between the **API** and **Database** tabs.
 
 ### All queries and top queries
 
-Clicking **All Queries** will show all queries in order of recency,
-while **Top Queries** will show the queries with the largest total duration (hits * avg duration) in the selected time frame. Both results are limited to 100 unique queries. 
+Clicking **All queries** will show all queries in order of recency,
+while **Top queries** will show the queries with the largest total duration (hits * avg duration) in the selected time frame. Both results are limited to 100 unique queries. 
 
 <Frame>
   <img src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/" />
@@ -73,7 +73,23 @@ You can use filters to find queries by various criteria:
 - cache status,
 - whether the query was accelerated with pre-aggregations,
 - whether the query yielded an error,
-- API type.
+- API type,
+- source.
+
+The **Source** filter shows the product that sent the query:
+
+| Source | `request_source` | Queries |
+| --- | --- | --- |
+| Cube | `cube` | Workbooks, Explore, dashboards, and dashboard exports in the workspace |
+| Cube (SQL Runner) | `sql-runner` | [SQL Runner][ref-workspace-sqlrunner] |
+| Cube (Playground) | `playground` | [Playground][ref-playground] |
+| Embedding | `embedding` | [Embedded][ref-embedding] apps, both signed and private embedding |
+| Cube for Excel | `cube-excel-addin` | The [Cube for Excel][ref-excel] add-in |
+| Cube for Sheets | `cube-sheets-addon` | The [Cube for Sheets][ref-sheets] add-on |
+| AI agents | `ai-engineer` | Analytics Chat, the Chat API, Slack, the MCP server, and scheduled report deliveries |
+| Other | None, or your own value | All other queries, e.g., queries that your applications send with their own API tokens |
+
+The request details page also shows the source of the query.
 
 <Frame>
   <img src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/" />
@@ -159,7 +175,7 @@ accelerate similar queries in the future.
 
 ### Security context
 
-The **Security Context** tab shows the [security context][ref-security-context]
+The **Security context** tab shows the [security context][ref-security-context]
 that was used to process this query:
 
 <Frame>
@@ -170,7 +186,7 @@ This is helpful in case [multitenancy][ref-multitenancy] is configured.
 
 ### Queue graph
 
-The **Queue Graph** tab details any activity in the query queue while
+The **Queue graph** tab details any activity in the query queue while
 processing the query. This may include other queries that were being processed
 or were waiting in the queue by Cube Cloud at the same time as this query:
 
@@ -183,7 +199,7 @@ under-provisioned, and you may want to consider scaling up your deployment.
 
 ### Flame graph
 
-The **Flame Graph** tab shows a [flame graph][datadog-kb-flamegraph] of a
+The **Flame graph** tab shows a [flame graph][datadog-kb-flamegraph] of a
 query's execution time across resources in the Cube Cloud deployment. This is
 extremely useful for diagnosing where time is being spent in a query, and can
 help identify bottlenecks in your Cube deployment or data source.
@@ -239,3 +255,7 @@ while the query is in the query execution queue:
 [ref-multitenancy]: /embedding/multitenancy
 [ref-apis]: /reference
 [ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export
+[ref-embedding]: /embedding
+[ref-excel]: /docs/integrations/microsoft-excel
+[ref-sheets]: /docs/integrations/google-sheets
+[ref-playground]: /docs/explore-analyze/playground

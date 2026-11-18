@@ -109,7 +109,7 @@ fn main() {
         let services = config.cube_services().await;
 
         if enable_telemetry {
-            track_event("Cube Store Start".to_string(), HashMap::new()).await;
+            track_event("Cube Store Start".to_string(), HashMap::new());
         }
 
         stop_on_ctrl_c(&services).await;

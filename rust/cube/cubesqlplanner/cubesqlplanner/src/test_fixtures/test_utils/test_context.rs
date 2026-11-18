@@ -1,9 +1,11 @@
 use crate::cube_bridge::base_query_options::{BaseQueryOptions, FilterValue, MaskedMemberItem};
 use crate::cube_bridge::join_hints::JoinHintItem;
 use crate::cube_bridge::options_member::OptionsMember;
-use crate::logical_plan::PreAggregationUsage;
 #[cfg(feature = "integration-postgres")]
-use crate::logical_plan::{PreAggregation, PreAggregationSource, PreAggregationTable};
+use crate::logical_plan::{
+    CompiledPreAggregation, PreAggregation, PreAggregationFullName, PreAggregationsCompiler,
+};
+use crate::logical_plan::{PreAggregationSource, PreAggregationTable, PreAggregationUsage};
 use crate::physical_plan::filter::ToSql;
 use crate::physical_plan::sql_nodes::SqlNodesFactory;
 use crate::physical_plan::{SqlEvaluatorVisitor, VisitorContext};
@@ -12,8 +14,8 @@ use crate::planner::filter::Filter;
 use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::state::State;
 use crate::planner::top_level_planner::TopLevelPlanner;
-use crate::planner::{CubeId, MemberSymbol, TimeDimensionSymbol};
-use crate::planner::{GranularityHelper, QueryProperties, QueryPropertiesCompiler};
+use crate::planner::{CubeId, MemberSymbol, ModelContext, QueryModelContext, TimeDimensionSymbol};
+use crate::planner::{GranularityHelper, QueryProperties, QueryPropertiesCompiler, RequestOptions};
 use crate::test_fixtures::cube_bridge::yaml::YamlBaseQueryOptions;
 use crate::test_fixtures::cube_bridge::{
     members_from_strings, MockBaseQueryOptions, MockBaseTools, MockSchema, MockSecurityContext,
@@ -69,6 +71,7 @@ impl TestContext {
             true,
             self.should_reuse_params,
             None,
+            Self::default_request_options(),
         )
     }
 
@@ -97,6 +100,8 @@ impl TestContext {
             None,
             None,
             None,
+            QueryModelContext::new(Rc::new(ModelContext::new()), None, false),
+            Self::default_request_options(),
         )?;
 
         Ok(Self {
@@ -131,6 +136,16 @@ impl TestContext {
         )
     }
 
+    #[allow(dead_code)]
+    pub fn new_with_union_full_key_aggregate(schema: MockSchema) -> Result<Self, CubeError> {
+        use crate::test_fixtures::cube_bridge::MockSqlTemplatesRender;
+        Self::new_with_custom_templates(
+            schema,
+            MockSqlTemplatesRender::default_templates_with_union_full_key_aggregate(),
+            true,
+        )
+    }
+
     fn new_with_custom_templates(
         schema: MockSchema,
         sql_templates: crate::test_fixtures::cube_bridge::MockSqlTemplatesRender,
@@ -147,6 +162,7 @@ impl TestContext {
             false,
             should_reuse_params,
             None,
+            Self::default_request_options(),
         )
     }
 
@@ -176,6 +192,11 @@ impl TestContext {
         Self::new_with_options(schema, Tz::UTC, Some(masked_members), None, false, false)
     }
 
+    // Tests plan as a Cube Store that supports multi-stage unless a query says otherwise.
+    fn default_request_options() -> RequestOptions {
+        RequestOptions::default().with_cubestore_support_multistage(true)
+    }
+
     fn for_options(&self, options: &dyn BaseQueryOptions) -> Result<Self, CubeError> {
         let static_data = options.static_data();
         let timezone = static_data
@@ -197,6 +218,13 @@ impl TestContext {
             self.external_cubestore,
             self.should_reuse_params,
             static_data.max_member_resolution_depth,
+            {
+                let options = RequestOptions::from_static_data(static_data);
+                match static_data.cubestore_support_multistage {
+                    Some(_) => options,
+                    None => options.with_cubestore_support_multistage(true),
+                }
+            },
         )
     }
 
@@ -219,6 +247,7 @@ impl TestContext {
             false,
             true,
             None,
+            Self::default_request_options(),
         )
     }
 
@@ -234,6 +263,7 @@ impl TestContext {
         external_cubestore: bool,
         should_reuse_params: bool,
         max_member_resolution_depth: Option<usize>,
+        request_options: RequestOptions,
     ) -> Result<Self, CubeError> {
         use crate::test_fixtures::cube_bridge::MockDriverTools;
         let mut driver_tools = match custom_sql_templates.clone() {
@@ -273,6 +303,8 @@ impl TestContext {
             masked_members,
             member_to_alias,
             max_member_resolution_depth,
+            QueryModelContext::new(Rc::new(ModelContext::new()), None, false),
+            request_options,
         )?;
 
         Ok(Self {
@@ -350,8 +382,7 @@ impl TestContext {
         let granularity_obj = GranularityHelper::make_granularity_obj(
             self.query_tools.cube_evaluator().clone(),
             &mut compiler,
-            &base_symbol.cube_id(),
-            &base_symbol.name(),
+            &base_symbol,
             granularity.clone(),
         )?;
         Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
@@ -547,7 +578,9 @@ impl TestContext {
                 .total_query(yaml_options.total_query)
                 .cubestore_support_multistage(yaml_options.cubestore_support_multistage)
                 .multi_stage_leaf_merge(yaml_options.multi_stage_leaf_merge)
+                .multi_stage_scan_sharing(yaml_options.multi_stage_scan_sharing)
                 .cubestore_union_full_key_aggregate(yaml_options.cubestore_union_full_key_aggregate)
+                .union_full_key_aggregate(yaml_options.union_full_key_aggregate)
                 .max_multi_stage_depth(yaml_options.max_multi_stage_depth)
                 .max_multi_stage_stages(yaml_options.max_multi_stage_stages)
                 .max_member_resolution_depth(yaml_options.max_member_resolution_depth)
@@ -594,7 +627,7 @@ impl TestContext {
         let options = self.create_query_options_from_yaml(query);
         let ctx = self.for_options(options.as_ref())?;
         let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
-        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         let (raw_sql, usages) = planner.plan()?;
 
         let is_external = !usages.is_empty() && usages.iter().all(|u| u.pre_aggregation.external());
@@ -607,8 +640,9 @@ impl TestContext {
         &self,
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<String, CubeError> {
-        let request = QueryPropertiesCompiler::new(self.query_tools.clone()).build(options)?;
-        let planner = TopLevelPlanner::new(request, self.query_tools.clone(), true);
+        let ctx = self.for_options(options.as_ref())?;
+        let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         let (sql, _) = planner.plan()?;
         Ok(sql)
     }
@@ -626,9 +660,16 @@ impl TestContext {
         extra_segments: Vec<OptionsMember>,
     ) -> Result<(String, Vec<PreAggregationUsage>), cubenativeutils::CubeError> {
         let options = self.create_query_options_from_yaml_with_segments(query, extra_segments);
+        self.build_sql_with_used_pre_aggregations_from_options(options)
+    }
+
+    pub fn build_sql_with_used_pre_aggregations_from_options(
+        &self,
+        options: Rc<dyn BaseQueryOptions>,
+    ) -> Result<(String, Vec<PreAggregationUsage>), cubenativeutils::CubeError> {
         let ctx = self.for_options(options.as_ref())?;
         let request = QueryPropertiesCompiler::new(ctx.query_tools.clone()).build(options)?;
-        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         planner.plan()
     }
 
@@ -695,11 +736,12 @@ impl TestContext {
         let request = QueryPropertiesCompiler::new(ctx.query_tools.clone())
             .build(options)
             .expect("Failed to create query properties");
-        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         let (raw_sql, pre_aggregations) = planner.plan().expect("Failed to plan query");
 
+        // Rollups are built per query timezone, so grain columns hold local time.
         if !pre_aggregations.is_empty() {
-            self.create_pre_agg_tables(&client, &pre_aggregations).await;
+            ctx.create_pre_agg_tables(&client, &pre_aggregations).await;
         }
 
         let templates = ctx
@@ -711,6 +753,7 @@ impl TestContext {
             .build_sql_and_params(&raw_sql, &templates)
             .expect("Failed to build SQL and params");
 
+        Self::assert_pre_agg_tables_suffixed(&sql, &pre_aggregations);
         // Strip __usage_N suffixes from SQL, same as base_query.rs does for single usage
         let sql = pre_aggregations
             .iter()
@@ -780,6 +823,22 @@ impl TestContext {
                         Self::create_pg_pre_agg_table(client, &table_name, &inlined_sql).await;
                     }
                 }
+                // Each leg of a rollupJoin is a rollup of its own, stored with its own members.
+                PreAggregationSource::Join(_) => {
+                    for table in Self::collect_pre_agg_source_tables(pre_agg.source()) {
+                        let leg = self.compile_leg_rollup(&table);
+                        let yaml = Self::build_pre_agg_query_yaml_from_members(
+                            &leg.measures,
+                            &leg.dimensions,
+                            &leg.time_dimensions,
+                        );
+                        let inlined_sql = self.build_pre_agg_table_sql(&yaml);
+                        let name = table.alias.clone().unwrap_or_else(|| table.name.clone());
+                        let table_name =
+                            PlanSqlTemplates::alias_name(&format!("{}.{}", table.cube_name, name));
+                        Self::create_pg_pre_agg_table(client, &table_name, &inlined_sql).await;
+                    }
+                }
                 _ => {
                     let tables = Self::collect_pre_agg_source_tables(pre_agg.source());
                     // Dedup usages by (cube, name): the optimizer creates a separate
@@ -796,12 +855,27 @@ impl TestContext {
                             }
                         }
                     }
+                    // Each usage keeps only the time-dimension columns it reads.
+                    let mut union_time_dimensions: Vec<Rc<MemberSymbol>> = Vec::new();
+                    let mut seen_time_dimensions = std::collections::HashSet::new();
+                    for u in usages {
+                        for td in u.pre_aggregation.time_dimensions() {
+                            let key = match td.as_time_dimension() {
+                                Ok(t) => (t.base_symbol().full_name(), t.granularity().clone()),
+                                Err(_) => (td.full_name(), None),
+                            };
+                            if seen_time_dimensions.insert(key) {
+                                union_time_dimensions.push(td.clone());
+                            }
+                        }
+                    }
                     let build_range = self
                         .pre_agg_build_range(client, pre_agg.cube_name(), pre_agg.name())
                         .await;
                     let yaml = Self::build_pre_agg_query_yaml(
                         pre_agg,
                         &union_measures,
+                        &union_time_dimensions,
                         build_range.as_ref(),
                     );
                     let inlined_sql = self.build_pre_agg_table_sql(&yaml);
@@ -817,13 +891,36 @@ impl TestContext {
         }
     }
 
+    #[cfg(feature = "integration-postgres")]
+    fn compile_leg_rollup(&self, table: &PreAggregationTable) -> Rc<CompiledPreAggregation> {
+        let mut compiler = PreAggregationsCompiler::try_new(
+            self.query_tools.clone(),
+            &vec![CubeId::cube(&table.cube_name)],
+        )
+        .expect("Failed to create pre-aggregation compiler");
+        compiler
+            .compile_pre_aggregation(&PreAggregationFullName::new(
+                table.cube_name.clone(),
+                table.name.clone(),
+            ))
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failed to compile rollup {}.{}: {}",
+                    table.cube_name, table.name, e
+                )
+            })
+    }
+
     /// Builds SQL that materializes a pre-aggregation table from a
     /// `pre_aggregation_query: true` YAML (the rollup-defining SELECT), with
     /// parameters inlined so it can run as `CREATE TABLE ... AS (...)`.
     #[cfg(feature = "integration-postgres")]
     fn build_pre_agg_table_sql(&self, yaml: &str) -> String {
-        let pa_ctx = Self::new_with_options(self.schema.clone(), Tz::UTC, None, None, false, false)
-            .expect("Failed to create pre-agg context");
+        let timezone = self.query_tools.query_tools().timezone();
+        let pa_ctx =
+            Self::new_with_options(self.schema.clone(), timezone, None, None, false, false)
+                .expect("Failed to create pre-agg context");
+        let yaml = &format!("{yaml}timezone: {timezone}\n");
 
         // Planned and resolved in one context, so the params a build range
         // allocates are the ones its placeholders refer to.
@@ -856,8 +953,35 @@ impl TestContext {
             });
     }
 
-    #[cfg(feature = "integration-postgres")]
-    fn collect_pre_agg_source_tables(source: &PreAggregationSource) -> Vec<PreAggregationTable> {
+    /// Panics when a plan with several usages reads a pre-aggregation table under its bare
+    /// name: the orchestrator resolves only the `__usage_N` names of the usages it is given.
+    pub fn assert_pre_agg_tables_suffixed(sql: &str, usages: &[PreAggregationUsage]) {
+        if usages.len() < 2 {
+            return;
+        }
+        for usage in usages {
+            for table in Self::collect_pre_agg_source_tables(usage.pre_aggregation.source()) {
+                let name = table.alias.clone().unwrap_or_else(|| table.name.clone());
+                let table_name =
+                    PlanSqlTemplates::alias_name(&format!("{}.{}", table.cube_name, name));
+                let bare_reference = regex::Regex::new(&format!(
+                    r#"(FROM|JOIN)\s+"?{}"?([\s,)]|$)"#,
+                    regex::escape(&table_name)
+                ))
+                .expect("Failed to build table name regex");
+                assert!(
+                    !bare_reference.is_match(sql),
+                    "{} is read without a usage suffix, which the orchestrator never replaces:\n{}",
+                    table_name,
+                    sql
+                );
+            }
+        }
+    }
+
+    pub(crate) fn collect_pre_agg_source_tables(
+        source: &PreAggregationSource,
+    ) -> Vec<PreAggregationTable> {
         match source {
             PreAggregationSource::Single(table) => vec![table.clone()],
             PreAggregationSource::Join(join) => {
@@ -910,6 +1034,7 @@ impl TestContext {
     fn build_pre_agg_query_yaml(
         pre_agg: &PreAggregation,
         measures: &[String],
+        time_dimensions: &[Rc<MemberSymbol>],
         build_range: Option<&(String, String)>,
     ) -> String {
         let mut yaml = String::new();
@@ -922,17 +1047,11 @@ impl TestContext {
         }
 
         // Segments go into dimensions
-        // Segments in pre-aggregation are stored as MemberExpression with "expr:" prefix
         let dims: Vec<String> = pre_agg
             .dimensions()
             .iter()
             .map(|d| d.full_name())
-            .chain(pre_agg.segments().iter().map(|s| {
-                s.full_name()
-                    .strip_prefix("expr:")
-                    .unwrap_or(&s.full_name())
-                    .to_string()
-            }))
+            .chain(pre_agg.segments().iter().map(|s| s.full_name()))
             .collect();
         if !dims.is_empty() {
             yaml.push_str("dimensions:\n");
@@ -941,9 +1060,9 @@ impl TestContext {
             }
         }
 
-        if !pre_agg.time_dimensions().is_empty() {
+        if !time_dimensions.is_empty() {
             yaml.push_str("time_dimensions:\n");
-            for td in pre_agg.time_dimensions() {
+            for td in time_dimensions {
                 if let Ok(td_sym) = td.as_time_dimension() {
                     yaml.push_str(&format!(
                         "  - dimension: {}\n",
@@ -1014,12 +1133,74 @@ impl TestContext {
         yaml
     }
 
+    /// Runs a pre-aggregation build query for one partition, replacing the
+    /// partition range placeholders in the bound params only, as the orchestrator does.
+    #[cfg(feature = "integration-postgres")]
+    pub async fn try_execute_pg_partition(
+        &self,
+        query_yaml: &str,
+        seed_file: &str,
+        partition: (&str, &str),
+    ) -> Option<String> {
+        let client = super::pg_service::connect_and_seed(seed_file).await;
+        let (sql, params) = self
+            .build_sql_and_params(query_yaml)
+            .expect("Failed to build SQL and params");
+        let params = params
+            .into_iter()
+            .map(|param| match param.to_param_string().as_deref() {
+                Some("__FROM_PARTITION_RANGE") => FilterValue::Str(partition.0.to_string()),
+                Some("__TO_PARTITION_RANGE") => FilterValue::Str(partition.1.to_string()),
+                _ => param,
+            })
+            .collect::<Vec<_>>();
+        let final_sql = Self::inline_params(&sql, &params);
+
+        let messages = client.simple_query(&final_sql).await.unwrap_or_else(|e| {
+            panic!(
+                "SQL execution failed:\n{}\nParams: {:?}\n\nError: {:?}",
+                final_sql, params, e
+            )
+        });
+        Some(super::integration_context::format_simple_query_results(
+            &messages,
+        ))
+    }
+
+    #[cfg(not(feature = "integration-postgres"))]
+    pub async fn try_execute_pg_partition(
+        &self,
+        _query_yaml: &str,
+        _seed_file: &str,
+        _partition: (&str, &str),
+    ) -> Option<String> {
+        None
+    }
+
     #[cfg(not(feature = "integration-postgres"))]
     pub async fn try_execute_pg_from_options(
         &self,
         _options: Rc<dyn BaseQueryOptions>,
         _seed_file: &str,
     ) -> Option<String> {
+        None
+    }
+
+    /// Runs hand-written SQL over the seed, as an oracle for planned queries.
+    #[cfg(feature = "integration-postgres")]
+    pub async fn try_execute_raw_pg(&self, sql: &str, seed_file: &str) -> Option<String> {
+        let client = super::pg_service::connect_and_seed(seed_file).await;
+        let messages = client
+            .simple_query(sql)
+            .await
+            .unwrap_or_else(|e| panic!("SQL execution failed:\n{}\n\nError: {:?}", sql, e));
+        Some(super::integration_context::format_simple_query_results(
+            &messages,
+        ))
+    }
+
+    #[cfg(not(feature = "integration-postgres"))]
+    pub async fn try_execute_raw_pg(&self, _sql: &str, _seed_file: &str) -> Option<String> {
         None
     }
 
@@ -1042,7 +1223,7 @@ impl TestContext {
         let request = QueryPropertiesCompiler::new(ctx.query_tools.clone())
             .build(options)
             .expect("Failed to create query properties");
-        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone(), true);
+        let planner = TopLevelPlanner::new(request, ctx.query_tools.clone());
         let (raw_sql, pre_aggregations) = planner.plan().expect("Failed to plan query");
 
         assert!(
@@ -1056,10 +1237,10 @@ impl TestContext {
             "CubeStore execution requires all matched pre-aggregations to be external"
         );
 
-        self.create_pre_agg_tables(&client, &pre_aggregations).await;
+        ctx.create_pre_agg_tables(&client, &pre_aggregations).await;
 
         let (mut conn, cs_schema) = super::cubestore_service::connect_with_schema().await;
-        let table_names = self
+        let table_names = ctx
             .upload_pre_agg_tables_to_cubestore(&client, &mut conn, &cs_schema, &pre_aggregations)
             .await;
 
@@ -1072,6 +1253,7 @@ impl TestContext {
             .build_sql_and_params(&raw_sql, &templates)
             .expect("Failed to build SQL and params");
 
+        Self::assert_pre_agg_tables_suffixed(&sql, &pre_aggregations);
         let sql = pre_aggregations
             .iter()
             .fold(sql, |s, u| s.replace(&format!("__usage_{}", u.index), ""));

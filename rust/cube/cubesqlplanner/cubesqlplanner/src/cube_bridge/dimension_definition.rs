@@ -31,6 +31,8 @@ pub struct DimensionDefinitionStatic {
     pub values: Option<Vec<String>>,
     #[serde(rename = "primaryKey")]
     pub primary_key: Option<bool>,
+    #[serde(rename = "fieldType")]
+    pub field_type: Option<String>,
     /// Re-exported by a view from its `includes`, rather than declared by it.
     pub included: Option<bool>,
 }

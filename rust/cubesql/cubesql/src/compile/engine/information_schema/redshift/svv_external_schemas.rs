@@ -25,12 +25,12 @@ struct RedshiftSvvExternalSchemasBuilder {
 impl RedshiftSvvExternalSchemasBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            esoid: UInt32Builder::new(capacity),
-            eskind: Int16Builder::new(capacity),
-            schemaname: StringBuilder::new(capacity),
-            esowner: Int32Builder::new(capacity),
-            databasename: StringBuilder::new(capacity),
-            esoptions: StringBuilder::new(capacity),
+            esoid: UInt32Builder::with_capacity(capacity),
+            eskind: Int16Builder::with_capacity(capacity),
+            schemaname: StringBuilder::with_capacity(capacity, capacity),
+            esowner: Int32Builder::with_capacity(capacity),
+            databasename: StringBuilder::with_capacity(capacity, capacity),
+            esoptions: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 

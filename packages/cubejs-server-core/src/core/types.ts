@@ -69,6 +69,8 @@ export interface QueryInitedOptions {
 export interface AggsInitedOptions {
   queueOptions?: (dataSource: string) => Promise<QueueInitedOptions>;
   externalRefresh?: boolean;
+  maxPartitions?: number;
+  maxSourceRowLimit?: number;
 }
 
 export interface OrchestratorInitedOptions {
@@ -135,6 +137,7 @@ export type ContextToAppIdFn = (context: RequestContext) => string | Promise<str
 export type ContextToGroupsFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string | Promise<string>;
+export type ContextToPreAggregationOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 
@@ -170,16 +173,16 @@ Promise<DatabaseType>;
 export type DriverFactoryInternalFn = (context: DriverContext) =>
 Promise<BaseDriver | DriverConfig>;
 
-export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
+export type DialectFactoryFn = (context: DialectContext) => typeof BaseQuery;
 
-export type DialectClassFn = (options: { dataSource: string; dbType: string }) => BaseQuery;
+export type DialectClassFn = (options: { dataSource: string; dbType: string }) => typeof BaseQuery;
 
 // external
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
 export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
-export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
+export type ExternalDialectFactoryFn = (context: RequestContext) => typeof BaseQuery;
 
-export { LoggerFnParams, LoggerFn } from '@cubejs-backend/shared';
+export type { LoggerFnParams, LoggerFn } from '@cubejs-backend/shared';
 
 export type BiToolSyncConfig = {
   type: string;
@@ -205,6 +208,12 @@ export interface CreateOptions {
   contextToGroups?: ContextToGroupsFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
   contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;
+  /**
+   * Id the pre-aggregation queues of an orchestrator are keyed by. Defaults to
+   * `contextToOrchestratorId`, or to `contextToCubeStoreRouterId` when
+   * `CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER` is set.
+   */
+  contextToPreAggregationOrchestratorId?: ContextToPreAggregationOrchestratorIdFn;
   contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuth?: CheckAuthFn;
@@ -224,6 +233,7 @@ export interface CreateOptions {
   scheduledRefreshConcurrency?: number;
   scheduledRefreshBatchSize?: number;
   compilerCacheSize?: number;
+  maxCompiledMembers?: number;
   maxCompilerCacheKeepAlive?: number;
   updateCompilerCacheKeepAlive?: boolean;
   telemetry?: boolean;

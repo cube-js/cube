@@ -1,0 +1,54 @@
+# `or` and `and` nest filters inside filters (`Joi.link('...')`), so the nested ones are checked too.
+cubes:
+  - name: nested_filters
+    sql_table: orders
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+    access_policy:
+      - group: "*"
+        row_level:
+          filters:
+            - or:
+                - member: status
+                  operator: equals
+                  values: ["completed"]
+                - and:
+                    - member: status
+                      operator: notEquals
+                      values: ["shipped"]
+
+  - name: wrong_nested_operator
+    sql_table: orders
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+    access_policy:
+      - group: "*"
+        row_level:
+          filters:
+            - or:
+                - and:
+                    - member: status
+                      operator: no_such_operator
+                      values: ["shipped"]
+
+  - name: scalar_values
+    sql_table: orders
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+    access_policy:
+      - group: "*"
+        row_level:
+          filters:
+            - member: status
+              operator: equals
+              values: 1
+            - or:
+                - member: status
+                  operator: equals
+                  values: true

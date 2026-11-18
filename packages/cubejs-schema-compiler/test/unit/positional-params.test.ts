@@ -39,11 +39,11 @@ const model = [
   '});',
 ].join('\n');
 
-async function queryFor(QueryClass, useNativeSqlPlanner: boolean, options = {}) {
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model);
-  await compiler.compile();
+async function queryFor(QueryClass: typeof PostgresQuery | typeof BigqueryQuery, useNativeSqlPlanner: boolean, options = {}) {
+  const compilers = prepareJsCompiler(model);
+  await compilers.compile();
 
-  return new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
+  return compilers.createQuery(QueryClass, {
     measures: ['orders.count'],
     timezone: 'UTC',
     contextSymbols: {
@@ -67,11 +67,11 @@ describe('positional params', () => {
   // between placeholders; those rendering a bare placeholder are not, since the
   // placeholder then says nothing about which value it binds.
   it('never reuses params on dialects whose placeholder omits the param index', async () => {
-    const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(model);
-    await compiler.compile();
+    const compilers = prepareJsCompiler(model);
+    await compilers.compile();
 
     const reusingPositionalDialects = allDialects().filter(([, QueryClass]) => {
-      const query = new QueryClass({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(QueryClass, {
         measures: ['orders.count'],
         timezone: 'UTC',
       });

@@ -87,6 +87,7 @@ const schemaOptions = Joi.object().keys({
   contextToGroups: Joi.func(),
   contextToOrchestratorId: Joi.func(),
   contextToCubeStoreRouterId: Joi.func(),
+  contextToPreAggregationOrchestratorId: Joi.func(),
   contextToDataSourceId: Joi.func(),
   contextToApiScopes: Joi.func(),
   repositoryFactory: Joi.func(),
@@ -114,6 +115,7 @@ const schemaOptions = Joi.object().keys({
   scheduledRefreshBatchSize: Joi.number().min(1).integer(),
   // Compiler cache
   compilerCacheSize: Joi.number().min(1).integer(),
+  maxCompiledMembers: Joi.number().min(1).integer(),
   updateCompilerCacheKeepAlive: Joi.boolean(),
   maxCompilerCacheKeepAlive: Joi.number().min(0).integer(),
   telemetry: Joi.boolean(),

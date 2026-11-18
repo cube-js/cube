@@ -40,20 +40,20 @@ impl PgCatalogNamespaceBuilder {
         let capacity = 10;
 
         Self {
-            oid: UInt32Builder::new(capacity),
-            nspname: StringBuilder::new(capacity),
-            nspowner: UInt32Builder::new(capacity),
-            nspacl: ListBuilder::new(StringBuilder::new(capacity)),
-            xmin: UInt32Builder::new(capacity),
+            oid: UInt32Builder::with_capacity(capacity),
+            nspname: StringBuilder::with_capacity(capacity, capacity),
+            nspowner: UInt32Builder::with_capacity(capacity),
+            nspacl: ListBuilder::new(StringBuilder::with_capacity(capacity, capacity)),
+            xmin: UInt32Builder::with_capacity(capacity),
         }
     }
 
     fn add_namespace(&mut self, ns: &PgNamespace) {
-        self.oid.append_value(ns.oid).unwrap();
-        self.nspname.append_value(ns.nspname).unwrap();
-        self.nspowner.append_value(ns.nspowner).unwrap();
-        self.nspacl.append(false).unwrap();
-        self.xmin.append_value(1).unwrap();
+        self.oid.append_value(ns.oid);
+        self.nspname.append_value(ns.nspname);
+        self.nspowner.append_value(ns.nspowner);
+        self.nspacl.append(false);
+        self.xmin.append_value(1);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
@@ -115,7 +115,7 @@ impl TableProvider for PgCatalogNamespaceProvider {
             Field::new("nspowner", DataType::UInt32, false),
             Field::new(
                 "nspacl",
-                DataType::List(Box::new(Field::new("item", DataType::Utf8, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
             Field::new("xmin", DataType::UInt32, false),

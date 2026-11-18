@@ -50,28 +50,28 @@ impl InformationSchemaColumnsBuilder {
         let capacity = 10;
 
         Self {
-            catalog_names: StringBuilder::new(capacity),
-            schema_names: StringBuilder::new(capacity),
-            table_names: StringBuilder::new(capacity),
-            column_names: StringBuilder::new(capacity),
-            ordinal_positions: UInt32Builder::new(capacity),
-            column_default: StringBuilder::new(capacity),
-            is_nullable: StringBuilder::new(capacity),
-            data_type: StringBuilder::new(capacity),
-            char_max_length: UInt32Builder::new(capacity),
-            char_octet_length: UInt32Builder::new(capacity),
-            numeric_precision: UInt32Builder::new(capacity),
-            numeric_precision_radix: UInt32Builder::new(capacity),
-            numeric_scale: UInt32Builder::new(capacity),
-            datetime_precision: UInt32Builder::new(capacity),
-            domain_catalog: StringBuilder::new(capacity),
-            domain_schema: StringBuilder::new(capacity),
-            domain_name: StringBuilder::new(capacity),
-            udt_catalog: StringBuilder::new(capacity),
-            udt_schema: StringBuilder::new(capacity),
-            udt_name: StringBuilder::new(capacity),
-            dtd_identifier: StringBuilder::new(capacity),
-            is_updatable: StringBuilder::new(capacity),
+            catalog_names: StringBuilder::with_capacity(capacity, capacity),
+            schema_names: StringBuilder::with_capacity(capacity, capacity),
+            table_names: StringBuilder::with_capacity(capacity, capacity),
+            column_names: StringBuilder::with_capacity(capacity, capacity),
+            ordinal_positions: UInt32Builder::with_capacity(capacity),
+            column_default: StringBuilder::with_capacity(capacity, capacity),
+            is_nullable: StringBuilder::with_capacity(capacity, capacity),
+            data_type: StringBuilder::with_capacity(capacity, capacity),
+            char_max_length: UInt32Builder::with_capacity(capacity),
+            char_octet_length: UInt32Builder::with_capacity(capacity),
+            numeric_precision: UInt32Builder::with_capacity(capacity),
+            numeric_precision_radix: UInt32Builder::with_capacity(capacity),
+            numeric_scale: UInt32Builder::with_capacity(capacity),
+            datetime_precision: UInt32Builder::with_capacity(capacity),
+            domain_catalog: StringBuilder::with_capacity(capacity, capacity),
+            domain_schema: StringBuilder::with_capacity(capacity, capacity),
+            domain_name: StringBuilder::with_capacity(capacity, capacity),
+            udt_catalog: StringBuilder::with_capacity(capacity, capacity),
+            udt_schema: StringBuilder::with_capacity(capacity, capacity),
+            udt_name: StringBuilder::with_capacity(capacity, capacity),
+            dtd_identifier: StringBuilder::with_capacity(capacity, capacity),
+            is_updatable: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
@@ -83,64 +83,56 @@ impl InformationSchemaColumnsBuilder {
         column: &CubeColumn,
         ordinal_position: u32,
     ) {
-        self.catalog_names
-            .append_value(catalog_name.as_ref())
-            .unwrap();
-        self.schema_names
-            .append_value(schema_name.as_ref())
-            .unwrap();
-        self.table_names.append_value(table_name.as_ref()).unwrap();
-        self.column_names.append_value(column.get_name()).unwrap();
-        self.ordinal_positions
-            .append_value(ordinal_position)
-            .unwrap();
-        self.column_default.append_value("").unwrap();
-        self.is_nullable.append_value(column.is_nullable()).unwrap();
+        self.catalog_names.append_value(catalog_name.as_ref());
+        self.schema_names.append_value(schema_name.as_ref());
+        self.table_names.append_value(table_name.as_ref());
+        self.column_names.append_value(column.get_name());
+        self.ordinal_positions.append_value(ordinal_position);
+        self.column_default.append_value("");
+        self.is_nullable.append_value(column.is_nullable());
 
-        self.data_type.append_value(column.get_data_type()).unwrap();
+        self.data_type.append_value(column.get_data_type());
 
-        self.char_max_length.append_null().unwrap();
+        self.char_max_length.append_null();
 
         match column.char_octet_length() {
-            Some(value) => self.char_octet_length.append_value(value).unwrap(),
-            _ => self.char_octet_length.append_null().unwrap(),
+            Some(value) => self.char_octet_length.append_value(value),
+            _ => self.char_octet_length.append_null(),
         }
 
         match column.get_numeric_precision() {
-            Some(value) => self.numeric_precision.append_value(value).unwrap(),
-            _ => self.numeric_precision.append_null().unwrap(),
+            Some(value) => self.numeric_precision.append_value(value),
+            _ => self.numeric_precision.append_null(),
         }
 
         match column.numeric_precision_radix() {
-            Some(value) => self.numeric_precision_radix.append_value(value).unwrap(),
-            _ => self.numeric_precision_radix.append_null().unwrap(),
+            Some(value) => self.numeric_precision_radix.append_value(value),
+            _ => self.numeric_precision_radix.append_null(),
         }
 
         match column.numeric_scale() {
-            Some(value) => self.numeric_scale.append_value(value).unwrap(),
-            _ => self.numeric_scale.append_null().unwrap(),
+            Some(value) => self.numeric_scale.append_value(value),
+            _ => self.numeric_scale.append_null(),
         }
 
         match column.datetime_precision() {
-            Some(value) => self.datetime_precision.append_value(value).unwrap(),
-            _ => self.datetime_precision.append_null().unwrap(),
+            Some(value) => self.datetime_precision.append_value(value),
+            _ => self.datetime_precision.append_null(),
         }
 
-        self.domain_catalog.append_null().unwrap();
-        self.domain_schema.append_null().unwrap();
-        self.domain_name.append_null().unwrap();
+        self.domain_catalog.append_null();
+        self.domain_schema.append_null();
+        self.domain_name.append_null();
 
-        self.udt_catalog
-            .append_value(catalog_name.as_ref())
-            .unwrap();
-        self.udt_schema.append_value(column.udt_schema()).unwrap();
-        self.udt_name.append_value(column.get_udt_name()).unwrap();
+        self.udt_catalog.append_value(catalog_name.as_ref());
+        self.udt_schema.append_value(column.udt_schema());
+        self.udt_name.append_value(column.get_udt_name());
 
         // unsupported
-        self.dtd_identifier.append_value("0").unwrap();
+        self.dtd_identifier.append_value("0");
 
         // always YES for basic tables
-        self.is_updatable.append_value("YES").unwrap();
+        self.is_updatable.append_value("YES");
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

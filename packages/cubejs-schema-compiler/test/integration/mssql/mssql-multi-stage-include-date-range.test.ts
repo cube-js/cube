@@ -9,7 +9,7 @@ describe('MSSQL multi-stage filter include with a date range', () => {
   jest.setTimeout(200000);
 
   // Daily amounts: Jan 3 = 100, Jan 5 = 200, Jan 6 = 300, Jan 7 = 900.
-  const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
+  const compilers = prepareYamlCompiler(`
 cubes:
   - name: visitors
     sql: "select * from ##visitors"
@@ -43,8 +43,8 @@ cubes:
 `);
 
   const evaluate = async (measures: string[], dateRange: [string, string]) => {
-    await compiler.compile();
-    const query = new MssqlQuery({ joinGraph, cubeEvaluator, compiler }, {
+    await compilers.compile();
+    const query = compilers.createQuery(MssqlQuery, {
       measures,
       timeDimensions: [{ dimension: 'visitors.created_at', granularity: 'day', dateRange }],
       timezone: 'UTC',

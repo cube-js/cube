@@ -8,7 +8,13 @@ use std::path::Path;
 /// crate directory built outside the monorepo).
 fn main() {
     println!("cargo:rerun-if-changed=../../lerna.json");
-    let version = lerna_version().unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
+    let version = lerna_version().unwrap_or_else(|| {
+        println!(
+            "cargo:warning=could not read the version from ../../lerna.json; \
+             this build reports the Cargo.toml placeholder version"
+        );
+        env!("CARGO_PKG_VERSION").to_string()
+    });
     println!("cargo:rustc-env=CUBE_CLI_VERSION={version}");
 }
 

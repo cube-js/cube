@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/calendar.rs
+expression: result
+---
+calendar_orders_view__custom_calendar_retail_date_year | calendar_orders_view__count
+-------------------------------------------------------+----------------------------
+2024-02-04                                             | 39                         
+2025-02-02                                             | 37                         
+NULL                                                   | 4

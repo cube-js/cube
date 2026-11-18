@@ -1,5 +1,7 @@
 /* eslint-disable no-underscore-dangle,camelcase */
-import { ErrorListener, CommonTokenStream, CharStream, RuleNode } from 'antlr4';
+import {
+  ErrorListener, CommonTokenStream, CharStream, RuleNode, Recognizer, RecognitionException, DFA, ATNConfigSet,
+} from 'antlr4';
 import * as t from '@babel/types';
 
 import Python3Lexer from './Python3Lexer';
@@ -145,22 +147,51 @@ export class PythonParser {
 
     const { errors } = this;
 
-    class ExprErrorListener implements ErrorListener<number> {
-      public syntaxError(recognizer, offendingSymbol, line, column, msg, err) {
+    class ExprErrorListener<TSymbol> implements ErrorListener<TSymbol> {
+      public syntaxError(
+        recognizer: Recognizer<TSymbol>,
+        offendingSymbol: TSymbol,
+        line: number,
+        column: number,
+        msg: string,
+        err: RecognitionException | undefined
+      ) {
         errors.push({
           msg, column, err, line, recognizer, offendingSymbol
         });
       }
 
-      public reportAmbiguity(recognizer, dfa, startIndex, stopIndex, exact, ambigAlts, configs) {
+      public reportAmbiguity(
+        recognizer: Recognizer<TSymbol>,
+        dfa: DFA,
+        startIndex: number,
+        stopIndex: number,
+        exact: boolean,
+        ambigAlts: unknown,
+        configs: ATNConfigSet
+      ) {
         // Optional: log ambiguity warnings if needed
       }
 
-      public reportAttemptingFullContext(recognizer, dfa, startIndex, stopIndex, conflictingAlts, configs) {
+      public reportAttemptingFullContext(
+        recognizer: Recognizer<TSymbol>,
+        dfa: DFA,
+        startIndex: number,
+        stopIndex: number,
+        conflictingAlts: unknown,
+        configs: ATNConfigSet
+      ) {
         // Optional: log full context attempts if needed
       }
 
-      public reportContextSensitivity(recognizer, dfa, startIndex, stopIndex, prediction, configs) {
+      public reportContextSensitivity(
+        recognizer: Recognizer<TSymbol>,
+        dfa: DFA,
+        startIndex: number,
+        stopIndex: number,
+        prediction: number,
+        configs: ATNConfigSet
+      ) {
         // Optional: log context sensitivity if needed
       }
     }

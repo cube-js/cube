@@ -59,17 +59,6 @@ impl MemberId {
         }
     }
 
-    /// The plain member an expression is named after, as a compiled segment
-    /// is named after its segment.
-    pub fn named_member(&self) -> Option<MemberId> {
-        match &self.0.kind {
-            MemberIdKind::Expression { cube, name } => {
-                Some(MemberId::member(cube.clone(), name.clone()))
-            }
-            _ => None,
-        }
-    }
-
     /// Path of the member in the data model, for cube evaluator calls.
     pub fn target_path(&self) -> String {
         match &self.0.kind {

@@ -81,7 +81,7 @@ See [multitenancy][ref-multitenancy] for details.
 
 </Warning>
 
-Called on each request.
+Called once per request.
 
 <CodeGroup>
 
@@ -247,6 +247,36 @@ environment variable, and takes precedence over it. Note that the environment
 variable also sizes the SQL API's compiler cache, which this option does not
 affect.
 
+### `max_compiled_members`
+
+Maximum number of compiled members — measures, dimensions and segments across
+every cube and view — to keep in the compiler cache. Least recently used data
+models are dropped until the total fits; the model that was just compiled, and
+the last one left in the cache, are never dropped.
+Bounds the same cache as [`compiler_cache_size`](#compiler_cache_size) by size
+rather than by count, and whichever limit is reached first evicts. Unset by
+default, leaving only the count bound. The SQL API's own compiler cache is not
+covered.
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+config.max_compiled_members = 20000
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  maxCompiledMembers: 20000
+}
+```
+
+</CodeGroup>
+
+This configuration option can also be set using the [`CUBEJS_MAX_COMPILED_MEMBERS`](/reference/configuration/environment-variables#cubejs_max_compiled_members)
+environment variable, and takes precedence over it.
+
 ### `max_compiler_cache_keep_alive`
 
 Maximum length of time in ms to keep compiled data models in memory. Default
@@ -362,7 +392,7 @@ your pre-aggregations.
 
 </Warning>
 
-Called on each request.
+Called once per request.
 
 <CodeGroup>
 
@@ -411,7 +441,7 @@ is not set, and all requests use the same Cube Store router.
 
 </Warning>
 
-Called on each request.
+Called once per request.
 
 <CodeGroup>
 
@@ -467,6 +497,51 @@ The example maps tenants onto a fixed set of router ids. In Cube, multiple Cube
 Store routers are available on Multi-cluster deployments with
 [Multi-router Cube Store][ref-multi-router-cube-store] enabled, and the number
 of distinct ids should stay at or below **Number of clusters**.
+
+### `context_to_pre_aggregation_orchestrator_id`
+
+`context_to_pre_aggregation_orchestrator_id` is a function used to determine the
+id that keys an orchestrator's pre-aggregation build queues. Orchestrators that
+resolve to the same id share those queues, so any of them can run a
+pre-aggregation build that another one queued, and they share its concurrency.
+
+When this function is not set, the id comes from
+[`context_to_orchestrator_id`][self-orchestrator-id], and each orchestrator has
+its own queues. If
+[`CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER`](/reference/configuration/environment-variables#cubejs_pre_aggregations_orchestrator_id_from_router)
+is `true`, the id comes from
+[`context_to_cube_store_router_id`](#context_to_cube_store_router_id) instead,
+when that function is set.
+
+<Warning>
+
+A build runs with the [`driver_factory`](#driver_factory) of the orchestrator
+that picks it up. Return the same id only for orchestrators that build
+pre-aggregations from the same data sources.
+
+</Warning>
+
+Called once per orchestrator, when it is created.
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+@config('context_to_pre_aggregation_orchestrator_id')
+def context_to_pre_aggregation_orchestrator_id(ctx: dict) -> str:
+  return f"CUBE_REGION_{ctx['securityContext']['region']}"
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  contextToPreAggregationOrchestratorId: ({ securityContext }) => {
+    return `CUBE_REGION_${securityContext.region}`
+  }
+}
+```
+
+</CodeGroup>
 
 ### `driver_factory`
 
@@ -682,8 +757,11 @@ and `prod_pre_aggregations` in production.
 
 <Info>
 
-In Cube Cloud, all [environments][ref-environments] share the same pre-aggregations schema name by default.
-This allows reusing pre-aggregations across environments, saving both time and cost.
+In the Cube cloud platform, all [environments][ref-environments] of a deployment
+share the same pre-aggregations schema and Cube Store. This allows reusing
+pre-aggregations across environments, saving both time and cost. See [Deployment
+environments → Pre-aggregations][ref-environments-preaggs] for what to expect
+when a branch changes a pre-aggregation.
 
 </Info>
 
@@ -692,8 +770,9 @@ environment variable.
 
 <Warning>
 
-It's **strongly** recommended to use different pre-aggregation schemas in
-development and production environments to avoid pre-aggregation table clashes.
+In Cube Core, it's **strongly** recommended to use different pre-aggregation
+schemas in development and production environments to avoid pre-aggregation
+table clashes.
 
 </Warning>
 
@@ -1359,6 +1438,7 @@ For example, you can use `check_sql_auth` to validate username and password.
 `check_sql_auth` should always return `password` as it used for validation of password provided by user.
 If clear text password can't be obtained, best practice is to return `password` provided as an argument after password validation.
 Only security context is used for change user and re-authentication flows so returned `password` isn't checked in this case.
+`check_sql_auth` can also return `superuser: true` to let the user switch to any other user and see details of all sessions in system views such as `pg_stat_activity`.
 
 <CodeGroup>
 
@@ -1633,3 +1713,4 @@ module.exports = {
 [ref-dap-roles]: /docs/data-modeling/data-access-policies#data-access-roles
 [ref-auth-integration]: /docs/data-modeling/access-control#authentication-integration
 [ref-environments]: /admin/deployment/environments
+[ref-environments-preaggs]: /admin/deployment/environments#pre-aggregations

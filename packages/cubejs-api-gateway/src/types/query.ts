@@ -167,7 +167,7 @@ interface NormalizedQuery extends Query {
   maskedMembers?: { member: string; filter?: any }[];
 }
 
-export {
+export type {
   QueryFilter,
   LogicalAndFilter,
   LogicalOrFilter,

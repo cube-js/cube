@@ -23,7 +23,7 @@ describe('Extensions', () => {
   //   user 1 purchases, user 4 does not.
   //
   // Expected conversions per step: View=4, Cart=2, Purchase=1.
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     const Funnels = require('Funnels');
 
     cube('Funnel', {
@@ -56,11 +56,8 @@ describe('Extensions', () => {
   `, { allowNodeRequire: true });
 
   async function runQueryTest(q: any, expectedResult: any) {
-    await compiler.compile();
-    const query = new PostgresQuery(
-      { joinGraph, cubeEvaluator, compiler },
-      { ...q, timezone: 'UTC', preAggregationsSchema: '' }
-    );
+    await compilers.compile();
+    const query = compilers.createQuery(PostgresQuery, { ...q, timezone: 'UTC', preAggregationsSchema: '' });
 
     const qp = query.buildSqlAndParams();
     console.log(qp);

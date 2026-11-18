@@ -41,9 +41,10 @@ impl ToSql for BaseSegment {
 
         let sql = visitor.apply(&self.member_evaluator(), node_processor, templates)?;
         if filters_ctx.reading_pre_aggregation {
-            // The segment is a stored pre-aggregation column; compare it to its
-            // truthy value so dialects without a bare-boolean predicate work.
-            templates.wrap_segment_filter(sql)
+            // The segment is a stored pre-aggregation column, or an expression over
+            // them; compare it to its truthy value so dialects without a bare-boolean
+            // predicate work. Parenthesized, as `x LIKE y = 1` binds `y = 1` first.
+            templates.wrap_segment_filter(format!("({sql})"))
         } else {
             Ok(sql)
         }

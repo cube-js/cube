@@ -3,7 +3,7 @@ import { PostgresQuery } from '../../src/adapter/PostgresQuery';
 import { prepareJsCompiler } from './PrepareCompiler';
 
 describe('PostgresQuery', () => {
-  const { compiler, joinGraph, cubeEvaluator } = prepareJsCompiler(`
+  const compilers = prepareJsCompiler(`
     cube(\`visitors\`, {
       sql: \`
       select * from visitors
@@ -104,7 +104,7 @@ describe('PostgresQuery', () => {
     `);
 
   it('test equal filters', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
     const filterValuesVariants = [
       [[true], 'WHERE ("visitors".name = $1)'],
@@ -114,7 +114,7 @@ describe('PostgresQuery', () => {
     ];
 
     for (const [values, expected] of filterValuesVariants) {
-      const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      const query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],
@@ -133,9 +133,9 @@ describe('PostgresQuery', () => {
   });
 
   it('test compound time dimension with custom granularity', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       dimensions: [
         'visitors.fiscalCreatedAtLabel'
       ],
@@ -148,9 +148,9 @@ describe('PostgresQuery', () => {
 
   describe('order by clause', () => {
     it('multi granularity ordered by min granularity (auto)', async () => {
-      await compiler.compile();
+      await compilers.compile();
 
-      let query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      let query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],
@@ -179,7 +179,7 @@ describe('PostgresQuery', () => {
       let queryAndParams = query.buildSqlAndParams();
       expect(queryAndParams[0]).toContain('ORDER BY  1  ASC,  2  ASC,  3  ASC');
 
-      query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],
@@ -206,7 +206,7 @@ describe('PostgresQuery', () => {
       queryAndParams = query.buildSqlAndParams();
       expect(queryAndParams[0]).toContain('ORDER BY  1  ASC,  2  ASC,  3  ASC');
 
-      query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],
@@ -231,9 +231,9 @@ describe('PostgresQuery', () => {
     });
 
     it('multi granularity ordered by specified granularity', async () => {
-      await compiler.compile();
+      await compilers.compile();
 
-      let query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      let query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],
@@ -256,7 +256,7 @@ describe('PostgresQuery', () => {
       let queryAndParams = query.buildSqlAndParams();
       expect(queryAndParams[0]).toMatch(/ORDER BY\s+2\s+ASC/);
 
-      query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],
@@ -279,7 +279,7 @@ describe('PostgresQuery', () => {
       queryAndParams = query.buildSqlAndParams();
       expect(queryAndParams[0]).toMatch(/ORDER BY\s+1\s+ASC/);
 
-      query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],
@@ -302,7 +302,7 @@ describe('PostgresQuery', () => {
       queryAndParams = query.buildSqlAndParams();
       expect(queryAndParams[0]).toMatch(/ORDER BY\s+2\s+ASC/);
 
-      query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      query = compilers.createQuery(PostgresQuery, {
         measures: [
           'visitors.count'
         ],
@@ -332,9 +332,9 @@ describe('PostgresQuery', () => {
   });
 
   it('handles time dimension without granularity in filter', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.count'
       ],
@@ -357,9 +357,9 @@ describe('PostgresQuery', () => {
   });
 
   it('handles time dimension with granularity in SELECT and GROUP BY', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.count'
       ],
@@ -385,9 +385,9 @@ describe('PostgresQuery', () => {
   });
 
   it('pushes down rowLimit: 0 as LIMIT 0', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.count'
       ],
@@ -403,9 +403,9 @@ describe('PostgresQuery', () => {
   });
 
   it('uses AS keyword in subquery aliases (regression test)', async () => {
-    await compiler.compile();
+    await compilers.compile();
 
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+    const query = compilers.createQuery(PostgresQuery, {
       measures: [
         'visitors.count',
         'visitors.unboundedCount'

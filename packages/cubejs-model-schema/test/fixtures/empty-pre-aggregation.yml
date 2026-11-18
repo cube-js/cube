@@ -1,0 +1,17 @@
+# Core sets no default `type` on a pre-aggregation with nothing but a name, and rejects it.
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: empty
+
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+    pre_aggregations:
+      - name: empty

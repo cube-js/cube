@@ -50,12 +50,17 @@ Configuring Kerberos authentication includes the following steps:
 * [Generate and upload the keytab](#generating-and-uploading-the-keytab).
 * [Set the XMLA service account](#setting-the-xmla-service-account).
 
+On Microsoft Entra Domain Services, you can run these steps from PowerShell instead: see
+[Setting up with Microsoft Entra Domain Services](#setting-up-with-microsoft-entra-domain-services).
+
 ### Obtaining a Windows machine
 
 To perform the next steps, you need a Windows Server virtual machine:
 
-* It should be joined to the same domain as the organization’s users.
-* It should have the [RSAT][link-rsat] feature enabled.
+* It should be joined to the same domain as the organization’s users. `setspn` and
+`ktpass` write to the domain, so they only work on a domain-joined machine.
+* It should have the [RSAT][link-rsat] feature enabled. `ktpass` comes with the Windows
+Server AD DS tools; Windows 10 with RSAT doesn't include it.
 * It should be able to reach the [Key Distribution Center][link-kdc] (KDC). For example,
 on Azure, this virtual machine can be created in the `aadds-vnet` subnet.
 
@@ -79,7 +84,9 @@ Create two separate accounts in your directory:
 * A **keytab account** (e.g., `mdax-api-svc-account`) that the SPNs are registered on
 and the keytab is generated for. Running `ktpass` rewrites this account's user principal
 name to the SPN format — this is expected, but it means the account can no longer sign
-in as a regular user, so don't use it for anything else.
+in as a regular user, so don't use it for anything else. `ktpass` also resets the
+account's password, which invalidates any keytab generated for it earlier, so use a
+separate keytab account for each deployment.
 * An **XMLA service account** (e.g., `cube-pbi-svc-account`) that clients — for example,
 the Power BI [on-premises data gateway][link-power-bi-opdg] — use to connect to Cube.
 
@@ -130,11 +137,11 @@ second SPN must be registered again.
 The [keytab][link-keytab-file] file contains information needed to decrypt the Kerberos
 token.
 
-First, use the [`ktpass` command][link-ktpass] to generate the keytab file. You will be
-prompted to enter the password for the specified user:
+First, use the [`ktpass` command][link-ktpass] to generate the keytab file. It sets a new
+password on the keytab account, which you will be prompted to enter:
 
 ```bash
-ktpass /out kerberos.keytab /princ HTTP/redundant-brohman.gcp-us-central1.cubecloudapp.dev@CUBE.DEV /mapuser mdax-api-svc-account /crypto All /ptype KRB5_NT_PRINCIPAL /pass *
+ktpass /out kerberos.keytab /princ HTTP/redundant-brohman.gcp-us-central1.cubecloudapp.dev@CUBE.DEV /mapuser CUBE\mdax-api-svc-account /crypto All /ptype KRB5_NT_PRINCIPAL /pass *
 ```
 
 Then, upload the `.keytab` file on the **Settings → Power BI** page. It is stored
@@ -158,6 +165,151 @@ like `CUBE\cube-pbi-svc-account` will not match.
 
 Once the deployment is ready, you can test the Kerberos authentication by connecting
 to the DAX API from Power BI.
+
+## Setting up with Microsoft Entra Domain Services
+
+If your users are in Microsoft Entra ID and you don't run an on-premises Active Directory,
+host the domain in [Microsoft Entra Domain Services][link-entra-ds] and run the
+[configuration](#configuration) steps from PowerShell. The [Cube CLI][ref-cli] uploads the
+keytab straight from that machine, so you don't have to copy it anywhere.
+
+You need:
+
+* A Windows Server machine [joined to the managed domain](#obtaining-a-windows-machine).
+* A Cube [API key][ref-api-keys] scoped to the deployment.
+
+Sign in to the machine and open PowerShell as Administrator. Run all steps in the same
+window, since later steps use variables set by earlier ones.
+
+<Steps>
+
+<Step title="Load the Active Directory tools">
+
+```powershell
+Install-WindowsFeature RSAT-AD-PowerShell, RSAT-ADDS-Tools | Out-Null
+Import-Module ActiveDirectory
+$Domain = Get-ADDomain
+$Realm  = $Domain.DNSRoot.ToUpper()
+"Realm: $Realm  NetBIOS: $($Domain.NetBIOSName)"
+```
+
+</Step>
+
+<Step title="Get the deployment's domain">
+
+[Install the Cube CLI][ref-cli-install] and [authenticate][ref-cli-auth] with the API key.
+The key is read with masked input and kept only in this PowerShell session:
+
+```powershell
+irm https://raw.githubusercontent.com/cube-js/cube/master/install-cli.ps1 | iex
+$env:Path = "$env:LOCALAPPDATA\cube\bin;$env:Path"
+$env:CUBE_API_URL = "https://TENANT.cubecloud.dev"
+$env:CUBE_API_KEY = [Net.NetworkCredential]::new("", (Read-Host "Cube API key" -AsSecureString)).Password
+cube deployments list
+```
+
+<Info>
+
+If `cube deployments list` prints nothing, the CLI is missing the Visual C++ runtime, which
+older Cube CLI releases need on Windows Server. Install it, then run `cube deployments list`
+again:
+
+```powershell
+Invoke-WebRequest https://aka.ms/vs/17/release/vc_redist.x64.exe -OutFile "$env:TEMP\vc_redist.x64.exe"
+Start-Process "$env:TEMP\vc_redist.x64.exe" -ArgumentList "/install","/quiet","/norestart" -Wait
+```
+
+</Info>
+
+Set your deployment's ID from the list and read its domain:
+
+```powershell
+$DeploymentId = 123
+$Deployment = cube deployments settings $DeploymentId --json | ConvertFrom-Json
+$CubeHost   = if ($Deployment.customDomain) { $Deployment.customDomain } else { $Deployment.autoDomain }
+if (-not $CubeHost) { throw "Couldn't read the deployment's domain. Check that 'cube --version' works and the API key is valid." }
+$Spn        = "HTTP/$CubeHost"
+"SPN: $Spn"
+```
+
+</Step>
+
+<Step title="Create the keytab account">
+
+Create the [keytab account](#creating-the-service-accounts) in a custom OU: accounts synced
+from Microsoft Entra ID are read-only in the managed domain.
+
+```powershell
+$KeytabAccount = "cube-keytab-$DeploymentId"   # up to 20 characters
+$OuName        = "CubeServiceAccounts"
+$OuPath        = "OU=$OuName,$($Domain.DistinguishedName)"
+if (-not (Get-ADOrganizationalUnit -Filter "Name -eq '$OuName'")) {
+    New-ADOrganizationalUnit -Name $OuName -Path $Domain.DistinguishedName
+}
+New-ADUser -Name $KeytabAccount -SamAccountName $KeytabAccount -Path $OuPath `
+    -Description "Kerberos keytab account for Cube ($CubeHost)" `
+    -AccountPassword (ConvertTo-SecureString "$(New-Guid)Aa1!" -AsPlainText -Force) `
+    -Enabled $true -PasswordNeverExpires $true -CannotChangePassword $true `
+    -KerberosEncryptionType AES128, AES256
+```
+
+`-KerberosEncryptionType` limits the account to AES, which also works when RC4 is disabled
+in the managed domain's security settings.
+
+</Step>
+
+<Step title="Register the SPN">
+
+```powershell
+setspn -S $Spn "$($Domain.NetBIOSName)\$KeytabAccount"
+```
+
+On AWS, also register the [load balancer SPN](#load-balancer-spn-on-aws).
+
+</Step>
+
+<Step title="Generate the keytab">
+
+`/pass +rndPass` sets a random password on the account, so nobody needs to know it:
+
+```powershell
+$Keytab = "$env:USERPROFILE\kerberos.keytab"
+ktpass /out $Keytab /princ "$Spn@$Realm" /mapuser "$($Domain.NetBIOSName)\$KeytabAccount" /crypto All /ptype KRB5_NT_PRINCIPAL /pass +rndPass
+```
+
+The output includes the keys in hex, so don't share it. To check the result, confirm that
+the account's key version matches the `vno` in the `ktpass` output and that the ticket
+listed for the SPN uses `AES-256-CTS-HMAC-SHA1-96`:
+
+```powershell
+Get-ADUser $KeytabAccount -Properties msDS-KeyVersionNumber | Format-List msDS-KeyVersionNumber
+klist get $Spn
+```
+
+</Step>
+
+<Step title="Upload the keytab">
+
+This is the same as uploading the file on the **Settings → Power BI** page. Setting the
+variable restarts the deployment.
+
+```powershell
+$KeytabB64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($Keytab))
+cube variables set $DeploymentId "CUBE_XMLA_KRB5_KEYTAB_B64=$KeytabB64"
+Remove-Item $Keytab
+```
+
+Revoke the API key once you've finished testing.
+
+</Step>
+
+</Steps>
+
+Then create the [XMLA service account](#creating-the-service-accounts) in the same OU, or
+use a synced Entra user, [set it](#setting-the-xmla-service-account), and connect from
+Power BI Desktop on a machine joined to the managed domain. Cloud-only users, including a
+synced XMLA service account, can only get Kerberos tickets after they've changed their
+password since Entra Domain Services was enabled.
 
 ## Provisioning users with SCIM
 
@@ -239,7 +391,10 @@ account’s UPN, so it can no longer sign in. Connect with a
 
 Cube always offers `Negotiate`, `NTLM`, and `Basic` authentication on the XMLA endpoints;
 the NTLM fallback can’t be disabled. Check the deployment logs to see which method a
-connection actually used: `method=kerberos` vs. `method=ntlm`.
+connection actually used: `method=kerberos` vs. `method=ntlm`. These lines are only logged
+when [`CUBEJS_LOG_LEVEL`][ref-log-level] is `trace`. Set it while testing, e.g., with
+`cube variables set <DEPLOYMENT_ID> CUBEJS_LOG_LEVEL=trace`, then set it back to `warn`:
+`trace` makes the logs very noisy.
 
 
 [link-rsat]: https://learn.microsoft.com/en-us/troubleshoot/windows-server/system-management-components/remote-server-administration-tools
@@ -255,3 +410,9 @@ connection actually used: `method=kerberos` vs. `method=ntlm`.
 [ref-ntlm]: /reference/core-data-apis/dax-api/ntlm
 [link-power-bi-opdg]: https://learn.microsoft.com/en-us/power-bi/connect-data/service-gateway-onprem
 [ref-scim]: /admin/sso/microsoft-entra-id/scim
+[link-entra-ds]: https://learn.microsoft.com/en-us/entra/identity/domain-services/overview
+[ref-cli]: /reference/cli
+[ref-cli-install]: /reference/cli#installation
+[ref-cli-auth]: /reference/cli#authentication
+[ref-api-keys]: /admin/account-billing/api-keys
+[ref-log-level]: /reference/configuration/environment-variables#cubejs_log_level

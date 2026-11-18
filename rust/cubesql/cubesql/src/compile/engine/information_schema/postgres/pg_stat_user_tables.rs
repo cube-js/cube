@@ -46,56 +46,56 @@ struct PgCatalogStatUserTablesBuilder {
 impl PgCatalogStatUserTablesBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            relid: UInt32Builder::new(capacity),
-            schemaname: StringBuilder::new(capacity),
-            relname: StringBuilder::new(capacity),
-            seq_scan: Int64Builder::new(capacity),
-            seq_tup_read: Int64Builder::new(capacity),
-            idx_scan: Int64Builder::new(capacity),
-            idx_tup_fetch: Int64Builder::new(capacity),
-            n_tup_ins: Int64Builder::new(capacity),
-            n_tup_upd: Int64Builder::new(capacity),
-            n_tup_del: Int64Builder::new(capacity),
-            n_tup_hot_upd: Int64Builder::new(capacity),
-            n_live_tup: Int64Builder::new(capacity),
-            n_dead_tup: Int64Builder::new(capacity),
-            n_mod_since_analyze: Int64Builder::new(capacity),
-            n_ins_since_vacuum: Int64Builder::new(capacity),
-            last_vacuum: TimestampNanosecondBuilder::new(capacity),
-            last_autovacuum: TimestampNanosecondBuilder::new(capacity),
-            last_analyze: TimestampNanosecondBuilder::new(capacity),
-            last_autoanalyze: TimestampNanosecondBuilder::new(capacity),
-            vacuum_count: Int64Builder::new(capacity),
-            autovacuum_count: Int64Builder::new(capacity),
-            analyze_count: Int64Builder::new(capacity),
-            autoanalyze_count: Int64Builder::new(capacity),
+            relid: UInt32Builder::with_capacity(capacity),
+            schemaname: StringBuilder::with_capacity(capacity, capacity),
+            relname: StringBuilder::with_capacity(capacity, capacity),
+            seq_scan: Int64Builder::with_capacity(capacity),
+            seq_tup_read: Int64Builder::with_capacity(capacity),
+            idx_scan: Int64Builder::with_capacity(capacity),
+            idx_tup_fetch: Int64Builder::with_capacity(capacity),
+            n_tup_ins: Int64Builder::with_capacity(capacity),
+            n_tup_upd: Int64Builder::with_capacity(capacity),
+            n_tup_del: Int64Builder::with_capacity(capacity),
+            n_tup_hot_upd: Int64Builder::with_capacity(capacity),
+            n_live_tup: Int64Builder::with_capacity(capacity),
+            n_dead_tup: Int64Builder::with_capacity(capacity),
+            n_mod_since_analyze: Int64Builder::with_capacity(capacity),
+            n_ins_since_vacuum: Int64Builder::with_capacity(capacity),
+            last_vacuum: TimestampNanosecondBuilder::with_capacity(capacity),
+            last_autovacuum: TimestampNanosecondBuilder::with_capacity(capacity),
+            last_analyze: TimestampNanosecondBuilder::with_capacity(capacity),
+            last_autoanalyze: TimestampNanosecondBuilder::with_capacity(capacity),
+            vacuum_count: Int64Builder::with_capacity(capacity),
+            autovacuum_count: Int64Builder::with_capacity(capacity),
+            analyze_count: Int64Builder::with_capacity(capacity),
+            autoanalyze_count: Int64Builder::with_capacity(capacity),
         }
     }
 
     fn add_table(&mut self, relid: u32, schemaname: impl AsRef<str>, relname: impl AsRef<str>) {
-        self.relid.append_value(relid).unwrap();
-        self.schemaname.append_value(schemaname).unwrap();
-        self.relname.append_value(relname).unwrap();
-        self.seq_scan.append_value(0).unwrap();
-        self.seq_tup_read.append_value(0).unwrap();
-        self.idx_scan.append_value(0).unwrap();
-        self.idx_tup_fetch.append_value(0).unwrap();
-        self.n_tup_ins.append_value(0).unwrap();
-        self.n_tup_upd.append_value(0).unwrap();
-        self.n_tup_del.append_value(0).unwrap();
-        self.n_tup_hot_upd.append_value(0).unwrap();
-        self.n_live_tup.append_value(0).unwrap();
-        self.n_dead_tup.append_value(0).unwrap();
-        self.n_mod_since_analyze.append_value(0).unwrap();
-        self.n_ins_since_vacuum.append_value(0).unwrap();
-        self.last_vacuum.append_null().unwrap();
-        self.last_autovacuum.append_null().unwrap();
-        self.last_analyze.append_null().unwrap();
-        self.last_autoanalyze.append_null().unwrap();
-        self.vacuum_count.append_value(0).unwrap();
-        self.autovacuum_count.append_value(0).unwrap();
-        self.analyze_count.append_value(0).unwrap();
-        self.autoanalyze_count.append_value(0).unwrap();
+        self.relid.append_value(relid);
+        self.schemaname.append_value(schemaname);
+        self.relname.append_value(relname);
+        self.seq_scan.append_value(0);
+        self.seq_tup_read.append_value(0);
+        self.idx_scan.append_value(0);
+        self.idx_tup_fetch.append_value(0);
+        self.n_tup_ins.append_value(0);
+        self.n_tup_upd.append_value(0);
+        self.n_tup_del.append_value(0);
+        self.n_tup_hot_upd.append_value(0);
+        self.n_live_tup.append_value(0);
+        self.n_dead_tup.append_value(0);
+        self.n_mod_since_analyze.append_value(0);
+        self.n_ins_since_vacuum.append_value(0);
+        self.last_vacuum.append_null();
+        self.last_autovacuum.append_null();
+        self.last_analyze.append_null();
+        self.last_autoanalyze.append_null();
+        self.vacuum_count.append_value(0);
+        self.autovacuum_count.append_value(0);
+        self.analyze_count.append_value(0);
+        self.autoanalyze_count.append_value(0);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

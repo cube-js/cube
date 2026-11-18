@@ -47,6 +47,21 @@ If you have developer or admin access, you can [apply a security context](/docs/
 
 Explore results carry the same [freshness and pre-aggregation indicators](/docs/explore-analyze/workbooks/querying-data#result-freshness-and-provenance) as workbook reports.
 
+## Querying source data
+
+You can also query your data sources directly with SQL, bypassing the
+semantic layer. Pick **Source SQL query** in the query type picker at the top
+of the data pane, or click **Query source data** in an empty exploration.
+
+Source SQL in Explore works the same way as [Source SQL tabs](/docs/explore-analyze/workbooks/source-sql-tabs)
+in workbooks, with these differences:
+
+- Users with the Admin or Developer role can also query **Cube Store** to check
+  pre-aggregation contents.
+- Source SQL explorations can't be saved, converted to a workbook, or copied
+  to the clipboard. To share one, use **Copy shareable link**. To keep a
+  query, use a Source SQL tab in a workbook.
+
 ## Saving explorations
 
 You can save an exploration so you can return to it later without
@@ -57,9 +72,9 @@ and the Cube MCP `createReport` tool save a standalone exploration the same
 way: by leaving the workbook unset.
 
 - **Save** — For an unsaved exploration, click **Save** to open the
-  **Save Exploration** dialog. Give your exploration a name and click
-  **Save**. The exploration is now persisted and appears in your
-  workspace.
+  **Save exploration** dialog. Cube fills in a name based on the query;
+  keep it or type your own, and click **Save**. The exploration is now
+  persisted and appears in your workspace.
 - **Save (existing)** — After you modify a previously saved exploration,
   click **Save** to update it in place.
 - **Save as** — For a saved exploration, open the chevron menu next to
@@ -79,7 +94,7 @@ as its first tab.
 
 You can copy an exploration to your clipboard and paste it as a new tab
 in any [workbook](/docs/explore-analyze/workbooks). Click the chevron
-next to **Convert to workbook** and select **Copy to Clipboard**.
+next to **Convert to workbook** and select **Copy to clipboard**.
 
 Then navigate to the target workbook and press **Cmd+V** (macOS) or
 **Ctrl+V** (Windows/Linux) to paste the exploration as a new tab.

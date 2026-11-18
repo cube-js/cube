@@ -4,6 +4,8 @@
 !tsconfig.json
 !rollup.config.js
 !yarn.lock
+!.yarnrc.yml
+!.yarn/releases/
 !lerna.json
 !packages/
 !rust/cubestore/js-wrapper/

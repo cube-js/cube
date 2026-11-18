@@ -276,6 +276,23 @@ impl MeasureKind {
         }
     }
 
+    /// The same kind aggregating `input` instead of its declared SQL. `Rank`
+    /// is returned unchanged: a window function has no input to replace.
+    pub fn over_input_sql(&self, input: Rc<SqlCall>) -> Self {
+        match self {
+            Self::Count(_) => Self::Count(CountMeasure::new(CountSql::Explicit(input))),
+            Self::MultipliedCount(_) => {
+                Self::MultipliedCount(CountMeasure::new(CountSql::Explicit(input)))
+            }
+            Self::Aggregated(a) => Self::Aggregated(AggregatedMeasure::new(a.agg_type(), input)),
+            Self::AggregatedState(a) => {
+                Self::AggregatedState(AggregatedMeasure::new(a.agg_type(), input))
+            }
+            Self::Calculated(c) => Self::Calculated(CalculatedMeasure::new(c.calc_type(), input)),
+            Self::Rank => Self::Rank,
+        }
+    }
+
     /// `Some(render form)` when the kind's aggregation can render as a
     /// mergeable intermediate state for an outer aggregation to merge:
     /// only `count_distinct_approx` has such a form (an HLL state).

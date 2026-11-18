@@ -31,16 +31,16 @@ impl InfoSchemaTableConstraintsBuilder {
         let capacity = 10;
 
         Self {
-            constraint_catalog: StringBuilder::new(capacity),
-            constraint_schema: StringBuilder::new(capacity),
-            constraint_name: StringBuilder::new(capacity),
-            table_catalog: StringBuilder::new(capacity),
-            table_schema: StringBuilder::new(capacity),
-            table_name: StringBuilder::new(capacity),
-            constraint_type: StringBuilder::new(capacity),
-            is_deferrable: StringBuilder::new(capacity),
-            initially_deferred: StringBuilder::new(capacity),
-            enforced: StringBuilder::new(capacity),
+            constraint_catalog: StringBuilder::with_capacity(capacity, capacity),
+            constraint_schema: StringBuilder::with_capacity(capacity, capacity),
+            constraint_name: StringBuilder::with_capacity(capacity, capacity),
+            table_catalog: StringBuilder::with_capacity(capacity, capacity),
+            table_schema: StringBuilder::with_capacity(capacity, capacity),
+            table_name: StringBuilder::with_capacity(capacity, capacity),
+            constraint_type: StringBuilder::with_capacity(capacity, capacity),
+            is_deferrable: StringBuilder::with_capacity(capacity, capacity),
+            initially_deferred: StringBuilder::with_capacity(capacity, capacity),
+            enforced: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
