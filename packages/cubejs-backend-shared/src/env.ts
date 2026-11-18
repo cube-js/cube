@@ -1089,8 +1089,8 @@ const variables: Record<string, (...args: any) => any> = {
     const key = keyByDataSource('CUBEJS_JDBC_BATCH_SIZE', dataSource, preAggregations);
     const value = get(key).default(1024).asIntPositive();
 
-    if (value < 1) {
-      throw new InvalidConfiguration(key, value, 'Must be a positive number.');
+    if (value < 16 || value > 32768) {
+      throw new InvalidConfiguration(key, value, 'Must be a number between 16 and 32768.');
     }
 
     return value;

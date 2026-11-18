@@ -507,8 +507,22 @@ describe('Multiple datasources', () => {
       'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
     );
 
-    process.env.CUBEJS_JDBC_BATCH_SIZE = '0';
-    expect(() => getEnv('jdbcBatchSize', { dataSource: 'default' })).toThrow();
+    process.env.CUBEJS_JDBC_BATCH_SIZE = '16';
+    expect(getEnv('jdbcBatchSize', { dataSource: 'default' })).toEqual(16);
+    process.env.CUBEJS_JDBC_BATCH_SIZE = '32768';
+    expect(getEnv('jdbcBatchSize', { dataSource: 'default' })).toEqual(32768);
+
+    for (const value of ['0', '15', '32769']) {
+      process.env.CUBEJS_JDBC_BATCH_SIZE = value;
+      expect(() => getEnv('jdbcBatchSize', { dataSource: 'default' })).toThrow(
+        `Value "${value}" is not valid for CUBEJS_JDBC_BATCH_SIZE. Must be a number between 16 and 32768.`
+      );
+    }
+
+    process.env.CUBEJS_DS_POSTGRES_JDBC_BATCH_SIZE = '8';
+    expect(() => getEnv('jdbcBatchSize', { dataSource: 'postgres' })).toThrow(
+      'Value "8" is not valid for CUBEJS_DS_POSTGRES_JDBC_BATCH_SIZE. Must be a number between 16 and 32768.'
+    );
 
     delete process.env.CUBEJS_JDBC_BATCH_SIZE;
     delete process.env.CUBEJS_DS_POSTGRES_JDBC_BATCH_SIZE;
