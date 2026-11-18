@@ -905,16 +905,66 @@ export class CubeEvaluator extends CubeSymbols {
 
     for (const [name, preAggregation] of Object.entries<any>(cube.preAggregations || {})) {
       for (const path of preAggregation.measureReferences ? measuresOf(preAggregation) : []) {
-        const [cubeName, measureName] = path.split('.');
-        // The built cube: an inherited measure is missing from the raw definition
-        const measure = this.cubeDefinitions[cubeName]
-          && this.getCubeDefinition(cubeName).measures?.[measureName] as MeasureDefinition | undefined;
-        if (measure?.case?.when?.some((item: any) => item.context)) {
+        const contextCase = this.queryContextCaseReachedBy(path, new Set());
+        if (contextCase === path) {
           errorReporter.error(
             `Pre-aggregation '${cube.name}.${name}' cannot store measure '${path}': its QUERY_CONTEXT case depends on the query`
           );
+        } else if (contextCase) {
+          errorReporter.error(
+            `Pre-aggregation '${cube.name}.${name}' cannot store measure '${path}': it reads '${contextCase}', whose QUERY_CONTEXT case depends on the query`
+          );
         }
       }
+    }
+  }
+
+  // The first context-case measure the measure at `path` reads, itself included,
+  // through its `sql` and case branches
+  protected queryContextCaseReachedBy(path: string, visited: Set<string>): string | undefined {
+    if (visited.has(path)) {
+      return undefined;
+    }
+    visited.add(path);
+    const measure = this.measureDefinitionAt(path);
+    if (!measure) {
+      return undefined;
+    }
+    if (measure.case?.when?.some((item: any) => item.context)) {
+      return path;
+    }
+    const [cubeName] = path.split('.');
+    const sqlFns: unknown[] = [measure.sql, measure.case?.switch, measure.case?.else?.sql]
+      .concat((measure.case?.when || []).map((item: any) => item.sql));
+
+    for (const fn of sqlFns.filter((candidate): candidate is SqlFn => typeof candidate === 'function')) {
+      for (const reference of this.measurePathsReadBy(cubeName, fn)) {
+        const found = this.queryContextCaseReachedBy(reference, visited);
+        if (found) {
+          return found;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  // Read from the built cube: an inherited measure is missing from the raw definition
+  protected measureDefinitionAt(path: string): MeasureDefinition | undefined {
+    const [cubeName, measureName, ...rest] = path.split('.');
+    if (rest.length > 0 || !this.cubeDefinitions[cubeName]) {
+      return undefined;
+    }
+    return this.getCubeDefinition(cubeName).measures?.[measureName] as MeasureDefinition | undefined;
+  }
+
+  // A bad reference is reported where the member itself is prepared
+  protected measurePathsReadBy(cubeName: string, sqlFn: SqlFn): string[] {
+    try {
+      return this.collectUsedCubeReferences(cubeName, sqlFn).pathReferencesUsed
+        .map(reference => reference.join('.'))
+        .filter(path => this.measureDefinitionAt(path));
+    } catch {
+      return [];
     }
   }
 

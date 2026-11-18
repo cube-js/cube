@@ -354,6 +354,53 @@ async fn test_stage_dropping_a_date_filter_resolves_at_its_own_grain() {
     }
 }
 
+// The chosen branch is what pre-aggregation matching sees: a stored branch
+// matches, one the rollup lacks does not.
+#[test]
+fn test_pre_aggregation_matching_sees_the_chosen_branch() {
+    let ctx = TestContext::new(MockSchema::from_yaml_file(
+        "common/query_context_pre_aggs.yaml",
+    ))
+    .unwrap();
+    let rollups_used = |query: &str| -> Vec<String> {
+        let (_, usages) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+        usages
+            .iter()
+            .map(|usage| usage.pre_aggregation.name().clone())
+            .collect()
+    };
+
+    let by_category = indoc! {r#"
+        measures:
+          - orders.amount_by_query_context
+        dimensions:
+          - orders.category
+    "#};
+    assert_eq!(
+        rollups_used(by_category),
+        vec!["amounts_by_status_category"]
+    );
+
+    let filtered = indoc! {r#"
+        measures:
+          - orders.amount_by_query_context
+        dimensions:
+          - orders.category
+        filters:
+          - member: orders.status
+            operator: equals
+            values:
+              - completed
+    "#};
+    assert_eq!(rollups_used(filtered), vec!["amounts_by_status_category"]);
+
+    let unstored_branch = indoc! {r#"
+        measures:
+          - orders.amount_by_query_context
+    "#};
+    assert_eq!(rollups_used(unstored_branch), Vec::<String>::new());
+}
+
 #[test]
 fn test_query_context_names_the_model_members() {
     let ctx = create_context();
