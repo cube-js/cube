@@ -472,6 +472,38 @@ cubes:
                 exclude:
                     - orders.created_at
 
+          - name: amount_context_with_status_grain
+            type: sum
+            sql: "{CUBE.amount_by_query_context}"
+            multi_stage: true
+            grain:
+                include:
+                    - orders.status
+
+          - name: amount_context_keep_only_category
+            type: sum
+            sql: "{CUBE.amount_by_query_context}"
+            multi_stage: true
+            grain:
+                keep_only:
+                    - orders.category
+
+          - name: amount_context_prev_month
+            type: number
+            sql: "{CUBE.amount_by_query_context}"
+            multi_stage: true
+            time_shift:
+                - interval: "1 month"
+                  type: prior
+                  timeDimension: orders.created_at
+
+          - name: rolling_amount_context
+            type: sum
+            sql: "{CUBE.amount_by_query_context}"
+            multi_stage: true
+            rolling_window:
+                trailing: 2 month
+
           - name: amount_by_status_category
             type: number
             sql: "{CUBE.total_amount}"

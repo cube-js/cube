@@ -354,6 +354,110 @@ async fn test_stage_dropping_a_date_filter_resolves_at_its_own_grain() {
     }
 }
 
+// `grain: include` adds status to the stage's grain: the inner measure still sees
+// the query's category and takes the avg branch per (category, status), which the
+// stage then sums over statuses.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_stage_including_a_dimension_resolves_at_its_own_grain() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_context_with_status_grain
+        dimensions:
+          - orders.category
+        order:
+          - id: orders.category
+    "#};
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(aggregations(&sql).contains(&"avg("), "{sql}");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// `grain: keep_only` narrows the stage to category: the inner measure takes the
+// per-category avg branch although the query also groups by status.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_stage_keeping_only_a_dimension_resolves_at_its_own_grain() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_context_keep_only_category
+        dimensions:
+          - orders.category
+          - orders.status
+        order:
+          - id: orders.category
+          - id: orders.status
+    "#};
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(aggregations(&sql).contains(&"avg("), "{sql}");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// A time-shifted stage keeps the query's filter, so the inner measure takes the
+// filtered branch, one month back.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_time_shifted_stage_keeps_the_query_filter() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_context_prev_month
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        filters:
+          - member: orders.status
+            operator: equals
+            values:
+              - completed
+        order:
+          - id: orders.created_at
+    "#};
+    let sql = ctx.build_sql(query).unwrap();
+    assert_eq!(aggregations(&sql), vec!["sum("]);
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The base of a rolling window is a stage of its own: with neither a category
+// nor a status filter in the query, it takes the `else` branch.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_window_base_resolves_at_its_own_grain() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_amount_context
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.created_at
+    "#};
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(aggregations(&sql).contains(&"max("), "{sql}");
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 // The chosen branch is what pre-aggregation matching sees: a stored branch
 // matches, one the rollup lacks does not.
 #[test]
