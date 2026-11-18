@@ -490,3 +490,30 @@ async fn date_range_on_an_hourly_grain_across_dst_falls_back() {
         assert_eq!(rollup, source);
     }
 }
+
+// Non-strict matching covers a time dimension's own date range, not a raw
+// filter the grain column cannot answer.
+#[tokio::test(flavor = "multi_thread")]
+async fn raw_date_bounds_off_the_grain_fall_back_on_a_non_strict_rollup() {
+    for (operator, values) in [
+        ("inDateRange", vec!["2025-01-04", "2025-01-06"]),
+        ("beforeDate", vec!["2025-01-15"]),
+    ] {
+        let query = raw_filter(operator, &values);
+        if let Some((rollup, source)) =
+            fallback_vs_source(&query, "non_strict_month_with_raw_dimension").await
+        {
+            assert_eq!(rollup, source, "{operator} {values:?}");
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn raw_date_range_aligned_with_the_grain_reads_it_on_a_non_strict_rollup() {
+    let query = raw_filter("inDateRange", &["2024-12-01", "2025-01-31"]);
+    if let Some((rollup, source)) =
+        rollup_vs_source(&query, "non_strict_month_with_raw_dimension").await
+    {
+        assert_eq!(rollup, source);
+    }
+}

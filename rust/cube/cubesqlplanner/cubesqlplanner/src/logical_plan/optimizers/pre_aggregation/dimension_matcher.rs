@@ -240,7 +240,7 @@ impl<'a> DimensionMatcher<'a> {
                 self.try_match_dimension(dimension, add_to_matched_dimension)
             }
             MemberSymbol::TimeDimension(time_dimension) => {
-                self.try_match_time_dimension(time_dimension, add_to_matched_dimension)
+                self.try_match_time_dimension(time_dimension, add_to_matched_dimension, false)
             }
             MemberSymbol::MemberExpression(me) => {
                 if let Some(found) = self.pre_aggregation_segments.get_mut(me.id()) {
@@ -340,11 +340,15 @@ impl<'a> DimensionMatcher<'a> {
         }
     }
 
+    // `strict_range` keeps the range alignment check under a non-strict
+    // pre-aggregation, whose opt-in covers a time dimension's own date range.
     fn try_match_time_dimension(
         &mut self,
         time_dimension: &TimeDimensionSymbol,
         add_to_matched_dimension: bool,
+        strict_range: bool,
     ) -> Result<MatchState, CubeError> {
+        let non_strict = self.pre_aggregation.allow_non_strict_date_range_match && !strict_range;
         // Read from a stored column rather than computed, so nothing derives
         // it from another bucket.
         let is_sql_granularity = |td: &TimeDimensionSymbol| {
@@ -354,7 +358,7 @@ impl<'a> DimensionMatcher<'a> {
         };
         let is_sql_defined_granularity = is_sql_granularity(time_dimension);
 
-        let granularity = if self.pre_aggregation.allow_non_strict_date_range_match {
+        let granularity = if non_strict {
             time_dimension.granularity().clone()
         } else {
             time_dimension.rollup_granularity(self.query_tools.clone())?
@@ -394,10 +398,7 @@ impl<'a> DimensionMatcher<'a> {
             // A range read without a granularity is served by a column whose
             // grain both its bounds fall on.
             let range = match time_dimension.date_range_vec().as_deref() {
-                Some([from, to])
-                    if time_dimension.granularity().is_none()
-                        && !self.pre_aggregation.allow_non_strict_date_range_match =>
-                {
+                Some([from, to]) if time_dimension.granularity().is_none() && !non_strict => {
                     Some((from.clone(), to.clone()))
                 }
                 _ => None,
@@ -517,14 +518,15 @@ impl<'a> DimensionMatcher<'a> {
         filter: &Rc<BaseFilter>,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
+        let add_to_matched_dimension = add_to_matched_dimension && filter.is_single_value_equal();
         let symbol = if let Some(time_dimension) = filter.time_dimension_symbol() {
             time_dimension
         } else if let Some(read) = self.date_filter_as_time_dimension(filter) {
-            MemberSymbol::new_time_dimension(read)
+            // The rollup holds no raw value to stand for a misaligned range.
+            return self.try_match_time_dimension(&read, add_to_matched_dimension, true);
         } else {
             filter.member_evaluator().clone()
         };
-        let add_to_matched_dimension = add_to_matched_dimension && filter.is_single_value_equal();
         let res = self.try_match_symbol(&symbol, add_to_matched_dimension)?;
         Ok(res)
     }
