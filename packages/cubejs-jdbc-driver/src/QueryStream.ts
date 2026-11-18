@@ -1,58 +1,62 @@
 import { Readable } from 'stream';
 
 export type Row = {
-  [field: string]: boolean | number | string
+  [field: string]: boolean | number | string | null
 };
 
-export type nextFn = () => {
-  done: boolean,
-  value: Row,
-};
-
-export function transformRow(row: any) {
-  // eslint-disable-next-line no-restricted-syntax
-  for (const [name, field] of Object.entries(row)) {
-    // console.log({ name, field });
-    if (field instanceof Int8Array) {
-      row[name] = Buffer.from(field).toString('base64');
-    }
-  }
-
-  return row;
-}
+/**
+ * Resolves to the next batch of rows, or to null once the result set is exhausted.
+ */
+export type NextBatchFn = () => Promise<Row[] | null>;
 
 export class QueryStream extends Readable {
-  private next: null | nextFn;
+  protected nextBatch: null | NextBatchFn;
+
+  protected reading: boolean = false;
 
   /**
    * @constructor
    */
-  public constructor(nextFn: nextFn, highWaterMark: number) {
+  public constructor(nextBatch: NextBatchFn, highWaterMark: number) {
     super({
       objectMode: true,
       highWaterMark,
     });
-    this.next = nextFn;
+    this.nextBatch = nextBatch;
   }
 
   /**
    * @override
    */
-  public _read(highWaterMark: number): void {
-    setTimeout(() => {
-      for (let i = 0; i < highWaterMark; i++) {
-        if (this.next) {
-          const row = this.next();
-          if (row.value) {
-            this.push(transformRow(row.value));
-          }
-          if (row.done) {
-            this.push(null);
-            break;
-          }
+  public _read(): void {
+    // A batch is fetched on a JVM worker thread and the result set is not thread-safe.
+    if (this.reading || !this.nextBatch) {
+      return;
+    }
+
+    this.reading = true;
+    this.nextBatch().then(
+      (rows) => {
+        this.reading = false;
+
+        if (!this.nextBatch) {
+          return;
         }
+
+        if (!rows) {
+          this.push(null);
+          return;
+        }
+
+        for (let i = 0; i < rows.length; i++) {
+          this.push(rows[i]);
+        }
+      },
+      (err) => {
+        this.reading = false;
+        this.destroy(err);
       }
-    }, 0);
+    );
   }
 
   /**
@@ -62,7 +66,7 @@ export class QueryStream extends Readable {
     error: Error | null,
     callback: (error?: Error | null | undefined) => void,
   ): void {
-    this.next = null;
+    this.nextBatch = null;
     callback(error);
   }
 }

@@ -24,8 +24,8 @@ import path from 'path';
 import { SupportedDrivers } from './supported-drivers';
 import type { DriverOptionsInterface, EscapeDialect } from './supported-drivers';
 import type { JDBCDriverConfiguration } from './types';
-import { QueryStream, transformRow } from './QueryStream';
-import type { nextFn } from './QueryStream';
+import { QueryStream } from './QueryStream';
+import type { NextBatchFn, Row } from './QueryStream';
 
 /* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
 const DriverManager = require('@cubejs-backend/jdbc/lib/drivermanager');
@@ -70,6 +70,19 @@ Connection.prototype.getMetaDataAsync = promisify(Connection.prototype.getMetaDa
 // promisify DatabaseMetaData methods
 DatabaseMetaData.prototype.getSchemasAsync = promisify(DatabaseMetaData.prototype.getSchemas);
 DatabaseMetaData.prototype.getTablesAsync = promisify(DatabaseMetaData.prototype.getTables);
+
+// java.sql.Types
+const JDBC_TYPE_NAMES: Record<number, string> = {
+  [-5]: 'bigint',
+  2: 'bigdecimal',
+  3: 'bigdecimal',
+};
+
+type RowBatchIter = {
+  labels: string[],
+  types: number[],
+  next: NextBatchFn,
+};
 
 export class JDBCDriver extends BaseDriver {
   protected readonly config: JDBCDriverConfiguration;
@@ -311,35 +324,18 @@ export class JDBCDriver extends BaseDriver {
 
       const executeQuery = promisify(statement.execute.bind(statement));
       const resultSet = await executeQuery(query);
-      return (await new Promise((resolve, reject) => {
-        resultSet.toObjectIter(
-          (
-            err: unknown,
-            res: {
-              labels: string[],
-              types: number[],
-              rows: { next: nextFn },
-            },
-          ) => {
-            if (err) {
-              reject(err);
-              return;
-            }
+      const iter = await this.rowBatchIter(resultSet, highWaterMark);
 
-            const rowStream = new QueryStream(res.rows.next, highWaterMark);
-            resolve({
-              rowStream,
-              release: () => this.pool.release(conn),
-              types: res.types.map(
-                (t, i) => ({
-                  name: res.labels[i],
-                  type: this.toGenericType(((t === -5 ? 'bigint' : resultSet._types[t]) || 'string').toLowerCase())
-                })
-              )
-            });
-          }
-        );
-      }));
+      return {
+        rowStream: new QueryStream(iter.next, highWaterMark),
+        release: () => this.pool.release(conn),
+        types: iter.types.map(
+          (t, i) => ({
+            name: iter.labels[i],
+            type: this.toGenericType(this.jdbcTypeName(t, resultSet._types))
+          })
+        )
+      };
     } catch (ex: any) {
       await this.pool.release(conn);
 
@@ -370,17 +366,36 @@ export class JDBCDriver extends BaseDriver {
     const executeQueryAsync = promisify(statement.execute.bind(statement));
     const resultSet = await executeQueryAsync(query);
 
-    if (resultSet.toObjArray) {
-      const result: any = await (promisify(resultSet.toObjArray.bind(resultSet)))();
+    if (resultSet.toObjectBatchIter) {
+      const iter = await this.rowBatchIter(resultSet);
+      const result: Row[] = [];
 
-      for (const [key, row] of Object.entries(result)) {
-        result[key] = transformRow(row);
+      for (let rows = await iter.next(); rows; rows = await iter.next()) {
+        for (let i = 0; i < rows.length; i++) {
+          result.push(rows[i]);
+        }
       }
 
       return result;
     }
 
     return resultSet;
+  }
+
+  /**
+   * `getterNames` is the table node-jdbc uses to pick a ResultSet getter. It reads BIGINT, NUMERIC
+   * and DECIMAL as strings to keep their precision, so their column types can't be taken from it.
+   */
+  protected jdbcTypeName(jdbcType: number, getterNames: (string | undefined)[]): string {
+    return (JDBC_TYPE_NAMES[jdbcType] || getterNames[jdbcType] || 'string').toLowerCase();
+  }
+
+  /**
+   * Rows are read and serialized inside the JVM, one batch per call. Reading them cell by cell
+   * from Node.js costs a synchronous JNI round trip per cell and blocks the event loop.
+   */
+  protected async rowBatchIter(resultSet: any, batchSize?: number): Promise<RowBatchIter> {
+    return resultSet.toObjectBatchIter({ batchSize });
   }
 
   public async release() {
