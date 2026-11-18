@@ -495,6 +495,26 @@ describe('Multiple datasources', () => {
     );
   });
 
+  test('getEnv("jdbcBatchSize")', () => {
+    expect(getEnv('jdbcBatchSize', { dataSource: 'default' })).toEqual(1024);
+    expect(getEnv('jdbcBatchSize', { dataSource: 'postgres' })).toEqual(1024);
+
+    process.env.CUBEJS_JDBC_BATCH_SIZE = '4096';
+    process.env.CUBEJS_DS_POSTGRES_JDBC_BATCH_SIZE = '256';
+    expect(getEnv('jdbcBatchSize', { dataSource: 'default' })).toEqual(4096);
+    expect(getEnv('jdbcBatchSize', { dataSource: 'postgres' })).toEqual(256);
+    expect(() => getEnv('jdbcBatchSize', { dataSource: 'wrong' })).toThrow(
+      'The wrong data source is missing in the declared CUBEJS_DATASOURCES.'
+    );
+
+    process.env.CUBEJS_JDBC_BATCH_SIZE = '0';
+    expect(() => getEnv('jdbcBatchSize', { dataSource: 'default' })).toThrow();
+
+    delete process.env.CUBEJS_JDBC_BATCH_SIZE;
+    delete process.env.CUBEJS_DS_POSTGRES_JDBC_BATCH_SIZE;
+    expect(getEnv('jdbcBatchSize', { dataSource: 'default' })).toEqual(1024);
+  });
+
   test('getEnv("dbMaxPoolSize")', () => {
     process.env.CUBEJS_DB_MAX_POOL = '55555';
     process.env.CUBEJS_DS_POSTGRES_DB_MAX_POOL = '44444';

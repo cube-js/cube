@@ -139,7 +139,8 @@ export class JDBCDriver extends BaseDriver {
         getEnv('jdbcDriver', { dataSource, preAggregations }) ||
         dbTypeDescription && dbTypeDescription.driverClass,
       properties: dbTypeDescription && dbTypeDescription.properties,
-      ...dbOptions
+      ...dbOptions,
+      batchSize: config.batchSize || getEnv('jdbcBatchSize', { dataSource, preAggregations }),
     } as JDBCDriverConfiguration;
 
     if (!this.config.drivername) {
@@ -324,7 +325,7 @@ export class JDBCDriver extends BaseDriver {
 
       const executeQuery = promisify(statement.execute.bind(statement));
       const resultSet = await executeQuery(query);
-      const iter = await this.rowBatchIter(resultSet, highWaterMark);
+      const iter = await this.rowBatchIter(resultSet);
 
       return {
         rowStream: new QueryStream(iter.next, highWaterMark),
@@ -394,8 +395,8 @@ export class JDBCDriver extends BaseDriver {
    * Rows are read and serialized inside the JVM, one batch per call. Reading them cell by cell
    * from Node.js costs a synchronous JNI round trip per cell and blocks the event loop.
    */
-  protected async rowBatchIter(resultSet: any, batchSize?: number): Promise<RowBatchIter> {
-    return resultSet.toObjectBatchIter({ batchSize });
+  protected async rowBatchIter(resultSet: any): Promise<RowBatchIter> {
+    return resultSet.toObjectBatchIter({ batchSize: this.config.batchSize });
   }
 
   public async release() {

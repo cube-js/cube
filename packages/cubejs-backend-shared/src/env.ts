@@ -1079,6 +1079,23 @@ const variables: Record<string, (...args: any) => any> = {
     get(keyByDataSource('CUBEJS_JDBC_DRIVER', dataSource, preAggregations)).asString()
   ),
 
+  /**
+   * Number of rows the JDBC driver reads from a result set per round trip to the JVM.
+   */
+  jdbcBatchSize: ({
+    dataSource,
+    preAggregations,
+  }: DataSourceOpts) => {
+    const key = keyByDataSource('CUBEJS_JDBC_BATCH_SIZE', dataSource, preAggregations);
+    const value = get(key).default(1024).asIntPositive();
+
+    if (value < 1) {
+      throw new InvalidConfiguration(key, value, 'Must be a positive number.');
+    }
+
+    return value;
+  },
+
   /** ****************************************************************
    * Export Bucket options                                           *
    ***************************************************************** */

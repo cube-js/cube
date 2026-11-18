@@ -27,7 +27,9 @@ class TestJDBCDriver extends JDBCDriver {
 }
 
 // The constructor requires a JVM-backed pool.
-const driver: TestJDBCDriver = Object.create(TestJDBCDriver.prototype);
+const driver: TestJDBCDriver = Object.create(TestJDBCDriver.prototype, {
+  config: { value: { batchSize: 1024 } },
+});
 
 function connectionReturning(resultSet: unknown) {
   const statement = {
@@ -53,8 +55,7 @@ describe('JDBCDriver row batches', () => {
     expect(await driver.executeStatement(connectionReturning(resultSet), 'SELECT 1')).toEqual(
       [{ id: 1 }, { id: 2 }, { id: 3 }]
     );
-    // the batch size is left to the node-jdbc default
-    expect(options).toEqual([{ batchSize: undefined }]);
+    expect(options).toEqual([{ batchSize: 1024 }]);
   });
 
   it('returns an empty array for an empty result set', async () => {

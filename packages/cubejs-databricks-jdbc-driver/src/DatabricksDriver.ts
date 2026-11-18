@@ -269,6 +269,7 @@ export class DatabricksDriver extends JDBCDriver {
         // as Java objects instead of EWKT strings.
         EnableGeoSpatialSupport: '0',
       },
+      batchSize: conf?.batchSize || getEnv('jdbcBatchSize', { dataSource, preAggregations }),
       catalog:
         conf?.catalog ||
         getEnv('databricksCatalog', { dataSource, preAggregations }),

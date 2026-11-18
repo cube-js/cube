@@ -86,6 +86,30 @@ describe('DatabricksDriver', () => {
     expect(result.csvFile).toBeTruthy();
   });
 
+  describe('batch size', () => {
+    afterEach(() => {
+      delete process.env.CUBEJS_JDBC_BATCH_SIZE;
+    });
+
+    test('defaults to 1024', () => {
+      expect(new TestDatabricksDriver().testConfig.batchSize).toBe(1024);
+    });
+
+    test('is read from CUBEJS_JDBC_BATCH_SIZE once, when the driver is created', () => {
+      process.env.CUBEJS_JDBC_BATCH_SIZE = '4096';
+      const driver = new TestDatabricksDriver();
+      process.env.CUBEJS_JDBC_BATCH_SIZE = '256';
+
+      expect(driver.testConfig.batchSize).toBe(4096);
+    });
+
+    test('prefers the value passed in the config', () => {
+      process.env.CUBEJS_JDBC_BATCH_SIZE = '4096';
+
+      expect(new TestDatabricksDriver({ batchSize: 512 }).testConfig.batchSize).toBe(512);
+    });
+  });
+
   describe('connection properties', () => {
     const baseUrl = 'jdbc:databricks://adb-123456789.10.azuredatabricks.net:443;httpPath=/sql/1.0/warehouses/abc123def456';
 
