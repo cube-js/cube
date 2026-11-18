@@ -48,6 +48,11 @@ export class QueryStream extends Readable {
           return;
         }
 
+        if (rows.length === 0) {
+          this._read();
+          return;
+        }
+
         for (let i = 0; i < rows.length; i++) {
           this.push(rows[i]);
         }
