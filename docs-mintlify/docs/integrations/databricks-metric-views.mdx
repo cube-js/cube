@@ -84,7 +84,7 @@ also needs **Access SQL Runner** (`SqlRunnerRead`); see [Jinja templates](#jinja
     cleans up a uniquely named temporary view; it does not change a final target.
   </Step>
   <Step title="Publish and inspect each result">
-    Select **Sync now**. Review the result for **each view** in run history. **Created**,
+    Select **Publish now**. Review the result for **each view** in run history. **Created**,
     **Updated**, and **Unchanged** are successful outcomes; **Blocked**, **Rejected by Databricks**,
     and **Write failed** need investigation. A run can be **Partial** if some views succeeded and
     others did not.
@@ -180,8 +180,12 @@ they are deployed. Each run:
 
 If another run is active, or the deployment is still rolling out a build with Jinja templates,
 the run retries for about 30 minutes. If a newer build succeeds first, only the newer build
-publishes. A build whose run can't start in that time is not published; sync manually or deploy
-again.
+publishes. A build whose run can't start in that time is not published.
+
+A run that can't start leaves no entry in run history. This happens when no user can render the
+model's Jinja templates, when the data source has no Databricks connection, or when the retry runs
+out. Databricks then keeps the Metric Views of an earlier build, and the card
+[warns that Databricks is behind](#databricks-behind-the-deployed-model).
 
 A run that completes sends no notification. A run that fails, ends **Partial**, or withholds a
 measure notifies its user in the [Inbox](/docs/inbox).
@@ -507,11 +511,32 @@ Other views in the same run may still publish.
 You can request cancellation of an active run. It prevents further writes but does not undo
 views already published. To roll back a bad definition, restore the desired Cube model and
 deploy it. Then preview and sync again or, with [Publish after each deployment](#publish-after-each-deployment)
-on, check that the build's **Deployment** run completed and sync manually only if it didn't.
-Inspect run history and the Databricks target afterward.
+on, check that the card shows no [Databricks is behind](#databricks-behind-the-deployed-model)
+warning, and select **Publish now** if it does. Inspect run history and the Databricks target
+afterward.
 If publication is unavailable, contact [Cube support](/admin/account-billing/support) with
 the deployment, data source, run ID, and per-view issue codes. Do not send credentials or
 sensitive source data.
+
+### Databricks behind the deployed model {#databricks-behind-the-deployed-model}
+
+Databricks serves the Metric Views of the last build that a **Completed** or **Partial** run
+published. When the deployment runs a newer build, the **Databricks Metric Views** card shows
+**Databricks is behind the deployed model**. The warning names the commit Databricks was last
+published from and the commit the deployment runs. When both builds share a commit, as after a
+redeploy, it names their build numbers instead. Select **Publish now** in the warning to publish
+the deployed build; the warning clears once that run publishes it.
+
+The warning doesn't show while publication is turned off, while a run is active, or before the
+first run publishes. It can show briefly after a deployment with
+[Publish after each deployment](#publish-after-each-deployment) on, until that run starts.
+
+Through the API, [reading the settings](/api-reference/databricks-metric-view-integration/get-databricks-metric-view-publication-settings)
+returns `deployedBuild`, the deployment's newest successful build, and `publishedBuild`, the build
+the newest **Completed** or **Partial** run converted. Each has a `buildJobId` and a `commit`.
+Databricks is behind while the two `buildJobId` values differ. `deployedBuild` is `null` when the
+deployment has no successful build, and `publishedBuild` is `null` until a run publishes. When run
+history can't be read, the response leaves out `publishedBuild`.
 
 ### Take over an existing Metric View
 
