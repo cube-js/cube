@@ -22,13 +22,27 @@ dashboard or an app.
 
 ## Turn a dashboard into an app
 
-Open a workbook and switch to **Dashboard builder**. In the workbook menu, select
-**App mode**. Cube replaces the dashboard with a starter app that you can edit,
-and the **Dashboard builder** tab reads **App builder**.
+Open a workbook and switch to the **Builder** tab. When the workbook has neither
+a dashboard nor an app yet, Cube asks what you want to build: choose **App** or
+**Dashboard**.
 
-To go back to a standard dashboard, select **App mode** again. The tab reads
-**Dashboard builder** again. Cube keeps the standard dashboard's draft while the
-workbook is in app mode, so switching back restores it.
+To turn a dashboard into an app, click the **Design** button (the brush icon)
+in the builder's toolbar. Under **Type**, choose **App** and confirm. Cube
+replaces the dashboard with a starter app that you can edit. To go back, choose
+**Dashboard** under **Type** in the app editor's **Design** panel. Cube keeps
+both the dashboard and the app in the workbook's draft, so converting back
+restores either one.
+
+### Change the app's format
+
+In the app editor, the **Design** panel also lists the formats an app can take:
+**Classic** (filters in a row on top), **Side filters**, **Story** and
+**Slides**. Choose one, and the agent rebuilds the app in that format on the
+same reports. Choose the current format to rebuild the app in it again.
+
+While the agent is working, or while the code editor has edits you haven't run,
+you can't change the type or the format. Wait for the agent to finish, or run or
+discard your edits first.
 
 ## Build the app with the agent
 
