@@ -1165,14 +1165,15 @@ paths:
           reuse that work; a later submission starts a fresh execution. Preview payloads and results
           are retained for at most seven days. The conversion supports scalar dimensions, common and
           calculated measures, and acyclic many-to-one equi-joins from one Databricks datasource.
-          Access policies, extends, unsafe fanout, unsupported expressions, multiple datasources,
-          and converter loss are blocked per view. Two-part schema.table sources are qualified with
-          the integration credential's `catalog`, or with `CUBEJS_DB_DATABRICKS_CATALOG` for the
-          selected datasource when the integration has no credential; without either they fail
-          closed with an actionable issue. A datasource with no env-defined Databricks connection,
-          such as one driver_factory in cube.py serves, previews only once its integration has a
-          credential. Requires `SchemaRead` or `SchemaUpdate` access. This is currently in preview —
-          reach out to the Cube support team to activate it for your account.
+          Access policies (including a cube's inherited ones), `extends` of a cube outside the YAML
+          model, unsafe fanout, unsupported expressions, multiple datasources, and converter loss
+          are blocked per view. Two-part schema.table sources are qualified with the integration
+          credential's `catalog`, or with `CUBEJS_DB_DATABRICKS_CATALOG` for the selected datasource
+          when the integration has no credential; without either they fail closed with an actionable
+          issue. A datasource with no env-defined Databricks connection, such as one driver_factory
+          in cube.py serves, previews only once its integration has a credential. Requires
+          `SchemaRead` or `SchemaUpdate` access. This is currently in preview — reach out to the
+          Cube support team to activate it for your account.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}:
     delete:
       operationId: cancelPreview

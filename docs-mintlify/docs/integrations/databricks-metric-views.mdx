@@ -435,9 +435,9 @@ fi
 ## What can be published
 
 The **Preview** result is the authority for your deployed model. This preview release supports
-YAML models, [Jinja-templated](#jinja-templates) ones included, one Databricks data source per
-published view, scalar dimensions, common aggregates and supported calculated measures, and
-conservative many-to-one equality joins. The target uses
+YAML models, [Jinja-templated](#jinja-templates) ones included, cubes that `extends` another
+YAML cube, one Databricks data source per published view, scalar dimensions, common aggregates
+and supported calculated measures, and conservative many-to-one equality joins. The target uses
 Databricks Metric View YAML 1.1.
 
 These categories reflect the current preview release. Capabilities may change between releases, so
@@ -451,10 +451,12 @@ run a new **Preview** after a Cube upgrade.
 
 Preview **blocks** a view when it finds any of these conditions:
 
-- JavaScript or TypeScript models, or unflattened `extends`: use YAML and flatten inherited
-  definitions before publishing.
-- A Cube access policy on the view or a referenced cube: keep that governed view in Cube; the
-  policy cannot be transferred to a Databricks Metric View.
+- JavaScript or TypeScript models: use YAML.
+- A cube that `extends` a cube outside the YAML model, such as a JavaScript cube, or an `extends`
+  chain that loops: extend a YAML cube instead, or flatten the inherited definitions.
+- A Cube access policy on the view or a referenced cube, including one a cube inherits through
+  `extends`: keep that governed view in Cube; the policy cannot be transferred to a Databricks
+  Metric View.
 - Mixed data sources or an ambiguous root dataset: use one data source and a clear root.
 - A two-part `schema.table` source without `CUBEJS_DB_DATABRICKS_CATALOG`: set that variable for
   the selected Databricks data source, or the credential's **Default catalog** for a data source
