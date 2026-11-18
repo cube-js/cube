@@ -1538,6 +1538,21 @@ describe('Cube RBAC Engine', () => {
       // order_open should return all values since it has no access policy
       expect(result.rawData()).toMatchSnapshot('orders_open_rest');
     });
+
+    // GH #11574: a row_level filter on the joined side of a LEFT JOIN is
+    // applied in the outer WHERE, which drops main-cube rows without a match.
+    test('row_level filter on the joined cube keeps unmatched rows of the main cube', async () => {
+      const result = await client.load({
+        dimensions: ['rls_join_orders.id', 'rls_join_shipments.carrier'],
+        order: {
+          'rls_join_orders.id': 'asc',
+        },
+      });
+      expect(result.rawData()).toEqual([
+        { 'rls_join_orders.id': 'o1', 'rls_join_shipments.carrier': 'ups' },
+        { 'rls_join_orders.id': 'o2', 'rls_join_shipments.carrier': null },
+      ]);
+    });
   });
 });
 
