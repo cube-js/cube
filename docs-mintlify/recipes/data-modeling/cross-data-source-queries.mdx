@@ -26,7 +26,8 @@ sources works only in one of two ways:
   results.
 - **Pre-aggregations.** A [`rollup_join`][ref-rollup-join] pre-aggregation joins
   rollups from different data sources in Cube Store, so one Cube query can read
-  members of both data sources.
+  members of both data sources. `rollup_join` is currently in Preview, and its
+  API may change.
 
 Everything else fails, including a regular join of two cubes from different data
 sources.
@@ -679,18 +680,13 @@ The plan names each cube, not its data source. Read it together with the
   `{CUBE.customer_id} = {customers.id}`, not `{CUBE}.customer_id =
   {customers}.id`. A join on raw columns fails with `From members are not found in
   join`.
+- **A cube name that starts with `pg_` needs a schema.** The SQL API routes such a
+  name to `pg_catalog`, and the query fails with `Table or CTE with name 'pg_...'
+  not found`. Qualify the name with the schema that holds cubes, or avoid the
+  prefix.
 
 See [Joining data from multiple data sources][ref-rollup-join-recipe] for a
 `rollup_join` walkthrough.
-
-<Note>
-
-A cube whose name starts with `pg_` cannot be referenced by that name alone. The
-SQL API routes such a name to `pg_catalog`, and the query fails with `Table or CTE
-with name 'pg_...' not found`. Qualify the name with the schema that holds cubes,
-as in `FROM public.pg_costs`, or avoid the prefix.
-
-</Note>
 
 [ref-qpp]: /reference/core-data-apis/sql-api/query-format#query-post-processing
 [ref-rollup-join]: /reference/data-modeling/pre-aggregations#rollup_join
