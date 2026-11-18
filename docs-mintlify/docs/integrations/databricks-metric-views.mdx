@@ -317,9 +317,9 @@ accepts only the successful outcomes.
 Each `views[]` entry carries its destination as `target` (`catalog.schema.name`, or `null` when
 conversion blocked the view), and a run carries the `takeOverTargets` it was started with. A
 `blocked` view whose `detail` is `unmanaged-target` or `ownership-conflict` collides with an object
-Cube does not manage, and a `detail` of `taken-over` marks a view a take-over published. A CI job
-can pass a blocked view's `target` back in `takeOverTargets` to
-[take it over](#take-over-an-existing-metric-view).
+Cube does not manage, and a `detail` of `taken-over` marks a view a take-over published. After
+you confirm that a blocked destination should belong to this data source, a CI job can pass its
+`target` in `takeOverTargets` to [take it over](#take-over-an-existing-metric-view).
 `incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
 zero rejects definitions missing measures.
 
@@ -498,9 +498,11 @@ Cube records ownership after a confirmed write. It refuses a view whose destinat
 holds an object this data source does not manage. Resolve the collision with the owner of the
 Databricks object, by [taking over the destination](#take-over-an-existing-metric-view), or with
 [Cube support](/admin/account-billing/support). Cube never deletes or overwrites an object it does
-not manage unless you take over that exact destination. A failed conversion,
-validation, or write leaves that view's previous Databricks definition in place. Other views in
-the same run may still publish.
+not manage unless you take over that exact destination. Cube does not compare a Metric View it
+manages with its current definition in Databricks: a sync skips the view while its generated
+definition is unchanged and otherwise replaces it, edits made in Databricks included. A failed
+conversion, validation, or write leaves that view's previous Databricks definition in place.
+Other views in the same run may still publish.
 
 You can request cancellation of an active run. It prevents further writes but does not undo
 views already published. To roll back a bad definition, restore the desired Cube model and
@@ -517,7 +519,7 @@ A sync labels a view **Blocked**, with one of these codes, when its destination 
 object this data source's publication does not manage:
 
 - `unmanaged-target`: an object Cube did not create, such as a Metric View made by hand or one
-  your own CI job publishes.
+  your own pipeline writes to Databricks directly.
 - `ownership-conflict`: the publication of another Databricks data source in your Cube account,
   in this or another deployment, manages it.
 
