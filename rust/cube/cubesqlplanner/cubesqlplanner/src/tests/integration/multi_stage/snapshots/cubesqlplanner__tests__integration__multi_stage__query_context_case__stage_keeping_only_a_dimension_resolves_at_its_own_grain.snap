@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/query_context_case.rs
+expression: result
+---
+orders__category | orders__status | orders__amount_context_keep_only_category
+-----------------+----------------+------------------------------------------
+books            | cancelled      | 176.0000000000000000                     
+books            | completed      | 176.0000000000000000                     
+books            | pending        | 176.0000000000000000                     
+clothing         | cancelled      | 180.0000000000000000                     
+clothing         | completed      | 180.0000000000000000                     
+clothing         | pending        | 180.0000000000000000                     
+electronics      | cancelled      | 108.3333333333333333                     
+electronics      | completed      | 108.3333333333333333                     
+electronics      | pending        | 108.3333333333333333

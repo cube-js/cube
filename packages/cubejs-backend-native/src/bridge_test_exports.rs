@@ -20,6 +20,13 @@ use cubesqlplanner::cube_bridge::{
         base_query_options_bridge_fields_meta, BaseQueryOptions, NativeBaseQueryOptions,
     },
     base_tools::{base_tools_bridge_fields_meta, BaseTools, NativeBaseTools},
+    case_context_definition::{
+        case_context_definition_bridge_fields_meta, CaseContextDefinition,
+        NativeCaseContextDefinition,
+    },
+    case_context_item::{
+        case_context_item_bridge_fields_meta, CaseContextItem, NativeCaseContextItem,
+    },
     case_definition::{case_definition_bridge_fields_meta, CaseDefinition, NativeCaseDefinition},
     case_else_item::{case_else_item_bridge_fields_meta, CaseElseItem, NativeCaseElseItem},
     case_item::{case_item_bridge_fields_meta, CaseItem, NativeCaseItem},
@@ -242,6 +249,8 @@ macro_rules! bridge_registry {
 bridge_registry! {
     "baseQueryOptions"            => NativeBaseQueryOptions,            base_query_options_bridge_fields_meta,            invoke_base_query_options;
     "baseTools"                   => NativeBaseTools,                   base_tools_bridge_fields_meta,                   invoke_base_tools;
+    "caseContextDefinition"       => NativeCaseContextDefinition,       case_context_definition_bridge_fields_meta,      invoke_case_context_definition;
+    "caseContextItem"             => NativeCaseContextItem,             case_context_item_bridge_fields_meta,            invoke_case_context_item;
     "caseDefinition"              => NativeCaseDefinition,              case_definition_bridge_fields_meta,              invoke_case_definition;
     "caseElseItem"                => NativeCaseElseItem,                case_else_item_bridge_fields_meta,               invoke_case_else_item;
     "caseItem"                    => NativeCaseItem,                    case_item_bridge_fields_meta,                    invoke_case_item;
@@ -472,6 +481,21 @@ fn invoke_case_switch_definition<IT: InnerTypes>(
     r
 }
 
+fn invoke_case_context_item<IT: InnerTypes>(b: &NativeCaseContextItem<IT>) -> InvokeResult {
+    let mut r = InvokeResult::new();
+    r.record("context", b.context());
+    r.record("sql", b.sql());
+    r
+}
+fn invoke_case_context_definition<IT: InnerTypes>(
+    b: &NativeCaseContextDefinition<IT>,
+) -> InvokeResult {
+    let mut r = InvokeResult::new();
+    r.record("when", b.when());
+    r.record("else_sql", b.else_sql());
+    r
+}
+
 fn invoke_member_order_by<IT: InnerTypes>(b: &NativeMemberOrderBy<IT>) -> InvokeResult {
     let mut r = InvokeResult::new();
     r.record("sql", b.sql());
@@ -654,6 +678,10 @@ fn invoke_base_tools<IT: InnerTypes>(b: &NativeBaseTools<IT>) -> InvokeResult {
     r.record("try_join_tree_for_hints", b.try_join_tree_for_hints(vec![]));
     r.skip(
         "compile_member_sql",
+        "Rc<dyn MemberSql> argument has no auto-default in Rust",
+    );
+    r.skip(
+        "evaluate_query_context_condition",
         "Rc<dyn MemberSql> argument has no auto-default in Rust",
     );
     r

@@ -140,6 +140,15 @@ impl CaseSqlNode {
     }
 }
 
+// The branch is chosen while the query node is planned; a node reaching the
+// renderer with every branch still in place skipped that step.
+fn unresolved_context_case(node: &Rc<MemberSymbol>) -> CubeError {
+    CubeError::internal(format!(
+        "QUERY_CONTEXT case of {} was not resolved against its query node",
+        node.full_name()
+    ))
+}
+
 // A case value rendered without its `CASE … END` wrap loses that wrap's
 // isolation; measures have no parenthesizing node above this one to restore it.
 fn unwrapped_case_value(visitor: &SqlEvaluatorVisitor, sql: String) -> String {
@@ -173,6 +182,7 @@ impl SqlNode for CaseSqlNode {
                             node_processor,
                             templates,
                         )?,
+                        Case::CaseContext(_) => return Err(unresolved_context_case(node)),
                     }
                 } else {
                     self.input.to_sql(
@@ -197,6 +207,7 @@ impl SqlNode for CaseSqlNode {
                             node_processor,
                             templates,
                         )?,
+                        Case::CaseContext(_) => return Err(unresolved_context_case(node)),
                     }
                 } else {
                     self.input.to_sql(

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/query_context_case.rs
+expression: result
+---
+orders__category | orders__amount_context_with_status_grain
+-----------------+-----------------------------------------
+books            | 490.0000000000000000                    
+clothing         | 535.0000000000000000                    
+electronics      | 266.6666666666666667
