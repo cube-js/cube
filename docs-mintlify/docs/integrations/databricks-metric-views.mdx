@@ -316,9 +316,9 @@ which reports obsolete targets without a `detail`. Publication-run `views[].outc
 accepts only the successful outcomes.
 Each `views[]` entry carries its destination as `target` (`catalog.schema.name`, or `null` when
 conversion blocked the view), and a run carries the `takeOverTargets` it was started with. A
-`blocked` view with `unmanaged-target` or `ownership-conflict` collides with an object Cube does
-not manage, and `taken-over` marks a view a take-over published. A CI job can pass a blocked
-view's `target` back in `takeOverTargets` to
+`blocked` view whose `detail` is `unmanaged-target` or `ownership-conflict` collides with an object
+Cube does not manage, and a `detail` of `taken-over` marks a view a take-over published. A CI job
+can pass a blocked view's `target` back in `takeOverTargets` to
 [take it over](#take-over-an-existing-metric-view).
 `incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
 zero rejects definitions missing measures.
@@ -495,11 +495,10 @@ converted from a mix of the two. Try again once the rollout finishes.
 ## Ownership, failures, and rollback
 
 Cube records ownership after a confirmed write. It refuses a view whose destination already
-holds an object this data source does not manage, and a managed target whose remote definition
-has drifted. Resolve the collision with the owner of the Databricks object or by
-[taking over the destination](#take-over-an-existing-metric-view); resolve drift with the owner,
-or contact [Cube support](/admin/account-billing/support). Cube never deletes or overwrites an
-object it does not manage unless an admin takes over that exact destination. A failed conversion,
+holds an object this data source does not manage. Resolve the collision with the owner of the
+Databricks object, by [taking over the destination](#take-over-an-existing-metric-view), or with
+[Cube support](/admin/account-billing/support). Cube never deletes or overwrites an object it does
+not manage unless you take over that exact destination. A failed conversion,
 validation, or write leaves that view's previous Databricks definition in place. Other views in
 the same run may still publish.
 
@@ -522,12 +521,14 @@ object this data source's publication does not manage:
 - `ownership-conflict`: the publication of another Databricks data source in your Cube account,
   in this or another deployment, manages it.
 
-To hand that destination to this data source, an admin takes it over. The run replaces the object
-at that exact destination with the view's Metric View and records it as managed by this data
-source; a data source that managed it before stops managing it. The object's current definition
-is lost. Later runs treat it like any other Metric View Cube manages. There is no option to take
-over everything: each take-over names its destinations, and without one Cube overwrites nothing
-it does not manage.
+To hand that destination to this data source, take it over, which needs the same `SchemaUpdate`
+access as any sync. The run replaces the object at that exact destination with the view's Metric
+View and records it as managed by this data source. The object's current definition is lost.
+Later runs treat it like any other Metric View Cube manages. A data source that managed it before
+stops managing it, and its next sync reports that view **Blocked** with `ownership-conflict`:
+remove the view from that data source's scope or change where it publishes. There is no option
+to take over everything: each take-over names its destinations, and without one Cube overwrites
+nothing it does not manage.
 
 - **In Console**: in the newest run in run history, select **Take over** next to the blocked view.
   The **Take over this destination?** confirmation names the destination; select
@@ -538,7 +539,7 @@ it does not manage.
   with `takeOverTargets`, a list of destinations as `catalog.schema.name`, for example
   `{"configurationVersion": 12, "takeOverTargets": ["main.metrics.orders"]}`. Each must be exactly
   where a Cube view in the run's scope publishes, ignoring case; otherwise the start returns `400`
-  and no run starts. It needs the same `SchemaUpdate` access as any sync.
+  and no run starts.
 
 Databricks lets only a view's owner, or a principal with `MANAGE` on it, replace the view, and the
 principal that replaces it becomes its owner (see
@@ -552,13 +553,16 @@ A take-over runs alone in your Cube account. Starting one returns `409` while an
 source's run is in flight, and starting another data source's run returns `409` while a take-over
 is in flight. A run that ended `CANCELLED` or `FAILED` in the last 10 minutes counts as in flight,
 because a write it sent may still land. A [deployment's run](#publish-after-each-deployment)
-retries a `409` for about 30 minutes.
+retries a `409` for about 30 minutes. The [CI recipe](#trigger-publication-from-ci) retries for
+about 5 minutes by default; if CI may start while a take-over runs, raise `MAX_START_ATTEMPTS`,
+for example to 90 (about 15 minutes).
 
 A failed take-over holds the run's drops, as a failed creation does (see
 [Removed views](#removed-views)). Cancelling a take-over does not stop a write already sent to
 Databricks. If that write lands, the new definition is live but Cube's record does not change: the
-destination stays unmanaged, or stays the other data source's until its model changes. Run the
-take-over again to record it.
+destination stays unmanaged, or stays managed by the other data source, which skips it while
+that view's model is unchanged and replaces it with its own definition once the model changes.
+Run the take-over again to record it.
 
 ### Removed views
 
