@@ -511,8 +511,9 @@ Other views in the same run may still publish.
 You can request cancellation of an active run. It prevents further writes but does not undo
 views already published. To roll back a bad definition, restore the desired Cube model and
 deploy it. Then preview and sync again or, with [Publish after each deployment](#publish-after-each-deployment)
-on, check that the card shows no [Databricks is behind](#databricks-behind-the-deployed-model)
-warning, and select **Publish now** if it does. Inspect run history and the Databricks target
+on, wait for that build's run to finish, then check that the card shows no
+[Databricks is behind](#databricks-behind-the-deployed-model) warning, and select **Publish now**
+if it does. Inspect run history and the Databricks target
 afterward.
 If publication is unavailable, contact [Cube support](/admin/account-billing/support) with
 the deployment, data source, run ID, and per-view issue codes. Do not send credentials or
@@ -525,7 +526,9 @@ published. When the deployment runs a newer build, the **Databricks Metric Views
 **Databricks is behind the deployed model**. The warning names the commit Databricks was last
 published from and the commit the deployment runs. When both builds share a commit, as after a
 redeploy, it names their build numbers instead. Select **Publish now** in the warning to publish
-the deployed build; the warning clears once that run publishes it.
+the deployed build; the warning clears once that run publishes it. A **Partial** run also
+clears the warning, but its **Blocked**, **Rejected by Databricks**, and **Write failed** views
+keep their earlier definitions, so check run history for them.
 
 The warning doesn't show while publication is turned off, while a run is active, or before the
 first run publishes. It can show briefly after a deployment with
