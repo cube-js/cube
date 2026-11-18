@@ -17,8 +17,8 @@ ones work, and why.
 
 ## How Cube queries across data sources
 
-A single Cube query always runs against one data source. A query that spans data
-sources works only in one of two ways:
+Without a `rollup_join`, a single Cube query runs against one data source. A query
+that spans data sources works only in one of two ways:
 
 - **Post-processing.** The SQL API splits the query into several Cube queries,
   each against one data source, and combines their results in [query
@@ -542,7 +542,7 @@ grouped results](#joining-grouped-results) instead.
 
 A view member takes the data source of its cube. A query to the `sales` view that
 uses only members of `orders` reads one data source, so it works, and the SQL API
-pushes the whole query down to that data source:
+runs it as one Cube query:
 
 ```sql
 SELECT status, MEASURE(revenue) AS revenue
