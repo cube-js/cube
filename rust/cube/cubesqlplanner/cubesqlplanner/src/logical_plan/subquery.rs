@@ -15,6 +15,7 @@ logical_source_enum!(
         MultiStageGetDateRange,
         MultiStageTimeSeries,
         MultiStageRollingWindow,
+        KeysGrid,
     ]
 );
 

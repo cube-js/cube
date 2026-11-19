@@ -2,10 +2,11 @@
   "name": "@cubejs-backend/model-schema",
   "description": "JSON Schema of the Cube model language, generated from Core's validator",
   "author": "Cube Dev, Inc.",
-  "version": "1.8.21",
-  "private": true,
+  "version": "1.8.29",
   "main": "index.js",
+  "types": "index.d.ts",
   "files": [
+    "index.d.ts",
     "index.js",
     "index.json",
     "manifests"
@@ -26,8 +27,8 @@
     "unit": "jest dist/test"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "1.8.21",
-    "@cubejs-backend/schema-compiler": "1.8.21",
+    "@cubejs-backend/linter": "1.8.29",
+    "@cubejs-backend/schema-compiler": "1.8.29",
     "@types/jest": "^29",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22",
@@ -37,5 +38,8 @@
     "js-yaml": "^4.1.0",
     "typescript": "~6.0.3"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
 }

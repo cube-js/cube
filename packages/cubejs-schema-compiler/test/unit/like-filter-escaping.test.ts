@@ -108,4 +108,29 @@ describe('LIKE filter wildcard escaping', () => {
       expect((await buildFilter(PostgresQuery, native, 'plain')).params).toEqual(['plain']);
     });
   });
+
+  // Cube Store before v1.6 fails any query that contains `||`, and a deployment can run an
+  // older Cube Store than its Cube API. A Cube Store integration test can't catch a regression
+  // here because current Cube Store accepts `||`, so this checks the generated SQL instead.
+  describe.each([['legacy', false], ['tesseract', true]])('Cube Store pattern on the %s planner', (_name, native) => {
+    it.each([
+      ['contains', "ILIKE CONCAT('%', ?, '%')"],
+      ['notContains', "NOT ILIKE CONCAT('%', ?, '%')"],
+      ['startsWith', "ILIKE CONCAT('', ?, '%')"],
+      ['endsWith', "ILIKE CONCAT('%', ?, '')"],
+    ])('%s builds the pattern with CONCAT, not ||', async (operator, expected) => {
+      await compilers.compile();
+
+      const query = compilers.createQuery(CubeStoreQuery, {
+        dimensions: ['Names.id'],
+        filters: [{ member: 'Names.name', operator, values: ['abc'] }],
+        useNativeSqlPlanner: native,
+      });
+
+      const [sql] = query.buildSqlAndParams();
+
+      expect(sql).not.toContain('||');
+      expect(sql.replace(/\s+/g, ' ')).toContain(expected);
+    });
+  });
 });

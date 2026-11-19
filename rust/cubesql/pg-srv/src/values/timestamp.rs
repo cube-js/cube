@@ -231,11 +231,22 @@ impl FromProtocolValue for TimestampValue {
         let pg_microseconds = BigEndian::read_i64(raw);
 
         // Convert PostgreSQL microseconds to Unix nanoseconds
-        let unix_nano = pg_base_date_epoch()
-            .and_utc()
-            .timestamp_nanos_opt()
-            .expect("Unable to get timestamp nanos for pg_base_date_epoch")
-            + (pg_microseconds * 1_000);
+        let unix_nano = pg_microseconds
+            .checked_mul(1_000)
+            .and_then(|nanos| {
+                pg_base_date_epoch()
+                    .and_utc()
+                    .timestamp_nanos_opt()
+                    .expect("Unable to get timestamp nanos for pg_base_date_epoch")
+                    .checked_add(nanos)
+            })
+            .ok_or_else(|| ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!("Timestamp out of range: {} microseconds", pg_microseconds),
+                ),
+                backtrace: Backtrace::capture(),
+            })?;
 
         Ok(TimestampValue::new(unix_nano, None))
     }
@@ -394,5 +405,16 @@ mod tests {
         // Test that invalid binary data returns errors
         assert!(TimestampValue::from_binary(&[1, 2, 3]).is_err()); // Wrong length
         assert!(TimestampValue::from_binary(&[]).is_err()); // Empty
+    }
+
+    #[test]
+    fn test_timestamp_binary_out_of_range() {
+        // Overflows the microseconds -> nanoseconds multiplication
+        assert!(TimestampValue::from_binary(&i64::MAX.to_be_bytes()).is_err());
+        assert!(TimestampValue::from_binary(&i64::MIN.to_be_bytes()).is_err());
+        // Largest value that still fits; one more overflows adding the 2000-01-01 epoch offset
+        let max_ok = (i64::MAX - 946_684_800_000_000_000) / 1_000;
+        assert!(TimestampValue::from_binary(&max_ok.to_be_bytes()).is_ok());
+        assert!(TimestampValue::from_binary(&(max_ok + 1).to_be_bytes()).is_err());
     }
 }

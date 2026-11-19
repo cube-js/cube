@@ -82,16 +82,16 @@ describe('CompilerApi', () => {
       expect(() => queryFactory.createQuery).toThrow(/disposed CompilerApi instance/);
     });
 
-    test('should set graphqlSchema to undefined on dispose', async () => {
+    test('should drop cached GraphQL schemas on dispose', async () => {
       const mockSchema = {} as any;
-      compilerApi.setGraphQLSchema(mockSchema);
+      compilerApi.setGraphQLSchema('compiler-id', mockSchema);
 
-      expect(compilerApi.getGraphQLSchema()).toBe(mockSchema);
+      expect(compilerApi.getGraphQLSchema('compiler-id')).toBe(mockSchema);
+      expect(compilerApi.getGraphQLSchema('other-compiler-id')).toBeUndefined();
 
       compilerApi.dispose();
 
-      // Schema should be undefined
-      expect(compilerApi.getGraphQLSchema()).toBeUndefined();
+      expect(compilerApi.getGraphQLSchema('compiler-id')).toBeUndefined();
     });
 
     test('should be safe to call dispose multiple times', async () => {
@@ -363,6 +363,50 @@ cubes:
       expect(second.cubes).toBe(first.cubes);
       expect(second.compilerId).toBe(first.compilerId);
       expect(visible(first)).toEqual(['orders.region']);
+    });
+
+    test('resolves the groups of a request once, whatever number of cubes have access policies', async () => {
+      const cubeWithPolicy = (name: string) => `
+  - name: ${name}
+    sql: SELECT * FROM ${name}
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+    access_policy:
+      - group: basic
+        member_level:
+          includes: "*"
+`;
+      const contextToGroups = jest.fn((context: any) => context.securityContext.groups);
+      const api = new CompilerApi(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{
+            fileName: 'cubes.yml',
+            content: `cubes:${['a', 'b', 'c', 'd'].map(cubeWithPolicy).join('')}`,
+          }]),
+        },
+        async () => 'postgres',
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          contextToGroups,
+        }
+      );
+
+      try {
+        await api.metaConfig({ requestId: 'request-1', securityContext: { groups: ['basic'] } } as any, {});
+        expect(contextToGroups).toHaveBeenCalledTimes(1);
+
+        await api.metaConfig({ requestId: 'request-2', securityContext: { groups: ['basic'] } } as any, {});
+        expect(contextToGroups).toHaveBeenCalledTimes(2);
+      } finally {
+        api.dispose();
+      }
     });
 
     test('patches another set of applicable policies on its own', async () => {

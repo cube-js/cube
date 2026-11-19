@@ -270,7 +270,8 @@ async fn test_calendar_shift_through_an_alias() {
     }
 }
 
-// The shift of one calendar instance leaves the other calendar's join alone.
+// A common shift moves each calendar instance through its own mapping, and
+// only its join: both buckets stay on the reporting dates.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_calendar_shift_through_one_alias_next_to_another() {
     let ctx = create_context();
@@ -298,6 +299,10 @@ async fn test_calendar_shift_through_one_alias_next_to_another() {
     );
     assert!(
         sql.contains(r#"ON "orders".created_at = "orders__calendar_created".date_prev_year"#),
+        "{sql}"
+    );
+    assert!(
+        sql.contains(r#"ON "orders".completed_at = "orders__calendar_completed".date_prev_year"#),
         "{sql}"
     );
 

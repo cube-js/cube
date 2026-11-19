@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/multi_granularity.rs
+assertion_line: 284
+expression: result
+---
+activity__cohort_date_month | activity__amount_all_january | activity__amount_early_january
+----------------------------+------------------------------+-------------------------------
+2025-01-01T00:00:00.000Z    | 165943                       | 12726

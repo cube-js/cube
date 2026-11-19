@@ -5,6 +5,7 @@ use std::sync::Arc;
 use warp::{Filter, Rejection, Reply};
 
 use crate::cachestore::QUEUE_ITEM_PROCESS_ID_MAX_LEN;
+use crate::import::LocationHelper;
 use crate::metastore::{Column, ColumnType, ImportFormat};
 use crate::mysql::SqlAuthService;
 use crate::sql::{
@@ -957,6 +958,8 @@ impl HttpServer {
         upload_query: UploadQuery,
         mut body: impl Stream<Item = Result<impl warp::Buf, warp::Error>> + Unpin,
     ) -> Result<impl Reply, Rejection> {
+        LocationHelper::temp_upload_remote_path(&upload_query.name)
+            .map_err(|e| CubeRejection::BadRequest(e.message))?;
         let temp_file = NamedTempFile::new_in(
             sql_service
                 .temp_uploads_dir(sql_query_context.clone())
@@ -1750,6 +1753,40 @@ mod tests {
         // Compared without pretty_assertions to keep a failure from dumping 512KB.
         assert_eq!(seen.len(), expected.len());
         assert!(seen == expected, "uploaded bytes differ from the body");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn upload_rejects_a_traversing_name_before_reading_the_body() -> Result<(), CubeError> {
+        let dir = tempfile::tempdir()?;
+        let service = Arc::new(UploadStubService {
+            dir: dir.path().to_path_buf(),
+            seen: std::sync::Mutex::new(None),
+        });
+        let body = futures::stream::iter(vec![Ok::<bytes::Bytes, warp::Error>(
+            bytes::Bytes::from_static(b"payload"),
+        )]);
+
+        let rejection = match HttpServer::handle_upload(
+            service.clone(),
+            SqlQueryContext::default(),
+            UploadQuery {
+                name: "../../escaped.csv".to_string(),
+            },
+            body,
+        )
+        .await
+        {
+            Ok(_) => panic!("traversing upload name was accepted"),
+            Err(rejection) => rejection,
+        };
+
+        assert!(matches!(
+            rejection.find::<CubeRejection>(),
+            Some(CubeRejection::BadRequest(_))
+        ));
+        assert!(service.seen.lock().unwrap().is_none());
+        assert_eq!(std::fs::read_dir(dir.path())?.count(), 0);
         Ok(())
     }
 

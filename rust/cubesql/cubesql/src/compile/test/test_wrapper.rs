@@ -2649,6 +2649,45 @@ async fn wrapper_dimension_agg_where_false() {
     assert!(sql.contains("LIMIT 50000"));
 }
 
+/// Aggregation(measure) with falsy filter should push the filter to Cube, not send a
+/// member-less ungrouped query with limit=0
+#[tokio::test]
+async fn wrapper_measure_agg_where_false() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            customer_gender,
+            MIN("count")
+        FROM
+            KibanaSampleDataEcommerce
+        WHERE 1 = 0
+        GROUP BY 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let sql = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .wrapped_sql
+        .sql;
+    assert!(sql.contains(r#"\"sql\":\"FALSE\""#), "{}", sql);
+    assert!(
+        sql.contains("KibanaSampleDataEcommerce.customer_gender"),
+        "{}",
+        sql
+    );
+    assert!(!sql.contains(r#""limit": 0"#), "{}", sql);
+}
+
 /// MIN(avg_measure) should get pushed to Cube with replaced measure
 #[tokio::test]
 async fn wrapper_min_from_avg_measure() {
@@ -8533,4 +8572,113 @@ async fn test_wrapper_describe_only_asks_cube_nothing() {
         described.as_logical_plan().schema(),
         planned.as_logical_plan().schema()
     );
+}
+
+#[tokio::test]
+async fn test_wrapper_trim_split_part_push_down() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan_customized(
+        // language=PostgreSQL
+        r#"
+        SELECT
+            TRIM(SPLIT_PART(customer_gender, ' - ', 1)) AS prefix,
+            AVG(avgPrice)
+        FROM KibanaSampleDataEcommerce
+        GROUP BY 1
+        "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+        vec![
+            (
+                "functions/TRIM".to_string(),
+                "TRIM({{ args_concat }})".to_string(),
+            ),
+            (
+                "functions/SPLITPART".to_string(),
+                "SPLIT_PART({{ args_concat }})".to_string(),
+            ),
+        ],
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
+    assert!(sql.contains("TRIM(SPLIT_PART("), "{}", sql);
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+}
+
+/// A rollup holding the members, with Cube matching no query to it
+async fn pre_aggregation_test_context_without_match(members: &[&str]) -> TestContext {
+    let mut config = ConfigObjImpl::default();
+    config.sql_push_down_pre_aggregations = true;
+    TestContext::with_config_and_meta(
+        DatabaseProtocol::PostgreSQL,
+        Arc::new(config),
+        get_test_tenant_ctx_with_cube_store_rollups(
+            vec![],
+            vec![],
+            vec![members
+                .iter()
+                .map(|member| format!("KibanaSampleDataEcommerce.{member}"))
+                .collect()],
+        ),
+    )
+    .await
+}
+
+/// A literal or a column used twice in one projected expression is one column of the inner
+/// query pushed to Cube
+#[tokio::test]
+async fn test_wrapper_pre_aggregation_duplicate_operand() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    for query in [
+        "SELECT taxful_total_price + taxful_total_price AS p FROM KibanaSampleDataEcommerce ORDER BY 1",
+        "SELECT (CASE WHEN taxful_total_price >= 38 THEN true ELSE false END) = true AS b FROM KibanaSampleDataEcommerce ORDER BY 1",
+        "SELECT taxful_total_price + 1 + 1 AS p FROM KibanaSampleDataEcommerce ORDER BY 1",
+    ] {
+        let context = pre_aggregation_test_context_without_match(&["taxful_total_price"]).await;
+        let wrapped_sql = wrapped_sql(&context, query).await;
+        assert!(!wrapped_sql.external, "{}", query);
+    }
+
+    // Only the query pushed to Cube reads the rollup here
+    let context = pre_aggregation_test_context_with_rollup(&["taxful_total_price"]).await;
+    let wrapped_sql = wrapped_sql(
+        &context,
+        "SELECT DISTINCT taxful_total_price + taxful_total_price AS p FROM KibanaSampleDataEcommerce",
+    )
+    .await;
+    assert!(wrapped_sql.external);
+}
+
+/// A pre-aggregation candidate that fails to convert leaves the query over the data source
+/// The candidate fails because the column named `"Int64(1)"` clashes with the literal `1` in
+/// its schema; once that converts, this test needs another candidate that fails
+#[tokio::test]
+async fn test_wrapper_pre_aggregation_unconvertible_candidate() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context_without_match(&["taxful_total_price"]).await;
+    let wrapped_sql = wrapped_sql(
+        &context,
+        r#"SELECT p + 1 + "Int64(1)" AS q FROM (SELECT taxful_total_price AS p, 5 AS "Int64(1)" FROM KibanaSampleDataEcommerce) s ORDER BY 1"#,
+    )
+    .await;
+    assert!(!wrapped_sql.external);
 }

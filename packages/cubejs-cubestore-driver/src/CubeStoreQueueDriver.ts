@@ -113,8 +113,12 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
       priority,
     ];
 
-    if (options.orphanedTimeout) {
-      values.push(options.orphanedTimeout);
+    // With the default too, so every waiter's re-add keeps the item from being orphaned. Older
+    // versions neither touch nor keep an item with ORPHANED as long as one without it.
+    const orphanedTimeout = options.orphanedTimeout ||
+      (await this.driver.hasCapability('queueTouch') ? this.options.orphanedTimeout : undefined);
+    if (orphanedTimeout) {
+      values.push(orphanedTimeout);
     }
 
     const useExternalId = options.externalId && await this.useExternalId();
@@ -130,7 +134,7 @@ export class CubestoreQueueDriverConnection implements QueueDriverConnectionInte
     return {
       addedToQueueTime: data.addedToQueueTime,
       values,
-      modifiers: `${exclusive ? ' EXCLUSIVE' : ''} PRIORITY ?${options.orphanedTimeout ? ' ORPHANED ?' : ''}${useExternalId ? ' EXTERNAL_ID ?' : ''} ? ?`,
+      modifiers: `${exclusive ? ' EXCLUSIVE' : ''} PRIORITY ?${orphanedTimeout ? ' ORPHANED ?' : ''}${useExternalId ? ' EXTERNAL_ID ?' : ''} ? ?`,
     };
   }
 

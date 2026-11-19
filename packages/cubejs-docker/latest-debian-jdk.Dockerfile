@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile-upstream:master-experimental
-FROM node:24.22.1-trixie-slim AS builder
+FROM node:24.22.3-trixie-slim AS builder
 
 # Use the image's Node headers to avoid concurrent node-gyp downloads and copies.
 ENV npm_config_nodedir=/usr/local
@@ -23,7 +23,7 @@ RUN yarn workspaces focus --production \
     # Users run their own Yarn in /cube/conf, so the monorepo's Yarn must not leak into the image
     && rm -rf .yarn .yarnrc.yml
 
-FROM node:24.22.1-trixie-slim
+FROM node:24.22.3-trixie-slim
 
 ARG IMAGE_VERSION=unknown
 

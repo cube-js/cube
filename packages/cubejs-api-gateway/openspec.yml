@@ -85,7 +85,7 @@ components:
       in: header
       name: x-request-id
       required: false
-      description: Request id for tracing; a request with an invalid id is rejected with 400. Generated when neither this header nor traceparent is sent.
+      description: Request id for tracing; for security, it must be unique and unpredictable, e.g., a random UUID. A request with an invalid id is rejected with 400. Generated when neither this header nor traceparent is sent.
       schema:
         type: string
         minLength: 1

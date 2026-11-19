@@ -11,6 +11,23 @@ pub use test_context::TestContext;
 
 use crate::planner::{CubeId, MemberId};
 
+/// Runs plain SQL over a freshly seeded database, as an oracle for planned
+/// queries; `None` unless built with `integration-postgres`.
+#[cfg(feature = "integration-postgres")]
+pub async fn try_execute_raw_pg(sql: &str, seed_file: &str) -> Option<String> {
+    let client = pg_service::connect_and_seed(seed_file).await;
+    let messages = client
+        .simple_query(sql)
+        .await
+        .unwrap_or_else(|e| panic!("SQL execution failed:\n{sql}\n\nError: {e:?}"));
+    Some(integration_context::format_simple_query_results(&messages))
+}
+
+#[cfg(not(feature = "integration-postgres"))]
+pub async fn try_execute_raw_pg(_sql: &str, _seed_file: &str) -> Option<String> {
+    None
+}
+
 /// The id a member renders as `cube.member`, or `expr:cube.member` for an
 /// expression.
 pub fn member_id(full_name: &str) -> MemberId {

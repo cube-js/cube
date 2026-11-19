@@ -1,7 +1,6 @@
 use super::{CommonUtils, JoinTreeBuilder};
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_item::JoinItem;
-use crate::logical_plan::*;
 use crate::planner::join_hints::JoinHints;
 use crate::planner::state::State;
 use crate::planner::MemberSymbol;
@@ -50,26 +49,11 @@ impl JoinPlanner {
         }
     }
 
-    /// Builds the query inputs from join hints, asking the join graph
-    /// to materialise the matching `JoinDefinition`.
-    pub fn make_query_inputs_with_join_hints(
-        &self,
-        join_hints: JoinHints,
-    ) -> Result<Rc<QueryInputs>, CubeError> {
+    /// The join tree of `join_hints`, materialised by the join graph.
+    pub fn join_tree_for_hints(&self, join_hints: JoinHints) -> Result<Rc<JoinTree>, CubeError> {
         let (_, join_tree) =
             JoinTreeBuilder::new(self.query_tools.clone()).build_for_hints(&join_hints)?;
-        Ok(self.make_query_inputs(join_tree))
-    }
-
-    /// No inputs — used when the query needs no joins
-    /// (e.g. it touches a single cube and pulls nothing extra).
-    pub fn make_empty_query_inputs(&self) -> Rc<QueryInputs> {
-        Rc::new(QueryInputs::builder().build())
-    }
-
-    /// Query inputs over an already-resolved `JoinTree`.
-    pub fn make_query_inputs(&self, join_tree: Rc<JoinTree>) -> Rc<QueryInputs> {
-        Rc::new(QueryInputs::builder().join(Some(join_tree)).build())
+        Ok(join_tree)
     }
 
     /// Materialises the join from `join_hints` and resolves the

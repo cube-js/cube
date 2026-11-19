@@ -21,6 +21,7 @@ import {
   internalExceptions,
   INVALID_REQUEST_ID_MESSAGE,
   isValidRequestId,
+  memoizeByObject,
   pinPreAggregationsSchema,
   releasePreAggregationsSchemaPin,
   track,
@@ -68,6 +69,7 @@ import type {
   DriverConfig,
   ScheduledRefreshTimeZonesFn,
   ContextToCubeStoreRouterIdFn,
+  ContextToPreAggregationOrchestratorIdFn,
   LoggerFnParams,
 } from './types';
 import {
@@ -156,6 +158,8 @@ export class CubejsServerCore {
 
   protected readonly contextToCubeStoreRouterId: ContextToCubeStoreRouterIdFn | null;
 
+  protected readonly contextToPreAggregationOrchestratorId: ContextToPreAggregationOrchestratorIdFn;
+
   protected readonly preAggregationsSchema: PreAggregationsSchemaFn;
 
   /**
@@ -236,8 +240,10 @@ export class CubejsServerCore {
       dispose: (v) => v.dispose(),
     });
 
+    // A request reaches the context functions through many code paths, while they can be costly
+    // user code, so each runs once per request context
     if (this.options.contextToAppId) {
-      this.contextToAppId = this.options.contextToAppId;
+      this.contextToAppId = memoizeByObject(this.options.contextToAppId);
       this.standalone = false;
     }
 
@@ -247,8 +253,13 @@ export class CubejsServerCore {
       throw new Error('contextToDataSourceId has been deprecated and removed. Use contextToOrchestratorId instead.');
     }
 
-    this.contextToOrchestratorId = this.options.contextToOrchestratorId || (() => 'STANDALONE');
-    this.contextToCubeStoreRouterId = this.options.contextToCubeStoreRouterId;
+    this.contextToOrchestratorId = this.options.contextToOrchestratorId
+      ? memoizeByObject(this.options.contextToOrchestratorId)
+      : () => 'STANDALONE';
+    this.contextToCubeStoreRouterId = this.options.contextToCubeStoreRouterId
+      ? memoizeByObject(this.options.contextToCubeStoreRouterId)
+      : this.options.contextToCubeStoreRouterId;
+    this.contextToPreAggregationOrchestratorId = this.resolveContextToPreAggregationOrchestratorId();
 
     // proactively free up old cache values occasionally
     if (this.options.maxCompilerCacheKeepAlive) {
@@ -672,6 +683,18 @@ export class CubejsServerCore {
     this.startScheduledRefreshTimer();
   }
 
+  protected resolveContextToPreAggregationOrchestratorId(): ContextToPreAggregationOrchestratorIdFn {
+    if (this.options.contextToPreAggregationOrchestratorId) {
+      return memoizeByObject(this.options.contextToPreAggregationOrchestratorId);
+    }
+
+    if (this.contextToCubeStoreRouterId && getEnv('preAggregationsOrchestratorIdFromRouter')) {
+      return this.contextToCubeStoreRouterId;
+    }
+
+    return this.contextToOrchestratorId;
+  }
+
   public async getOrchestratorApi(context: RequestContext): Promise<OrchestratorApi> {
     const orchestratorId = await this.contextToOrchestratorId(context);
 
@@ -715,6 +738,12 @@ export class CubejsServerCore {
 
     const contextToDbType: DbTypeInternalFn = this.contextToDbType.bind(this);
     const externalDbType = this.contextToExternalDbType(context);
+    // An orchestrator is cached by its own id, so its pre-aggregation id comes from
+    // the context that built it, as its other per-context options do
+    const preAggregationOrchestratorId = `${await this.contextToPreAggregationOrchestratorId(context)}`;
+    // Every query asks for the type of its data source, and the default `dbType` calls
+    // `driverFactory` to answer, but the answer depends only on this orchestrator's context
+    const dbTypeByDataSource = new Map<string, ReturnType<DbTypeInternalFn>>();
 
     // orchestrator options can be empty, if user didn't define it.
     // so we are adding default and configuring queues concurrency.
@@ -828,13 +857,23 @@ export class CubejsServerCore {
             }
           })();
         }),
-        contextToDbType: async (dataSource) => contextToDbType({
-          ...context,
-          dataSource
-        }),
+        contextToDbType: (dataSource) => {
+          let dbType = dbTypeByDataSource.get(dataSource);
+          if (!dbType) {
+            dbType = Promise.resolve(contextToDbType({ ...context, dataSource }));
+            dbTypeByDataSource.set(dataSource, dbType);
+            dbType.catch(() => dbTypeByDataSource.delete(dataSource));
+          }
+          return dbType;
+        },
         // speedup with cache
         contextToExternalDbType: () => externalDbType,
         redisPrefix: orchestratorId,
+        // Left unset when it matches, so `orchestratorOptions.redisPrefix` still keys
+        // the pre-aggregation queues by default
+        preAggregationsRedisPrefix: preAggregationOrchestratorId !== orchestratorId
+          ? preAggregationOrchestratorId
+          : undefined,
         skipExternalCacheAndQueue: externalDbType === 'cubestore',
         cacheAndQueueDriver: this.options.cacheAndQueueDriver,
         ...orchestratorOptions,

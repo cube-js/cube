@@ -26,7 +26,7 @@ import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
-import { disposedProxy, getEnv } from '@cubejs-backend/shared';
+import { disposedProxy, getEnv, memoizeByObject } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
 import { DriverCapabilities } from '@cubejs-backend/base-driver';
@@ -146,7 +146,15 @@ export class CompilerApi {
 
   protected readonly multiTenantSharing: boolean;
 
-  protected graphqlSchema?: GraphQLSchema;
+  /**
+   * Keyed by the compiler id `metaConfig` returns, which mixes in the caller's visibility mask:
+   * one schema per model version and set of members the access policies leave visible.
+   */
+  protected graphqlSchemas: LRUCache<string, GraphQLSchema> = new LRUCache({
+    max: 64,
+    ttl: 1000 * 60 * 5,
+    updateAgeOnGet: true,
+  });
 
   protected compilers?: Promise<Compilers>;
 
@@ -176,7 +184,9 @@ export class CompilerApi {
     this.convertTzForRawTimeDimension = this.options.convertTzForRawTimeDimension;
     this.localRefreshKey = this.options.localRefreshKey;
     this.schemaVersion = this.options.schemaVersion;
-    this.contextToGroups = this.options.contextToGroups;
+    // A request checks the access policies of every cube it touches, and `contextToGroups`
+    // can be costly user code, so it runs once per request context
+    this.contextToGroups = this.options.contextToGroups && memoizeByObject(this.options.contextToGroups);
     this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
     this.sqlCache = options.sqlCache;
@@ -229,7 +239,7 @@ export class CompilerApi {
     // using safeguard for potential dangling references.
     this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
     this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
-    this.graphqlSchema = undefined;
+    this.graphqlSchemas.clear();
 
     // A request can still hold this instance -- the gateway keeps one across
     // several awaits. Clearing the version makes its next getCompilers()
@@ -237,12 +247,12 @@ export class CompilerApi {
     this.compilerVersion = undefined;
   }
 
-  public setGraphQLSchema(schema: GraphQLSchema): void {
-    this.graphqlSchema = schema;
+  public setGraphQLSchema(compilerId: string, schema: GraphQLSchema): void {
+    this.graphqlSchemas.set(compilerId, schema);
   }
 
-  public getGraphQLSchema(): GraphQLSchema {
-    return this.graphqlSchema;
+  public getGraphQLSchema(compilerId: string): GraphQLSchema | undefined {
+    return this.graphqlSchemas.get(compilerId);
   }
 
   public createNativeInstance(): NativeInstance {

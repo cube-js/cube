@@ -1,6 +1,8 @@
 // Converts Joi's description of Core's model schemas into a JSON Schema (draft-07) of the model
 // language as written in YAML. A rule Joi keeps only as a JS function becomes its looser base
 // type.
+import type { JsonSchema, JsonSchemaObject } from '../index.js';
+
 import { withDefinitions } from './definitions';
 
 /** The parts of `Joi.Description` the converter reads. */
@@ -66,34 +68,6 @@ interface JoiWhen extends Partial<JoiCase> {
   ref: JoiRef;
   switch?: JoiCase[];
   break?: boolean;
-}
-
-export type JsonSchema = boolean | JsonSchemaObject;
-
-export interface JsonSchemaObject {
-  $schema?: string;
-  $ref?: string;
-  type?: string | string[];
-  description?: string;
-  deprecated?: boolean;
-  enum?: unknown[];
-  pattern?: string;
-  minItems?: number;
-  maxItems?: number;
-  minLength?: number;
-  maxLength?: number;
-  properties?: Record<string, JsonSchema>;
-  patternProperties?: Record<string, JsonSchema>;
-  required?: string[];
-  additionalProperties?: boolean;
-  items?: JsonSchema;
-  anyOf?: JsonSchema[];
-  allOf?: JsonSchema[];
-  not?: JsonSchema;
-  if?: JsonSchema;
-  then?: JsonSchema;
-  else?: JsonSchema;
-  definitions?: Record<string, JsonSchema>;
 }
 
 export type ModelSchemaDescriptions = Record<'cube' | 'view' | 'viewGroup', JoiDescription>;

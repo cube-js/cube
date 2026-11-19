@@ -802,6 +802,36 @@ impl RocksCacheStore {
             active,
         })
     }
+
+    fn touch_queue_item<'a>(
+        db_ref: &DbTableRef<'a>,
+        queue_schema: &QueueItemRocksTable<'a>,
+        batch_pipe: &mut BatchPipe<'a>,
+        id_row: IdRow<QueueItem>,
+        orphaned: u32,
+    ) -> Result<IdRow<QueueItem>, CubeError> {
+        let mut item = id_row.get_row().clone();
+        let Some(expire_moved) = item.touch_orphaned(orphaned) else {
+            return Ok(id_row);
+        };
+
+        if expire_moved {
+            // The payload is evicted on its own expiry, so it must outlive the item it belongs to
+            let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+            if let Some(payload_row) = queue_payload_schema.get_row(id_row.get_id())? {
+                let mut payload = payload_row.get_row().clone();
+                payload.set_expire(item.get_expire().clone());
+                queue_payload_schema.update(
+                    payload_row.get_id(),
+                    payload,
+                    payload_row.get_row(),
+                    batch_pipe,
+                )?;
+            }
+        }
+
+        queue_schema.update(id_row.get_id(), item, id_row.get_row(), batch_pipe)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, DeepSizeOf)]
@@ -1368,7 +1398,12 @@ impl CacheStore for RocksCacheStore {
                 .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
 
             let (id, added) = if let Some(row) = id_row_opt {
-                (row.id, false)
+                let id = row.get_id();
+                if let Some(orphaned) = payload.orphaned {
+                    Self::touch_queue_item(&db_ref, &queue_schema, batch_pipe, row, orphaned)?;
+                }
+
+                (id, false)
             } else {
                 let queue_item_row = queue_schema.insert(
                     QueueItem::new(
@@ -1438,6 +1473,12 @@ impl CacheStore for RocksCacheStore {
 
             if let Some(id_row) = id_row_opt {
                 let id = id_row.get_id();
+                // The claim below updates the touched row, so it has to start from it
+                let id_row = if let Some(orphaned) = payload.orphaned {
+                    Self::touch_queue_item(&db_ref, &queue_schema, batch_pipe, id_row, orphaned)?
+                } else {
+                    id_row
+                };
                 let claim_result = if claim {
                     let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
 
@@ -3565,6 +3606,247 @@ mod tests {
         assert!(err.message.contains("was removed"), "{}", err.message);
 
         RocksCacheStore::cleanup_test_cachestore("test_queue_result_blocking_by_path_removed");
+
+        Ok(())
+    }
+
+    fn queue_add_orphaned_payload(path: &str, orphaned: Option<u32>) -> QueueAddPayload {
+        QueueAddPayload {
+            path: path.to_string(),
+            value: "v".to_string(),
+            priority: 0,
+            orphaned,
+            process_id: None,
+            exclusive: false,
+            external_id: None,
+        }
+    }
+
+    async fn queue_item_by_key(
+        cachestore: &Arc<RocksCacheStore>,
+        key: &str,
+    ) -> Result<IdRow<QueueItem>, CubeError> {
+        Ok(cachestore
+            .queue_all(None)
+            .await?
+            .into_iter()
+            .find(|row| row.item.get_row().get_key() == key)
+            .expect("queue item must exist")
+            .item)
+    }
+
+    #[test]
+    fn test_queue_item_expire_is_never_shorter_with_orphaned() {
+        let without = QueueItem::new(
+            "prefix:k".to_string(),
+            QueueItemStatus::Pending,
+            0,
+            None,
+            None,
+            false,
+            None,
+        );
+        let with = QueueItem::new(
+            "prefix:k".to_string(),
+            QueueItemStatus::Pending,
+            0,
+            Some(120),
+            None,
+            false,
+            None,
+        );
+
+        assert!(with.get_expire() >= without.get_expire());
+    }
+
+    #[test]
+    fn test_queue_item_touch_skips_while_deadline_is_far() {
+        let item = |orphaned: u32| {
+            QueueItem::new(
+                "prefix:k".to_string(),
+                QueueItemStatus::Pending,
+                0,
+                Some(orphaned),
+                None,
+                false,
+                None,
+            )
+        };
+
+        // A full timeout is still left: polling waiters must not rewrite the row on every add
+        assert_eq!(item(900).touch_orphaned(600), None);
+
+        // Less than a full timeout left: written, and at least a full timeout is left again
+        let mut due = item(590);
+        assert!(due.touch_orphaned(600).is_some());
+        assert!(due.get_orphaned().unwrap() >= chrono::Utc::now() + chrono::Duration::seconds(600));
+        // so the poll right after it is skipped
+        assert_eq!(due.touch_orphaned(600), None);
+    }
+
+    #[tokio::test]
+    async fn test_queue_add_touches_orphaned() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_add_touches_orphaned",
+            Config::test("test_queue_add_touches_orphaned"),
+        );
+
+        let res = cachestore
+            .queue_add(queue_add_orphaned_payload("prefix:touched", Some(0)))
+            .await?;
+        assert!(res.added);
+        // Seconds precision on disk, so let the zero deadline pass for sure
+        Delay::new(Duration::from_millis(1100)).await;
+
+        let to_cancel = cachestore
+            .queue_to_cancel("prefix".to_string(), Some(120_000), None)
+            .await?;
+        assert_eq!(to_cancel.len(), 1, "an item nobody waits for is orphaned");
+
+        // A waiter adding it again pushes the deadline forward instead of being ignored
+        let before = queue_item_by_key(&cachestore, "touched").await?;
+        let res = cachestore
+            .queue_add(queue_add_orphaned_payload("prefix:touched", Some(600)))
+            .await?;
+        assert!(!res.added);
+        assert_eq!(res.id, before.get_id());
+
+        let after = queue_item_by_key(&cachestore, "touched").await?;
+        let deadline = after
+            .get_row()
+            .get_orphaned()
+            .expect("touched item has a deadline");
+        assert!(deadline > chrono::Utc::now() + chrono::Duration::seconds(500));
+        assert!(*after.get_row().get_expire() >= deadline + chrono::Duration::hours(2));
+
+        let to_cancel = cachestore
+            .queue_to_cancel("prefix".to_string(), Some(120_000), None)
+            .await?;
+        assert!(to_cancel.is_empty(), "a touched item is not orphaned");
+
+        // A shorter timeout never pulls the deadline back
+        cachestore
+            .queue_add(queue_add_orphaned_payload("prefix:touched", Some(0)))
+            .await?;
+        let again = queue_item_by_key(&cachestore, "touched").await?;
+        assert_eq!(
+            again.get_row().get_orphaned(),
+            after.get_row().get_orphaned()
+        );
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_add_touches_orphaned");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_queue_add_without_orphaned_does_not_touch() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_add_without_orphaned_does_not_touch",
+            Config::test("test_queue_add_without_orphaned_does_not_touch"),
+        );
+
+        cachestore
+            .queue_add(queue_add_orphaned_payload("prefix:untouched", None))
+            .await?;
+        let before = queue_item_by_key(&cachestore, "untouched").await?;
+
+        cachestore
+            .queue_add(queue_add_orphaned_payload("prefix:untouched", None))
+            .await?;
+        let after = queue_item_by_key(&cachestore, "untouched").await?;
+        assert_eq!(before.get_row(), after.get_row());
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_add_without_orphaned_does_not_touch");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_queue_add_touch_extends_payload_expire() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_add_touch_extends_payload_expire",
+            Config::test("test_queue_add_touch_extends_payload_expire"),
+        );
+
+        let res = cachestore
+            .queue_add(queue_add_orphaned_payload("prefix:long_wait", Some(0)))
+            .await?;
+        let created_expire = queue_item_by_key(&cachestore, "long_wait")
+            .await?
+            .get_row()
+            .get_expire()
+            .clone();
+
+        // Past the item's own expiry, so both the item and its payload have to move
+        cachestore
+            .queue_add(queue_add_orphaned_payload(
+                "prefix:long_wait",
+                Some(5 * 60 * 60),
+            ))
+            .await?;
+
+        let item = queue_item_by_key(&cachestore, "long_wait").await?;
+        assert!(*item.get_row().get_expire() > created_expire);
+
+        let id = res.id;
+        let payload = cachestore
+            .read_operation_queue("test_payload_expire", move |db_ref| {
+                QueueItemPayloadRocksTable::new(db_ref).get_row(id)
+            })
+            .await?
+            .expect("payload must exist");
+        assert_eq!(payload.get_row().get_expire(), item.get_row().get_expire());
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_add_touch_extends_payload_expire");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_queue_add_and_retrieve_touches_then_claims() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_, cachestore) = RocksCacheStore::prepare_test_cachestore(
+            "test_queue_add_and_retrieve_touches_then_claims",
+            Config::test("test_queue_add_and_retrieve_touches_then_claims"),
+        );
+
+        // Pending: no concurrency left for it
+        let res = cachestore
+            .queue_add_and_retrieve(QueueAddAndRetrievePayload {
+                orphaned: Some(0),
+                ..queue_add_and_retrieve_payload("prefix:claimed", "v", 0)
+            })
+            .await?;
+        assert!(res.added);
+        assert_queue_item_status(&cachestore, "claimed", QueueItemStatus::Pending, false).await?;
+
+        // Added again with room to run: touched and claimed in the same write
+        let res = cachestore
+            .queue_add_and_retrieve(QueueAddAndRetrievePayload {
+                orphaned: Some(600),
+                ..queue_add_and_retrieve_payload("prefix:claimed", "v", 1)
+            })
+            .await?;
+        assert!(!res.added);
+        assert_eq!(res.payload, Some("v".to_string()));
+
+        assert_queue_item_status(&cachestore, "claimed", QueueItemStatus::Active, true).await?;
+        let item = queue_item_by_key(&cachestore, "claimed").await?;
+        let deadline = item
+            .get_row()
+            .get_orphaned()
+            .expect("touched item has a deadline");
+        assert!(deadline > chrono::Utc::now() + chrono::Duration::seconds(500));
+
+        RocksCacheStore::cleanup_test_cachestore("test_queue_add_and_retrieve_touches_then_claims");
 
         Ok(())
     }

@@ -72,6 +72,8 @@ pub struct MockBaseQueryOptions {
     #[builder(default)]
     multi_stage_leaf_merge: Option<bool>,
     #[builder(default)]
+    multi_stage_scan_sharing: Option<bool>,
+    #[builder(default)]
     cubestore_union_full_key_aggregate: Option<bool>,
     #[builder(default)]
     union_full_key_aggregate: Option<bool>,
@@ -113,6 +115,7 @@ impl_static_data!(
     total_query,
     cubestore_support_multistage,
     multi_stage_leaf_merge,
+    multi_stage_scan_sharing,
     cubestore_union_full_key_aggregate,
     union_full_key_aggregate,
     max_multi_stage_depth,

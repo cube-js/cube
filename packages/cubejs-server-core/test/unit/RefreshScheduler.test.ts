@@ -1092,6 +1092,7 @@ describe('Refresh Scheduler', () => {
       buildJobs.forEach(({ job }) => {
         expect(job?.dataSource).toEqual('default');
         expect(['UTC', 'America/Los_Angeles']).toContain(job?.timezone);
+        expect(job?.context.securityContext).toMatchObject({ tenantId: 'tenant1' });
       });
     });
 
@@ -1106,10 +1107,13 @@ describe('Refresh Scheduler', () => {
       const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
 
       let finish = false;
+      let jobs: string[] = [];
+      // What the job stores when the context it runs in was extended from it.
+      const jobContext = { securityContext: { tenant: 'posted' } };
 
       while (!finish) {
         try {
-          await refreshScheduler.postBuildJobs(
+          jobs = await refreshScheduler.postBuildJobs(
             ctx,
             {
               metadata: undefined,
@@ -1117,7 +1121,8 @@ describe('Refresh Scheduler', () => {
               timezones: ['UTC', 'America/Los_Angeles'],
               forceBuildPreAggregations: false,
               throwErrors: false,
-            }
+            },
+            jobContext,
           );
           finish = true;
         } catch (err: any) {
@@ -1145,6 +1150,10 @@ describe('Refresh Scheduler', () => {
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_first') && o.timezone === 'America/Los_Angeles').length).toEqual(5);
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_orphaned')).length).toEqual(0);
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_second')).length).toEqual(0);
+
+      const buildJobs = await refreshScheduler.getCachedBuildJobs(ctx, jobs);
+      expect(buildJobs.length).toBeGreaterThan(0);
+      buildJobs.forEach(({ job }) => expect(job?.context).toEqual(jobContext));
     });
 
     test('Only `first` pre-aggregation with dateRange', async () => {
@@ -1418,7 +1427,18 @@ describe('Refresh Scheduler', () => {
     // Initial backoff multiplier is 1 second
     expect(backoffData!.backoffMultiplier).toBeGreaterThanOrEqual(1);
 
-    // Step 1: Immediate retry - should skip due to backoff (10-second window)
+    // The first windows (1s from each build start) have passed, and the earliest entries have expired,
+    // by now; force all foo_first partitions into backoff so the retries below run inside it
+    for (const partition of possiblePartitions) {
+      const tableName = `stb_pre_aggregations.foo_first${partition}`;
+      const data = await preAggsInstance.getPreAggBackoff(tableName);
+      await preAggsInstance.updatePreAggBackoff(tableName, {
+        backoffMultiplier: data?.backoffMultiplier ?? 1,
+        nextTimestamp: new Date(Date.now() + 60 * 1000),
+      });
+    }
+
+    // Step 1: Immediate retry - should skip due to backoff
     const beforeSkipAttempts = mockDriver.queryAttempts;
     const immediateRetryCount = 5;
 
@@ -1435,16 +1455,8 @@ describe('Refresh Scheduler', () => {
       }
     }
 
-    // Query attempts should not increase significantly (skipped due to backoff)
-    // Allow some margin for other pre-aggregations processed by scheduler
-    expect(mockDriver.queryAttempts).toBeLessThanOrEqual(beforeSkipAttempts + 2);
-
-    // Step 2: Verify backoff persists - pre-aggregation is still in backoff after 500ms
-    await mockDriver.delay(500);
-    const backoffDataStillActive = await preAggsInstance.getPreAggBackoff(targetTableName!);
-    expect(backoffDataStillActive).not.toBeNull();
-    // backoffDataStillActive exists, which means backoff is still in place
-    // (nextTimestamp may be close to current time due to test execution delays)
+    // No new attempts: every partition in backoff is skipped
+    expect(mockDriver.queryAttempts).toBe(beforeSkipAttempts);
   });
 
   describe('Local refresh key', () => {

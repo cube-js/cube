@@ -9,11 +9,12 @@ use crate::{
             },
             binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
             cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
-            cube_scan_members_empty_tail, cube_scan_order_empty_tail, dimension_expr, distinct,
-            expr_column_name, filter, fun_expr, join, like_expr, limit,
+            cube_scan_members_empty_tail, cube_scan_order_empty_tail, cube_scan_wrapper,
+            dimension_expr, distinct, expr_column_name, filter, fun_expr, join, like_expr, limit,
             list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
             literal_member, measure_expr, member_pushdown_replacer, member_replacer,
-            multi_fact_join_wrapper, original_expr_name, projection, referenced_columns, rewrite,
+            multi_fact_join_wrapper, original_expr_name, projection, projection_expr,
+            referenced_columns, rewrite,
             rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
             rules::{
                 replacer_flat_push_down_node_substitute_rules, replacer_push_down_node,
@@ -23,13 +24,13 @@ use crate::{
             transforming_chain_rewrite, transforming_rewrite, transforming_rewrite_with_root,
             udaf_expr, udf_expr, virtual_field_expr, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
-            BinaryExprOp, CastExprDataType, ColumnExprColumn, CubeScanAliasToCube,
-            CubeScanCanPushdownJoin, CubeScanJoinHints, CubeScanLimit, CubeScanOffset,
-            CubeScanUngrouped, DimensionName, JoinLeftOn, JoinRightOn, LikeExprEscapeChar,
-            LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip, ListType,
-            LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
-            MeasureName, MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
-            MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube,
+            AllMembersSelected, BinaryExprOp, CastExprDataType, ColumnExprColumn,
+            CubeScanAliasToCube, CubeScanCanPushdownJoin, CubeScanJoinHints, CubeScanLimit,
+            CubeScanOffset, CubeScanUngrouped, DimensionName, JoinLeftOn, JoinRightOn,
+            LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip,
+            ListType, LiteralExprValue, LiteralMemberRelation, LiteralMemberValue,
+            LogicalPlanLanguage, MeasureName, MemberErrorAliasToCube, MemberErrorError,
+            MemberErrorPriority, MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube,
             MultiFactJoinWrapperJoinMembers, ProjectionAlias, TableScanFetch, TableScanProjection,
             TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
             TimeDimensionGranularity, TimeDimensionName,
@@ -67,6 +68,60 @@ pub struct MemberRules {
 impl RewriteRules for MemberRules {
     fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = vec![
+            // `SELECT *` over a scan reads all of its members: marking them selected keeps the
+            // scan one node, where pushing the expanded columns down would add nodes per member
+            rewrite(
+                "select-all-members",
+                projection(
+                    projection_expr(vec!["WildcardExpr"]),
+                    cube_scan(
+                        "?alias_to_cube",
+                        cube_scan_members(
+                            all_members("?cube", "?alias", "AllMembersSelected:false"),
+                            cube_scan_members_empty_tail(),
+                        ),
+                        "?filters",
+                        "?order",
+                        "?limit",
+                        "?offset",
+                        "?split",
+                        "?can_pushdown_join",
+                        "?wrapped",
+                        "?ungrouped",
+                        "?join_hints",
+                    ),
+                    "ProjectionAlias:None",
+                    "?projection_split",
+                ),
+                cube_scan(
+                    "?alias_to_cube",
+                    cube_scan_members(
+                        all_members("?cube", "?alias", "AllMembersSelected:true"),
+                        cube_scan_members_empty_tail(),
+                    ),
+                    "?filters",
+                    "?order",
+                    "?limit",
+                    "?offset",
+                    "?split",
+                    "?can_pushdown_join",
+                    "?wrapped",
+                    "?ungrouped",
+                    "?join_hints",
+                ),
+            ),
+            // A wrapped scan of a table exposes every column of it already, and the wrapper can't
+            // render a wildcard projection on top
+            rewrite(
+                "select-all-wrapper",
+                projection(
+                    projection_expr(vec!["WildcardExpr"]),
+                    cube_scan_wrapper("?wrapper_input", "CubeScanWrapperFinalized:false"),
+                    "ProjectionAlias:None",
+                    "?projection_split",
+                ),
+                cube_scan_wrapper("?wrapper_input", "CubeScanWrapperFinalized:false"),
+            ),
             transforming_rewrite(
                 "cube-scan",
                 table_scan(
@@ -299,6 +354,8 @@ impl RewriteRules for MemberRules {
                     "?join_hints",
                 ),
                 self.push_down_limit(
+                    "?members",
+                    "?ungrouped",
                     "?skip",
                     "?fetch",
                     "?inner_skip",
@@ -793,7 +850,8 @@ impl RewriteRules for MemberRules {
 
 enum ColumnToSearch {
     Var(&'static str),
-    DefaultCount,
+    /// Literal argument of `COUNT(<literal>)`
+    DefaultCount(&'static str),
 }
 
 impl MemberRules {
@@ -1017,7 +1075,7 @@ impl MemberRules {
                 "AggregateFunctionExprDistinct:false",
                 agg_fun_expr_within_group_empty_tail(),
             ),
-            ColumnToSearch::DefaultCount,
+            ColumnToSearch::DefaultCount("?any"),
             None,
         ));
         rules.push(find_matching_old_member(
@@ -1031,7 +1089,7 @@ impl MemberRules {
                 ),
                 "?alias",
             ),
-            ColumnToSearch::DefaultCount,
+            ColumnToSearch::DefaultCount("?any"),
             None,
         ));
         rules.push(find_matching_old_member(
@@ -1076,7 +1134,8 @@ impl MemberRules {
              fun_name: Option<&'static str>,
              distinct: Option<&'static str>,
              cast_data_type: Option<&'static str>,
-             _column: Option<&'static str>| {
+             _column: Option<&'static str>,
+             count_literal: Option<&'static str>| {
                 transforming_chain_rewrite(
                     name,
                     member_pushdown_replacer(
@@ -1093,6 +1152,7 @@ impl MemberRules {
                         distinct,
                         "?aggr_expr",
                         cast_data_type,
+                        count_literal,
                         "?measure",
                     ),
                 )
@@ -1391,7 +1451,7 @@ impl MemberRules {
         ));
         rules.push(list_concat_terminal(
             "all-members",
-            all_members("?cube", "?all_members_alias"),
+            all_members("?cube", "?all_members_alias", "?all_members_selected"),
         ));
         rules.push(list_concat_terminal(
             "literal-member",
@@ -1414,12 +1474,24 @@ impl MemberRules {
         rules
     }
 
+    /// COUNT(NULL) is always 0, so it can't be replaced with the count measure
+    pub fn is_null_count_literal(
+        egraph: &CubeEGraph,
+        subst: &Subst,
+        count_literal_var: Option<Var>,
+    ) -> bool {
+        count_literal_var.is_some_and(|var| {
+            var_iter!(egraph[subst[var]], LiteralExprValue).any(|value| value.is_null())
+        })
+    }
+
     pub fn measure_rewrites(
         rules: &mut Vec<CubeRewrite>,
         pushdown_measure_rewrite: impl Fn(
             &'static str,
             String,
             String,
+            Option<&'static str>,
             Option<&'static str>,
             Option<&'static str>,
             Option<&'static str>,
@@ -1439,6 +1511,7 @@ impl MemberRules {
             Some("?distinct"),
             None,
             Some("?column"),
+            None,
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-alias",
@@ -1456,6 +1529,7 @@ impl MemberRules {
             Some("?distinct"),
             None,
             Some("?column"),
+            None,
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-cast",
@@ -1470,6 +1544,7 @@ impl MemberRules {
             Some("?distinct"),
             Some("?data_type"),
             Some("?column"),
+            None,
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-on-dimension",
@@ -1484,6 +1559,7 @@ impl MemberRules {
             Some("?distinct"),
             None,
             Some("?column"),
+            None,
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-udaf-fun",
@@ -1497,6 +1573,7 @@ impl MemberRules {
             None,
             None,
             Some("?column"),
+            None,
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-udaf-fun-on-dimension",
@@ -1510,6 +1587,7 @@ impl MemberRules {
             None,
             None,
             Some("?column"),
+            None,
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-default-count",
@@ -1524,6 +1602,7 @@ impl MemberRules {
             Some("?distinct"),
             None,
             None,
+            Some("?any"),
         ));
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun-default-count-alias",
@@ -1541,6 +1620,7 @@ impl MemberRules {
             Some("?distinct"),
             None,
             None,
+            Some("?any"),
         ));
     }
 
@@ -1662,11 +1742,16 @@ impl MemberRules {
                             AllMembersAlias(table_name.to_string()),
                         ));
 
+                        let all_members_selected = egraph.add(
+                            LogicalPlanLanguage::AllMembersSelected(AllMembersSelected(false)),
+                        );
+
                         subst.insert(
                             cube_scan_members_var,
                             egraph.add(LogicalPlanLanguage::AllMembers([
                                 all_members_cube,
                                 all_members_alias,
+                                all_members_selected,
                             ])),
                         );
 
@@ -2201,6 +2286,8 @@ impl MemberRules {
 
     fn push_down_limit(
         &self,
+        members_var: &'static str,
+        ungrouped_var: &'static str,
         skip_var: &'static str,
         fetch_var: &'static str,
         inner_skip_var: &'static str,
@@ -2208,6 +2295,8 @@ impl MemberRules {
         new_skip_var: &'static str,
         new_fetch_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let members_var = var!(members_var);
+        let ungrouped_var = var!(ungrouped_var);
         let skip_var = var!(skip_var);
         let fetch_var = var!(fetch_var);
         let inner_skip_var = var!(inner_skip_var);
@@ -2227,6 +2316,14 @@ impl MemberRules {
             for fetch in var_iter!(egraph[subst[fetch_var]], LimitFetch) {
                 fetch_value = *fetch;
                 break;
+            }
+            // An ungrouped scan of AllMembers with LIMIT 0 (e.g. from WHERE false) can't be
+            // pushed to Cube as a whole and would reach it with no members
+            if fetch_value == Some(0)
+                && egraph[subst[members_var]].data.all_members
+                && var_iter!(egraph[subst[ungrouped_var]], CubeScanUngrouped).any(|u| *u)
+            {
+                return false;
             }
 
             let mut inner_skip_value = None;
@@ -2507,7 +2604,11 @@ impl MemberRules {
             var!(member_pushdown_replacer_alias_to_cube_var);
         let column_var = match &column_to_search {
             ColumnToSearch::Var(column_var) => Some(var!(column_var)),
-            ColumnToSearch::DefaultCount => None,
+            ColumnToSearch::DefaultCount(_) => None,
+        };
+        let count_literal_var = match &column_to_search {
+            ColumnToSearch::DefaultCount(literal_var) => Some(var!(literal_var)),
+            ColumnToSearch::Var(_) => None,
         };
         let cast_type_var = cast_type_var.map(|cast_type_var| var!(cast_type_var));
         let old_members_var = var!(old_members_var);
@@ -2517,6 +2618,9 @@ impl MemberRules {
         let flat_list = self.config_obj.push_down_pull_up_split();
         let meta = self.meta_context.clone();
         move |egraph, subst| {
+            if Self::is_null_count_literal(egraph, subst, count_literal_var) {
+                return false;
+            }
             let alias_to_cubes: Vec<_> = var_iter!(
                 egraph[subst[member_pushdown_replacer_alias_to_cube_var]],
                 MemberPushdownReplacerAliasToCube
@@ -2532,7 +2636,7 @@ impl MemberRules {
 
             for alias_to_cube in alias_to_cubes {
                 // Do not push down COUNT(*) if there are joined cubes
-                if matches!(column_to_search, ColumnToSearch::DefaultCount) {
+                if matches!(column_to_search, ColumnToSearch::DefaultCount(_)) {
                     let joined_cubes = alias_to_cube
                         .iter()
                         .map(|(_, cube_name)| cube_name)
@@ -2610,6 +2714,7 @@ impl MemberRules {
         distinct_var: Option<&'static str>,
         original_expr_var: &'static str,
         cast_data_type_var: Option<&'static str>,
+        count_literal_var: Option<&'static str>,
         measure_out_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let member_pushdown_replacer_alias_to_cube_var =
@@ -2619,10 +2724,14 @@ impl MemberRules {
         let distinct_var = distinct_var.map(|distinct_var| var!(distinct_var));
         let original_expr_var = var!(original_expr_var);
         let cast_data_type_var = cast_data_type_var.map(|var| var!(var));
+        let count_literal_var = count_literal_var.map(|var| var!(var));
         let measure_out_var = var!(measure_out_var);
         let meta_context = self.meta_context.clone();
         let disable_strict_agg_type_match = self.config_obj.disable_strict_agg_type_match();
         move |egraph, subst| {
+            if Self::is_null_count_literal(egraph, subst, count_literal_var) {
+                return false;
+            }
             if let Some(alias) = original_expr_name(egraph, subst[original_expr_var]) {
                 for measure_name in var_iter!(egraph[subst[measure_name_var]], MeasureName)
                     .cloned()

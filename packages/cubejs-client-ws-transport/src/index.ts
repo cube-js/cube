@@ -259,6 +259,8 @@ class WebSocketTransport implements ITransport<WebSocketTransportResult> {
         return callback(result, () => this.subscribe(callback));
       },
       async unsubscribe() {
+        // TODO: Switch to `{ method: 'unsubscribe', messageId }` once servers without this method are out of support,
+        // they reply to it with a 500
         transport.sendMessage({ unsubscribe: message.messageId });
         delete transport.messageIdToSubscription[message.messageId];
       }

@@ -138,15 +138,17 @@ impl LogicalNode for MultiStageRollingWindow {
         vec![self.time_series_input.id(), self.measure_input.id()]
     }
 
-    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        forwards: &InputForwards,
+    ) -> Result<Rc<Self>, CubeError> {
         let forward = |input: &SubqueryRef| {
-            if input.id() == from {
-                to.as_ref().clone()
-            } else {
-                input.clone()
-            }
+            forwards
+                .target(input.id())
+                .map(|to| to.as_ref().clone())
+                .unwrap_or_else(|| input.clone())
         };
-        Rc::new(Self {
+        Ok(Rc::new(Self {
             schema: self.schema.clone(),
             is_ungrouped: self.is_ungrouped,
             rolling_time_dimension: self.rolling_time_dimension.clone(),
@@ -155,7 +157,7 @@ impl LogicalNode for MultiStageRollingWindow {
             time_series_input: forward(&self.time_series_input),
             measure_input: forward(&self.measure_input),
             time_dimension_in_measure_input: self.time_dimension_in_measure_input.clone(),
-        })
+        }))
     }
 
     fn node_name(&self) -> &'static str {

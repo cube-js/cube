@@ -2,6 +2,7 @@ use cubenativeutils::CubeError;
 
 use super::pretty_print::*;
 use crate::planner::collectors::has_multi_stage_members;
+use crate::planner::query_properties::member_chain_eq;
 use crate::planner::{MemberId, MemberSymbol};
 use std::fmt;
 use std::rc::Rc;
@@ -100,6 +101,11 @@ impl LogicalSchema {
 
     pub fn all_members(&self) -> impl Iterator<Item = &Rc<MemberSymbol>> {
         self.all_dimensions().chain(self.measures.iter())
+    }
+
+    /// Whether a dimension of the schema is `member`, references followed.
+    pub fn has_dimension(&self, member: &Rc<MemberSymbol>) -> bool {
+        self.all_dimensions().any(|d| member_chain_eq(d, member))
     }
 
     pub fn has_dimensions(&self) -> bool {

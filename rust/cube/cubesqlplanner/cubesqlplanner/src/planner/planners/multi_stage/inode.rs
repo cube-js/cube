@@ -238,15 +238,9 @@ impl<'a> InodeStagePlanner<'a> {
             scope,
         )?;
 
-        // JOIN-model: when the measure side no longer enumerates the rows
-        // this inode has to report — because new_state misses a dim that
-        // was on the parent's `state`, or because a dropped query filter
-        // widened it — we build keys-side stages per child on the
-        // parent state, so the Merge broadcasts measure values
-        // onto the query grain and only onto it. Window-path Aggregate
-        // inodes (sum-of-sum / sum-of-count with no leaf-extending
-        // `include`) handle broadcast via the window expression instead and
-        // don't need keys_input.
+        // When the measure side no longer enumerates the parent state's rows, keys-side stages
+        // on that state build the grid the values are handed onto. The window path broadcasts
+        // through the window expression instead and needs no keys_input.
         let mut keys_input: Vec<StageRef> = vec![];
         if !use_window_path {
             let new_state_has = |sym: &Rc<MemberSymbol>| {
@@ -298,6 +292,7 @@ impl<'a> InodeStagePlanner<'a> {
                 &multi_stage_member,
                 &input,
                 &keys_input,
+                scope,
             )?
         };
         self.planner
@@ -558,9 +553,8 @@ impl<'a> InodeStagePlanner<'a> {
     }
 
     /// Builds a measure-calculation subquery (Rank / Aggregate /
-    /// Calculate). Wires the input subqueries into a `Merge`
-    /// source; for the JOIN-based path (when the stage has keys inputs)
-    /// also wires keys-side refs.
+    /// Calculate) over its inputs; with keys inputs, their values are handed
+    /// onto the grid the keys inputs enumerate.
     fn plan_for_measure_calculation(
         &self,
         id: InputId,
@@ -571,11 +565,12 @@ impl<'a> InodeStagePlanner<'a> {
         multi_stage_member: &MultiStageInodeMember,
         inputs: &[StageRef],
         keys_inputs: &[StageRef],
+        scope: &mut PlanningScope,
     ) -> Result<Rc<Subquery>, CubeError> {
         let partition_by = multi_stage_member.grain().partition(&all_dimensions(state));
 
         // Rank always uses a window function. Aggregate inodes are
-        // routed through `Merge` by default; only the narrow
+        // planned as a join of their inputs by default; only the narrow
         // optimisation-eligible subset (planner sets `use_window_path`)
         // is emitted as a Window expression and additionally requires
         // partition_by to be a strict subset of all dimensions —
@@ -620,13 +615,7 @@ impl<'a> InodeStagePlanner<'a> {
             .partition_by(partition_by)
             .window_function_to_use(window_function_to_use)
             .order_by(query_order_by(member, state))
-            .source(Rc::new(
-                Merge::builder()
-                    .schema(input_schema(inputs))
-                    .subqueries(input_subqueries(inputs))
-                    .keys(input_subqueries(keys_inputs))
-                    .build(),
-            ))
+            .source(calculation_source(&alias, inputs, keys_inputs, scope)?)
             .build();
 
         let result = Subquery::new(
@@ -720,6 +709,44 @@ fn input_schema(inputs: &[StageRef]) -> Rc<LogicalSchema> {
         .set_dimensions(dimensions)
         .set_time_dimensions(time_dimensions)
         .into_rc()
+}
+
+// Inputs at the calculation's grain are merged by their keys. With keys
+// inputs, the measure inputs sit at coarser grains and their values are handed
+// onto the grid of the keys inputs, each by the grid keys it carries.
+fn calculation_source(
+    alias: &str,
+    inputs: &[StageRef],
+    keys_inputs: &[StageRef],
+    scope: &mut PlanningScope,
+) -> Result<CalculationSource, CubeError> {
+    let sources = input_subqueries(keys_inputs);
+    let Some(first) = sources.first() else {
+        let merge = Merge::builder()
+            .schema(input_schema(inputs))
+            .subqueries(input_subqueries(inputs))
+            .build();
+        return Ok(Rc::new(merge).into());
+    };
+    let grid_schema = LogicalSchema::default()
+        .set_dimensions(first.schema().dimensions.clone())
+        .set_time_dimensions(first.schema().time_dimensions.clone())
+        .into_rc();
+    let grid = scope.add_inline(
+        format!("{alias}_keys"),
+        Rc::new(
+            KeysGrid::builder()
+                .schema(grid_schema.clone())
+                .sources(sources)
+                .build(),
+        ),
+        grid_schema.clone(),
+    )?;
+    let legs = input_subqueries(inputs)
+        .into_iter()
+        .map(|subquery| LookupLeg::new(subquery, &grid_schema))
+        .collect();
+    Ok(Rc::new(GridLookup::builder().grid(grid).legs(legs).build()).into())
 }
 
 fn input_subqueries(inputs: &[StageRef]) -> Vec<Rc<SubqueryRef>> {

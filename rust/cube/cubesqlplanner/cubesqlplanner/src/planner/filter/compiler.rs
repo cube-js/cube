@@ -120,8 +120,16 @@ impl<'a> FilterCompiler<'a> {
         if !is_time || !matches!(filter.filter_operator(), FilterOperator::InDateRange) {
             return Ok(None);
         }
-        let time_dimension =
-            MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(member, None, None, None));
+        // The range's alignment decides which stored grain can serve it.
+        let date_range = match filter.values().as_slice() {
+            [FilterValue::Str(from), FilterValue::Str(to)] => {
+                Some((from.clone(), QueryDateTimeHelper::inclusive_to_date(to)?))
+            }
+            _ => None,
+        };
+        let time_dimension = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+            member, None, None, date_range,
+        ));
         Ok(Some(FilterItem::Item(BaseFilter::try_new(
             self.query_tools.clone(),
             time_dimension,

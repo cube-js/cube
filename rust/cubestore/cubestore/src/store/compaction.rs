@@ -851,7 +851,7 @@ impl CompactionService for CompactionServiceImpl {
         Ok(())
     }
 
-    #[tracing::instrument(level = "trace", skip(self))]
+    #[tracing::instrument(level = "trace", skip_all)]
     async fn compact_node_in_memory_chunks(&self, node: String) -> Result<(), CubeError> {
         let candidates = self
             .meta_store

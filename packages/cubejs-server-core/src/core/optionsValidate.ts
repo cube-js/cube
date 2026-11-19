@@ -87,6 +87,7 @@ const schemaOptions = Joi.object().keys({
   contextToGroups: Joi.func(),
   contextToOrchestratorId: Joi.func(),
   contextToCubeStoreRouterId: Joi.func(),
+  contextToPreAggregationOrchestratorId: Joi.func(),
   contextToDataSourceId: Joi.func(),
   contextToApiScopes: Joi.func(),
   repositoryFactory: Joi.func(),

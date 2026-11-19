@@ -1,0 +1,39 @@
+cubes:
+  - name: customers_with_a_very_long_cube_name_that_overflows_postgres_identifiers
+    sql: "SELECT * FROM customers"
+    sql_alias: cust
+    joins:
+      - name: CustomerOrders
+        relationship: one_to_many
+        sql: "{CUBE}.id = {CustomerOrders.customerId}"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: orderTotal
+        type: number
+        sql: "{CustomerOrders.orderTotal}"
+        sub_query: true
+      - name: orderCount
+        type: number
+        sql: "{CustomerOrders.count}"
+        sub_query: true
+    measures: []
+
+  - name: CustomerOrders
+    sql: "SELECT * FROM customer_orders"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: customerId
+        type: number
+        sql: "{CUBE}.customer_id"
+    measures:
+      - name: orderTotal
+        type: sum
+        sql: amount
+      - name: count
+        type: count

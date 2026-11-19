@@ -821,6 +821,15 @@ cube(`products`, {
 
 </CodeGroup>
 
+<Info>
+
+A filter that needs a join whose condition reads this dimension itself can't be
+evaluated inside its subquery, so it isn't passed there; the query still applies
+it. If the subquery needs such a join even without filters, the query fails with
+an error.
+
+</Info>
+
 ### `sql`
 
 `sql` is a required parameter. It can take any valid SQL expression depending on

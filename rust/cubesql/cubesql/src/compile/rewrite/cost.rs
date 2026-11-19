@@ -10,11 +10,11 @@ use std::{
 
 use crate::{
     compile::rewrite::{
-        rules::utils::granularity_str_to_int_order, AggregateFunctionExprDistinct, CubeScanLimit,
-        CubeScanUngrouped, CubeScanWrapped, DimensionName, LogicalPlanLanguage,
-        MemberErrorPriority, ScalarUDFExprFun, ScanWrapping, TimeDimensionGranularity,
-        WrappedSelectLimit, WrappedSelectPushToCube, WrappedSelectUngroupedScan,
-        WRAPPED_SELECT_LIMIT,
+        rules::utils::granularity_str_to_int_order, AggregateFunctionExprDistinct,
+        AllMembersSelected, CubeScanLimit, CubeScanUngrouped, CubeScanWrapped, DimensionName,
+        LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun, ScanWrapping,
+        TimeDimensionGranularity, WrappedSelectLimit, WrappedSelectPushToCube,
+        WrappedSelectUngroupedScan, WRAPPED_SELECT_LIMIT,
     },
     transport::{MetaContext, V1CubeMetaDimensionExt},
 };
@@ -179,6 +179,7 @@ impl BestCubePlan {
             LogicalPlanLanguage::ChangeUser(_) => 1,
             LogicalPlanLanguage::VirtualField(_) => 1,
             LogicalPlanLanguage::LiteralMember(_) => 1,
+            LogicalPlanLanguage::AllMembersSelected(AllMembersSelected(true)) => 1,
             LogicalPlanLanguage::TimeDimensionGranularity(TimeDimensionGranularity(Some(_))) => 1,
             // MemberError must be present here as well in order to preserve error priority
             LogicalPlanLanguage::MemberError(_) => 1,

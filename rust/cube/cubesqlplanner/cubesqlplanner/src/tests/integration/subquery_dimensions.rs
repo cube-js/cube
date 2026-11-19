@@ -1,5 +1,5 @@
 use crate::test_fixtures::cube_bridge::MockSchema;
-use crate::test_fixtures::test_utils::TestContext;
+use crate::test_fixtures::test_utils::{table_rows, try_execute_raw_pg, TestContext};
 use indoc::indoc;
 
 fn create_context() -> TestContext {
@@ -138,4 +138,42 @@ async fn test_subquery_dim_with_multiplied_measure() {
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
     }
+}
+
+// Subquery join aliases derive from `sql_alias`: built from a cube name longer
+// than 63 chars, two of them would truncate to the same Postgres identifier.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_subquery_dims_of_long_named_cube_with_sql_alias() {
+    let ctx = TestContext::new(MockSchema::from_yaml_file(
+        "common/subquery_dimensions_sql_alias.yaml",
+    ))
+    .unwrap();
+
+    let query = indoc! {"
+        dimensions:
+          - customers_with_a_very_long_cube_name_that_overflows_postgres_identifiers.id
+          - customers_with_a_very_long_cube_name_that_overflows_postgres_identifiers.orderTotal
+          - customers_with_a_very_long_cube_name_that_overflows_postgres_identifiers.orderCount
+        order:
+          - id: customers_with_a_very_long_cube_name_that_overflows_postgres_identifiers.id
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    let Some(result) = ctx.try_execute_pg(query, SEED).await else {
+        return;
+    };
+    let oracle = try_execute_raw_pg(
+        indoc! {"
+            SELECT c.id, sum(o.amount), count(o.id)
+            FROM customers c
+            LEFT JOIN customer_orders o ON o.customer_id = c.id
+            GROUP BY c.id
+            ORDER BY c.id
+        "},
+        SEED,
+    )
+    .await
+    .unwrap();
+    assert_eq!(table_rows(&result), table_rows(&oracle), "{result}");
 }

@@ -17,7 +17,7 @@ use futures::FutureExt;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use tempfile::{NamedTempFile, PathPersistError};
 use tokio::fs;
@@ -166,6 +166,22 @@ impl CommonRemoteFsUtils {
     }
 }
 
+/// Resolves `remote_path` under `root`. Remote paths reach here from clients (upload names,
+/// `temp://` import locations), so a path that could resolve outside `root` is rejected.
+pub fn join_remote_path(root: &Path, remote_path: &str) -> Result<PathBuf, CubeError> {
+    let relative = Path::new(remote_path);
+    let is_contained = relative
+        .components()
+        .all(|c| matches!(c, Component::Normal(_) | Component::CurDir));
+    if remote_path.is_empty() || !is_contained {
+        return Err(CubeError::user(format!(
+            "Invalid remote path: {:?}",
+            remote_path
+        )));
+    }
+    Ok(root.join(relative))
+}
+
 pub fn ensure_temp_file_is_dropped(path: String) {
     if std::fs::metadata(path.clone()).is_ok() {
         if let Err(e) = std::fs::remove_file(path) {
@@ -236,7 +252,7 @@ impl RemoteFs for LocalDirRemoteFs {
         if let Some(remote_dir) = self.remote_dir.write().await.as_ref() {
             has_remote = true;
             debug!("Uploading {}", remote_path);
-            let dest = remote_dir.as_path().join(&remote_path);
+            let dest = join_remote_path(&remote_dir, &remote_path)?;
             fs::create_dir_all(dest.parent().unwrap())
                 .await
                 .map_err(|e| {
@@ -262,7 +278,7 @@ impl RemoteFs for LocalDirRemoteFs {
             self.check_upload_file(remote_path.clone(), size).await?;
         }
 
-        let local_path = self.dir.as_path().join(&remote_path);
+        let local_path = join_remote_path(&self.dir, &remote_path)?;
 
         if Path::new(&temp_upload_path) != local_path {
             fs::create_dir_all(local_path.parent().unwrap())
@@ -293,7 +309,7 @@ impl RemoteFs for LocalDirRemoteFs {
         remote_path: String,
         _expected_file_size: Option<u64>,
     ) -> Result<String, CubeError> {
-        let mut local_file = self.dir.as_path().join(&remote_path);
+        let mut local_file = join_remote_path(&self.dir, &remote_path)?;
         let local_dir = local_file.parent().unwrap();
         let downloads_dir = local_dir.join("downloads");
         fs::create_dir_all(&downloads_dir).await?;
@@ -304,7 +320,7 @@ impl RemoteFs for LocalDirRemoteFs {
                     cube_ext::spawn_blocking(move || NamedTempFile::new_in(downloads_dir))
                         .await??
                         .into_temp_path();
-                fs::copy(remote_dir.as_path().join(&remote_path), &temp_path)
+                fs::copy(join_remote_path(&remote_dir, &remote_path)?, &temp_path)
                     .await
                     .map_err(|e| {
                         CubeError::internal(format!(
@@ -332,7 +348,7 @@ impl RemoteFs for LocalDirRemoteFs {
         debug!("Deleting {}", remote_path);
         {
             if let Some(remote_dir) = self.remote_dir.write().await.as_ref() {
-                let remote = remote_dir.as_path().join(&remote_path);
+                let remote = join_remote_path(&remote_dir, &remote_path)?;
                 if fs::metadata(remote.clone()).await.is_ok() {
                     fs::remove_file(remote.clone()).await?;
                     Self::remove_empty_paths(remote_dir.clone(), remote.clone()).await?;
@@ -341,7 +357,7 @@ impl RemoteFs for LocalDirRemoteFs {
         }
 
         let _local_guard = acquire_lock("delete file", self.dir_delete_mut.lock()).await?;
-        let local = self.dir.as_path().join(&remote_path);
+        let local = join_remote_path(&self.dir, &remote_path)?;
         if fs::metadata(local.clone()).await.is_ok() {
             fs::remove_file(local.clone()).await?;
             LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone())
@@ -378,7 +394,7 @@ impl RemoteFs for LocalDirRemoteFs {
     }
 
     async fn local_file(&self, remote_path: String) -> Result<String, CubeError> {
-        let buf = self.dir.join(remote_path);
+        let buf = join_remote_path(&self.dir, &remote_path)?;
         fs::create_dir_all(buf.parent().unwrap()).await?;
         Ok(buf.to_str().unwrap().to_string())
     }
@@ -674,6 +690,59 @@ mod tests {
 
         clear_test_dir("local");
         clear_test_dir("local-upstream");
+    }
+
+    #[test]
+    fn join_remote_path_rejects_escaping_paths() {
+        let root = Path::new("/data");
+        assert_eq!(
+            join_remote_path(root, "temp-uploads/a.csv.gz").unwrap(),
+            PathBuf::from("/data/temp-uploads/a.csv.gz")
+        );
+        for bad in [
+            "",
+            "..",
+            "../etc/passwd",
+            "temp-uploads/../../etc/passwd",
+            "temp-uploads/..",
+            "/etc/passwd",
+        ] {
+            assert!(join_remote_path(root, bad).is_err(), "accepted {:?}", bad);
+        }
+    }
+
+    #[tokio::test]
+    async fn local_dir_rejects_traversal() {
+        let base = get_test_local_dir("local-traversal");
+        let _ = fs::remove_dir_all(&base);
+        let local_dir = base.join("local");
+        let remote_dir = base.join("remote");
+        fs::create_dir_all(&local_dir).unwrap();
+        fs::create_dir_all(&remote_dir).unwrap();
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_dir.clone()), local_dir.clone());
+
+        let escape = "temp-uploads/../../escaped.txt".to_string();
+        let temp_upload = local_dir.join("upload.tmp");
+        fs::write(&temp_upload, "payload").unwrap();
+        assert!(remote_fs
+            .upload_file(temp_upload.to_str().unwrap().to_string(), escape.clone())
+            .await
+            .is_err());
+        assert!(!base.join("escaped.txt").exists());
+        assert!(temp_upload.exists());
+
+        let victim = base.join("victim.txt");
+        fs::write(&victim, "keep").unwrap();
+        let victim_path = "temp-uploads/../../victim.txt".to_string();
+        assert!(remote_fs.delete_file(victim_path.clone()).await.is_err());
+        assert!(victim.exists());
+        assert!(remote_fs
+            .download_file(victim_path.clone(), None)
+            .await
+            .is_err());
+        assert!(remote_fs.local_file(victim_path).await.is_err());
+
+        fs::remove_dir_all(&base).unwrap();
     }
 
     #[tokio::test]

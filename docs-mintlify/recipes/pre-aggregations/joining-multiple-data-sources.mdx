@@ -186,6 +186,18 @@ cube("products", {
 
 </CodeGroup>
 
+A `rollup_join` has two requirements:
+
+- The rollup of the joined cube needs an index on the join key, like
+  `category_index` on `id` in `suppliers_rollup`. Otherwise, Cube Store fails
+  with `Can't find index to join table`.
+- The join SQL must reference members, as in `{supplier_id} = {suppliers.id}`,
+  not raw columns. Otherwise, the query fails with `From members are not found
+  in join`.
+
+See [Querying across data sources](/recipes/data-modeling/cross-data-source-queries)
+for the query shapes that span data sources without a `rollup_join`.
+
 ## Query
 
 Let's get the product names and their suppliers' info, such as company name and

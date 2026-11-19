@@ -15,6 +15,7 @@ use crate::cluster::{Cluster, ClusterImpl, ClusterMetaStoreClient};
 use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
+use crate::import::host_filter::LocationHostFilter;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl, LocationsValidator, LocationsValidatorImpl};
 use crate::metastore::{
@@ -463,6 +464,18 @@ pub trait ConfigObj: DIService {
 
     fn import_job_timeout(&self) -> u64;
 
+    /// Whether `CREATE TABLE ... LOCATION` may read a local filesystem path.
+    /// `temp://` import locations are always allowed regardless of this setting.
+    fn location_allow_local_fs(&self) -> bool;
+
+    /// Hosts `http(s)://` import locations may point to: `host`, `host:port`, a pattern like
+    /// `*.example.com` or a subnet. `*` (the default) allows every host, empty allows none.
+    fn location_allow_hosts(&self) -> &Vec<String>;
+
+    /// Whether `http(s)://` import locations are refused non-public IP addresses (also after
+    /// DNS resolution) that `location_allow_hosts` does not list as a subnet or IP.
+    fn location_deny_private_ips(&self) -> bool;
+
     fn meta_store_snapshot_interval(&self) -> u64;
 
     fn meta_store_log_upload_interval(&self) -> u64;
@@ -792,6 +805,9 @@ pub struct ConfigObjImpl {
     pub server_name: String,
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
+    pub location_allow_local_fs: bool,
+    pub location_allow_hosts: Vec<String>,
+    pub location_deny_private_ips: bool,
     pub enable_topk: bool,
     pub load_aware_import_placement_enabled: bool,
     pub repartition_chunks_time_budget_secs: u64,
@@ -980,6 +996,18 @@ impl ConfigObj for ConfigObjImpl {
 
     fn import_job_timeout(&self) -> u64 {
         self.import_job_timeout
+    }
+
+    fn location_allow_local_fs(&self) -> bool {
+        self.location_allow_local_fs
+    }
+
+    fn location_allow_hosts(&self) -> &Vec<String> {
+        &self.location_allow_hosts
+    }
+
+    fn location_deny_private_ips(&self) -> bool {
+        self.location_deny_private_ips
     }
 
     fn meta_store_snapshot_interval(&self) -> u64 {
@@ -2099,6 +2127,13 @@ impl Config {
                     .ok()
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
+                location_allow_local_fs: env_flag("CUBESTORE_LOCATION_ALLOW_LOCAL_FS", false),
+                location_allow_hosts: env_parse_list(
+                    "CUBESTORE_LOCATION_ALLOW_HOSTS",
+                    vec!["*".to_string()],
+                    |h| LocationHostFilter::validate_entry(h).map_err(|e| e.message),
+                ),
+                location_deny_private_ips: env_flag("CUBESTORE_LOCATION_DENY_PRIVATE_IPS", false),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 load_aware_import_placement_enabled: env_flag(
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
@@ -2401,6 +2436,10 @@ impl Config {
                 connection_timeout: 60,
                 server_name: "localhost".to_string(),
                 upload_to_remote: true,
+                // Tests import CSV files straight from disk.
+                location_allow_local_fs: true,
+                location_allow_hosts: vec!["*".to_string()],
+                location_deny_private_ips: false,
                 enable_topk: true,
                 load_aware_import_placement_enabled: true,
                 repartition_chunks_time_budget_secs: 60,
@@ -2964,8 +3003,15 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<dyn LocationsValidator, _, _, _>(async move |_| {
-                LocationsValidatorImpl::new()
+            .register_typed::<dyn LocationsValidator, _, _, _>(async move |i| {
+                let config = i.get_service_typed::<dyn ConfigObj>().await;
+                let host_filter = LocationHostFilter::new(
+                    config.location_allow_hosts(),
+                    config.location_deny_private_ips(),
+                )
+                .expect("Invalid import location host allowlist");
+                LocationsValidatorImpl::new(config.location_allow_local_fs(), host_filter)
+                    .expect("Unable to create import HTTP client")
             })
             .await;
 

@@ -5481,8 +5481,8 @@ impl OldSplitRules {
                     }
                     // Replace outer projection columns with unqualified variants
                     if let Some(expr_name_to_alias) = expr_to_alias
-                        .clone()
-                        .into_iter()
+                        .iter()
+                        .cloned()
                         .map(|(expr, alias, explicit)| {
                             let default_alias = Some((alias.clone(), None));
                             if explicit == Some(true) {

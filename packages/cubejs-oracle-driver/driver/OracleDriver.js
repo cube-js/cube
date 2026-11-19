@@ -191,6 +191,56 @@ class OracleDriver extends BaseDriver {
     return super.createTable(quotedTableName, columns);
   }
 
+  // An Oracle schema is a user account, which a pre-aggregation build cannot create.
+  async createSchemaIfNotExists(schemaName) {
+    const users = await this.query('SELECT username FROM all_users WHERE username = UPPER(?)', [schemaName]);
+    if (users.length === 0) {
+      throw new Error(
+        `Oracle schema ${schemaName} does not exist. Create a dedicated schema (user) for pre-aggregations and point CUBEJS_PRE_AGGREGATIONS_SCHEMA at it; builds drop every other table in that schema.`
+      );
+    }
+  }
+
+  // Cube can only address names that are stored uppercase, so it must not see or drop others.
+  getTablesQuery(schemaName) {
+    return this.query(
+      'SELECT LOWER(table_name) "table_name" FROM all_tables WHERE owner = UPPER(?) AND table_name = UPPER(table_name)',
+      [schemaName]
+    );
+  }
+
+  // Oracle rejects bind variables in DDL, so the CTAS carries its parameters as literals.
+  loadPreAggregationIntoTable(preAggregationTableName, loadSql, params, options) {
+    return super.loadPreAggregationIntoTable(preAggregationTableName, OracleDriver.inlineParams(loadSql, params), [], options);
+  }
+
+  static inlineParams(query, values) {
+    if (!values || values.length === 0) {
+      return query;
+    }
+
+    let idx = 0;
+    return query.replace(/:"\?"|\?/g, () => {
+      const value = values[idx];
+      idx += 1;
+      return OracleDriver.toSqlLiteral(value);
+    });
+  }
+
+  static toSqlLiteral(value) {
+    if (value === null || value === undefined) {
+      return 'NULL';
+    }
+    if (typeof value === 'string') {
+      return `'${value.replace(/'/g, "''")}'`;
+    }
+    // Parenthesized so that a negative value after `-` doesn't start a `--` comment.
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return `(${value})`;
+    }
+    throw new Error(`Oracle can not inline a ${typeof value} parameter into a pre-aggregation build`);
+  }
+
   static normalizeParams(query, values) {
     if (!values || values.length === 0) {
       return { sql: query, binds: {} };
