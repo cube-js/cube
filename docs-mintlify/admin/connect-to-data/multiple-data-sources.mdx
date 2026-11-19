@@ -18,7 +18,9 @@ connection form — the same form the deployment wizard uses.
 
 Cube Cloud tests the connection before saving; on success it persists the
 env vars and restarts the development environment, on failure it surfaces
-the driver's error and saves nothing.
+the driver's error and saves nothing. The first named source also creates
+`CUBEJS_DATASOURCES`, so Cube Cloud first shows the data sources it will
+list and asks you to confirm them (see [Under the hood](#under-the-hood)).
 
 ## Editing and deleting
 
@@ -37,14 +39,17 @@ including the ones [`driver_factory`](/reference/configuration/config#driver_fac
 The clickhouse data source is missing in the declared CUBEJS_DATASOURCES.
 ```
 
-The first named source you add on this page creates the variable. Cube Cloud lists the new
-source and the data sources your data model uses, and asks you to confirm the list. Later saves
-keep every name it holds. If `driver_factory` serves a data source that isn't in the list, add
-its name to `CUBEJS_DATASOURCES` in [**Settings → Environment Variables**][ref-config-ref-env].
+Cube Cloud adds the data sources your data model uses when it creates the variable (see
+[Under the hood](#under-the-hood)). If `driver_factory` serves a data source that isn't in the
+list, such as one no cube uses yet, add its name to `CUBEJS_DATASOURCES` in
+[**Settings → Environment Variables**][ref-config-ref-env]. Names are case-sensitive.
 
 Don't give a data source that `driver_factory` serves a connection of its own with
 **+ Add data source** or **Edit**. Its driver reads those variables too, and a Databricks
 service principal saved there takes precedence over the per-user `token` the factory returns.
+To publish Databricks Metric Views from such a data source, give the integration its own
+credential instead: see
+[Data sources served by `driver_factory`](/docs/integrations/databricks-metric-views#data-sources-served-by-driver_factory).
 
 ## Source name rules
 
@@ -107,9 +112,16 @@ variables — inspect or hand-edit them from
 [**Settings → Environment Variables**][ref-config-ref-env] at any time.
 
 The default source uses bare `CUBEJS_DB_*` variables; each named source
-uses a `CUBEJS_DS_<NAME>_*` prefix. `CUBEJS_DATASOURCES` is auto-maintained
-whenever at least one named source exists, with `default` first and named
-entries lowercased:
+uses a `CUBEJS_DS_<NAME>_*` prefix. `CUBEJS_DATASOURCES` lists the data
+sources Cube accepts queries for, and Cube Cloud sets it whenever at least
+one named source exists:
+
+- The first named source you add creates it from the new source and the
+  data sources your data model uses, after you confirm the list.
+- Later saves keep every name it lists and add new sources. Deleting a
+  source removes its name.
+- Deleting the last named source removes the variable, and Cube then
+  accepts every data source name.
 
 ```dotenv
 CUBEJS_DATASOURCES=default,analytics
