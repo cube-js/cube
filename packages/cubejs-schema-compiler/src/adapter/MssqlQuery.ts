@@ -312,16 +312,9 @@ export class MssqlQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
-    // SQL Server 2014 supports space trimming through one-argument LTRIM/RTRIM.
-    // Explicit character sets require newer versions and must not be pushed down.
-    delete templates.functions.TRIM;
-    delete templates.functions.BTRIM;
-    delete templates.functions.LTRIM;
-    delete templates.functions.RTRIM;
-    templates.functions.BTRIM_1 = 'LTRIM(RTRIM({{ args[0] }}))';
-    templates.functions.TRIM_1 = templates.functions.BTRIM_1;
-    templates.functions.LTRIM_1 = 'LTRIM({{ args[0] }})';
-    templates.functions.RTRIM_1 = 'RTRIM({{ args[0] }})';
+    // One-argument trimming also works on SQL Server versions before 2017.
+    templates.functions.TRIM = '{% if args[1] is defined %}TRIM({{ args[1] }} FROM {{ args[0] }}){% else %}LTRIM(RTRIM({{ args[0] }})){% endif %}';
+    templates.functions.BTRIM = templates.functions.TRIM;
     templates.functions.APPROXDISTINCT = 'APPROX_COUNT_DISTINCT({{ args_concat }})';
     // INT tokens truncate float division. DECIMAL keeps fractional arithmetic and
     // INT's ten whole digits, avoiding ROUND overflow from minimally sized decimals.
