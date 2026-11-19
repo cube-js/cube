@@ -17,7 +17,7 @@ import {
 import { DriverFactory } from './DriverFactory';
 import { PreAggTableToTempTableNames, QueryCache } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
-import { LargeStreamWarning } from './StreamObjectsCounter';
+import { withLargeStreamWarning } from './StreamObjectsCounter';
 import {
   getStructureVersion,
   InvalidationKeys,
@@ -1015,14 +1015,12 @@ export class PreAggregationLoader {
       );
 
       if (client.unload) {
-        const stream = new LargeStreamWarning(this.preAggregation.preAggregationId, (msg) => {
+        tableData.rowStream = withLargeStreamWarning(tableData.rowStream, this.preAggregation.preAggregationId, (msg) => {
           this.logger('Downloading external pre-aggregation warning', {
             ...queryOptions,
             error: msg
           });
         });
-        tableData.rowStream.pipe(stream);
-        tableData.rowStream = stream;
       }
     } else {
       tableData = await saveCancelFn(client.downloadTable(table, {
@@ -1060,14 +1058,12 @@ export class PreAggregationLoader {
       );
 
       if (client.unload) {
-        const stream = new LargeStreamWarning(this.preAggregation.preAggregationId, (msg) => {
+        tableData.rowStream = withLargeStreamWarning(tableData.rowStream, this.preAggregation.preAggregationId, (msg) => {
           this.logger('Downloading external pre-aggregation warning', {
             ...queryOptions,
             error: msg
           });
         });
-        tableData.rowStream.pipe(stream);
-        tableData.rowStream = stream;
       }
     } else {
       tableData = { rows: await saveCancelFn(client.query(sql, params, queryOptions)) };

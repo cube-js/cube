@@ -894,47 +894,53 @@ export class QueryCache {
       streamHandler: async (req, target) => {
         queue.logger('Streaming SQL', QueryCache.payloadForLog(req));
         await (new Promise((resolve, reject) => {
-          let logged = false;
           Promise
             .all([clientFactory()])
             .then(([client]) => (<DriverInterface>client).stream(traceFn(req), req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark'), requestId: req.requestId }))
             .then((source) => {
-              const cleanup = async (error?: Error) => {
-                if (source.release) {
+              let releasing: Promise<void> | undefined;
+              const release = () => {
+                if (!releasing) {
                   const toRelease = source.release;
                   delete source.release;
-                  await toRelease();
+                  releasing = toRelease ? toRelease() : Promise.resolve();
                 }
-                if (error && !target.destroyed) {
-                  target.destroy(error);
-                }
-                if (!logged && target.destroyed) {
-                  logged = true;
-                  if (error) {
-                    queue.logger('Streaming done with error', {
-                      query: req.query,
-                      query_values: req.values,
-                      error,
-                    });
-                    reject(error);
-                  } else {
-                    queue.logger('Streaming successfully completed', {
-                      requestId: req.requestId,
-                    });
-                    resolve(req.requestId);
-                  }
-                }
+                return releasing;
               };
 
-              source.rowStream.once('end', () => cleanup(undefined));
-              source.rowStream.once('error', cleanup);
-              source.rowStream.once('close', () => cleanup(undefined));
+              // target closes last in every outcome: fully read, failed, or abandoned by its reader
+              target.once('close', async () => {
+                // Not the pipeline() callback's error: there an abandoned target is a premature close
+                const error = target.errored;
 
-              target.once('end', () => cleanup(undefined));
-              target.once('error', cleanup);
-              target.once('close', () => cleanup(undefined));
+                try {
+                  await release();
+                } catch (e) {
+                  reject(e);
+                  return;
+                }
 
-              source.rowStream.pipe(target);
+                if (error) {
+                  queue.logger('Streaming done with error', {
+                    query: req.query,
+                    query_values: req.values,
+                    error,
+                  });
+                  reject(error);
+                } else {
+                  queue.logger('Streaming successfully completed', {
+                    requestId: req.requestId,
+                  });
+                  resolve(req.requestId);
+                }
+              });
+
+              // Not pipe(): it forwards neither a source error to target nor target's destroy()
+              // to the source, so every driver had to wire both by hand.
+              pipeline(source.rowStream, target, () => {
+                // The source is done here, while target may still be read for a long time
+                release().catch((): undefined => undefined);
+              });
             })
             .catch((reason) => {
               target.emit('error', reason);
