@@ -78,8 +78,8 @@ client's custom setup ([Claude](#claude-custom-connector), [ChatGPT](#chatgpt-cu
 [Microsoft 365 Copilot](#connect-to-microsoft-365-copilot),
 [other clients](#connect-to-other-mcp-clients)); the Cube directory connector and plugins
 use the single endpoint only. For Copilot, each endpoint needs its own OAuth client
-registration. Give each connector its own name, such as **Cube** and
-**Cube EU**; the Cursor and CLI examples on this page name the server `cube-mcp-server`, so
+registration. Give each connector its own name, such as **Cube** and **Cube EU**. The setup
+steps on this page name it **Cube** (or `cube-mcp-server` in the Cursor and CLI examples), so
 pick another name for the second one.
 
 Signing in on an endpoint opens your default deployment if that endpoint serves it, and
@@ -432,10 +432,9 @@ Note that `tool:chat` gives access to the whole agent, including the write-capab
 ### Call the MCP server
 
 Send the token as `Authorization: Bearer <token>` to `$MCP_URL`. The example below
-negotiates protocol version `2025-11-25`. Start with
-`initialize`, then send the `mcp-session-id` header it returns on every later request.
-For a region-specific endpoint, set `MCP_URL` and `TOKEN_URL` to the matching URLs
-in the table above.
+negotiates protocol version `2025-11-25`. Start with `initialize`, then send the
+`mcp-session-id` header it returns on every later request. For a region-specific endpoint,
+set `MCP_URL` and `TOKEN_URL` to the matching URLs in the table above.
 
 ```bash
 TOKEN=$(curl -s "$TOKEN_URL" \
