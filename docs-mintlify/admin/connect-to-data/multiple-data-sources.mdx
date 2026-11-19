@@ -29,19 +29,22 @@ not deleted — to remove it, clear the bare `CUBEJS_DB_*` variables from
 
 ## Data sources served by `driver_factory` {#data-sources-served-by-driver_factory}
 
-If [`driver_factory`](/reference/configuration/config#driver_factory) in `cube.py` serves
-some of your data sources, manage data sources in `cube.py` and
-[**Settings → Environment Variables**][ref-config-ref-env], not on this page. Saving a data
-source here sets `CUBEJS_DATASOURCES` to only the data sources that environment variables
-configure, and Cube then rejects queries to the others:
+Once `CUBEJS_DATASOURCES` is set, Cube rejects queries to any data source it doesn't list,
+including the ones [`driver_factory`](/reference/configuration/config#driver_factory) in
+`cube.py` serves:
 
 ```text
 The clickhouse data source is missing in the declared CUBEJS_DATASOURCES.
 ```
 
-To fix it, in **Settings → Environment Variables**, set `CUBEJS_DATASOURCES` to every data
-source name your cubes use, `default` included. Delete the `CUBEJS_DS_<NAME>_*` variables this
-page added for a data source that `driver_factory` serves.
+The first named source you add on this page creates the variable. Cube Cloud lists the new
+source and the data sources your data model uses, and asks you to confirm the list. Later saves
+keep every name it holds. If `driver_factory` serves a data source that isn't in the list, add
+its name to `CUBEJS_DATASOURCES` in [**Settings → Environment Variables**][ref-config-ref-env].
+
+Don't give a data source that `driver_factory` serves a connection of its own with
+**+ Add data source** or **Edit**. Its driver reads those variables too, and a Databricks
+service principal saved there takes precedence over the per-user `token` the factory returns.
 
 ## Source name rules
 

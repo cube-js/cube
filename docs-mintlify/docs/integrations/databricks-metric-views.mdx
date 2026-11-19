@@ -136,10 +136,9 @@ service principal instead. Your users' queries keep going through `driver_factor
 
 <Warning>
 
-Don't give the data source a service principal with **+ Add data source**. Its environment
-variables make Cube reject queries to the data sources only `driver_factory` serves, and run
-every query on this one as the service principal instead of with the per-user `token` that
-`driver_factory` returns. To undo it, see
+Don't give the data source a service principal with **+ Add data source** or **Edit**. The
+Databricks driver prefers a data source's OAuth client variables over the per-user `token` that
+`driver_factory` returns, so every query on it would run as the service principal. See
 [Data sources served by `driver_factory`](/admin/connect-to-data/multiple-data-sources#data-sources-served-by-driver_factory).
 
 </Warning>
