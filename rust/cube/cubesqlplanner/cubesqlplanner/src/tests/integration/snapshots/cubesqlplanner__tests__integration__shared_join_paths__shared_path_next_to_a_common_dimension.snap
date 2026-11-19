@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/shared_join_paths.rs
+expression: result
+---
+complaints_and_attendance__title | complaints_and_attendance__person_name | complaints_and_attendance__complaints_count | complaints_and_attendance__attendances_count
+---------------------------------+----------------------------------------+---------------------------------------------+---------------------------------------------
+Expo                             | Ann                                    | 2                                           | 1                                           
+Expo                             | Bob                                    | NULL                                        | 1                                           
+Fair                             | Bob                                    | 1                                           | 1                                           
+Fair                             | Cid                                    | NULL                                        | 1

@@ -2,7 +2,8 @@ use super::{
     MergeQueryPlanner, MultiStageQueryPlanner, MultipliedMeasuresQueryPlanner, SimpleQueryPlanner,
 };
 use crate::logical_plan::*;
-use crate::planner::planners::multi_stage::PlanningScope;
+use crate::planner::planners::multi_stage::{EvaluationContext, PlanningScope};
+use crate::planner::shared_dimensions::{bind_shared_dimensions, SharedDimensionBinding};
 use crate::planner::state::State;
 use crate::planner::{QueryAnalysis, QueryProperties};
 use cubenativeutils::CubeError;
@@ -38,7 +39,49 @@ impl QueryPlanner {
     /// refs the planners return are consumed right here by this
     /// query's `Merge`; they never leak between scopes.
     pub fn plan(&self, scope: &mut PlanningScope) -> Result<Rc<Query>, CubeError> {
+        match bind_shared_dimensions(&self.request)? {
+            SharedDimensionBinding::None => self.plan_request(self.request.clone(), scope),
+            SharedDimensionBinding::Single(request) => self.plan_request(request, scope),
+            SharedDimensionBinding::Split(legs) => self.plan_legs(legs, scope),
+        }
+    }
+
+    /// Plans each leg of a query whose measures read shared view dimensions
+    /// through different paths as a subquery of its own, and merges them on
+    /// the dimensions, which every leg names alike.
+    fn plan_legs(
+        &self,
+        legs: Vec<Rc<QueryProperties>>,
+        scope: &mut PlanningScope,
+    ) -> Result<Rc<Query>, CubeError> {
+        let mut refs = Vec::new();
+        for leg in legs {
+            let query = QueryPlanner::new(leg, self.query_tools.clone()).plan(scope)?;
+            let (subquery_id, subquery_name) = scope.next_subquery();
+            let leaf = query.with_evaluation_context(Some(EvaluationContext::default()));
+            scope.add_member(Rc::new(Subquery::new(
+                subquery_id,
+                subquery_name.clone(),
+                SubqueryBody::Query(leaf),
+            )))?;
+            refs.push(Rc::new(
+                SubqueryRef::builder()
+                    .id(subquery_id)
+                    .name(subquery_name)
+                    .schema(query.schema().clone())
+                    .build(),
+            ));
+        }
         let analysis = QueryAnalysis::try_new(self.request.clone())?;
+        MergeQueryPlanner::new(analysis).plan_logical_plan(refs, scope)
+    }
+
+    fn plan_request(
+        &self,
+        request: Rc<QueryProperties>,
+        scope: &mut PlanningScope,
+    ) -> Result<Rc<Query>, CubeError> {
+        let analysis = QueryAnalysis::try_new(request.clone())?;
         if analysis.is_simple() {
             let planner = SimpleQueryPlanner::new(self.query_tools.clone(), analysis);
             planner.plan(scope)
@@ -47,7 +90,7 @@ impl QueryPlanner {
 
             let multi_stage_query_planner =
                 MultiStageQueryPlanner::try_new(self.query_tools.clone(), &analysis)?;
-            if self.request.allow_multi_stage() {
+            if request.allow_multi_stage() {
                 refs.extend(multi_stage_query_planner.plan_queries(scope)?);
             }
 

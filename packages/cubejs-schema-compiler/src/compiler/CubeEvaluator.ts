@@ -615,10 +615,7 @@ export class CubeEvaluator extends CubeSymbols {
       return [];
     }
 
-    const matchingCubeInclude = cube.rawCubes()?.find((c) => {
-      const cubePath = this.evaluateReferences(null, c.joinPath, { collectJoinHints: true });
-      return cubePath === fullPath;
-    });
+    const matchingCubeInclude = cube.rawCubes()?.find((c) => this.viewCubeJoinPaths(c).includes(fullPath));
 
     if (!matchingCubeInclude) {
       errorReporter.error(

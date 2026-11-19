@@ -1,0 +1,183 @@
+cubes:
+  - name: dates
+    sql_table: dates
+    dimensions:
+      - name: date
+        type: time
+        sql: date
+        primary_key: true
+
+  - name: orders
+    sql_table: orders
+    joins:
+      - name: dates
+        alias: event_day
+        sql: "{CUBE}.event_date = {event_day.date}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: status
+        type: string
+        sql: status
+    measures:
+      - name: order_count
+        type: count
+      - name: order_count_prev_day
+        type: number
+        multi_stage: true
+        sql: "{order_count}"
+        time_shift:
+          - interval: 1 day
+            type: prior
+
+  - name: order_items
+    sql_table: order_items
+    joins:
+      - name: orders
+        sql: "{CUBE}.order_id = {orders.id}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+    measures:
+      - name: item_count
+        type: count
+
+  - name: refunds
+    sql_table: refunds
+    joins:
+      - name: dates
+        alias: event_day
+        sql: "{CUBE}.event_date = {event_day.date}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+    measures:
+      - name: refund_count
+        type: count
+
+  - name: surveys
+    sql_table: surveys
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+    measures:
+      - name: survey_count
+        type: count
+
+  - name: people
+    sql_table: people
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: name
+        type: string
+        sql: name
+
+  - name: events
+    sql_table: events
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: title
+        type: string
+        sql: title
+
+  - name: complaints
+    sql_table: complaints
+    joins:
+      - name: events
+        sql: "{CUBE}.event_id = {events.id}"
+        relationship: many_to_one
+      - name: people
+        alias: complainant
+        sql: "{CUBE}.complainant_id = {complainant.id}"
+        relationship: many_to_one
+      - name: people
+        alias: handler
+        sql: "{CUBE}.handler_id = {handler.id}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+
+  - name: attendances
+    sql_table: attendances
+    joins:
+      - name: events
+        sql: "{CUBE}.event_id = {events.id}"
+        relationship: many_to_one
+      - name: people
+        sql: "{CUBE}.person_id = {people.id}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+
+views:
+  - name: activity
+    cubes:
+      - join_path: orders
+        includes:
+          - order_count
+          - order_count_prev_day
+          - status
+      - join_path: refunds
+        includes:
+          - refund_count
+      - join_path: order_items
+        includes:
+          - item_count
+      - join_path: surveys
+        includes:
+          - survey_count
+      - join_paths:
+          - orders.event_day
+          - refunds.event_day
+        includes:
+          - date
+
+  - name: complaints_and_attendance
+    cubes:
+      - join_path: complaints
+        prefix: true
+        includes:
+          - count
+      - join_path: attendances
+        prefix: true
+        includes:
+          - count
+      - join_path: events
+        includes:
+          - title
+      - join_paths:
+          - complaints.complainant
+          - attendances.people
+        alias: person
+        prefix: true
+        includes:
+          - name

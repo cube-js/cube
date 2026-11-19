@@ -63,9 +63,30 @@ impl PartialEq for OrderByItem {
     }
 }
 
-/// Compare two member symbols by their reference-chain-resolved id.
+/// Compare two member symbols by their reference-chain-resolved id. The chain
+/// stops at a view dimension shared through `join_paths`: legs reading it
+/// through different paths still hold the same member.
 pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
-    a.clone().resolve_reference_chain().id() == b.clone().resolve_reference_chain().id()
+    member_chain_id(a) == member_chain_id(b)
+}
+
+fn member_chain_id(member: &Rc<MemberSymbol>) -> MemberId {
+    let mut current = member.clone();
+    loop {
+        let reference = match current.as_ref() {
+            MemberSymbol::TimeDimension(time_dimension) => time_dimension.base_symbol().clone(),
+            _ => current.clone(),
+        };
+        if let MemberSymbol::Ref(reference) = reference.as_ref() {
+            if reference.has_shared_identity() {
+                return current.id().clone();
+            }
+        }
+        match current.reference_member() {
+            Some(next) => current = next,
+            None => return current.id().clone(),
+        }
+    }
 }
 
 /// The full description of a query: selected members, filters, ordering
@@ -162,6 +183,19 @@ impl QueryProperties {
             order_item.member_evaluator = f(&order_item.member_evaluator)?;
         }
         Ok(Rc::new(result))
+    }
+
+    /// This query as one leg of a merge, computing `measures`: the legs share
+    /// its dimensions and WHERE-side filters, while its measure filters, order
+    /// and limit apply over the merge.
+    pub(crate) fn as_merge_leg(&self, measures: Vec<Rc<MemberSymbol>>) -> Rc<QueryProperties> {
+        let mut leg = self.clone();
+        leg.measures = measures;
+        leg.measures_filters = vec![];
+        leg.order_by = vec![];
+        leg.row_limit = None;
+        leg.offset = None;
+        Rc::new(leg)
     }
 
     pub(crate) fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {

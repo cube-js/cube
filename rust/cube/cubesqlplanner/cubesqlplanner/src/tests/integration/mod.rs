@@ -25,6 +25,7 @@ mod null_filters;
 mod pre_aggregations;
 mod propagate_subquery;
 mod rolling_window;
+mod shared_join_paths;
 mod single_cube;
 mod subquery_dimensions;
 mod subquery_in_join;

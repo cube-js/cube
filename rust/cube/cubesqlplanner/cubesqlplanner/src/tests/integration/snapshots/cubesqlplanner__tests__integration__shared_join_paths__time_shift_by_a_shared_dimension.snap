@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/shared_join_paths.rs
+expression: result
+---
+activity__date_day  | activity__order_count_prev_day | activity__refund_count
+--------------------+--------------------------------+-----------------------
+2024-01-02 00:00:00 | 2                              | 1                     
+2024-01-03 00:00:00 | 1                              | 1

@@ -35,6 +35,11 @@ pub struct DimensionDefinitionStatic {
     pub field_type: Option<String>,
     /// Re-exported by a view from its `includes`, rather than declared by it.
     pub included: Option<bool>,
+    /// For a view dimension included through `join_paths`: the member it
+    /// stands for along each path, in declared order. `sql` references the
+    /// first one; a query reads the one whose path its facts join through.
+    #[serde(rename = "sharedPaths")]
+    pub shared_paths: Option<Vec<String>>,
 }
 
 #[nativebridge::native_bridge(DimensionDefinitionStatic, with_static_meta)]

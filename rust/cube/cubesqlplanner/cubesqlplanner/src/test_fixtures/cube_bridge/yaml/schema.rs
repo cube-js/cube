@@ -110,7 +110,12 @@ enum YamlIncludes {
 
 #[derive(Debug, Deserialize)]
 struct YamlViewCube {
-    join_path: String,
+    #[serde(default)]
+    join_path: Option<String>,
+    #[serde(default)]
+    join_paths: Option<Vec<String>>,
+    #[serde(default)]
+    alias: Option<String>,
     #[serde(default)]
     includes: Option<YamlIncludes>,
     #[serde(default)]
@@ -214,8 +219,23 @@ impl YamlSchema {
                     _ => vec![],
                 };
                 let prefix = view_cube.prefix.unwrap_or(false);
-                view_builder =
-                    view_builder.include_cube_with_prefix(view_cube.join_path, includes, prefix);
+                view_builder = match (view_cube.join_path, view_cube.join_paths) {
+                    (Some(join_path), None) => {
+                        view_builder.include_cube_with_prefix(join_path, includes, prefix)
+                    }
+                    (None, Some(join_paths)) => view_builder.include_shared_cube(
+                        join_paths,
+                        includes,
+                        view_cube.alias,
+                        prefix,
+                    ),
+                    _ => {
+                        return Err(CubeError::user(format!(
+                            "A cube of view '{}' needs either join_path or join_paths",
+                            view_name
+                        )))
+                    }
+                };
             }
 
             for filter in view.default_filters {

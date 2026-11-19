@@ -44,6 +44,19 @@ impl SymbolDeps for RefTarget {
     }
 }
 
+/// One way to read a view dimension included through `join_paths`: the
+/// member the dimension stands for along one of the paths.
+#[derive(Clone)]
+pub struct SharedTarget {
+    /// The path as the view writes it (`orders.event_day`).
+    pub path: String,
+    /// The cube the path starts at.
+    pub root: String,
+    pub target: Rc<MemberSymbol>,
+    /// The dimension's mask, compiled against the cube this path reaches.
+    pub mask_sql: Option<Rc<SqlCall>>,
+}
+
 /// `MemberSymbol::Ref` body: computes nothing. A `Member` target is a view
 /// member rendering its target under its own name (optionally masked); a
 /// terminal target takes its origin's identity and renders the column/value.
@@ -52,6 +65,14 @@ pub struct RefSymbol {
     pub(super) compiled_path: CompiledMemberPath,
     pub(super) target: RefTarget,
     pub(super) mask_sql: Option<Rc<SqlCall>>,
+    /// Set on a view dimension included through `join_paths`: every member it
+    /// may stand for, one per path, the first being `target`. Not dependencies:
+    /// a query is bound to one of them (`bind_shared`) before it is planned.
+    pub(super) shared: Option<Rc<Vec<SharedTarget>>>,
+    /// Bound from a shared view dimension to one of its paths: it keeps the
+    /// shared dimension's identity, which legs reading it through different
+    /// paths are merged by.
+    pub(super) bound_shared: bool,
 }
 
 symbol_deps! {
@@ -59,6 +80,8 @@ symbol_deps! {
         target: dep,
         mask_sql: dep,
         compiled_path: skip,
+        shared: skip,
+        bound_shared: skip,
     }
 }
 
@@ -80,6 +103,53 @@ impl RefSymbol {
             compiled_path,
             target: RefTarget::Member(target),
             mask_sql,
+            shared: None,
+            bound_shared: false,
+        }))
+    }
+
+    /// This reference as a view dimension shared through `join_paths`, standing
+    /// for `targets` - the first of which must be its current target.
+    pub fn with_shared_targets(&self, targets: Vec<SharedTarget>) -> Rc<Self> {
+        Rc::new(Self {
+            shared: Some(Rc::new(targets)),
+            ..self.clone()
+        })
+    }
+
+    /// The members a view dimension included through `join_paths` may stand
+    /// for, one per path in declared order.
+    pub fn shared_targets(&self) -> Option<&[SharedTarget]> {
+        self.shared.as_ref().map(|targets| targets.as_slice())
+    }
+
+    pub fn is_shared(&self) -> bool {
+        self.shared.is_some()
+    }
+
+    /// A shared view dimension, or one bound to a path: either way, matched
+    /// across subqueries by its own id rather than by the member it reads.
+    pub fn has_shared_identity(&self) -> bool {
+        self.is_shared() || self.bound_shared
+    }
+
+    /// The plain reference to the member of the `index`-th shared path, under
+    /// this dimension's own name.
+    pub fn bind_shared(&self, index: usize) -> Result<Rc<Self>, CubeError> {
+        let shared = self.shared_targets().unwrap_or_default();
+        let bound = shared.get(index).ok_or_else(|| {
+            CubeError::internal(format!(
+                "Member '{}' has no shared path {}",
+                self.full_name(),
+                index
+            ))
+        })?;
+        Ok(Rc::new(Self {
+            compiled_path: self.compiled_path.clone(),
+            target: RefTarget::Member(bound.target.clone()),
+            mask_sql: bound.mask_sql.clone(),
+            shared: None,
+            bound_shared: true,
         }))
     }
 
@@ -93,6 +163,8 @@ impl RefSymbol {
                 origin: origin.clone(),
             },
             mask_sql: None,
+            shared: None,
+            bound_shared: false,
         })
     }
 
@@ -105,6 +177,8 @@ impl RefSymbol {
                 origin: origin.clone(),
             },
             mask_sql: None,
+            shared: None,
+            bound_shared: false,
         })
     }
 

@@ -4,7 +4,7 @@ import { LRUCache } from 'lru-cache';
 import cronParser from 'cron-parser';
 import { isPredefinedGranularity, TIME_SERIES } from '@cubejs-backend/shared';
 
-import { CubeSymbols, CubeDefinition, ToString } from './CubeSymbols';
+import { CubeSymbols, CubeDefinition } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
 import { NAMED_NUMERIC_FORMATS } from './named-numeric-formats';
@@ -1361,7 +1361,8 @@ const viewSchema = inherit(baseSchema, {
   viewGroups: Joi.alternatives([Joi.array().items(Joi.string().required()), Joi.func()]).description('Names of the view groups this view belongs to'),
   cubes: Joi.array().items(
     Joi.object().keys({
-      joinPath: Joi.func().required().description("The path to the cube, including any joins. Use cube name for direct access (e.g., 'Events') or dot notation for joined cubes (e.g., 'Events.Users')"),
+      joinPath: Joi.func().description("The path to the cube, including any joins. Use cube name for direct access (e.g., 'Events') or dot notation for joined cubes (e.g., 'Events.Users')"),
+      joinPaths: Joi.func().description('Paths to one cube, one from each fact cube of the view (e.g. [orders.event_day, refunds.event_day]). Its dimensions are shared: each fact reads them through its own path'),
       prefix: Joi.boolean().description('Whether to prefix the included members with the cube name'),
       split: Joi.boolean().description("Whether to expose this cube's members in a separate view named <view>_<cube>"),
       alias: Joi.string().description("Name of the cube in this view: the prefix of its members when prefix is true, and the end of a split view's name. Defaults to the last part of join_path"),
@@ -1380,9 +1381,15 @@ const viewSchema = inherit(baseSchema, {
         ]))
       ]).required().description("Specify which members to include from the cube. Use '*' for all members, or an array of member names/objects with aliases"),
       excludes: Joi.array().items(Joi.string().required()).description('Members to exclude from the cube'),
-    }).oxor('split', 'prefix').messages({
-      'object.oxor': 'Using split together with prefix is not supported'
-    })
+    }).oxor('split', 'prefix')
+      .xor('joinPath', 'joinPaths')
+      .without('joinPaths', 'split')
+      .messages({
+        'object.oxor': 'Using split together with prefix is not supported',
+        'object.xor': 'A view cube needs either join_path or join_paths, not both',
+        'object.missing': 'A view cube needs either join_path or join_paths',
+        'object.without': 'Using split together with join_paths is not supported',
+      })
   ).description('List of cubes to include in the view'),
   folders: Joi.array().items(folderSchema).description('Folders for organizing view members into logical groups'),
   defaultFilters: Joi.array().items(ViewDefaultFilterSchema).description('Default filters applied to every query against the view'),
@@ -1625,34 +1632,36 @@ export class CubeValidator implements CompilerInterface {
 
     for (const cube of cubesArray) {
       try {
-        const fullPath = this.cubeSymbols.evaluateReferences(null, cube.joinPath as () => ToString, { collectJoinHints: true });
-        const split = fullPath.split('.');
-        const rootCube = split[0];
+        // Each path of a `join_paths` entry counts within its own root
+        for (const fullPath of this.cubeSymbols.viewCubeJoinPaths(cube)) {
+          const split = fullPath.split('.');
+          const rootCube = split[0];
 
-        if (!rootCubePaths.has(rootCube)) {
-          rootCubePaths.set(rootCube, new Map<string, Set<string>>());
-        }
-
-        const cubesJoinPaths = rootCubePaths.get(rootCube)!;
-
-        // A cube reached through a join alias, or below one, is an instance of
-        // its own: its path identifies it, so two aliases may reach one cube
-        let current = rootCube;
-        let aliased = false;
-
-        for (let i = 0; i < split.length; i++) {
-          const path = split.slice(0, i + 1).join('.');
-          if (i > 0) {
-            const aliasTarget = this.cubeSymbols.joinAliasTarget(current, split[i]);
-            aliased = aliased || aliasTarget !== undefined;
-            current = aliasTarget ?? split[i];
+          if (!rootCubePaths.has(rootCube)) {
+            rootCubePaths.set(rootCube, new Map<string, Set<string>>());
           }
-          const cubeName = aliased ? path : split[i];
 
-          if (!cubesJoinPaths.has(cubeName)) {
-            cubesJoinPaths.set(cubeName, new Set<string>());
+          const cubesJoinPaths = rootCubePaths.get(rootCube)!;
+
+          // A cube reached through a join alias, or below one, is an instance of
+          // its own: its path identifies it, so two aliases may reach one cube
+          let current = rootCube;
+          let aliased = false;
+
+          for (let i = 0; i < split.length; i++) {
+            const path = split.slice(0, i + 1).join('.');
+            if (i > 0) {
+              const aliasTarget = this.cubeSymbols.joinAliasTarget(current, split[i]);
+              aliased = aliased || aliasTarget !== undefined;
+              current = aliasTarget ?? split[i];
+            }
+            const cubeName = aliased ? path : split[i];
+
+            if (!cubesJoinPaths.has(cubeName)) {
+              cubesJoinPaths.set(cubeName, new Set<string>());
+            }
+            cubesJoinPaths.get(cubeName)!.add(path);
           }
-          cubesJoinPaths.get(cubeName)!.add(path);
         }
       } catch (e) {
         // Ignore errors during joinPath evaluation - cube may not be defined yet

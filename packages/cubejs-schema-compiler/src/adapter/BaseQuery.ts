@@ -3547,6 +3547,9 @@ export class BaseQuery {
     memberExpressionType?: string | false,
     subPropertyName?: string
   ): string {
+    if (symbol?.sharedPaths && !(this.options.useNativeSqlPlanner ?? getEnv('nativeSqlPlanner'))) {
+      throw new UserError(`'${cubeName}.${name}' is shared through join_paths, which require the Tesseract SQL planner`);
+    }
     const aliasPath = this.cubeEvaluator.joinAliasPath();
     if (aliasPath && this.safeEvaluateSymbolContext().memberInstanceAliasPath !== aliasPath) {
       this.ensureNativePlannerForJoinAliases([...aliasPath, name].join('.'));

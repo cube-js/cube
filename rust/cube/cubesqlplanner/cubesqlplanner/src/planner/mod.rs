@@ -29,6 +29,7 @@ pub mod query_properties_compiler;
 pub mod query_tools;
 pub mod request_options;
 pub mod row_limit;
+pub mod shared_dimensions;
 pub mod sql_templates;
 pub mod state;
 pub mod symbol_classification;
