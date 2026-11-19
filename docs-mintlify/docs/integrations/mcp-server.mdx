@@ -75,8 +75,10 @@ When your deployments are served by more than one endpoint, **Admin → MCP Serv
 every endpoint with the deployments it serves. Add one connector per endpoint through your
 client's custom setup ([Claude](#claude-custom-connector), [ChatGPT](#chatgpt-custom-app),
 [Codex](#codex-custom-connector), [Cursor](#connect-to-cursor),
+[Microsoft 365 Copilot](#connect-to-microsoft-365-copilot),
 [other clients](#connect-to-other-mcp-clients)); the Cube directory connector and plugins
-use the single endpoint only. Give each connector its own name, such as **Cube** and
+use the single endpoint only. For Copilot, each endpoint needs its own OAuth client
+registration. Give each connector its own name, such as **Cube** and
 **Cube EU**; the Cursor and CLI examples on this page name the server `cube-mcp-server`, so
 pick another name for the second one.
 
@@ -979,6 +981,7 @@ and friends) are set.
 - **MCP OAuth integration is not configured**: Enable MCP in **Admin → Team & Security → OAuth Integrations**.
 - **No deployments available / MCP access is disabled**: In **Admin → MCP Server → Deployment access**, make sure **Limit available deployments** is off, or that at least one deployment is selected and the user has permission to access it.
 - **`Deployment <id> is not available via MCP for this account` (403)**: The requested deployment is excluded by the deployment-access allow-list or by the user's permissions. Call `listDeployments` to see which deployments are reachable, or adjust the allow-list in **Admin → MCP Server → Deployment access**.
+- **`Deployment <id> is served by the Cube MCP endpoint <endpoint>, which this session cannot reach`**: The deployment is served by another endpoint than the one this connection signed in on. Add a connector for that endpoint — see [Deployments in more than one region](#deployments-in-more-than-one-region). If the client already uses that endpoint, reconnect it so it signs in there again.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-api-keys]: /admin/account-billing/api-keys
