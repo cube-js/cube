@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.30](https://github.com/cube-js/cube/compare/v1.8.29...v1.8.30) (2026-11-19)
+
+### Bug Fixes
+
+- **tesseract:** Build Cube Store LIKE patterns with CONCAT instead of || ([#12858](https://github.com/cube-js/cube/issues/12858)) ([2613f2c](https://github.com/cube-js/cube/commit/2613f2cf0c6fca1374d12b627f73a6f88f691ec6))
+
 ## [1.8.29](https://github.com/cube-js/cube/compare/v1.8.28...v1.8.29) (2026-11-19)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
