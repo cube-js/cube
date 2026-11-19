@@ -71,7 +71,7 @@ The target dashboard applies each value it arrives with, in this order:
 
 A value that none of these take is dropped from the URL, and the dashboard shows the message "Unable to filter by" followed by the field's title, once for each such field. So does a value whose placed filter's [visibility][ref-visibility] is **Disabled**. To make a dashboard a good target, place a filter, or allow a dynamic filter, on every dimension of the charts that drill through to it.
 
-The same applies to every link that opens a published dashboard with filter parameters, such as a `dashboard:` [link on a dimension][ref-dimension-links] or a link you write by hand. The target decides once, when it opens. [Downloads][ref-downloads], the print version, [scheduled refreshes][ref-scheduled-refreshes] and [data alerts][ref-data-alerts] render the URL as it is, without these steps: a value that no control on the dashboard takes is left out, without a message. A download of a target you opened through a drill-through keeps the filters the drill-through added.
+The same applies to every link that opens a published dashboard with filter parameters, such as a `dashboard:` [link on a dimension][ref-dimension-links] or a link you write by hand. The target decides once, when it opens. [Downloads][ref-downloads], the print version, [dashboard deliveries][ref-dashboard-deliveries] and [alerts][ref-alerts] render the URL as it is, without these steps: a value that no control on the dashboard takes is left out, without a message. A download of a target you opened through a drill-through keeps the filters the drill-through added.
 
 ## Changing the target's slug
 
@@ -90,5 +90,5 @@ When you take over a slug another dashboard holds, the dialog says that the char
 [ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
 [ref-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-downloads]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
-[ref-scheduled-refreshes]: /docs/explore-analyze/scheduled-refreshes
-[ref-data-alerts]: /docs/explore-analyze/data-alerts
+[ref-dashboard-deliveries]: /docs/explore-analyze/dashboard-deliveries
+[ref-alerts]: /docs/explore-analyze/alerts
