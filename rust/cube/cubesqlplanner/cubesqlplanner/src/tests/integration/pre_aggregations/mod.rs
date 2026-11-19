@@ -1,13 +1,16 @@
 mod calendar;
 mod calendar_stored_shift;
 mod external_split;
+mod filter_join_path;
 mod filtered_leaf_merge;
 mod hub_spoke_join_path;
 mod masked_members;
 mod multi_fact;
 mod multi_fact_view_stored_shift;
+mod multi_granularity;
 mod multi_stage;
 mod query_join_hints;
+mod rolling_non_additive;
 mod rollup_join_keys;
 mod rollup_join_usages;
 mod sql_generation;

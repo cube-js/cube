@@ -2,10 +2,20 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 use pretty_assertions::assert_eq;
+use serde_json::json;
+use std::sync::Arc;
 
-use crate::compile::{
-    test::{convert_select_to_query_plan, init_testing_logger, utils::LogicalPlanTestUtils},
-    DatabaseProtocol, Rewriter,
+use crate::config::ConfigObjImpl;
+use crate::{
+    compile::{
+        test::{
+            convert_select_to_query_plan, convert_sql_to_cube_query, get_test_session,
+            get_test_tenant_ctx_with_meta, init_testing_logger, utils::LogicalPlanTestUtils,
+            TestContext,
+        },
+        DatabaseProtocol, Rewriter,
+    },
+    transport::{CubeMeta, CubeMetaDimension, CubeMetaMeasure},
 };
 
 /// LIMIT n OFFSET m should be pushed to CubeScan
@@ -566,6 +576,116 @@ async fn cubescan_projection_keeps_order_members() {
     }
 }
 
+/// Cube ignores orders on members a request does not select, so the scan selects them when it loads
+#[tokio::test]
+async fn cubescan_loads_order_members() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+    context
+        .add_cube_load_mock(
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.notes".to_string(),
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(50000),
+                ungrouped: Some(true),
+                ..Default::default()
+            },
+            crate::compile::tests::simple_load_response(
+                vec![
+                    "KibanaSampleDataEcommerce.notes",
+                    "KibanaSampleDataEcommerce.customer_gender",
+                ],
+                vec![
+                    vec![json!("b"), json!("a")],
+                    vec![json!("female"), json!("male")],
+                ],
+            ),
+        )
+        .await;
+    context
+        .add_cube_load_mock(
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: Some(50000),
+                ..Default::default()
+            },
+            crate::compile::tests::simple_load_response(
+                vec![
+                    "KibanaSampleDataEcommerce.customer_gender",
+                    "KibanaSampleDataEcommerce.sumPrice",
+                ],
+                vec![
+                    vec![json!("male"), json!("female")],
+                    vec![json!(1), json!(2)],
+                ],
+            ),
+        )
+        .await;
+
+    insta::assert_snapshot!(context
+        .execute_query("SELECT notes FROM KibanaSampleDataEcommerce ORDER BY customer_gender")
+        .await
+        .unwrap());
+    insta::assert_snapshot!(
+        context
+            .execute_query(
+                "SELECT customer_gender FROM KibanaSampleDataEcommerce GROUP BY 1 ORDER BY SUM(sumPrice)"
+            )
+            .await
+            .unwrap()
+    );
+
+    // An order member from another data source is not loaded, as Cube would reject the load
+    let context = TestContext::with_config_and_meta(
+        DatabaseProtocol::PostgreSQL,
+        Arc::new(ConfigObjImpl::default()),
+        crate::compile::test::get_test_tenant_ctx_with_multi_data_source_view(),
+    )
+    .await;
+    context
+        .add_cube_load_mock(
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["MultiSourceView.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                order: Some(vec![vec![
+                    "MultiSourceView.content".to_string(),
+                    "desc".to_string(),
+                ]]),
+                limit: Some(50000),
+                ungrouped: Some(true),
+                ..Default::default()
+            },
+            crate::compile::tests::simple_load_response(
+                vec!["MultiSourceView.customer_gender"],
+                vec![vec![json!("male")]],
+            ),
+        )
+        .await;
+    insta::assert_snapshot!(context
+        .execute_query("SELECT customer_gender FROM MultiSourceView ORDER BY content DESC")
+        .await
+        .unwrap());
+}
+
 /// Projection over a grouped CubeScan should keep its grouping dimensions
 #[tokio::test]
 async fn cubescan_projection_keeps_grouping_dimensions() {
@@ -765,4 +885,70 @@ async fn cubescan_projection_pushed_under_aggregate_and_join() {
         .find_cube_scan_wrapped_sql()
         .request;
     assert_eq!(request.subquery_joins.unwrap().len(), 1);
+}
+
+/// BI tools read the columns of a table with `SELECT *`, which expands to one column per
+/// member: on a wide view the rewrite must not grow with the member count, or it hits the
+/// node limit
+#[tokio::test]
+async fn select_star_from_wide_view() {
+    init_testing_logger();
+
+    let members = 1000;
+    let meta = get_test_tenant_ctx_with_meta(vec![CubeMeta {
+        name: "wide".to_string(),
+        dimensions: (0..members)
+            .map(|i| CubeMetaDimension {
+                name: format!("wide.dim{i}"),
+                r#type: "string".to_string(),
+                ..CubeMetaDimension::default()
+            })
+            .collect(),
+        measures: (0..members)
+            .map(|i| CubeMetaMeasure {
+                name: format!("wide.measure{i}"),
+                r#type: "number".to_string(),
+                agg_type: Some("sum".to_string()),
+                ..CubeMetaMeasure::default()
+            })
+            .collect(),
+        ..CubeMeta::default()
+    }]);
+
+    for (sql, limit) in [
+        ("SELECT * FROM wide WHERE 1 = 0", Some(0)),
+        ("SELECT * FROM wide LIMIT 0", Some(0)),
+        ("SELECT * FROM wide", None),
+    ] {
+        let session = get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await;
+        let query_plan = convert_sql_to_cube_query(&sql.to_string(), meta.clone(), session)
+            .await
+            .unwrap_or_else(|e| panic!("{}: {}", sql, e));
+        let request = query_plan.as_logical_plan().find_cube_scan().request;
+        assert_eq!(request.measures.unwrap().len(), members, "{sql}");
+        assert_eq!(request.dimensions.unwrap().len(), members, "{sql}");
+        assert_eq!(request.limit, limit, "{sql}");
+    }
+}
+
+/// A `SELECT *` filtered in SQL is still one wrapped query, with no post-processing above it
+#[tokio::test]
+async fn select_star_with_sql_filter_is_wrapped() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        "SELECT * FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'female' LIMIT 10"
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let request = query_plan
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sql()
+        .request;
+    assert_eq!(request.limit, Some(10));
 }

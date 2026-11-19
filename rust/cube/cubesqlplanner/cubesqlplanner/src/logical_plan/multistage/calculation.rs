@@ -44,9 +44,12 @@ impl ToString for MultiStageCalculationWindowFunction {
     }
 }
 
-/// Measure subquery in a multi-stage chain — wraps a `Merge`
-/// source with the partition / window function / ordering decided
-/// by `calculation_type`.
+// The inputs of a measure calculation: subqueries at the calculation's grain
+// merged by their keys, or values at coarser grains handed onto a grid.
+logical_source_enum!(CalculationSource, [Merge, GridLookup]);
+
+/// Measure subquery in a multi-stage chain — wraps a `CalculationSource` with
+/// the partition / window function / ordering decided by `calculation_type`.
 #[derive(TypedBuilder)]
 pub struct MultiStageMeasureCalculation {
     schema: Rc<LogicalSchema>,
@@ -57,7 +60,7 @@ pub struct MultiStageMeasureCalculation {
     window_function_to_use: MultiStageCalculationWindowFunction,
     #[builder(default)]
     order_by: Vec<OrderByItem>,
-    source: Rc<Merge>,
+    source: CalculationSource,
 }
 
 impl MultiStageMeasureCalculation {
@@ -85,7 +88,7 @@ impl MultiStageMeasureCalculation {
         &self.order_by
     }
 
-    pub fn source(&self) -> &Rc<Merge> {
+    pub fn source(&self) -> &CalculationSource {
         &self.source
     }
 }
@@ -163,7 +166,7 @@ impl LogicalNode for MultiStageMeasureCalculation {
                 .partition_by(self.partition_by().clone())
                 .window_function_to_use(self.window_function_to_use().clone())
                 .order_by(self.order_by().clone())
-                .source(source.clone().into_logical_node()?)
+                .source(self.source.with_plan_node(source.clone())?)
                 .build(),
         ))
     }

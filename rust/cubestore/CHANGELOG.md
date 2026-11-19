@@ -3,6 +3,54 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.29](https://github.com/cube-js/cube/compare/v1.8.28...v1.8.29) (2026-11-19)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+### Bug Fixes
+
+- **cubestore:** Don't kill RWLoop threads when telemetry tracks errors outside of a Tokio runtime ([#12416](https://github.com/cube-js/cube/issues/12416)), closes [#12415](https://github.com/cube-js/cube/issues/12415)
+
+### BREAKING CHANGES
+
+- **cubestore:** cubestore::telemetry::agent_event_spawn is renamed to
+  track_agent_event; track_event and EventSender::track_event(\_object) are no
+  longer async.
+
+## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
+
+### Features
+
+- **cubestore:** Allowlist hosts for http(s) import locations ([#12820](https://github.com/cube-js/cube/issues/12820)) ([cdeb005](https://github.com/cube-js/cube/commit/cdeb00598d5e28ca9310dc9106ac0f9724c83c68))
+
+## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
+
+### Bug Fixes
+
+- **cubestore:** Push LIMIT to workers for queries without ORDER BY and GROUP BY ([#12778](https://github.com/cube-js/cube/issues/12778)) ([8f63d9d](https://github.com/cube-js/cube/commit/8f63d9d6f2168ed84afae0e5149dc9bd3aa4c694))
+
+## [1.8.25](https://github.com/cube-js/cube/compare/v1.8.24...v1.8.25) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.24](https://github.com/cube-js/cube/compare/v1.8.23...v1.8.24) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
+
+### Bug Fixes
+
+- **cubestore:** Disable local filesystem imports by default ([#12779](https://github.com/cube-js/cube/issues/12779)) ([bcbe7fd](https://github.com/cube-js/cube/commit/bcbe7fd7f5c7d204a928fdf589a93c2eb0df7c72))
+- **cubestore:** Keep a queued query a client still waits for from being orphaned ([#12761](https://github.com/cube-js/cube/issues/12761)) ([1b0e81f](https://github.com/cube-js/cube/commit/1b0e81ffd9f13fa72ebcf39766b7c1da82d057ce)), closes [cube-js/cube#12755](https://github.com/cube-js/cube/issues/12755)
+- **cubestore:** Reject path traversal in temp uploads and remote fs paths ([#12773](https://github.com/cube-js/cube/issues/12773)) ([5c18c87](https://github.com/cube-js/cube/commit/5c18c8761a22b68f5d3e45cc2cea685257243738))
+
+## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
 ## [1.8.21](https://github.com/cube-js/cube/compare/v1.8.20...v1.8.21) (2026-11-09)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

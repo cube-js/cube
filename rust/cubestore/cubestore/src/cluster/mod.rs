@@ -41,8 +41,11 @@ use crate::queryplanner::query_executor::{QueryExecutor, SerializedRecordBatchSt
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
-use crate::telemetry::tracing::{TraceIdAndSpanId, TracingHelper};
+use crate::telemetry::tracing::{
+    record_result, record_trace_obj, ProcessMemoryWindow, TraceIdAndSpanId, TracingHelper,
+};
 use crate::trace::{MainTrace, OpKind, SubprocessTrace, WorkerTrace};
+use crate::util::memory::MemoryHandler;
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::SchemaRef;
@@ -379,6 +382,9 @@ impl WorkerProcessing for WorkerProcessor {
                 let memory_pool =
                     detailed.then(crate::queryplanner::query_executor::TrackingMemoryPool::new);
                 let memory_pool_for_exec = memory_pool.clone();
+                let trace_obj = plan_node.trace_obj();
+                let memory_handler: Arc<dyn MemoryHandler> =
+                    config.injector().get_service_typed().await;
                 let future = async move {
                     let time = SystemTime::now();
                     debug!("Running select in worker started");
@@ -447,7 +453,8 @@ impl WorkerProcessing for WorkerProcessor {
                     );
 
                     let context = OtelContext::new().with_remote_span_context(span_context);
-                    let span = tracing::info_span!("Process on select worker");
+                    let span = crate::work_span!("Process on select worker");
+                    record_trace_obj(&span, trace_obj.as_deref());
 
                     // Fails only when no OpenTelemetry layer is installed or the span is filtered
                     // out, and either way the span just stays untraced.
@@ -455,8 +462,9 @@ impl WorkerProcessing for WorkerProcessor {
                     span
                 });
 
+                let run_span = span.clone();
                 let run = async move {
-                    if let Some(span) = span {
+                    if let Some(span) = run_span {
                         future.instrument(span).await
                     } else {
                         future.await
@@ -465,8 +473,17 @@ impl WorkerProcessing for WorkerProcessor {
 
                 let ctx = detailed.then(crate::trace::TraceCtx::new);
                 let started = std::time::Instant::now();
-                let (schema, records, data_loaded_size) =
-                    crate::trace::scoped(ctx.clone(), run).await?;
+                // A select subprocess runs one select at a time, so the process heap is its own.
+                let memory_window = ProcessMemoryWindow::start(memory_handler);
+                let result = crate::trace::scoped(ctx.clone(), run).await;
+                if let Some(span) = &span {
+                    record_result(span, &result);
+                    memory_window.usage().record(span);
+                    if let Ok((_, _, data_loaded_size)) = &result {
+                        span.record("cubestore.data_loaded_bytes", *data_loaded_size as u64);
+                    }
+                }
+                let (schema, records, data_loaded_size) = result?;
                 let total_us = started.elapsed().as_micros() as u64;
                 let subtrace = ctx.map(|c| SubprocessTrace {
                     total_us,
@@ -589,7 +606,7 @@ impl Cluster for ClusterImpl {
         }
     }
 
-    #[instrument(level = "trace", skip(self, plan_node))]
+    #[instrument(level = "trace", skip_all, fields(node_name = node_name))]
     async fn run_select(
         &self,
         node_name: &str,
@@ -826,7 +843,7 @@ impl Cluster for ClusterImpl {
         Ok(())
     }
 
-    #[instrument(level = "trace", skip(self, m))]
+    #[instrument(level = "trace", skip_all)]
     async fn process_message_on_worker(&self, m: NetworkMessage) -> NetworkMessage {
         match m {
             NetworkMessage::RouterSelect(plan) => {
@@ -1631,7 +1648,7 @@ impl ClusterImpl {
             }
         }
     }
-    #[instrument(level = "trace", skip(self, plan_node))]
+    #[instrument(level = "trace", skip_all)]
     async fn run_local_select_worker_impl(
         &self,
         plan_node: SerializedPlan,
@@ -1941,7 +1958,7 @@ impl ClusterImpl {
         Ok(())
     }
 
-    #[instrument(level = "trace", skip(self, m))]
+    #[instrument(level = "trace", skip_all, fields(node_name = node_name))]
     async fn send_or_process_locally(
         &self,
         node_name: &str,
@@ -1964,7 +1981,7 @@ impl ClusterImpl {
         }
     }
 
-    #[instrument(level = "trace", skip(self, m))]
+    #[instrument(level = "trace", skip_all, fields(node_name = node_name))]
     async fn call_streaming(
         self: &Arc<Self>,
         node_name: &str,

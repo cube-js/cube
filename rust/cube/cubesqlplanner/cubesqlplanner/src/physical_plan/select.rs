@@ -26,7 +26,11 @@ impl AliasedExpr {
         templates: &PlanSqlTemplates,
         context: Rc<VisitorContext>,
     ) -> Result<TemplateProjectionColumn, CubeError> {
-        let expr = self.expr.to_sql(templates, context)?;
+        let mut expr = self.expr.to_sql(templates, context)?;
+        // Only the projection is wrapped: a wrapped column in a filter defeats index pruning
+        if self.expr.is_boolean_dimension() {
+            expr = templates.wrap_boolean_dimension(expr)?;
+        }
         let aliased = templates.column_aliased(&expr, &self.alias)?;
         Ok(TemplateProjectionColumn {
             expr,

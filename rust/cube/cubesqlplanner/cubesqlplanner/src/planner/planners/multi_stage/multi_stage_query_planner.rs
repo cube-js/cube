@@ -163,8 +163,7 @@ impl MultiStageQueryPlanner {
         // `filter: include` lets a stage filter a member the query around it does
         // not, so the member is specialized against this stage's own set.
         let member =
-            Specializer::for_stage_member(state.dimensions_filters(), &state.all_filter_items())
-                .specialize(&member)?;
+            Specializer::for_stage_member(&state, &self.query_properties).specialize(&member)?;
         let state = if member.is_dimension() {
             let mut new_state = state.as_ref().clone();
             new_state.remove_multistage_dimensions(registry.resolved_multi_stage_dimensions())?;

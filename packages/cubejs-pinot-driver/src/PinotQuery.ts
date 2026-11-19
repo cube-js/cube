@@ -214,6 +214,7 @@ export class PinotQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.APPROXDISTINCT = 'DISTINCTCOUNTHLLPLUS({{ args_concat }})';
     // NOW() returns the current epoch millis (inherently UTC), matching the
     // epoch-millis representation produced by the timestamp_literal template
     templates.functions.UTCTIMESTAMP = 'NOW()';

@@ -36,13 +36,13 @@ impl RollingBaseScanOptimizer {
         }
 
         let mut widened_at: HashMap<usize, Rc<Subquery>> = HashMap::new();
-        let mut forwards: Vec<(InputId, Rc<SubqueryRef>)> = Vec::new();
+        let mut forwards = InputForwards::default();
         let mut absorbed: HashSet<InputId> = HashSet::new();
         for group in groups.iter() {
             if group.absorbed.is_empty() {
                 continue;
             }
-            let widened = Self::widen_leaf(&root.subqueries()[group.position], group);
+            let widened = Self::widen_leaf(&root.subqueries()[group.position], group)?;
             let to = Rc::new(
                 SubqueryRef::builder()
                     .id(widened.id)
@@ -51,7 +51,7 @@ impl RollingBaseScanOptimizer {
                     .build(),
             );
             for id in group.absorbed.iter() {
-                forwards.push((*id, to.clone()));
+                forwards.add(*id, &to);
                 absorbed.insert(*id);
             }
             widened_at.insert(group.position, widened);
@@ -70,15 +70,13 @@ impl RollingBaseScanOptimizer {
             })
             .collect::<Vec<_>>();
 
-        let mut result = Rc::new(
+        let result = Rc::new(
             RootQuery::builder()
                 .subqueries(subqueries)
                 .query(root.query().clone())
                 .build(),
         );
-        for (from, to) in forwards.iter() {
-            result = result.forward(*from, to)?;
-        }
+        let result = result.forward_all(&forwards)?;
         Ok(result)
     }
 
@@ -147,15 +145,12 @@ impl RollingBaseScanOptimizer {
 
     /// The kept subquery, projecting every measure of its group. An absorbed
     /// window's reference names the whole group; it reads its own measure.
-    fn widen_leaf(subquery: &Rc<Subquery>, group: &MergeGroup) -> Rc<Subquery> {
+    fn widen_leaf(subquery: &Rc<Subquery>, group: &MergeGroup) -> Result<Rc<Subquery>, CubeError> {
         let query = &group.leaf;
-        let widened = query.with_schema_filter_and_modifers(
-            group_schema(group),
-            query.filter().clone(),
-            query.modifers().clone(),
-        );
+        let widened =
+            query.with_schema_and_modifers(group_schema(group), query.modifers().clone())?;
 
-        subquery.with_body(SubqueryBody::Query(widened))
+        Ok(subquery.with_body(SubqueryBody::Query(widened)))
     }
 }
 

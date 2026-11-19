@@ -2,6 +2,7 @@ use super::*;
 use crate::planner::InputId;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::collections::HashMap;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -26,13 +27,12 @@ impl SubqueryRef {
         &self.schema
     }
 
-    /// `to` if this ref reads the subquery `from`, this ref otherwise.
-    pub fn forwarded(self: &Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
-        if self.id == from {
-            to.clone()
-        } else {
-            self.clone()
-        }
+    /// The ref `forwards` replaces this one with, this ref otherwise.
+    pub fn forwarded(self: &Rc<Self>, forwards: &InputForwards) -> Rc<Self> {
+        forwards
+            .target(self.id)
+            .cloned()
+            .unwrap_or_else(|| self.clone())
     }
 }
 
@@ -51,18 +51,13 @@ impl PrettyPrint for SubqueryRef {
 }
 
 /// Top-level aggregating source that stitches together several
-/// multi-stage / multi-fact subqueries into one keyed result. The
-/// physical builder picks a join strategy from `subqueries`,
-/// `keys` and the dialect.
+/// multi-stage / multi-fact subqueries at one grain into one keyed result.
+/// The physical builder picks a join strategy from `subqueries` and the dialect.
 #[derive(Clone, TypedBuilder)]
 pub struct Merge {
     schema: Rc<LogicalSchema>,
     #[builder(default)]
     subqueries: Vec<Rc<SubqueryRef>>,
-    /// Refs supplying the key grid at a finer grain than the measure refs;
-    /// empty when the keys are derived from the measure refs themselves.
-    #[builder(default)]
-    keys: Vec<Rc<SubqueryRef>>,
 }
 
 impl Merge {
@@ -72,10 +67,6 @@ impl Merge {
 
     pub fn subqueries(&self) -> &Vec<Rc<SubqueryRef>> {
         &self.subqueries
-    }
-
-    pub fn keys(&self) -> &Vec<Rc<SubqueryRef>> {
-        &self.keys
     }
 
     pub fn is_empty(&self) -> bool {
@@ -99,49 +90,27 @@ impl LogicalNode for Merge {
             Self::builder()
                 .schema(self.schema().clone())
                 .subqueries(self.subqueries().clone())
-                .keys(self.keys.clone())
                 .build(),
         ))
     }
 
     fn referenced_inputs(&self) -> Vec<InputId> {
-        self.subqueries
-            .iter()
-            .chain(self.keys.iter())
-            .map(|r| r.id())
-            .collect()
+        self.subqueries.iter().map(|r| r.id()).collect()
     }
 
-    // In a list reading `from`, a ref already reading `to` is replaced too, so
-    // the legs collapsing onto `to` keep the schema the forward brings. Lists
-    // not reading `from` stay as they are.
-    fn with_forwarded_input(self: Rc<Self>, from: InputId, to: &Rc<SubqueryRef>) -> Rc<Self> {
-        let reads_from = |refs: &Vec<Rc<SubqueryRef>>| refs.iter().any(|r| r.id() == from);
-        if !reads_from(&self.subqueries) && !reads_from(&self.keys) {
-            return self;
+    fn with_forwarded_input(
+        self: Rc<Self>,
+        forwards: &InputForwards,
+    ) -> Result<Rc<Self>, CubeError> {
+        if !forwards.replaces_any(&self.referenced_inputs()) {
+            return Ok(self);
         }
-        let forward = |refs: &Vec<Rc<SubqueryRef>>| {
-            if !reads_from(refs) {
-                return refs.clone();
-            }
-            refs.iter()
-                .map(|r| {
-                    if r.id() == from || r.id() == to.id() {
-                        to.clone()
-                    } else {
-                        r.clone()
-                    }
-                })
-                .unique_by(|r| r.id())
-                .collect_vec()
-        };
-        Rc::new(
+        Ok(Rc::new(
             Self::builder()
                 .schema(self.schema.clone())
-                .subqueries(forward(&self.subqueries))
-                .keys(forward(&self.keys))
+                .subqueries(forward_refs(&self.subqueries, forwards))
                 .build(),
-        )
+        ))
     }
 
     fn node_name(&self) -> &'static str {
@@ -169,11 +138,70 @@ impl PrettyPrint for Merge {
                 subquery_ref.pretty_print(result, &details_state);
             }
         }
-        if !self.keys.is_empty() {
-            result.println("keys:", &state);
-            for keys_ref in self.keys.iter() {
-                keys_ref.pretty_print(result, &details_state);
+    }
+}
+
+// The refs after `forwards`. A ref already reading a target is replaced too,
+// so the refs collapsing onto it keep the schema the forward brings, and they
+// are deduplicated.
+pub(super) fn forward_refs(
+    refs: &[Rc<SubqueryRef>],
+    forwards: &InputForwards,
+) -> Vec<Rc<SubqueryRef>> {
+    refs.iter()
+        .map(|r| forwards.collapsed(r))
+        .unique_by(|r| r.id())
+        .collect_vec()
+}
+
+/// Subqueries replaced by others, applied to a plan in one pass so it never
+/// holds some replacements without the rest.
+#[derive(Clone, Default)]
+pub struct InputForwards {
+    targets: HashMap<InputId, Rc<SubqueryRef>>,
+}
+
+impl InputForwards {
+    pub fn single(from: InputId, to: &Rc<SubqueryRef>) -> Self {
+        let mut forwards = Self::default();
+        forwards.add(from, to);
+        forwards
+    }
+
+    /// Replaces `from` by `to`, following the replacements already added.
+    pub fn add(&mut self, from: InputId, to: &Rc<SubqueryRef>) {
+        let to = self.target(to.id()).cloned().unwrap_or_else(|| to.clone());
+        for target in self.targets.values_mut() {
+            if target.id() == from {
+                *target = to.clone();
             }
         }
+        self.targets.insert(from, to);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.targets.is_empty()
+    }
+
+    pub fn target(&self, from: InputId) -> Option<&Rc<SubqueryRef>> {
+        self.targets.get(&from)
+    }
+
+    /// Whether any of `inputs` is replaced.
+    pub fn replaces_any(&self, inputs: &[InputId]) -> bool {
+        inputs.iter().any(|id| self.targets.contains_key(id))
+    }
+
+    /// The ref `input` becomes: its target, or the target ref when it already
+    /// reads a target.
+    pub fn collapsed(&self, input: &Rc<SubqueryRef>) -> Rc<SubqueryRef> {
+        if let Some(to) = self.target(input.id()) {
+            return to.clone();
+        }
+        self.targets
+            .values()
+            .find(|to| to.id() == input.id())
+            .cloned()
+            .unwrap_or_else(|| input.clone())
     }
 }

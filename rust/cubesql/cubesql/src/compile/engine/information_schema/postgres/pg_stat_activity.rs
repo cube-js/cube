@@ -2,7 +2,7 @@ use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
 
-use crate::sql::{session::SessionStatActivity, SessionManager};
+use crate::sql::{session::SessionStatActivity, SessionManager, SessionState};
 use datafusion::{
     arrow::{
         array::{Array, Int64Builder, StringBuilder, TimestampNanosecondBuilder, UInt32Builder},
@@ -77,10 +77,10 @@ impl PgStatActivityBuilder {
         self.usename.append_option(session.usename);
         self.application_name
             .append_option(session.application_name);
-        self.client_addr.append_value(session.client_addr);
+        self.client_addr.append_option(session.client_addr);
         self.client_hostname.append_option(session.client_hostname);
         self.client_port
-            .append_value(session.client_port.to_string());
+            .append_option(session.client_port.map(|port| port.to_string()));
         self.backend_start.append_null();
         self.xact_start.append_null();
         self.query_start.append_null();
@@ -128,11 +128,12 @@ impl PgStatActivityBuilder {
 
 pub struct PgCatalogStatActivityProvider {
     sessions: Arc<SessionManager>,
+    viewer: Arc<SessionState>,
 }
 
 impl PgCatalogStatActivityProvider {
-    pub fn new(sessions: Arc<SessionManager>) -> Self {
-        Self { sessions }
+    pub fn new(sessions: Arc<SessionManager>, viewer: Arc<SessionState>) -> Self {
+        Self { sessions, viewer }
     }
 }
 
@@ -201,7 +202,17 @@ impl TableProvider for PgCatalogStatActivityProvider {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        let sessions = self.sessions.map_sessions::<SessionStatActivity>().await;
+        let sessions = self
+            .sessions
+            .map_sessions(|session| {
+                let activity = SessionStatActivity::from(session);
+                if self.viewer.can_observe_session(&session.state) {
+                    activity
+                } else {
+                    activity.insufficient_privilege()
+                }
+            })
+            .await;
         let mut builder = PgStatActivityBuilder::new(sessions.len());
 
         for session in sessions {

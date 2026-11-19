@@ -89,7 +89,7 @@ impl GranularityHelper {
             } else if interval.contains("day") {
                 Some("day".to_string())
             } else if interval.contains("week") {
-                Some("day".to_string())
+                Some("week".to_string())
             } else if interval.contains("month") {
                 Some("month".to_string())
             } else if interval.contains("quarter") {

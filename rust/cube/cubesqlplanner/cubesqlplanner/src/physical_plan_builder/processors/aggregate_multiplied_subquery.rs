@@ -1,6 +1,6 @@
 use super::super::{LogicalNodeProcessor, ProcessableNode, PushDownBuilderContext};
 use crate::logical_plan::transforms as logical_transforms;
-use crate::logical_plan::{AggregateMultipliedSubquery, DimensionInputKeys};
+use crate::logical_plan::AggregateMultipliedSubquery;
 use crate::physical_plan::VisitorContext;
 use crate::physical_plan::{
     measure_over_column, Expr, From, JoinBuilder, JoinCondition, MemberExpression,
@@ -10,6 +10,7 @@ use crate::physical_plan_builder::PhysicalPlanBuilder;
 use crate::planner::symbols::transforms;
 use crate::planner::{AggregateWrap, MemberSymbol};
 use cubenativeutils::CubeError;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 /// The measure subquery renders measures without their aggregate for the select
@@ -66,6 +67,10 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         let keys_body =
             PhysicalPlanBuilder::inline_query_body(&aggregate_multiplied_subquery.keys, context)?;
         let keys_query = self.builder.process_node(keys_body.as_ref(), context)?;
+        // Rows reach the measure cube by the keys alone, never by a cube join.
+        let mut context = context.clone();
+        context.members_in_join_conditions = Some(Rc::new(HashSet::new()));
+        let context = &context;
 
         let keys_query_alias = "keys".to_string();
 
@@ -119,14 +124,13 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
                     JoinCondition::new_dimension_join(conditions, false),
                 );
                 for input in aggregate_multiplied_subquery.dimension_inputs.iter() {
-                    if input.keys_kind != DimensionInputKeys::PrimaryKeys {
-                        return Err(CubeError::internal(
-                            "A multiplied measure subquery joins only primary-key dimension inputs"
-                                .to_string(),
-                        ));
-                    }
-                    self.builder
-                        .add_subquery_join(input, &mut join_builder, context)?;
+                    self.builder.add_subquery_join(
+                        &input.subquery,
+                        &input.keys,
+                        false,
+                        &mut join_builder,
+                        context,
+                    )?;
                 }
             }
             Some(measure_values) => {
@@ -173,7 +177,10 @@ impl<'a> LogicalNodeProcessor<'a, AggregateMultipliedSubquery>
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut substitutions = ReferenceSubstitutions::new();
         self.builder.collect_dimension_inputs_substitutions(
-            &aggregate_multiplied_subquery.dimension_inputs,
+            aggregate_multiplied_subquery
+                .dimension_inputs
+                .iter()
+                .map(|input| &input.subquery),
             &references_builder,
             &mut substitutions,
         )?;

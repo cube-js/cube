@@ -57,6 +57,7 @@ tags:
   - name: Dashboard Embed Access
   - name: Usage Analytics
   - name: OpenAPI Spec
+  - name: Audit Log
   - name: Chat History
   - name: Ossie Conversion
   - name: Report Deliveries
@@ -155,6 +156,60 @@ paths:
       summary: Get app config
       tags:
         - App Theme
+  /api/v1/audit-logs/export:
+    get:
+      operationId: exportAuditLog
+      parameters:
+        - in: query
+          name: start
+          required: true
+          description: First day of the range, `YYYY-MM-DD`.
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end
+          required: true
+          description: Last day of the range, `YYYY-MM-DD`.
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: search
+          required: false
+          description: Free-text filter.
+          schema:
+            type: string
+        - in: query
+          name: eventName
+          required: false
+          description: Only events with this name.
+          schema:
+            type: string
+        - in: query
+          name: userEmail
+          required: false
+          description: Only events by the user with this email.
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                format: binary
+                type: string
+          description: The audit log events in the range.
+      summary: Export the audit log
+      tags:
+        - Audit Log
+      x-mint:
+        content: >-
+          Stream the account audit log for a date range as a CSV attachment. Requires the
+          `AuditLogManage` action.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /api/v1/deployments:
     get:
       operationId: getDeployments
@@ -732,21 +787,23 @@ paths:
 
 
           Pass `filters`, `timeGrains` and `memberSwitchers` to render the board with specific
-          control values, exactly as a scheduled notification does; omit them to render its saved
-          defaults.
+          control values, exactly as a scheduled notification does; omit them and the dashboard's
+          published defaults apply.
 
 
-          Pass `layout: print` with `format: pdf` for the paginated A4 document the dashboard's
-          "Download print version" menu item produces — one column, every table row, the filter
-          state as a summary line — instead of the default `screenshot` of the board. `print` with
-          `format: png` returns `400`.
+          `format` and `layout` are the Format and Layout of the dashboard's Download settings. The
+          default `screenshot` is Snapshot: the board as laid out, with the rows each table shows
+          and the control widgets. Pass `layout: print` with `format: pdf` for Print version — a
+          paginated A4 document with every tab and every table row, and the control values listed at
+          the top instead of the control widgets — instead of the default `screenshot`. Print
+          version is PDF only: `print` with `format: png` returns `400`.
 
 
           By default the dashboard renders under the calling user's own security context, so the
           file shows what that user would see. Requires **read** access to the dashboard's workbook
           and the **download data** permission on the deployment — the same rule the console's own
-          "Download as PNG / PDF" actions follow. **Manage** access to the workbook also passes, as
-          it did before the download data permission was required.
+          Download settings follow. **Manage** access to the workbook also passes, as it did before
+          the download data permission was required.
 
 
           To export on someone else's behalf, pass `renderAs`: the queries behind the image then run
@@ -867,15 +924,16 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DatabricksMetricViewIntegrationResponse'
+                $ref: '#/components/schemas/DatabricksMetricViewIntegrationWithBuildsResponse'
           description: ''
       summary: Get Databricks Metric View publication settings
       tags:
         - Databricks Metric View Integration
       x-mint:
         content: >-
-          Requires a Databricks datasource. This is currently in preview — reach out to the Cube
-          support team to activate it for your account.
+          Also returns the deployment's newest successful build and the build last published, so
+          automation can tell when Databricks lags the deployed model. This is currently in preview
+          — reach out to the Cube support team to activate it for your account.
     put:
       operationId: saveIntegration
       parameters:
@@ -909,8 +967,9 @@ paths:
       x-mint:
         content: >-
           Uses optimistic configuration versioning. Pass `expectedConfigurationVersion` 0 to create.
-          Requires a Databricks datasource. This is currently in preview — reach out to the Cube
-          support team to activate it for your account.
+          Requires a Databricks datasource defined in environment variables, or a `connection` for
+          one with none, such as a datasource driver_factory in cube.py serves. This is currently in
+          preview — reach out to the Cube support team to activate it for your account.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs:
     get:
       operationId: listSyncs
@@ -953,8 +1012,8 @@ paths:
       x-mint:
         content: >-
           Durable run history for this datasource, newest first. It remains available after a run
-          finishes. Requires a Databricks datasource. This is currently in preview — reach out to
-          the Cube support team to activate it for your account.
+          finishes. This is currently in preview — reach out to the Cube support team to activate it
+          for your account.
     post:
       operationId: startSync
       parameters:
@@ -988,14 +1047,19 @@ paths:
       x-mint:
         content: >-
           Converts the configured Cube views from the deployment's latest successful build and
-          creates or replaces each one's managed Databricks Metric View. Views publish
-          independently: one that is incompatible, fails Databricks validation, or whose destination
-          belongs to another integration keeps its last good definition and does not stop the
-          others, and a view whose definition is unchanged is skipped without a Databricks write.
+          creates or replaces each one's managed Databricks Metric View. For a caller with
+          `SqlRunnerRead`, other than an embedded analytics session, Jinja-templated YAML files are
+          first rendered in the deployment's Cube runtime with its default context, and the request
+          returns 409 while a rollout leaves that runtime on another build; otherwise a templated
+          file fails the request. Views publish independently: one that is incompatible, fails
+          Databricks validation, or whose destination belongs to another integration keeps its last
+          good definition and does not stop the others, and a view whose definition is unchanged is
+          skipped without a Databricks write. A view whose destination already holds an object this
+          integration does not manage is refused unless `takeOverTargets` names that destination.
           One run per integration at a time; a second start while one is active returns 409.
-          Requires a Databricks datasource, enabled publication settings, and SchemaUpdate access.
-          This is currently in preview — reach out to the Cube support team to activate it for your
-          account.
+          Requires a Databricks connection (env-defined, or the integration's own credential),
+          enabled publication settings, and SchemaUpdate access. This is currently in preview —
+          reach out to the Cube support team to activate it for your account.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}:
     delete:
       operationId: cancelSync
@@ -1089,15 +1153,25 @@ paths:
         - Databricks Metric View Publication
       x-mint:
         content: >-
-          Queues an offline conversion of static YAML from the deployment's latest successful build
-          and returns polling URLs immediately. Exact retries while the same content-addressed
-          preview is running reuse that work; a later submission starts a fresh execution. Preview
-          payloads and results are retained for at most seven days. The conversion supports scalar
-          dimensions, common and calculated measures, and acyclic many-to-one equi-joins from one
-          Databricks datasource. Access policies, templating, extends, unsafe fanout, unsupported
-          expressions, multiple datasources, and converter loss are blocked per view. Two-part
-          schema.table sources are qualified with `CUBEJS_DB_DATABRICKS_CATALOG` for the selected
-          datasource; without that setting they fail closed with an actionable issue. Requires
+          Queues an offline conversion of the YAML data model from the deployment's latest
+          successful build and returns polling URLs immediately. For a caller with `SqlRunnerRead`,
+          other than an embedded analytics session, Jinja-templated YAML files are first rendered in
+          the deployment's Cube runtime with its default context, and the request returns 409 while
+          a rollout leaves that runtime on another build; otherwise a templated file fails the
+          request. With `source: 'files'`, it converts the YAML `files` sent with the request
+          instead, such as a pull request's checkout, so CI can compare that preview with one of the
+          deployment before merging; the response then has no `buildJobId`, and a Jinja-templated
+          file fails the request. Exact retries while the same content-addressed preview is running
+          reuse that work; a later submission starts a fresh execution. Preview payloads and results
+          are retained for at most seven days. The conversion supports scalar dimensions, common and
+          calculated measures, and acyclic many-to-one equi-joins from one Databricks datasource.
+          Access policies (including a cube's inherited ones), `extends` of a cube outside the YAML
+          model, unsafe fanout, unsupported expressions, multiple datasources, and converter loss
+          are blocked per view. Two-part schema.table sources are qualified with the integration
+          credential's `catalog`, or with `CUBEJS_DB_DATABRICKS_CATALOG` for the selected datasource
+          when the integration has no credential; without either they fail closed with an actionable
+          issue. A datasource with no env-defined Databricks connection, such as one driver_factory
+          in cube.py serves, previews only once its integration has a credential. Requires
           `SchemaRead` or `SchemaUpdate` access. This is currently in preview — reach out to the
           Cube support team to activate it for your account.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}:
@@ -4214,6 +4288,10 @@ paths:
 
           - `name` — rename the workbook.
 
+          - `renamed` — set to `true` when a person renamed the workbook. A suggested name then
+          stops following the workbook's content. Without it, a `name` equal to a name a suggestion
+          replaced is ignored as a stale value.
+
           - `meta` — replace the workbook's metadata object.
 
           - `folderId` — move the workbook between folders. Set it to a folder id to move the
@@ -4621,6 +4699,45 @@ paths:
           Requires **manage** access to the workbook. Returns `404` if the workbook or the named
           embed tenant does not exist, and `400` if the request specifies no change or sets
           `allowEmbed` on a workbook that has no published dashboard.
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/name-suggestion:
+    post:
+      operationId: suggestWorkbookName
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuggestWorkbookNameInput'
+        description: SuggestWorkbookNameInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workbook'
+          description: ''
+      summary: Suggest a workbook name
+      tags:
+        - Workbooks
+      x-mint:
+        content: >-
+          Names a workbook created with a placeholder name (`nameSource: "default"`) from its tabs
+          and dashboard tiles. The name follows the content, at most once per 5 minutes, until the
+          workbook is renamed. Returns the workbook, renamed or as it was.
+
+
+          Requires **edit** access to the workbook.
   /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion:
     get:
       operationId: getWorkbookPromotion
@@ -9496,6 +9613,17 @@ components:
               type: array
               maxItems: 50
             - type: 'null'
+        crossFilters:
+          description: >-
+            Cross-filters the notification renders with: each is one chart's selection ("Filter
+            dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
+            every other chart renders filtered by it. The chart must be on the published dashboard,
+            with Cross-filtering on.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardCrossFilterInput'
+              type: array
+            - type: 'null'
         customCron:
           description: Custom cron expression (required if scheduleType is CUSTOM)
           oneOf:
@@ -9914,7 +10042,15 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        nameSource:
+          oneOf:
+            - $ref: '#/components/schemas/CreateWorkbookInputNameSource'
+            - type: 'null'
       type: object
+    CreateWorkbookInputNameSource:
+      enum:
+        - default
+      type: string
     CreatedDeploymentEnvironmentToken:
       properties:
         created_at:
@@ -10485,6 +10621,95 @@ components:
         - CLASSIC
         - APP
       type: string
+    DashboardCrossFilter:
+      properties:
+        dimensions:
+          items:
+            $ref: '#/components/schemas/DashboardCrossFilterDimension'
+          type: array
+        sourceWidgetId:
+          type: string
+        view:
+          type: string
+      required:
+        - sourceWidgetId
+        - view
+        - dimensions
+      type: object
+    DashboardCrossFilterDimension:
+      properties:
+        grain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        member:
+          type: string
+        operator:
+          $ref: '#/components/schemas/DashboardCrossFilterDimensionOperator'
+        values:
+          items:
+            oneOf:
+              - type: string
+              - type: number
+          type: array
+      required:
+        - member
+        - operator
+        - values
+      type: object
+    DashboardCrossFilterDimensionInput:
+      properties:
+        grain:
+          description: A time member's granularity, e.g. "month", for a clicked period
+          oneOf:
+            - type: string
+            - type: 'null'
+        member:
+          description: The member's bare name in the cross filter's view, e.g. "status"
+          type: string
+        operator:
+          $ref: '#/components/schemas/DashboardCrossFilterDimensionInputOperator'
+          description: '"equals" (any of `values`) or "between" (`values` is [start, end], inclusive)'
+        values:
+          description: The selected values
+          items:
+            oneOf:
+              - type: string
+              - type: number
+          type: array
+      required:
+        - member
+        - operator
+        - values
+      type: object
+    DashboardCrossFilterDimensionInputOperator:
+      enum:
+        - equals
+        - between
+      type: string
+    DashboardCrossFilterDimensionOperator:
+      enum:
+        - equals
+        - between
+      type: string
+    DashboardCrossFilterInput:
+      properties:
+        dimensions:
+          description: The selected values, one entry per dimension of the chart
+          items:
+            $ref: '#/components/schemas/DashboardCrossFilterDimensionInput'
+          type: array
+        sourceWidgetId:
+          description: The id of the chart widget the cross filter comes from
+          type: string
+        view:
+          description: The view the chart queries, e.g. "orders"
+          type: string
+      required:
+        - sourceWidgetId
+        - view
+        - dimensions
+      type: object
     DashboardEmbeddingResponse:
       properties:
         allowEmbed:
@@ -10605,8 +10830,10 @@ components:
         value:
           description: >-
             Filter value. Omit for is_null / is_not_null / is_empty / is_not_empty; provide a
-            2-element [start, end] array for between. An empty array or empty string with no
-            operator renders the filter cleared; with an operator, the filter keeps that operator.
+            2-element [start, end] array for between; a whole number of members of at least 1
+            for top_n / bottom_n, which set a Top N control and rank by the measure it is
+            configured with. An empty array or empty string with no operator renders the filter
+            cleared; with an operator, the filter keeps that operator.
           oneOf:
             - oneOf:
                 - type: string
@@ -10643,6 +10870,8 @@ components:
         - is_empty
         - is_not_empty
         - between
+        - top_n
+        - bottom_n
         - custom
       type: string
     DashboardFilterOperator:
@@ -10670,6 +10899,8 @@ components:
         - is_empty
         - is_not_empty
         - between
+        - top_n
+        - bottom_n
         - custom
       type: string
     DashboardLayout:
@@ -11099,8 +11330,78 @@ components:
       required:
         - success
       type: object
+    DatabricksMetricViewBuildResponse:
+      properties:
+        buildJobId:
+          type: integer
+        commit:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - buildJobId
+      type: object
+    DatabricksMetricViewConnectionInput:
+      properties:
+        catalog:
+          description: >-
+            Catalog for two-part sql_table names, as CUBEJS_DB_DATABRICKS_CATALOG is for an
+            env-defined connection.
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        clientId:
+          description: OAuth client ID of the Databricks service principal.
+          maxLength: 255
+          type: string
+        clientSecret:
+          description: >-
+            OAuth secret of the service principal. Write-only, never returned. Omit to keep the
+            stored secret, which is kept only while host and clientId are unchanged.
+          oneOf:
+            - maxLength: 1024
+              type: string
+            - type: 'null'
+        host:
+          description: Workspace hostname, without https://.
+          maxLength: 255
+          type: string
+        httpPath:
+          description: SQL warehouse HTTP path, like /sql/1.0/warehouses/<id>.
+          maxLength: 255
+          type: string
+      required:
+        - host
+        - httpPath
+        - clientId
+      type: object
+    DatabricksMetricViewConnectionResponse:
+      properties:
+        catalog:
+          oneOf:
+            - type: string
+            - type: 'null'
+        clientId:
+          type: string
+        host:
+          type: string
+        httpPath:
+          type: string
+      required:
+        - host
+        - httpPath
+        - clientId
+      type: object
     DatabricksMetricViewIntegrationConfigurationResponse:
       properties:
+        connection:
+          description: >-
+            The integration's own credential, without its secret. Absent when the datasource's
+            env-defined connection is used.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewConnectionResponse'
+            - type: 'null'
         deletionPolicy:
           $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponseDeletionPolicy'
         enabled:
@@ -11113,6 +11414,9 @@ components:
               additionalProperties:
                 type: string
             - type: 'null'
+        syncOnDeploy:
+          description: True when a successful build of the deployment starts a publication run.
+          type: boolean
         targetCatalog:
           type: string
         targetNamePrefix:
@@ -11142,6 +11446,7 @@ components:
       required:
         - version
         - enabled
+        - syncOnDeploy
         - targetCatalog
         - targetSchema
         - selectionMode
@@ -11184,6 +11489,58 @@ components:
           type: integer
         publicId:
           type: string
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+      required:
+        - publicId
+        - deploymentId
+        - dataSourceName
+        - configurationVersion
+        - configuration
+        - createdAt
+        - updatedAt
+      type: object
+    DatabricksMetricViewIntegrationWithBuildsResponse:
+      properties:
+        accessTest:
+          oneOf:
+            - type: object
+            - type: 'null'
+        configuration:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponse'
+        configurationVersion:
+          type: integer
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        dataSourceName:
+          type: string
+        deployedBuild:
+          description: >-
+            The deployment's newest successful build: the one a publication run converts. Null when
+            the deployment has none.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewBuildResponse'
+            - type: 'null'
+        deploymentId:
+          type: integer
+        publicId:
+          type: string
+        publishedBuild:
+          description: >-
+            The build the newest COMPLETED or PARTIAL run converted. Null when no run has published
+            or that run recorded no build; absent when the run history could not be read. Databricks
+            lags the deployed model while its buildJobId differs from deployedBuild.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewBuildResponse'
+            - type: 'null'
         updatedAt:
           oneOf:
             - format: date
@@ -11272,11 +11629,30 @@ components:
       properties:
         dataSourceName:
           type: string
+        files:
+          description: >-
+            With source 'files' only. `.yml`/`.yaml` paths relative to the model folder, mapped to
+            their contents. A path has no `.` or `..` segments and uses only letters, digits, `_`,
+            `-`, `.` and `/`. Jinja-templated files are refused: only a deployed model can be
+            rendered.
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
         selectionMode:
           $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInputSelectionMode'
           description: >-
             Choose every deployed Cube view ('all'), an exact ordered list ('selected'), or names
             matching viewNameRegex ('pattern').
+        source:
+          description: >-
+            'deployment' (the default) converts the YAML data model of the deployment's latest
+            successful build; 'files' converts the `files` sent with the request, such as a pull
+            request's checkout, so CI can compare it with a preview of the deployment.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInputSource'
+            - type: 'null'
         sourceOverrides:
           description: >-
             Optional map of Cube view name to the root source dataset the view projects from, for
@@ -11317,10 +11693,18 @@ components:
         - selected
         - pattern
       type: string
+    DatabricksMetricViewPublicationPreviewInputSource:
+      enum:
+        - deployment
+        - files
+      type: string
     DatabricksMetricViewPublicationPreviewResultResponse:
       properties:
         buildJobId:
-          type: integer
+          description: The converted build. Absent for source 'files'.
+          oneOf:
+            - type: integer
+            - type: 'null'
         commit:
           oneOf:
             - type: string
@@ -11352,7 +11736,6 @@ components:
         - previewId
         - deploymentId
         - dataSourceName
-        - buildJobId
         - completedAt
         - durationMs
         - version
@@ -11374,7 +11757,10 @@ components:
     DatabricksMetricViewPublicationPreviewStartResponse:
       properties:
         buildJobId:
-          type: integer
+          description: The converted build. Absent for source 'files'.
+          oneOf:
+            - type: integer
+            - type: 'null'
         commit:
           oneOf:
             - type: string
@@ -11397,7 +11783,6 @@ components:
         - previewId
         - deploymentId
         - dataSourceName
-        - buildJobId
         - reused
         - status
         - statusUrl
@@ -11668,6 +12053,11 @@ components:
           description: >-
             PARTIAL means at least one view published and another did not. Every non-successful view
             keeps its previous Databricks definition.
+        takeOverTargets:
+          description: Destinations, as catalog.schema.name, this run was started to take over.
+          items:
+            type: string
+          type: array
         targetCatalog:
           oneOf:
             - type: string
@@ -11678,6 +12068,9 @@ components:
             - type: 'null'
         trigger:
           $ref: '#/components/schemas/DatabricksMetricViewSyncRunResponseTrigger'
+          description: >-
+            MANUAL for a run a user started, DEPLOYMENT for one a successful build of the deployment
+            started.
         viewNames:
           description: The Cube views this run was planned against.
           items:
@@ -11695,6 +12088,7 @@ components:
         - trigger
         - status
         - viewNames
+        - takeOverTargets
         - views
         - incompleteViewCount
         - createdAt
@@ -11712,6 +12106,7 @@ components:
     DatabricksMetricViewSyncRunResponseTrigger:
       enum:
         - MANUAL
+        - DEPLOYMENT
       type: string
     DatabricksMetricViewSyncStartResponse:
       properties:
@@ -11749,12 +12144,20 @@ components:
         cubeViewName:
           type: string
         detail:
-          description: A stable reason code, never raw Databricks output.
+          description: >-
+            A stable reason code, never raw Databricks output. `unmanaged-target` and
+            `ownership-conflict` mean an object this integration does not manage holds the
+            destination; pass its `target` in `takeOverTargets` to replace it.
           oneOf:
             - type: string
             - type: 'null'
         outcome:
           $ref: '#/components/schemas/DatabricksMetricViewSyncViewOutcomeResponseOutcome'
+        target:
+          description: The destination, as catalog.schema.name; null when conversion blocked the view.
+          oneOf:
+            - type: string
+            - type: 'null'
         withheldMembers:
           description: >-
             Measures this view published without, as 'cube.member'. Non-empty means the Metric View
@@ -11863,12 +12266,33 @@ components:
       type: object
     DbtSyncManifestStats:
       properties:
+        importedMetrics:
+          description: Number of imported dbt semantic metrics, when import is enabled.
+          oneOf:
+            - type: integer
+            - type: 'null'
         macros:
           type: integer
         models:
           type: integer
+        skippedMetrics:
+          description: >-
+            The first 25 skipped metrics by unique ID, with the reason for each;
+            `unsupportedMetrics` counts them all.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DbtSyncSkippedMetric'
+              type: array
+            - type: 'null'
         sources:
           type: integer
+        unsupportedMetrics:
+          description: >-
+            Number of dbt semantic metrics skipped because they cannot be imported exactly, when
+            import is enabled.
+          oneOf:
+            - type: integer
+            - type: 'null'
       required:
         - models
         - sources
@@ -12084,6 +12508,11 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        importedMetrics:
+          description: Number of imported dbt semantic metrics, when import is enabled.
+          oneOf:
+            - type: integer
+            - type: 'null'
         macros:
           description: dbt macros found in the manifest.
           oneOf:
@@ -12104,6 +12533,13 @@ components:
             - type: 'null'
         sources:
           description: dbt sources found in the manifest.
+          oneOf:
+            - type: integer
+            - type: 'null'
+        unsupportedMetrics:
+          description: >-
+            Number of dbt semantic metrics skipped because they cannot be imported exactly, when
+            import is enabled.
           oneOf:
             - type: integer
             - type: 'null'
@@ -12139,6 +12575,22 @@ components:
         - agent
         - unknown
       type: string
+    DbtSyncSkippedMetric:
+      properties:
+        name:
+          description: The dbt metric name.
+          type: string
+        reason:
+          description: Why the metric cannot be imported exactly.
+          type: string
+        uniqueId:
+          description: The dbt metric unique ID.
+          type: string
+      required:
+        - name
+        - uniqueId
+        - reason
+      type: object
     DbtSyncStatusResponse:
       properties:
         error:
@@ -12954,8 +13406,10 @@ components:
             agent cannot save or update standalone explorations/reports, create or modify workbooks,
             create or publish dashboards, or direct users to those Cube UI surfaces. Omit or set to
             `true` to preserve the session user's role-derived authoring capabilities; `true` never
-            grants access the user does not already have. This setting changes only AI Chat tools
-            and instructions. It does not change user roles or permissions for direct API calls.
+            grants access the user does not already have. For an `externalId` session, authoring
+            also requires `creatorMode: true`: outside creator mode the agent never saves workspace
+            content. This setting changes only AI Chat tools and instructions. It does not change
+            user roles or permissions for direct API calls.
           oneOf:
             - type: boolean
             - type: 'null'
@@ -14021,6 +14475,9 @@ components:
             - type: boolean
             - type: 'null'
         message:
+          description: >-
+            Commit message for the merge. If empty or missing, the agent writes it from the branch's
+            diff; if AI is not available, Git's default merge message is used.
           oneOf:
             - type: string
             - type: 'null'
@@ -14050,13 +14507,16 @@ components:
         branchName:
           type: string
         message:
-          type: string
+          description: >-
+            Commit message for the merge. If empty or missing, the agent writes it from the branch's
+            diff; if AI is not available, Git's default merge message is used.
+          oneOf:
+            - type: string
+            - type: 'null'
         removeBranchAfterMerge:
           oneOf:
             - type: boolean
             - type: 'null'
-      required:
-        - message
       type: object
     MoveWorkspaceObjectInput:
       properties:
@@ -14091,6 +14551,17 @@ components:
             - type: 'null'
         cronExpression:
           type: string
+        crossFilters:
+          description: >-
+            Cross-filters the notification renders with: each is one chart's selection ("Filter
+            dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
+            every other chart renders filtered by it. The chart must be on the published dashboard,
+            with Cross-filtering on.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardCrossFilter'
+              type: array
+            - type: 'null'
         dashboardId:
           type: integer
         deploymentId:
@@ -16462,11 +16933,21 @@ components:
       type: object
     SaveDatabricksMetricViewIntegrationInput:
       properties:
+        connection:
+          description: >-
+            The integration's own Databricks service-principal credential, for a datasource with no
+            env-defined Databricks connection (for example one served by driver_factory in cube.py).
+            When set, it is used instead of the datasource's env vars. Omit to keep the stored one;
+            null removes it.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewConnectionInput'
+            - type: 'null'
         deletionPolicy:
           $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputDeletionPolicy'
           description: >-
-            Use retain. The delete-managed value is deprecated and currently retains obsolete Metric
-            Views; it does not delete them.
+            What a sync does with a Metric View Cube created once it is obsolete: its Cube view left
+            the scope or its target name changed. retain keeps it; delete-managed drops it, under
+            fixed safety rules. Omitted, it saves retain, also on an update.
         enabled:
           type: boolean
         expectedConfigurationVersion:
@@ -16479,6 +16960,11 @@ components:
           additionalProperties:
             type: string
           type: object
+        syncOnDeploy:
+          description: >-
+            Start a publication run after each successful build of the deployment, while enabled is
+            also true. Defaults to false.
+          type: boolean
         targetCatalog:
           maxLength: 255
           type: string
@@ -16508,13 +16994,10 @@ components:
         - selectionMode
       type: object
     SaveDatabricksMetricViewIntegrationInputDeletionPolicy:
-      oneOf:
-        - const: retain
-          type: string
-        - const: delete-managed
-          type: string
-          deprecated: true
-          description: Managed deletion is not implemented. Use retain.
+      enum:
+        - retain
+        - delete-managed
+      type: string
     SaveDatabricksMetricViewIntegrationInputSelectionMode:
       enum:
         - all
@@ -17122,14 +17605,17 @@ components:
             - type: 'null'
         format:
           $ref: '#/components/schemas/StartDashboardExportInputFormat'
-          description: 'Output format: `png` or `pdf`.'
+          description: >-
+            Output format, the Format of the dashboard's Download settings: `png` (PNG) or `pdf`
+            (PDF).
         layout:
           default: screenshot
           description: >-
-            How the dashboard is laid out. `screenshot` (the default) renders the board as it looks
-            on screen. `print` renders the paginated A4 document the dashboard's 'Download print
-            version' menu item produces: one column, every table row, and the filter state as a
-            summary line instead of filter controls. `print` is available for `format: 'pdf'` only.
+            How the dashboard is laid out, the Layout of the dashboard's Download settings.
+            `screenshot` (the default) is Snapshot: the board as laid out, with the rows each table
+            shows and the control widgets. `print` is Print version: a paginated A4 document with
+            every tab and every table row, and the control values listed at the top instead of the
+            control widgets. `print` is available for `format: 'pdf'` only.
           oneOf:
             - $ref: '#/components/schemas/StartDashboardExportInputLayout'
             - type: 'null'
@@ -17183,6 +17669,19 @@ components:
           oneOf:
             - format: uuid
               type: string
+            - type: 'null'
+        takeOverTargets:
+          description: >-
+            Destinations, each as catalog.schema.name (a refused view's `target` in run history),
+            that this run replaces whatever Databricks object holds them and records as managed by
+            this integration — including one another integration manages. Each must be where a Cube
+            view in the integration's scope publishes; every other destination stays guarded. Omit
+            it and no object Cube does not manage is overwritten.
+          oneOf:
+            - items:
+                type: string
+              type: array
+              maxItems: 128
             - type: 'null'
       required:
         - configurationVersion
@@ -17372,6 +17871,19 @@ components:
       required:
         - transaction
         - deploymentName
+      type: object
+    SuggestWorkbookNameInput:
+      properties:
+        fallbackName:
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        language:
+          maxLength: 35
+          type: string
+      required:
+        - language
       type: object
     TenantSettings:
       properties:
@@ -17777,6 +18289,17 @@ components:
                 $ref: '#/components/schemas/DashboardAddedControlInput'
               type: array
               maxItems: 50
+            - type: 'null'
+        crossFilters:
+          description: >-
+            Cross-filters the notification renders with: each is one chart's selection ("Filter
+            dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
+            every other chart renders filtered by it. The chart must be on the published dashboard,
+            with Cross-filtering on. Replaces the stored set when provided; [] clears it.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardCrossFilterInput'
+              type: array
             - type: 'null'
         customCron:
           oneOf:
@@ -18207,6 +18730,10 @@ components:
         name:
           oneOf:
             - type: string
+            - type: 'null'
+        renamed:
+          oneOf:
+            - type: boolean
             - type: 'null'
         slug:
           oneOf:

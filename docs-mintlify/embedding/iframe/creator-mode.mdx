@@ -49,16 +49,20 @@ that is the Cube app's own surface, with its own separate setting.
 
 ## AI
 
-Creator Mode workbooks show the same AI entry points as the full Cube app — the chat side panel, the launchpad's "Ask Cube Agent" button, "Fix in chat" on a failed report, and AI summary widgets — unless you turn them off.
+Creator Mode workbooks show the same AI entry points as the full Cube app — the chat side panel, the launchpad's "Ask Cube Agent" button, "Fix in chat" on a failed report, and Analysis widgets — unless you turn them off.
 
 Three account-wide switches under **Embed → Settings** control this, each overridable per session via [Generate Session][ref-generate-session]:
 
 - **AI** (`allowAi`) is the master switch. Turning it off is enforced server-side — a denied session can't obtain AI credentials at all, so it can't spend AI tokens, and it overrides the toggles below.
-- **Workbook chat** (`showWorkbookChat`) and **AI widgets** (`showAiWidgets`) hide those specific entry points without disabling AI as a whole. While the master switch is off, these are disabled rather than cleared, so turning AI back on restores their configured state.
+- **Workbook chat** (`showWorkbookChat`) and **Analysis widgets** (`showAiWidgets`) hide those specific entry points without disabling AI as a whole. While the master switch is off, these are disabled rather than cleared, so turning AI back on restores their configured state.
+
+The agent creates and modifies workbooks, explorations, and dashboards only in Creator Mode sessions. In a session for an `externalId` user minted without `creatorMode: true` — an embedded dashboard, an [embedded chat](/embedding/iframe/analytics-chat), or a [Chat API](/reference/embed-apis/chat-api) session — it can answer questions with queries, tables, and charts, but it does not save them.
 
 See [Session settings][ref-session-settings] for the full list of AI-related keys, including `allowChatWorkspaceAuthoring` for headless chat integrations that shouldn't let the agent create or modify workbooks, explorations, or dashboards.
 
-To let users [dictate messages](/docs/explore-analyze/analytics-chat#voice-input) in the chat side panel, give the iframe the `allow="microphone"` attribute, as in the [example below](#example). Without it, the chat shows no dictation control. The [Analytics Chat embed](/embedding/iframe/analytics-chat#voice-input) page lists the other requirements.
+To let users [dictate messages](/docs/explore-analyze/analytics-chat#voice-input) in the chat side panel, include `microphone` in the iframe's `allow` attribute, as in the [example below](#example). Without it, the chat shows no dictation control. The [Analytics Chat embed](/embedding/iframe/analytics-chat#voice-input) page lists the other requirements.
+
+To let users present an app's [slide deck](/docs/explore-analyze/apps#present-a-slide-deck) full screen, include `fullscreen` in the iframe's `allow` attribute, as in the [example below](#example). Without it, the deck shows no **Full screen** button.
 
 ## Workspace appearance and SQL visibility
 
@@ -154,7 +158,7 @@ on your page, must include these permissions for Creator Mode to work:
   sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"
   width="100%"
   height="800"
-  allow="microphone"
+  allow="microphone; fullscreen"
 ></iframe>
 ```
 
@@ -206,7 +210,7 @@ Embed the app with the returned session ID:
   src="https://your-tenant.cubecloud.dev/embed/d/{deploymentId}/app?session={sessionId}"
   width="100%"
   height="800"
-  allow="microphone"
+  allow="microphone; fullscreen"
 ></iframe>
 ```
 

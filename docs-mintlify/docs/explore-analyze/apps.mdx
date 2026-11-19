@@ -3,61 +3,515 @@ title: Apps
 description: Build custom, interactive data experiences backed by governed data from your Cube semantic layer.
 ---
 
-<Warning>
-
-Apps are currently in preview, and their capabilities and authoring experience may
-still change. Reach out to the [Cube support team](/admin/account-billing/support)
-to activate this feature for your account.
-
-</Warning>
-
 Apps let you go beyond a dashboard's grid of widgets. An app is a custom,
 interactive interface with its own layout, components, and controls, powered by
 live data from reports in a Cube workbook.
 
 Use an app when you need a guided workflow, a custom visual presentation, or an
-interactive data tool that does not fit a standard dashboard layout.
+interactive data tool that does not fit a standard [dashboard][ref-dashboards]
+layout. A workbook holds one dashboard, and that dashboard is either a standard
+dashboard or an app.
 
-## Create an app with the Cube agent
+## Turn a dashboard into an app
 
-Open a workbook, switch to **Dashboard builder**, and describe the app you want in
-the agent chat. Include the business question, the data you want to show, and how
-people should interact with it. For example:
+Open a workbook and switch to the **Builder** tab. If the workbook has no
+dashboard yet, Cube asks **What do you want to build?** Pick **App** to start an
+app, or **Dashboard** for a standard dashboard.
+
+To turn an existing dashboard into an app, click **Convert to app** in the
+toolbar and confirm. The app starts from your first report.
+
+To go back to a standard dashboard, click **Convert to dashboard** in the app
+editor's toolbar. Cube keeps both the dashboard's widgets and the app in the
+draft, so converting either way restores what you had.
+
+## Build the app with the agent
+
+Describe the app you want in the agent chat. Include the business question, the
+data you want to show, and how people should interact with it. For example:
 
 > Build a revenue performance app with headline metrics, a monthly trend chart,
 > and a searchable status filter. Use the company's brand colors.
 
-The agent creates the workbook reports, writes the app, and installs reusable
-components for common elements such as charts, tables, KPI cards, tabs, and
-searchable controls. Continue prompting the agent to adjust the layout, behavior,
-or styling.
+The agent starts from the layout that your prompt describes:
 
-## Preview and edit the app
+- **A dashboard with filters on top** — the default when you name no layout.
+- **A dashboard with filters on the left** — for example, "with the filters in a
+  column on the left". On a narrow screen, the filters move above the content.
+- **A story** — for example, "tell the story of Q3 sales". The headline and its
+  key numbers come first, then one section for each finding: a short text, a
+  chart, and a takeaway. A menu at the top stays in view while you scroll and
+  jumps to each section.
+- **Slides** — for example, "present the Q3 review as slides". A title slide
+  and an overview of up to four key numbers come first, then one finding per
+  slide: a chart, a table, or a list, with a one-line narration under it. The
+  agent keeps a deck to about eight slides. See
+  [Present a slide deck](#present-a-slide-deck).
 
-Use **Preview** to interact with the running app. Select **Code** to inspect or
-edit its files directly. After making code changes, click **Run** to apply them
-and refresh the preview.
+The agent creates the workbook reports, writes the app's files, and adds reusable
+components for common elements: KPI cards with sparklines, tables, charts,
+[maps](#show-data-on-a-map), tabs, section menus, slide decks, searchable
+controls, date range pickers, segmented controls, switches, buttons, and
+tooltips. The charts are line, area, bar
+(grouped, stacked, 100% stacked, or horizontal), donut, combo, scatter, heatmap,
+and funnel charts. The agent then runs the app and fixes the errors that it
+finds. Continue prompting the agent to adjust the layout, behavior, or styling.
 
-App components are copied into the app's source, so you can customize their code
-and styling for that specific experience.
+To let viewers filter the app by date, ask the agent for a date range picker,
+for example "add a date range picker that filters all reports". Viewers pick a
+preset, such as _Last 7 days_ or _Last quarter_, or pick a custom range on a
+calendar. The app then filters its reports to that range. Presets mean the same
+as Cube's [relative date ranges][ref-relative-date-range]: _Last 7 days_ is the
+seven days that ended yesterday, and _This month_ is the whole calendar month.
+
+### How the agent picks charts
+
+The agent picks each chart from the question it answers and the shape of the
+report's data:
+
+- **Change over time** gets a line or an area chart. A bar chart over time keeps
+  the periods in date order instead of sorting them by value.
+- **A ranking or a comparison** gets a bar chart sorted by value. Long labels or
+  more than 12 categories get horizontal bars. With more than 30 categories,
+  the agent shows the top ones or a table.
+- **Part of a whole** gets a donut chart only when one count or sum is split
+  into 2 to 6 parts with no negative values. To compare shares across a
+  second category or over time, the agent uses a 100% stacked bar.
+- **One number** gets a KPI card. **Two related measures** get a scatter chart,
+  or a combo chart when their units differ.
+
+The agent never draws a line over categories that have no order. When several
+chart types fit a question equally well, it picks one that the page doesn't use
+yet, and it doesn't show the same report twice. Ask for a specific chart type to
+override its choice.
+
+### Periods that are still running
+
+When the agent sets a relative date range on a report, such as the last 30
+days, it ends the range at today, unlike the date range picker presets above.
+It shows rows dated after today only when they belong in the app, for example a
+forecast.
+
+Line, area, and bar charts mark the period that holds today, such as the
+current month, because its numbers are not final:
+
+- A line or an area chart draws the last segment dashed, into a hollow point.
+- A bar chart draws the bar hatched.
+- The tooltip adds **(to date)** to the period, for example **Nov 2026 (to
+  date)**.
+
+Charts leave out empty periods after today. A bar chart labels dates by their
+period, for example **Nov 2026**.
+The center of a donut chart names the report's date range, for example **Oct 14
+– Nov 12, 2026**.
+
+KPI cards show the last complete period, for example last month, so a number
+for a month that just started does not read as a drop. A card shows the current
+period only when it is the only one, and labels it as such, for example **Nov
+2026 to date**. Each card names the window that its number covers. When every
+card in a row covers the same window, the row shows it once, as a heading. In a
+[story](#build-the-app-with-the-agent), the window is shown next to each number.
+
+The app's components hold this behavior, and an app keeps the components that
+it was built with. If an app doesn't mark the current period, ask the agent to
+update the app's chart and KPI components.
+
+## Show data on a map
+
+Apps have two map components:
+
+- `RegionMap` shades countries or US states by a value, for example revenue by
+  country.
+- `PointMap` draws one point per row at its latitude and longitude, for example
+  stores sized by their orders.
+
+Ask the agent for a map or a globe, for example "show revenue by country on a
+globe", or use the components in the app's code:
+
+```js
+import React from 'react';
+import { useReportData } from 'app/_cube.js';
+import { RegionMap } from 'app/components/RegionMap.js';
+
+const h = React.createElement;
+
+function RevenueMap() {
+  // Use the ID of a report in the app's workbook
+  const report = useReportData('REPORT_ID');
+
+  return h(RegionMap, {
+    data: report.rows,
+    columns: report.columns,
+    regionField: 'orders.country',
+    valueField: 'orders.revenue',
+    projection: 'globe',
+  });
+}
+```
+
+Both maps are drawn from shapes that ship with Cube, so they make no network
+requests. They follow the viewer's light or dark theme.
+
+### Regions and projections
+
+The `regions` prop picks the shapes:
+
+- `world` (the default) draws the countries of the world at a 1:110m scale.
+  Small countries, such as Singapore and Malta, are not on this map.
+- `us-states` draws the 50 US states and the District of Columbia, with Alaska
+  and Hawaii in insets. US territories, such as Puerto Rico and Guam, are not on
+  this map.
+
+The `projection` prop picks how the world is drawn:
+
+- `flat` (the default) draws a flat map. It leaves out Antarctica.
+- `globe` draws a globe that viewers turn by dragging it. It opens on the
+  center of the data, weighted by value, and never turns by itself, so a
+  download always shows that view. To open it elsewhere, pass `center` as
+  `[longitude, latitude]`.
+
+A map of US states ignores `projection`.
+
+### Match regions
+
+`RegionMap` reads the region from `regionField`. A country matches by its
+English name, its ISO 3166 alpha-2, alpha-3, or numeric code, or a common name,
+such as `USA`, `UK`, or `South Korea`. A US state matches by its name or its
+postal code, such as `CA`. Case, accents, and punctuation don't matter.
+
+Rows for the same region are added up. Shades run from a faint to a full tint
+of one color. A region without a row is hatched, so it doesn't read as a small
+value.
+
+A value that matches no region is not drawn. The app logs it once in the
+[**Console**](#find-and-fix-problems), for example:
+
+```text
+RegionMap "Revenue": 1 value of "orders.country" matches no country and is not drawn: "Atlantis". …
+```
+
+`PointMap` leaves out rows with a latitude outside -90 to 90 or a longitude
+outside -180 to 180, and, on a map of US states, rows outside the states. It
+logs them once, too. On a globe, points on the far side are hidden until a
+viewer turns it.
+
+### Props
+
+Both components take `data` and `columns`, like the app's other charts. With
+`columns`, field titles and value formats come from the report.
+
+| Prop | Component | Description |
+| --- | --- | --- |
+| `regionField` | `RegionMap` | Field that names the country or the state. |
+| `valueField` | `RegionMap` | Numeric field that shades the region. |
+| `includeZero` | `RegionMap` | Shade from zero rather than from the smallest value. Default: `true`. |
+| `latitudeField`, `longitudeField` | `PointMap` | Numeric fields with the point's coordinates. |
+| `sizeField` | `PointMap` | Numeric field that sizes the points. Without it, points have the size of `pointRadius`. |
+| `pointRadius` | `PointMap` | Point radius in pixels when there is no `sizeField`. Default: `4`. |
+| `colorField` | `PointMap` | Field that splits the points into series, each in its own color. |
+| `colorOverrides`, `mutedSeries`, `legendTitle` | `PointMap` | Series colors, series drawn in a muted color, and the legend heading. |
+| `labelField` | Both | Field that names the region or the point in its tooltip. |
+| `regions` | Both | `world` or `us-states`. Default: `world`. |
+| `projection` | Both | `flat` or `globe`. Default: `flat`. |
+| `center` | Both | `[longitude, latitude]` that the globe opens on. |
+| `color` | Both | Color of the darkest region, or of the points without `colorField`. Default: the first color of the [chart palette][ref-default-palette]. |
+| `title`, `valueTitle`, `valueFormat` | Both | The chart title, and the name and format of the value in tooltips. |
+| `height` | Both | Height in pixels. Default: `300`. |
+| `showLegend` | Both | Show the legend. Default: `true`. `PointMap` shows it only with two or more series. |
+| `ariaLabel`, `emptyMessage` | Both | The accessible label and the text shown when there is no data. |
+
+Maps don't zoom or pan, don't react to clicks, and can't draw custom GeoJSON
+shapes or map tiles.
+
+## Present a slide deck
+
+A slide deck shows one slide at a time in a 16:9 frame. Under the slide, the
+deck shows the slide number, a dot for each slide, and arrow buttons. Click a dot
+to go to its slide.
+
+To move between slides with the keyboard, click the app first, then press:
+
+- **→**, **Page Down**, or **Space** for the next slide.
+- **←**, **Page Up**, or **Shift+Space** for the previous slide.
+- **Home** or **End** for the first or last slide.
+
+Click **Full screen** to present the deck on the whole screen. The keys work the
+same way there. Click **Exit full screen** or press **Esc** to leave. The deck
+shows no **Full screen** button where the page around the app doesn't allow full
+screen, such as an [embed](#apps-in-embedded-analytics) whose iframe doesn't allow
+it.
+
+When you [download the deck as a PDF](#download-and-schedule-the-app) or send it
+in a notification, each slide goes on its own page, without the slide number,
+dots, arrows, and **Full screen** button. A PNG shows all slides, one under
+another, in one image.
+
+## Preview and edit the code
+
+The app editor has two modes:
+
+- **Preview** shows the running app. Use it as your viewers will.
+- **Code** shows the app's **Files** and a code editor. Select a file to edit it.
+
+An app is made of JavaScript, CSS, and JSON files. The app starts from its entry
+file, which **Files** marks as **Entry**. Components are copied into the app's
+files, so you can change their code and styling for this app.
+
+Your code edits are not saved as you type. The editor shows how many files have
+unsaved changes:
+
+- Click **Run** to save all changed files and reload the app with them. Until
+  the new version is ready, the preview shows the previous one, dimmed.
+- Click **Discard** to drop your unsaved changes.
+
+Click **Undo** and **Redo** in the header to step back and forward through the
+app's changes, or press ⌘Z and ⌘⇧Z in **Preview** (Ctrl+Z and Ctrl+Shift+Z on
+Windows and Linux). Each **Run** is one step. Each agent turn is one step too,
+however many files the agent changed, so one **Undo** reverses the whole turn.
+Inside the code editor, ⌘Z or Ctrl+Z undoes your typing instead.
+
+**Undo** and **Redo** are unavailable while the agent is still writing to the app
+and while the editor has unsaved changes. Wait for the agent to finish, or run or
+discard your edits first. The history is kept when you switch to the **Workbook**
+tab and back, and it starts over when you reload the page.
+
+<Note>
+
+If you leave the workbook before you click **Run**, your unsaved changes are lost.
+
+</Note>
+
+### Edit text in the preview
+
+To fix a title or a caption, click it in **Preview** and type. Press **Enter**,
+or click elsewhere, to save it. Press **Esc** to cancel. Cube writes the new
+text into the app's code and reloads the app. Each saved edit is one **Undo**
+step. While you're typing in a title or a caption, ⌘Z or Ctrl+Z undoes your
+typing instead.
+
+When you point at text you can edit, it gets a dashed outline. You can't edit
+this way:
+
+- Buttons, tabs, links, and other controls. Clicking them works as usual.
+- Text that comes from your data, or that appears in more than one place in the
+  app.
+- Text that the app doesn't show yet, such as an empty subtitle or note. Add it
+  in **Code** or ask the agent.
+
+You can't edit text while the agent is writing to the app or while **Code** has
+unsaved changes.
+
+## Add reports that the app doesn't use
+
+When the workbook has reports that the app doesn't show, the editor toolbar
+shows how many, for example **2 reports not used**. Click it to see the list.
+To have the agent add them, click **Add in chat**. Cube opens the agent chat
+and adds the reports, with their IDs, to the message box. Review the message,
+then send it.
+
+The list leaves out reports that an app can't read: reports from
+[Source SQL tabs][ref-source-sql-tabs], reports with no query yet, and
+[Python reports][ref-python-analysis] that haven't run. If the app's code gets
+the list of reports at run time, with `useReports()` or `cube.getReports()`,
+instead of naming the reports it reads, it can show any of them. The editor
+doesn't show the note for such an app.
+
+## Find and fix problems
+
+When the app reports errors or warnings, the editor toolbar shows their count.
+Click the count (**Show problems**) to open the code and the **Problems** panel
+under the code editor. The panel also opens by itself when the first problem
+appears.
+
+The panel has two tabs:
+
+- **Problems** lists the app's errors and warnings, resources that the sandbox
+  blocked, and an app that rendered nothing. When Cube can find the file and line
+  of a problem, the row shows them. Click the row to open the file at that line.
+  A blocked resource has a hint, for example "Apps can't load files from the
+  internet". See [Governed data access](#governed-data-access) for how to
+  include such files in the app. In **Files**, each file that has a problem
+  shows an error mark.
+- **Console** shows what the app writes to the browser console.
+
+Click the copy button to copy the contents of the open tab.
+
+To have the agent fix the problems, click **Fix in chat**. Cube opens the agent
+chat and adds the problems, with their files and lines, to the message box.
+Review the message, then send it.
+
+If the app starts without errors but shows nothing, the preview shows **The app
+rendered nothing**. Click **Open code** to see the code and the **Problems**
+panel. Make sure that the entry file renders the app into the page.
+
+After you fix the code, click **Run**. The problems that are fixed go away.
+
+Only people who can edit the app see problems. Viewers of a published app do
+not.
+
+## Publish the app
+
+Click **Publish** to publish the app, the same way you
+[publish a dashboard][ref-publishing]. Cube refuses to publish an app that has no
+entry file or whose entry file is empty.
+
+Viewers see the published app read-only. It uses the report definitions from
+the version you published, and Cube runs these reports for each viewer. Viewers
+cannot open the app's code. The app follows the viewer's light or dark theme and
+locale.
+
+Apps use your account's [app theme][ref-app-theme] for colors and fonts, and the
+account's [default chart palette][ref-default-palette] for charts, so they match
+your brand without code changes. New apps also show the theme's logo.
+
+## Download and schedule the app
+
+Download a published app as a PNG or PDF file from the **Download** button, the
+same way you [download a dashboard][ref-download]. The file shows the whole
+app, not only the part that fits on the screen. The app's **Download settings**
+dialog has no **Layout** row: apps don't offer a print version. You need the
+**Download data** permission, and the button is hidden when an admin turns off
+the [data download controls][ref-data-downloads].
+
+[Refreshes, dashboard deliveries, and alerts][ref-scheduled-refreshes] work
+for apps the same way as for dashboards. They run the reports of the published
+version, and their [notifications][ref-notifications] attach the whole app as a
+PNG or PDF file.
+
+The PDF depends on the app's layout:
+
+- A dashboard or a [story](#build-the-app-with-the-agent) is one tall page.
+- A [slide deck](#present-a-slide-deck) has one page per slide. If the PDF
+  shows only the deck's first slide, ask the agent to update the app's slide
+  deck component.
+
+Nobody can click a downloaded or attached file, so an app can show more in it:
+every tab's content or every collapsed section. To tell when Cube renders the
+app for a download or a notification, call `useCapture()` from `app/_cube.js`.
+It returns `true` while Cube renders the app for a file and `false` otherwise.
+In a PDF, each element with the `data-app-page` attribute starts a new page.
+
+```js
+import { useCapture } from 'app/_cube.js';
+```
 
 ## Governed data access
 
-An app reads the results of reports in its workbook. Cube runs those reports using
-the viewer's existing permissions and passes the results to the app. The app does
-not receive credentials for your data source or Cube APIs, and it cannot query
-your warehouse directly.
+An app reads only the results of reports in its own workbook. Cube runs those
+reports with the viewer's permissions and passes the results to the app. The app
+does not receive credentials for your data source or Cube APIs, and it cannot
+query your warehouse directly.
 
-Apps run inside a sandboxed frame, isolated from the Cube interface. The app's
-data access remains governed by the semantic model and the permissions already
-configured in Cube.
+Apps run in a sandbox, isolated from the Cube interface:
 
-## Preview limitations
+- An app cannot make network requests, so it cannot call external APIs or send
+  data out of Cube.
+- An app cannot load external scripts, stylesheets, images, or fonts. Put
+  everything the app needs in its files. Images and fonts can be embedded as
+  `data:` URLs.
+- An app cannot read Cube cookies, storage, or the page around it.
 
-During preview:
+## Apps in embedded analytics
 
-- Apps are created and viewed from the workbook's Dashboard Builder.
-- Publishing, embedding, scheduled refreshes, and deliveries are not yet
-  supported for Apps.
+A published app renders in [signed and private embeds][ref-embedding] the same
+way as on its published page. Embed the dashboard as you would any other
+dashboard. The app runs in the same sandbox, isolated from the embedding page.
+
+The app is treated like a standard dashboard:
+
+- It reads only the reports pinned by the published version.
+- Cube runs those reports with the viewer's permissions and, in signed embeds,
+  the embed user's [user attributes][ref-user-attributes], so two viewers can
+  see different numbers in the same app.
+- The page receives [`cube:event:dashboard-loaded`][ref-event-loaded] once the
+  app has loaded, or once it shows an error. The event does not say which.
+- [`cube:action:refresh`][ref-action-refresh] makes the app read its reports
+  again.
+- [`cube:action:set-filter`][ref-action-set-filter] filters the app's reports,
+  and so do [filter parameters in the embed URL][ref-url-filters]. Cube applies
+  each filter to every report that the app reads, so the app needs no code for
+  it. A report that cannot take a filter fails to load instead of showing
+  unfiltered numbers: for example, a report on a view that does not have the
+  filter's dimension, or a Python report, which the app reads from its last
+  run. A filter that Cube cannot read makes every report fail to load: its
+  value is not valid JSON, its name is not in the `view.dimension` form, its
+  `type` is unknown, or it has no `value` where its `type` needs one.
+
+To show the active filters in the app, call `useHostFilters()`. It comes from
+`app/_cube.js`, the module that Cube provides to every app for reading data:
+
+```js
+import { useHostFilters } from 'app/_cube.js';
+```
+
+It returns an array with one object per filter: the JSON from
+the filter parameter, with the member added and the filter type filled in. For
+example, `f_orders.status={"value":"completed"}` becomes
+`{ member: "orders.status", type: "equals", value: "completed" }`. The array is
+empty when the page sets no filters. A component that calls it re-renders when
+the page sends new filters.
+
+To let viewers present a [slide deck](#present-a-slide-deck) full screen, the
+iframe's `allow` attribute must include `fullscreen`, as in
+`allow="microphone; fullscreen"`. The host page's `Permissions-Policy` header,
+and any parent iframe, must allow `fullscreen` too. If any of them doesn't, the
+deck shows no **Full screen** button.
+
+<Warning>
+
+Cube does not review the code of an app. [Data download controls][ref-data-downloads]
+control the buttons that Cube shows, such as **Download data**. They do not control what
+the app's code does with the rows that it reads. The app can show the rows in
+any form, including as a table that a viewer can copy. The author of the app is
+responsible for what its code does with the data.
+
+</Warning>
+
+## When an app fails
+
+- **The app couldn't start** — Cube could not save your changes or open a
+  session for the app. Click **Try again**.
+- **The app didn't load** — the app did not finish loading within 15 seconds.
+  Click **Try again**.
+- **Dashboard apps aren't available here** — apps are not set up for this
+  environment. Contact your administrator.
+- **This app hit an error** — the app's code threw an error while it
+  ran. The message shows the error. Fix the code, or ask the agent to fix it,
+  and click **Run**.
+- **Couldn't load the app's source** — Cube could not fetch the app's files, so
+  the editor did not open. Click **Reload** to try again.
+- **The app rendered nothing** — the app started without errors but put nothing
+  on the page. See [Find and fix problems](#find-and-fix-problems).
+
+## Limitations {#preview-limitations}
+
+- Workbooks with an app cannot be promoted to another deployment.
+- A PDF of a slide deck holds about 18 slides. Later slides are cut off.
+- An app takes today's date from the time zone of the viewer's device, not from
+  the time zone of the query. Close to midnight, a viewer far from that time
+  zone can see the [current period](#periods-that-are-still-running) end a day
+  early or late.
+- Dashboard [filter widgets and other controls][ref-controls] do not apply to an
+  app. Build the controls into the app instead, or filter it from the embedding
+  page with [`cube:action:set-filter`][ref-action-set-filter].
+- An app cannot read reports from [Source SQL tabs][ref-source-sql-tabs].
 - Apps can read workbook report results but cannot write data back to a source.
-- Available components and APIs may change as the feature develops.
+
+[ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-publishing]: /docs/explore-analyze/dashboards#publishing-and-versions
+[ref-embedding]: /embedding
+[ref-user-attributes]: /embedding/iframe/auth/signed#user-attributes
+[ref-event-loaded]: /embedding/iframe/events#cube-event-dashboard-loaded
+[ref-action-refresh]: /embedding/iframe/events#cube-action-refresh
+[ref-action-set-filter]: /embedding/iframe/events#cube-action-set-filter
+[ref-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
+[ref-data-downloads]: /admin/users-and-permissions/roles-and-permissions#restricting-data-downloads
+[ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-source-sql-tabs]: /docs/explore-analyze/workbooks/source-sql-tabs
+[ref-python-analysis]: /docs/explore-analyze/workbooks/python-analysis
+[ref-app-theme]: /admin/customization/app-theme#apps
+[ref-default-palette]: /admin/customization/chart-palettes#set-a-default-palette
+[ref-download]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
+[ref-scheduled-refreshes]: /docs/explore-analyze/dashboard-deliveries
+[ref-notifications]: /docs/explore-analyze/dashboard-deliveries#notifications
+[ref-relative-date-range]: /reference/core-data-apis/rest-api/query-format#relative-date-range

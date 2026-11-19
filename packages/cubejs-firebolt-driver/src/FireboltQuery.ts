@@ -51,12 +51,14 @@ export class FireboltQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    templates.functions.APPROXDISTINCT = 'APPROX_COUNT_DISTINCT({{ args_concat }})';
     // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z');
     // the TIMESTAMPTZ literal accepts a 'T' separator and the 'Z' UTC designator per
     // Firebolt's documented ISO-8601/RFC-3339 grammar. The base template renders the
     // value bare, which is invalid syntax
     templates.expressions.timestamp_literal = 'TIMESTAMPTZ \'{{ value }}\'';
     templates.tesseract.bool_param_cast = 'CAST({{ expr }} AS BOOLEAN)';
+    templates.functions.SPLITPART = 'SPLIT_PART({{ args_concat }})';
     delete templates.functions.WIDTH_BUCKET;
     return templates;
   }

@@ -7,9 +7,6 @@ use crate::utils::sql_expression_scanner::{ends_in_line_comment, is_top_level_co
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-const FROM_PARTITION_RANGE: &str = "__FROM_PARTITION_RANGE";
-const TO_PARTITION_RANGE: &str = "__TO_PARTITION_RANGE";
-
 // Digits with an optional minus only: a `+`, spaces or an exponent may fail an
 // integer cast that a float cast accepts.
 fn is_int64_literal(value: &str) -> bool {
@@ -178,7 +175,7 @@ impl<'a> FilterSqlContext<'a> {
         if self.use_raw_values {
             return Ok(value.to_string());
         }
-        if self.is_partition_range(value) {
+        if QueryDateTimeHelper::is_partition_range(value) {
             return allocate(value);
         }
         let precision = self.plan_templates.timestamp_precision()?;
@@ -192,10 +189,6 @@ impl<'a> FilterSqlContext<'a> {
             formatted
         };
         allocate(&formatted)
-    }
-
-    fn is_partition_range(&self, value: &str) -> bool {
-        value == FROM_PARTITION_RANGE || value == TO_PARTITION_RANGE
     }
 
     fn apply_db_time_zone(&self, value: String) -> Result<String, CubeError> {

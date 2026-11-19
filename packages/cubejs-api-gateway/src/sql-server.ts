@@ -3,6 +3,7 @@ import {
   registerInterface,
   shutdownInterface,
   execSql,
+  describeSqlParams,
   sql4sql,
   rest4sql,
   getSqlFilters,
@@ -17,6 +18,8 @@ import {
   QueryConvertResponse,
   SqlFilterItem,
   SqlFiltersResponse,
+  SqlParams,
+  SqlParamsResponse,
 } from '@cubejs-backend/native';
 import type { ShutdownMode, SqlResponseFormat, SqlResponseStream } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv, CacheMode } from '@cubejs-backend/shared';
@@ -92,8 +95,12 @@ export class SQLServer {
     return this.sqlInterfaceInstance;
   }
 
-  public async execSql(sqlQuery: string, stream: SqlResponseStream, securityContext?: any, cacheMode?: CacheMode, timezone?: string, throwContinueWait?: boolean, requestId?: string, responseFormat?: SqlResponseFormat) {
-    await execSql(this.getSqlInterfaceInstance(), sqlQuery, stream, securityContext, cacheMode, timezone, throwContinueWait, requestId, responseFormat);
+  public async execSql(sqlQuery: string, stream: SqlResponseStream, securityContext?: any, cacheMode?: CacheMode, timezone?: string, throwContinueWait?: boolean, requestId?: string, responseFormat?: SqlResponseFormat, params?: SqlParams) {
+    await execSql(this.getSqlInterfaceInstance(), sqlQuery, stream, securityContext, cacheMode, timezone, throwContinueWait, requestId, responseFormat, params);
+  }
+
+  public async describeSqlParams(sqlQuery: string, securityContext?: unknown): Promise<SqlParamsResponse> {
+    return describeSqlParams(this.getSqlInterfaceInstance(), sqlQuery, securityContext);
   }
 
   public async sql4sql(sqlQuery: string, disablePostProcessing: boolean, securityContext?: unknown): Promise<Sql4SqlResponse> {

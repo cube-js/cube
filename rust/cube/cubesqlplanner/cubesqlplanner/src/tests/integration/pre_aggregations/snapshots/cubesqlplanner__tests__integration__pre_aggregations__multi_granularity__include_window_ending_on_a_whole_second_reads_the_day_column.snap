@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/multi_granularity.rs
+assertion_line: 302
+expression: result
+---
+activity__app_name | activity__amount_january_to_last_second
+-------------------+----------------------------------------
+alpha              | 1643                                   
+beta               | 164300

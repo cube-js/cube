@@ -424,9 +424,7 @@ impl TableCreator {
         }
 
         if let Some(locations) = locations.as_ref() {
-            self.import_service
-                .validate_locations_size(locations)
-                .await?;
+            self.import_service.validate_locations(locations).await?;
         }
 
         let partition_split_threshold = if let Some(locations) = locations.as_ref() {

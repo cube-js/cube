@@ -19,6 +19,7 @@ describe('toGenericType', () => {
     expect(generic('String')).toEqual('text');
     expect(generic('Date')).toEqual('date');
     expect(generic('DateTime')).toEqual('timestamp');
+    expect(generic('Bool')).toEqual('boolean');
   });
 
   it('maps parameterized scalars by their name', () => {
@@ -32,6 +33,7 @@ describe('toGenericType', () => {
 
   it('unwraps Nullable and LowCardinality', () => {
     expect(generic('Nullable(Int64)')).toEqual('bigint');
+    expect(generic('Nullable(Bool)')).toEqual('boolean');
     expect(generic('Nullable(DateTime(\'UTC\'))')).toEqual('timestamp');
     expect(generic('LowCardinality(String)')).toEqual('text');
     expect(generic('LowCardinality(Nullable(String))')).toEqual('text');

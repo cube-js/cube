@@ -372,7 +372,7 @@ a measure. A measure can only have one type.
 | `min` | Non-aggregated numeric expression | Minimum value, similar to SQL `MIN`. |
 | `max` | Non-aggregated numeric expression | Maximum value, similar to SQL `MAX`. |
 | `number` | Aggregate expression | Arithmetic on other measures, e.g., in [calculated measures][ref-calculated-measures]. |
-| `number_agg` | Custom aggregate function | Custom aggregate not covered by other types (e.g., `PERCENTILE_CONT`). Tesseract only. |
+| `number_agg` | Custom aggregate function | Custom aggregate not covered by other types (e.g., `PERCENTILE_CONT`), including the outer aggregate of a [nested aggregate][ref-nested-aggregate]. Tesseract only. |
 | `string` | Aggregate expression returning string | String-valued measure. |
 | `time` | Aggregate expression returning timestamp | Timestamp-valued measure. |
 | `boolean` | Aggregate expression returning boolean | Boolean-valued measure. |

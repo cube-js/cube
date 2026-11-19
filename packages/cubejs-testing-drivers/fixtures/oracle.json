@@ -10,6 +10,7 @@
       "CUBEJS_DB_NAME": "FREEPDB1",
       "CUBEJS_DB_USER": "test",
       "CUBEJS_DB_PASS": "test",
+      "CUBEJS_PRE_AGGREGATIONS_SCHEMA": "test_preaggs",
       "CUBEJS_PG_SQL_PORT": "5656",
       "CUBEJS_SQL_USER": "admin",
       "CUBEJS_SQL_PASSWORD": "admin_password",
@@ -28,6 +29,9 @@
       "APP_USER": "test",
       "APP_USER_PASSWORD": "test"
     },
+    "volumes": [
+      "../fixtures/oracle-init.sql:/container-entrypoint-initdb.d/oracle-init.sql"
+    ],
     "ports" : ["1521"],
     "healthcheck": {
       "test": ["CMD", "healthcheck.sh"],

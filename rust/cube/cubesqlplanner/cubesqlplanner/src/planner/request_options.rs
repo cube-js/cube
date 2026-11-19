@@ -15,6 +15,8 @@ pub struct RequestOptions {
     total_query: bool,
     // Folds multi-stage leaves that read one rollup under different filters into one scan.
     multi_stage_leaf_merge: bool,
+    // Multi-stage leaves and calculations over the same inputs share one subquery.
+    multi_stage_scan_sharing: bool,
     // Lets Cube Store combine multi-stage results with `UNION ALL` instead of joins.
     cubestore_union_full_key_aggregate: bool,
     // The same for the data source's own dialect, when it opts in via its templates.
@@ -35,6 +37,7 @@ impl Default for RequestOptions {
             use_original_sql_pre_aggregations_in_pre_aggregation: false,
             total_query: false,
             multi_stage_leaf_merge: true,
+            multi_stage_scan_sharing: true,
             cubestore_union_full_key_aggregate: true,
             union_full_key_aggregate: true,
             max_multi_stage_depth: DEFAULT_MAX_MULTI_STAGE_DEPTH,
@@ -60,6 +63,9 @@ impl RequestOptions {
             multi_stage_leaf_merge: static_data
                 .multi_stage_leaf_merge
                 .unwrap_or(default.multi_stage_leaf_merge),
+            multi_stage_scan_sharing: static_data
+                .multi_stage_scan_sharing
+                .unwrap_or(default.multi_stage_scan_sharing),
             cubestore_union_full_key_aggregate: static_data
                 .cubestore_union_full_key_aggregate
                 .unwrap_or(default.cubestore_union_full_key_aggregate),
@@ -100,6 +106,10 @@ impl RequestOptions {
 
     pub fn multi_stage_leaf_merge(&self) -> bool {
         self.multi_stage_leaf_merge
+    }
+
+    pub fn multi_stage_scan_sharing(&self) -> bool {
+        self.multi_stage_scan_sharing
     }
 
     pub fn cubestore_union_full_key_aggregate(&self) -> bool {

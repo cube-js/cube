@@ -53,6 +53,7 @@ impl CubeConfigPy {
             "context_to_app_id",
             "context_to_orchestrator_id",
             "context_to_cube_store_router_id",
+            "context_to_pre_aggregation_orchestrator_id",
             "context_to_groups",
             "driver_factory",
             "extend_context",

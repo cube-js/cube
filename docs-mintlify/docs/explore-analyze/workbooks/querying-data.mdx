@@ -87,8 +87,8 @@ for dimensions:
 
 | Data type | Operators |
 | --- | --- |
-| String | is, is not, contains, not contains, starts with, not starts with, ends with, not ends with, is null, is not null, is empty, is not empty |
-| Number | is, is not, greater than, greater than or equal, less than, less than or equal, between, is null, is not null |
+| String | is, is not, contains, not contains, starts with, not starts with, ends with, not ends with, top, bottom, is null, is not null, is empty, is not empty |
+| Number | is, is not, greater than, greater than or equal, less than, less than or equal, between, top, bottom, is null, is not null |
 | Time | is, is not, after, after or on, before, before or on, between, in the month, not in the month, in the quarter, not in the quarter, in the year, not in the year, is null, is not null |
 | Boolean | is, is not, is null, is not null |
 
@@ -105,6 +105,9 @@ for dimensions:
 On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
 `<` and `≤`.
 
+**top** and **bottom** are offered on dimensions only, not on measures; see
+[Top N and Bottom N](#top-n-and-bottom-n).
+
 ### Values
 
 - **is** and **is not** accept several values, matching any of them. On a string
@@ -115,16 +118,67 @@ On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
   without **(null)** keeps null rows.
 - The **contains**, **starts with** and **ends with** family matches a
   substring, prefix or suffix, ignoring case.
-- **between** includes both bounds.
+- **between** includes both bounds. A range from `start of …` or `now` to the
+  start of a period, such as **Last month**, stops just before that period; see
+  [`default_ui_filters`][ref-default-ui-filters] for the exact rule.
 - **is null**, **is not null**, **is empty** and **is not empty** take no value.
   Empty means the empty string, which is not the same as null.
 - The period operators take any date inside the period — **in the year** with
   `2026-03-14` matches all of 2026.
-- A date value can be fixed or relative. The date editor's **Relative** tab
-  takes values like `today`, `7 days ago`, `this month` or `2 weeks from now`,
-  and resolves them every time the query runs, so the window rolls forward on
-  its own. The full list is under
+- A date value is picked in a popover with a search field and the
+  **Presets**, **Relative** and **Fixed** tabs. **between** picks a range, such
+  as **Last month** or **Past 30 days**, and its **Up to now** or **From now**
+  box ends or starts the range now instead of at midnight. **after**,
+  **before** and the "or on" variants pick one moment, such as **Now** or
+  **Start of last month**, and **is** and **is not** pick a day, such as
+  **Yesterday**. A preset or relative value resolves
+  every time the query runs, so the window rolls forward on its own. The
+  [dashboard filter widget][ref-time-filter-values] uses the same popover, and
+  the accepted values are under
   [`default_ui_filters`][ref-default-ui-filters].
+- With a range set, the chip shows **is** and the range's name, for example
+  *Created at* **is** *last month*, with the dates in a tooltip. A single date
+  reads like *Created at* **before** *start of last month*.
+
+### Top N and Bottom N
+
+**top** and **bottom** keep the N members of a dimension with the highest or
+lowest value of a measure, such as the 10 cities with the most orders. They are
+offered on string and number dimensions of the semantic view, in their own
+section of the operator menu.
+
+The filter's popover has these settings:
+
+- **Number of values** — N, a whole number of at least 1. It starts at 10.
+- **Ranked by** — the measure to rank by. It is filled in when the view has a
+  single measure; otherwise, choose one.
+- **Ranked within** — other dimensions of the report, time dimensions at their
+  granularity included. Leave it on **Whole report** to rank across the whole
+  report, or pick dimensions to keep N members in each group, such as the top 3
+  products in each city.
+
+The filter runs once N and a measure are set and you click **Apply**. The chip
+reads like *City* **top** *10 by Count*, or *Product* **top** *3 by Count per
+City*.
+
+Members are ranked among the rows the report shows: every other filter in the
+bar, measure filters included, applies before the ranking. Ties are broken by
+the member's value in ascending order. A member with a null measure value never
+takes a slot, and neither does a null member, so **bottom** can return fewer
+than N members.
+
+The ranking keeps the same members everywhere in the report:
+
+- [Totals](#totals) and subtotals add up the ranked members only, and so do
+  [sparklines](/docs/explore-analyze/charts/chart-types/table#sparklines).
+- A [period-over-period comparison](#period-over-period-comparison) shows the
+  same members in the previous period, rather than ranking that period again.
+
+**top** and **bottom** are not offered on calculated fields, bins and value
+groups, or inside a filter group.
+To show the top N members and group the rest under one label, use a
+[Top N field][ref-calculated-fields-top-n] instead. A data model author can
+also seed a ranking with [`default_ui_filters`][ref-default-ui-filters].
 
 ### Combining filters
 
@@ -176,8 +230,10 @@ change their values, switch operators, or remove them.
 
 Date range filters can use relative bounds like `7 days ago` or `this month`.
 A relative range resolves each time the query runs, so the window rolls
-forward day over day, and the filter's date editor opens on the **Relative**
-tab showing its bounds. See
+forward day over day. The filter's popover opens on **Relative** for a range
+that only that tab offers, and on **Presets** otherwise, such as for
+`["start of 1 month ago", "this month"]` (last month). A range that isn't a
+preset is listed above the presets. See
 [`default_ui_filters`][ref-default-ui-filters] for the full list of accepted
 operators and values.
 
@@ -383,6 +439,13 @@ the math.
 On a dashboard, a chart with a comparison keeps its granularity: [time
 granularity switchers][ref-time-granularity-period-comparisons] don't change it.
 
+You can also ask the agent for a comparison in chat, e.g., *"Revenue by month
+compared with the previous year"*. The answer has the same derived columns,
+values, titles, and formats as a report in a workbook. In the comparison
+period, a bucket with no rows reads `0` for additive measures, such as sums
+and counts, and is empty for other measures. The [Chat API][ref-chat-api-sql]
+and the [MCP server][ref-mcp-period-comparisons] return these columns too.
+
 ## Inspecting queries
 
 Every query in the Semantic Query tab can be inspected as code. Open the SQL panel via the **SQL** button in the toolbar, next to the Results and Chart tabs, to see the query that the workbook generates, switch between representations, and copy it for use elsewhere.
@@ -473,7 +536,7 @@ Advanced semantic queries typically can contain CTEs (Common Table Expressions) 
 
 <Info>
 
-Currently, advanced semantic queries can be placed on dashboards, but dashboard filters cannot be applied to advanced semantic queries.
+Currently, advanced semantic queries can be placed on dashboards, but only [dashboard filters that fill a parameter](/docs/explore-analyze/dashboards/widgets/controls#parameter-filters) apply to them.
 
 </Info>
 
@@ -582,14 +645,18 @@ behaves as intended.
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-access-control]: /docs/data-modeling/access-control
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-chat-api-sql]: /reference/embed-apis/chat-api#cubesqlapi
+[ref-mcp-period-comparisons]: /docs/integrations/mcp-server#period-comparisons
 [ref-time-granularity-period-comparisons]: /docs/explore-analyze/dashboards/widgets/controls#time-granularity-period-comparisons
 [ref-explore]: /docs/explore-analyze/explore
 [ref-analytics-chat]: /docs/explore-analyze/analytics-chat
 [ref-embedding]: /embedding
 [ref-chat-api-cube-token]: /reference/embed-apis/chat-api#cube-token-authentication
 [ref-default-ui-filters]: /reference/data-modeling/view#default_ui_filters
+[ref-time-filter-values]: /docs/explore-analyze/dashboards/widgets/controls#operators-by-dimension-type
 [ref-table-chart]: /docs/explore-analyze/charts/chart-types/table
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields
+[ref-calculated-fields-top-n]: /docs/explore-analyze/workbooks/calculated-fields#top-n-fields
 [ref-auto-run]: /reference/data-modeling/view#auto_run
 [ref-configuration-auto-run]: /docs/data-modeling/configuration#auto-run
 

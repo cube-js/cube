@@ -72,21 +72,15 @@ fn a_measure_over_a_rolling_window_crosses_it() {
 }
 
 #[test]
-fn a_subquery_dimension_is_a_boundary_its_reads_are_walked() {
+fn a_subquery_dimension_stops_at_itself() {
     let ctx = create_context();
     let dimension = ctx.create_dimension("orders.lifetime_amount").unwrap();
     assert_eq!(
         kinds(&dimension),
-        vec![
-            (
-                BoundaryKind::SubQueryDimension,
-                "orders.lifetime_amount".to_string()
-            ),
-            (
-                BoundaryKind::Cumulative,
-                "orders.rolling_amount".to_string()
-            ),
-        ]
+        vec![(
+            BoundaryKind::SubQueryDimension,
+            "orders.lifetime_amount".to_string()
+        )]
     );
 }
 

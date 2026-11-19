@@ -1,0 +1,50 @@
+# A QUERY_CONTEXT case whose branches are plain references, with a rollup
+# storing some of them: matching follows the branch the query picks.
+cubes:
+    - name: orders
+      sql: "SELECT * FROM ms_orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: category
+            type: string
+            sql: category
+
+      measures:
+          - name: count
+            type: count
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: min_amount
+            type: min
+            sql: amount
+          - name: max_amount
+            type: max
+            sql: amount
+
+          - name: amount_by_query_context
+            type: number
+            multi_stage: true
+            case:
+                when:
+                    - context: "{QUERY_CONTEXT.has_filter(CUBE.status)}"
+                      sql: "{CUBE.total_amount}"
+                    - context: "{QUERY_CONTEXT.has_dimension(CUBE.category)}"
+                      sql: "{CUBE.min_amount}"
+                else:
+                    sql: "{CUBE.max_amount}"
+
+      pre_aggregations:
+          - name: amounts_by_status_category
+            measures:
+                - total_amount
+                - min_amount
+            dimensions:
+                - status
+                - category

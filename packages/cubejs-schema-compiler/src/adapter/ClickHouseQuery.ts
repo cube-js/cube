@@ -295,6 +295,15 @@ export class ClickHouseQuery extends BaseQuery {
     return `ALTER TABLE ${tableName} ADD INDEX ${indexName} (${escapedColumns.join(', ')}) TYPE minmax GRANULARITY 1`;
   }
 
+  // ClickHouse predicates evaluate to UInt8, which a pre-aggregation would store as an integer
+  public wrapBooleanDimension(sql: string) {
+    return `toBool(${sql})`;
+  }
+
+  public wrapSegmentForDimensionSelect(sql: string) {
+    return `toBool(${sql})`;
+  }
+
   public dimensionColumns(cubeAlias: string) {
     // For the top-level SELECT statement, explicitly set the column alias.
     // Clickhouse sometimes includes the "q_0" prefix in the column name, and this
@@ -310,6 +319,7 @@ export class ClickHouseQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.UTCTIMESTAMP = 'now(\'UTC\')';
+    templates.functions.APPROXDISTINCT = 'uniq({{ args_concat }})';
     templates.functions.STRING_AGG = 'arrayStringConcat(group{% if distinct %}Uniq{% endif %}Array({{ args[0] }}), {{ args[1] }})';
     // DATEADD is being rewritten to DATE_ADD. The operator form is used instead of
     // addDate(), which only exists since ClickHouse 23.9
@@ -327,6 +337,8 @@ export class ClickHouseQuery extends BaseQuery {
     // names the nullable form of the type instead
     templates.types.nullable = 'Nullable({{ data_type }})';
     templates.types.boolean = 'BOOL';
+    templates.expressions.wrap_boolean_dimension = 'toBool({{ expr }})';
+    templates.expressions.wrap_segment_select = 'toBool({{ expr }})';
     templates.types.timestamp = 'DATETIME';
     delete templates.types.time;
     // ClickHouse intervals have a distinct type for each granularity

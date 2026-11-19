@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/query_context_case.rs
+expression: result
+---
+orders__created_at_month | orders__amount_context_without_date_filter
+-------------------------+-------------------------------------------
+2024-01-01 00:00:00      | 200.00                                    
+2024-02-01 00:00:00      | 300.00                                    
+2024-03-01 00:00:00      | 400.00

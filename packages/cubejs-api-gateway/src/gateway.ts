@@ -92,6 +92,7 @@ import { LocalSubscriptionStore } from './ws/local-subscription-store';
 import {
   getPivotQuery,
   cubeSqlRequestSchema,
+  cubeSqlParamsRequestSchema,
   getQueryGranularity,
   isSerializedMemberExpression,
   normalizeQuery,
@@ -426,16 +427,17 @@ class ApiGateway {
 
         const compilerApi = await this.getCompilerApi(req.context);
 
-        // Cache unfiltered schema - RBAC enforcement happens at query execution time
-        // via annotation-based validation in the Rust result transform layer
-        let schema = compilerApi.getGraphQLSchema();
+        // Built from the caller's visibility-patched meta so introspection doesn't list members
+        // their access policies hide. The compiler id carries the visibility mask, so callers
+        // with the same visible members share a schema.
+        const { cubes, compilerId } = await compilerApi.metaConfig(req.context, {
+          requestId: req.context.requestId,
+          includeCompilerId: true,
+        });
+        let schema = compilerApi.getGraphQLSchema(compilerId);
         if (!schema) {
-          const metaConfig = await compilerApi.metaConfig(req.context, {
-            requestId: req.context.requestId,
-            skipVisibilityPatch: true,
-          });
-          schema = makeSchema(metaConfig);
-          compilerApi.setGraphQLSchema(schema);
+          schema = makeSchema(cubes);
+          compilerApi.setGraphQLSchema(compilerId, schema);
         }
         return graphqlHTTP({
           schema,
@@ -661,7 +663,7 @@ class ApiGateway {
             throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
           }
 
-          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache, body.timezone, body.throwContinueWait, req.context?.requestId, body.responseFormat);
+          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache, body.timezone, body.throwContinueWait, req.context?.requestId, body.responseFormat, body.params);
         } catch (e: any) {
           // Quickfix for https://github.com/cube-js/cube/issues/10450,
           // Right now, it's too complicated to fix the issue correctly, because
@@ -674,6 +676,42 @@ class ApiGateway {
               sql: query,
             },
             redactedQuery: this.redactedSqlForLog(query),
+            context: req.context,
+            res: this.resToResultFn(res),
+            requestStarted
+          });
+        }
+      })
+    );
+
+    app.post(
+      `${this.basePath}/v1/cubesql/params`,
+      userMiddlewares,
+      userAsyncHandler(async (req, res) => {
+        const requestStarted = new Date();
+
+        try {
+          // The scopes running the query needs; planning reads the data model as `meta`
+          await this.assertApiScope('data', req.context?.securityContext);
+          await this.assertApiScope('meta', req.context?.securityContext);
+
+          const { error, value: body } = cubeSqlParamsRequestSchema.validate(req.body);
+          if (error) {
+            throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
+          }
+
+          const result = await this.sqlServer.describeSqlParams(body.query, req.context?.securityContext);
+          if ('error' in result) {
+            throw new UserError(result.error);
+          }
+          res.json({ params: result.params });
+        } catch (e: any) {
+          this.handleError({
+            e,
+            query: {
+              sql: req.body?.query,
+            },
+            redactedQuery: this.redactedSqlForLog(req.body?.query),
             context: req.context,
             res: this.resToResultFn(res),
             requestStarted
@@ -1179,6 +1217,7 @@ class ApiGateway {
       switch (query.action) {
         case 'post':
           result = await this.preAggregationsJobsPOST(
+            req,
             context,
             <PreAggsSelector>value.selector
           );
@@ -1191,6 +1230,7 @@ class ApiGateway {
           break;
         case 'get':
           result = await this.preAggregationsJobsGET(
+            req,
             context,
             <string[]>query.tokens,
             query.resType,
@@ -1212,6 +1252,7 @@ class ApiGateway {
    * Post pre-aggregations build jobs entry point.
    */
   private async preAggregationsJobsPOST(
+    req: Request,
     context: RequestContext,
     selector: PreAggsSelector,
   ): Promise<string[]> {
@@ -1232,13 +1273,11 @@ class ApiGateway {
 
     const promise = Promise.all(
       selector.contexts.map(async (config) => {
-        const ctx = <RequestContext>{
-          ...context,
-          ...config,
-        };
+        const ctx = await this.preAggregationsJobContext(req, config.securityContext, context.requestId);
         const _jobs = await this.postPreAggregationsBuildJobs(
           ctx,
           selector,
+          { securityContext: config.securityContext },
         );
         return _jobs;
       })
@@ -1252,11 +1291,24 @@ class ApiGateway {
   }
 
   /**
+   * Runs extendContext for the job's own security context; the caller's extensions are dropped.
+   * Each job gets its own request object, as contextByReq sets req.securityContext.
+   */
+  protected async preAggregationsJobContext(
+    req: Request,
+    securityContext: any,
+    requestId: string,
+  ): Promise<RequestContext> {
+    return this.contextByReq(Object.create(req), securityContext, requestId);
+  }
+
+  /**
    * Add pre-aggregations build job. Returns added jobs ids.
    */
   private async postPreAggregationsBuildJobs(
     context: RequestContext,
-    selector: PreAggsSelector
+    selector: PreAggsSelector,
+    jobContext: PreAggJob['context'],
   ): Promise<string[]> {
     const compiler = await this.getCompilerApi(context);
     const { timezones, dateRange } = selector;
@@ -1283,7 +1335,8 @@ class ApiGateway {
             })),
             forceBuildPreAggregations: false,
             throwErrors: false,
-          }
+          },
+          jobContext,
         );
       return jobs;
     }
@@ -1293,6 +1346,7 @@ class ApiGateway {
    * Get pre-aggregations build jobs entry point.
    */
   private async preAggregationsJobsGET(
+    req: Request,
     context: RequestContext,
     tokens: string[],
     resType = 'array',
@@ -1300,6 +1354,19 @@ class ApiGateway {
     const jobs: { job: PreAggJob | null, token: string }[] = await this
       .refreshScheduler()
       .getCachedBuildJobs(context, tokens);
+
+    // A selector context posts one job per partition, so many tokens share a
+    // security context: extend each distinct one once per request.
+    const jobContexts = new Map<string, Promise<RequestContext>>();
+    const jobContext = (securityContext: any): Promise<RequestContext> => {
+      const key = JSON.stringify(securityContext);
+      let ctx = jobContexts.get(key);
+      if (!ctx) {
+        ctx = this.preAggregationsJobContext(req, securityContext, context.requestId);
+        jobContexts.set(key, ctx);
+      }
+      return ctx;
+    };
 
     const response: PreAggJobStatusItem[] = await Promise.all(
       jobs.map(async ({ job, token }) => {
@@ -1310,7 +1377,7 @@ class ApiGateway {
           };
         }
 
-        const ctx = { ...context, ...job.context };
+        const ctx = await jobContext(job.context.securityContext);
         const orchestrator = await this.getAdapterApi(ctx);
         const compiler = await this.getCompilerApi(ctx);
         // TODO(1.8): drop the fallback, no job posted by 1.7 can still be in the cache.
@@ -2854,6 +2921,20 @@ class ApiGateway {
     } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
+      });
+    }
+  }
+
+  public async unsubscribe({ context, res, unsubscribe }) {
+    try {
+      this.log({
+        type: 'Unsubscribe',
+      }, context);
+
+      await unsubscribe();
+    } catch (e: any) {
+      this.handleError({
+        e, context, res
       });
     }
   }

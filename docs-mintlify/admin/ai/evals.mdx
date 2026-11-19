@@ -305,13 +305,30 @@ run's scope is repeated in the header, next to **Questions**.
   you can spot the difference.
 - **Response** (`agentResponse`) — the agent's text answer, rendered as
   Markdown. Long answers are truncated.
+- **Response time** — how long the agent took to answer, from the start of its
+  run to its final answer. The time spent grading the answer isn't included.
+- **Tokens** — the total number of LLM tokens the agent spent on the answer,
+  across all of its LLM calls.
 
-The results endpoint and the CLI's `--json` output return these details for
-each question in the fields shown in parentheses. `scoreReasons` holds the
-labels exactly as the UI shows them, such as `"Row count mismatch"`. They are
-display text, not stable codes, and new labels can appear, so gate CI on
-`verdict` and print the reasons rather than match on them. A field with nothing
-to show is `null`, or an empty array for `scoreReasons`.
+A question has no response time or tokens when its agent errored, and no tokens
+when its agent made no LLM call. Results of older runs, made before Cube
+started recording these values, have neither.
+
+When a run finishes, its header shows two run-level metrics next to the
+accuracy:
+
+- **Median response time** — the median over the questions that recorded a
+  response time.
+- **Total tokens** — the sum over all questions. It's shown only when every
+  question recorded its tokens, so it's hidden when any question has none.
+
+The results endpoint and the CLI's `--json` output return the details for each
+question in the fields shown in parentheses; they don't return the response
+time or tokens. `scoreReasons` holds the labels exactly as the UI shows them,
+such as `"Row count mismatch"`. They are display text, not stable codes, and
+new labels can appear, so gate CI on `verdict` and print the reasons rather
+than match on them. A field with nothing to show is `null`, or an empty array
+for `scoreReasons`.
 
 ## How grading works
 

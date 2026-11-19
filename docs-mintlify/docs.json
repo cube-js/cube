@@ -117,7 +117,7 @@
                       "docs/explore-analyze/dashboards/widgets/charts",
                       "docs/explore-analyze/dashboards/widgets/text",
                       "docs/explore-analyze/dashboards/widgets/controls",
-                      "docs/explore-analyze/dashboards/widgets/ai-summary",
+                      "docs/explore-analyze/dashboards/widgets/analysis",
                       "docs/explore-analyze/dashboards/widgets/layout"
                     ]
                   },
@@ -130,10 +130,9 @@
                 ]
               },
               "docs/explore-analyze/apps",
-              "docs/explore-analyze/scheduled-refreshes",
-              "docs/explore-analyze/data-alerts",
-              "docs/explore-analyze/google-sheets-deliveries",
-              "docs/explore-analyze/notifications"
+              "docs/explore-analyze/dashboard-deliveries",
+              "docs/explore-analyze/alerts",
+              "docs/explore-analyze/report-deliveries"
             ]
           },
           {
@@ -969,6 +968,7 @@
                   "GET /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/file",
                   "PATCH /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/file",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/duplicate",
+                  "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/name-suggestion",
                   "POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/publish"
                 ]
               },
@@ -1205,6 +1205,13 @@
                 ]
               },
               {
+                "group": "Audit Log",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/audit-logs/export"
+                ]
+              },
+              {
                 "group": "Chat History",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
@@ -1327,6 +1334,26 @@
     ]
   },
   "redirects": [
+    {
+      "source": "/docs/explore-analyze/dashboards/widgets/ai-summary",
+      "destination": "/docs/explore-analyze/dashboards/widgets/analysis"
+    },
+    {
+      "source": "/docs/explore-analyze/scheduled-refreshes",
+      "destination": "/docs/explore-analyze/dashboard-deliveries"
+    },
+    {
+      "source": "/docs/explore-analyze/notifications",
+      "destination": "/docs/explore-analyze/dashboard-deliveries"
+    },
+    {
+      "source": "/docs/explore-analyze/data-alerts",
+      "destination": "/docs/explore-analyze/alerts"
+    },
+    {
+      "source": "/docs/explore-analyze/google-sheets-deliveries",
+      "destination": "/docs/explore-analyze/report-deliveries"
+    },
     {
       "source": "/admin/connect-to-data/aws-athena",
       "destination": "/admin/connect-to-data/data-sources/aws-athena"

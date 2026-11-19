@@ -10,10 +10,10 @@ use crate::{
             extract_exprlist_from_groupping_set,
             rewriter::{CubeEGraph, Rewriter},
             AggregateFunctionExprDistinct, AggregateFunctionExprFun, AggregateSplit,
-            AggregateUDFExprDistinct, AggregateUDFExprFun, AliasExprAlias, AnyExprAll, AnyExprOp,
-            BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
-            ColumnExprColumn, CubeScanAliasToCube, CubeScanJoinHints, CubeScanLimit,
-            CubeScanOffset, CubeScanUngrouped, CubeScanWrapped, DimensionName,
+            AggregateUDFExprDistinct, AggregateUDFExprFun, AliasExprAlias, AllMembersSelected,
+            AnyExprAll, AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType,
+            ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanJoinHints,
+            CubeScanLimit, CubeScanOffset, CubeScanUngrouped, CubeScanWrapped, DimensionName,
             EmptyRelationDerivedSourceTableName, EmptyRelationIsWrappable,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, GroupingSetExprType, GroupingSetType, InListExprNegated,
@@ -215,6 +215,8 @@ pub struct LogicalPlanToLanguageConverter {
 #[derive(Default, Clone)]
 pub struct LogicalPlanToLanguageContext {
     subquery_source_table_name: Option<String>,
+    // Set once a node other than `Limit` has been passed on the way down from the root
+    below_top: bool,
 }
 
 impl LogicalPlanToLanguageConverter {
@@ -590,6 +592,21 @@ impl LogicalPlanToLanguageConverter {
         })
     }
 
+    /// A projection of every column of a table scan in order, which is how `SELECT *` plans
+    fn is_select_star(node: &Projection) -> bool {
+        let scan = match node.input.as_ref() {
+            LogicalPlan::Filter(Filter { input, .. }) => input.as_ref(),
+            input => input,
+        };
+        let input_fields = node.input.schema().fields();
+        matches!(scan, LogicalPlan::TableScan(_))
+            && node.alias.is_none()
+            && node.expr.len() == input_fields.len()
+            && node.expr.iter().zip(input_fields).all(
+                |(expr, field)| matches!(expr, Expr::Column(c) if *c == field.qualified_column()),
+            )
+    }
+
     pub fn add_logical_plan(&mut self, plan: &LogicalPlan) -> Result<Id, CubeError> {
         self.add_logical_plan_replace_params(
             plan,
@@ -604,11 +621,30 @@ impl LogicalPlanToLanguageConverter {
         query_params: &mut Option<HashMap<usize, ScalarValue>>,
         ctx: &LogicalPlanToLanguageContext,
     ) -> Result<Id, CubeError> {
+        let top = !ctx.below_top;
+        let below_top_ctx;
+        let ctx = if matches!(plan, LogicalPlan::Limit(_)) {
+            ctx
+        } else {
+            below_top_ctx = LogicalPlanToLanguageContext {
+                below_top: true,
+                ..ctx.clone()
+            };
+            &below_top_ctx
+        };
         Ok(match plan {
             LogicalPlan::Projection(node) => {
+                // `SELECT *` of the query stays a wildcard: rules pushing its columns one by one
+                // would add nodes per member of the scan. Anything above it but a limit would
+                // need the columns pushed down to the data source
+                let wildcard = vec![Expr::Wildcard];
                 let expr = add_binary_expr_list_node!(
                     &mut self.graph,
-                    node.expr,
+                    if self.flat_list && top && Self::is_select_star(node) {
+                        &wildcard
+                    } else {
+                        &node.expr
+                    },
                     query_params,
                     ProjectionExpr,
                     self.flat_list
@@ -1371,7 +1407,18 @@ impl LanguageToLogicalPlanConverter {
         Ok(match node {
             LogicalPlanLanguage::Projection(params) => {
                 let expr = match_expr_list_node!(node_by_id, to_expr, params[0], ProjectionExpr);
+                let expr = dedup_exprs(expr);
                 let input = Arc::new(self.to_logical_plan(params[1])?);
+                let expr = if expr == [Expr::Wildcard] {
+                    input
+                        .schema()
+                        .fields()
+                        .iter()
+                        .map(|f| Expr::Column(f.qualified_column()))
+                        .collect()
+                } else {
+                    expr
+                };
                 let expr =
                     replace_qualified_col_with_flat_name_if_missing(expr, input.schema(), true)?;
                 let alias = match_data_node!(node_by_id, params[2], ProjectionAlias);
@@ -1428,6 +1475,8 @@ impl LanguageToLogicalPlanConverter {
                     match_expr_list_node!(node_by_id, to_expr, params[1], AggregateGroupExpr);
                 let aggr_expr =
                     match_expr_list_node!(node_by_id, to_expr, params[2], AggregateAggrExpr);
+                let group_expr = dedup_exprs(group_expr);
+                let aggr_expr = dedup_exprs(aggr_expr);
                 let group_expr = normalize_cols(
                     replace_qualified_col_with_flat_name_if_missing(
                         group_expr,
@@ -1829,53 +1878,59 @@ impl LanguageToLogicalPlanConverter {
                             let error = match_data_node!(node_by_id, params[0], MemberErrorError);
                             return Err(CubeError::rewrite(error.to_string()));
                         }
-                        LogicalPlanLanguage::AllMembers(_) => {
-                            if !wrapped {
+                        LogicalPlanLanguage::AllMembers(params) => {
+                            let selected =
+                                match_data_node!(node_by_id, params[2], AllMembersSelected);
+                            if !wrapped && !selected {
                                 return Err(CubeError::rewrite(
                                     "Can't detect Cube query and it may be not supported yet"
                                         .to_string(),
                                 ));
-                            } else {
-                                for (alias, cube) in alias_to_cube.iter() {
-                                    let cube = self
-                                        .cube_context
-                                        .meta
-                                        .find_cube_with_name(cube)
-                                        .ok_or_else(|| {
-                                            CubeError::rewrite(format!(
-                                                "Can't find cube '{}'",
-                                                cube
-                                            ))
-                                        })?;
-                                    for column in cube.get_columns() {
-                                        if self
-                                            .cube_context
-                                            .meta
-                                            .is_synthetic_field(column.member_name())
-                                        {
-                                            fields.push((
-                                                DFField::new(
-                                                    Some(&alias),
-                                                    column.get_name(),
-                                                    column.get_column_type().to_arrow(),
-                                                    true,
-                                                ),
-                                                MemberField::Literal(ScalarValue::Utf8(None)),
-                                            ));
+                            }
+                            for (alias, cube) in alias_to_cube.iter() {
+                                let cube = self
+                                    .cube_context
+                                    .meta
+                                    .find_cube_with_name(cube)
+                                    .ok_or_else(|| {
+                                        CubeError::rewrite(format!("Can't find cube '{}'", cube))
+                                    })?;
+                                let measures = cube
+                                    .measures
+                                    .iter()
+                                    .map(|m| m.name.as_str())
+                                    .collect::<HashSet<_>>();
+                                let dimensions = cube
+                                    .dimensions
+                                    .iter()
+                                    .map(|d| d.name.as_str())
+                                    .collect::<HashSet<_>>();
+                                for column in cube.get_columns() {
+                                    let member = column.member_name();
+                                    let member_field =
+                                        if self.cube_context.meta.is_synthetic_field(member) {
+                                            MemberField::Literal(ScalarValue::Utf8(None))
+                                        } else if wrapped {
+                                            MemberField::regular(member.to_string())
+                                        } else if measures.contains(member.as_str()) {
+                                            query_measures.push(member.to_string());
+                                            MemberField::regular(member.to_string())
+                                        } else if dimensions.contains(member.as_str()) {
+                                            query_dimensions.push(member.to_string());
+                                            MemberField::regular(member.to_string())
                                         } else {
-                                            fields.push((
-                                                DFField::new(
-                                                    Some(&alias),
-                                                    column.get_name(),
-                                                    column.get_column_type().to_arrow(),
-                                                    true,
-                                                ),
-                                                MemberField::regular(
-                                                    column.member_name().to_string(),
-                                                ),
-                                            ));
-                                        }
-                                    }
+                                            // A segment selected as a column reads as NULL
+                                            MemberField::Literal(ScalarValue::Boolean(None))
+                                        };
+                                    fields.push((
+                                        DFField::new(
+                                            Some(&alias),
+                                            column.get_name(),
+                                            column.get_column_type().to_arrow(),
+                                            true,
+                                        ),
+                                        member_field,
+                                    ));
                                 }
                             }
                         }
@@ -2058,6 +2113,55 @@ impl LanguageToLogicalPlanConverter {
                     ));
                 }
 
+                let ungrouped =
+                    match_data_node!(node_by_id, cube_scan_params[9], CubeScanUngrouped);
+
+                // Members only the order uses are selected when the scan loads, if they come from
+                // the scan's cubes. A grouped scan only takes measures, as a dimension would change
+                // its grouping
+                let mut order_measures = Vec::new();
+                let mut order_dimensions = Vec::new();
+                if !wrapped {
+                    let meta = &self.cube_context.meta;
+                    for order_member in query_order.iter().map(|o| &o[0]).unique() {
+                        let selected = query_measures.contains(order_member)
+                            || query_dimensions.contains(order_member)
+                            || query_time_dimensions.iter().any(|td| {
+                                &td.dimension == order_member && td.granularity.is_some()
+                            });
+                        let scan_cube = order_member.split('.').next().is_some_and(|cube| {
+                            alias_to_cube.iter().any(|(_, scan_cube)| scan_cube == cube)
+                        });
+                        if selected || !scan_cube {
+                            continue;
+                        }
+                        // A member from another data source (through a view) would fail the load
+                        let loaded = query_measures
+                            .iter()
+                            .chain(&query_dimensions)
+                            .map(String::as_str)
+                            .chain(query_time_dimensions.iter().map(|td| td.dimension.as_str()))
+                            .chain(
+                                order_measures
+                                    .iter()
+                                    .chain(&order_dimensions)
+                                    .map(String::as_str),
+                            );
+                        if meta
+                            .data_source_for_member_names(loaded.chain([order_member.as_str()]))
+                            .is_err()
+                        {
+                            continue;
+                        }
+                        if meta.find_measure_with_name(order_member).is_some() {
+                            order_measures.push(order_member.clone());
+                        } else if ungrouped && meta.find_dimension_with_name(order_member).is_some()
+                        {
+                            order_dimensions.push(order_member.clone());
+                        }
+                    }
+                }
+
                 query.measures = Some(query_measures.into_iter().unique().collect());
                 query.dimensions = Some(query_dimensions.into_iter().unique().collect());
                 query.time_dimensions = if query_time_dimensions.len() > 0 {
@@ -2124,9 +2228,6 @@ impl LanguageToLogicalPlanConverter {
                     .into_iter()
                     .unique_by(|(f, _)| f.qualified_name())
                     .collect();
-
-                let ungrouped =
-                    match_data_node!(node_by_id, cube_scan_params[9], CubeScanUngrouped);
 
                 if ungrouped {
                     query.ungrouped = Some(true);
@@ -2207,6 +2308,8 @@ impl LanguageToLogicalPlanConverter {
                         cache_mode: *cache_mode,
                         throw_continue_wait,
                         pre_aggregation,
+                        order_measures,
+                        order_dimensions,
                     },
                     alias_to_cube.into_iter().map(|(_, c)| c).unique().collect(),
                     self.span_id.clone(),
@@ -2232,12 +2335,12 @@ impl LanguageToLogicalPlanConverter {
                     params[WRAPPED_SELECT_SELECT_TYPE],
                     WrappedSelectSelectType
                 );
-                let projection_expr = match_expr_list_node!(
+                let projection_expr = dedup_exprs(match_expr_list_node!(
                     node_by_id,
                     to_expr,
                     params[WRAPPED_SELECT_PROJECTION_EXPR],
                     WrappedSelectProjectionExpr
-                );
+                ));
                 let subqueries = match_list_node_ids!(
                     node_by_id,
                     params[WRAPPED_SELECT_SUBQUERIES],
@@ -2249,18 +2352,18 @@ impl LanguageToLogicalPlanConverter {
                     Ok(input)
                 })
                 .collect::<Result<Vec<_>, CubeError>>()?;
-                let group_expr = match_expr_list_node!(
+                let group_expr = dedup_exprs(match_expr_list_node!(
                     node_by_id,
                     to_expr,
                     params[WRAPPED_SELECT_GROUP_EXPR],
                     WrappedSelectGroupExpr
-                );
-                let aggr_expr = match_expr_list_node!(
+                ));
+                let aggr_expr = dedup_exprs(match_expr_list_node!(
                     node_by_id,
                     to_expr,
                     params[WRAPPED_SELECT_AGGR_EXPR],
                     WrappedSelectAggrExpr
-                );
+                ));
                 let window_expr = match_expr_list_node!(
                     node_by_id,
                     to_expr,
@@ -2640,6 +2743,13 @@ pub fn expr_relation(expr: &Expr) -> Option<&str> {
         Expr::Column(c) => c.relation.as_ref().map(|s| s.as_str()),
         _ => None,
     }
+}
+
+/// Identical expressions are one column, and a schema rejects them twice. Split rules list the
+/// inner expressions of each operand of an outer expression, so an operand used twice, like a
+/// literal or a column, is listed twice
+fn dedup_exprs(exprs: Vec<Expr>) -> Vec<Expr> {
+    exprs.into_iter().unique().collect()
 }
 
 /// This function replaces fully qualified names with flat names in case of it is missing in the input from schema.

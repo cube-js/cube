@@ -244,7 +244,7 @@ fn test_filter_on_unselected_multi_stage_dim_is_rejected() {
         dimensions:
           - activity.tier_ms_dim
         filters:
-          - member: activity.tier_subquery_dim
+          - member: activity.tier_label_ms_dim
             operator: equals
             values:
               - low
@@ -252,11 +252,31 @@ fn test_filter_on_unselected_multi_stage_dim_is_rejected() {
         .unwrap_err();
     assert!(
         err.message.contains(
-            "Filtering on multi-stage dimension activity.tier_subquery_dim requires it to be selected"
+            "Filtering on multi-stage dimension activity.tier_label_ms_dim requires it to be selected"
         ),
         "{}",
         err.message
     );
+}
+
+// A subquery dimension is computed by its own subquery, so a query can filter
+// on it without selecting it. The multi-stage dimension aggregates every row the
+// filter keeps, hence `high` although each row alone is `low`.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_filter_on_unselected_subquery_dim_under_multi_stage_dim() {
+    assert_query(
+        "filter_on_unselected_subquery_dim_under_multi_stage_dim",
+        indoc! {r#"
+        dimensions:
+          - activity.tier_ms_dim
+        filters:
+          - member: activity.tier_subquery_dim
+            operator: equals
+            values:
+              - low
+    "#},
+    )
+    .await;
 }
 
 // The subquery dimension inside the multi-stage time dimension is computed by

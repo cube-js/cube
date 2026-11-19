@@ -130,6 +130,10 @@ pub struct CubeScanOptions {
     /// pre-aggregation. Cube was asked at planning whether it matches one, so SQL
     /// generation fails when it no longer does instead of falling back
     pub pre_aggregation: bool,
+    /// Measures and dimensions only the scan's order uses. Cube ignores orders on members a
+    /// request does not select, so the loaded request selects them; the schema leaves them out
+    pub order_measures: Vec<String>,
+    pub order_dimensions: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -1008,7 +1012,17 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             (_, _) => false,
         };
 
-        let mut request = self.request.clone();
+        let mut load_request = self.request.clone();
+        if !self.options.order_measures.is_empty() {
+            let measures = load_request.measures.get_or_insert_with(Vec::new);
+            measures.extend(self.options.order_measures.iter().cloned());
+        }
+        if !self.options.order_dimensions.is_empty() {
+            let dimensions = load_request.dimensions.get_or_insert_with(Vec::new);
+            dimensions.extend(self.options.order_dimensions.iter().cloned());
+        }
+
+        let mut request = load_request.clone();
         if request.limit.unwrap_or_default() > query_limit || request.limit.is_none() {
             request.limit = Some(query_limit);
         }
@@ -1033,7 +1047,7 @@ impl ExecutionPlan for CubeScanExecutionPlan {
                 .transport
                 .load_stream(
                     self.span_id.clone(),
-                    self.request.clone(),
+                    load_request,
                     self.wrapped_sql.clone(),
                     self.auth_context.clone(),
                     meta,
@@ -2594,6 +2608,8 @@ mod tests {
                 cache_mode: None,
                 throw_continue_wait: false,
                 pre_aggregation: false,
+                order_measures: vec![],
+                order_dimensions: vec![],
             },
             transport: get_test_transport(),
             meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),

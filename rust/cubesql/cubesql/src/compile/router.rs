@@ -46,6 +46,7 @@ pub struct QueryRouter {
     state: Arc<SessionState>,
     meta: Arc<MetaContext>,
     session_manager: Arc<SessionManager>,
+    describe_only: bool,
 }
 
 impl QueryRouter {
@@ -58,6 +59,15 @@ impl QueryRouter {
             state,
             meta,
             session_manager,
+            describe_only: false,
+        }
+    }
+
+    /// Plans to describe the result only, see [`QueryEngine::plan_with_options`]
+    pub fn describe_only(self) -> Self {
+        Self {
+            describe_only: true,
+            ..self
         }
     }
 
@@ -970,7 +980,14 @@ impl QueryRouter {
 
         let sql_query_engine = SqlQueryEngine::new(self.session_manager.clone());
         let (plan, _) = sql_query_engine
-            .plan(stmt, qtrace, span_id, self.meta.clone(), self.state.clone())
+            .plan_with_options(
+                stmt,
+                qtrace,
+                span_id,
+                self.meta.clone(),
+                self.state.clone(),
+                self.describe_only,
+            )
             .await?;
 
         Ok(plan)
@@ -1123,14 +1140,33 @@ pub async fn convert_statement_to_cube_query(
     qtrace: &mut Option<Qtrace>,
     span_id: Option<Arc<SpanId>>,
 ) -> CompilationResult<QueryPlan> {
+    let stmt = rewrite_planned_statement(stmt, qtrace);
+    let planner = QueryRouter::new(session.state.clone(), meta, session.session_manager.clone());
+    planner.plan(stmt, qtrace, span_id).await
+}
+
+/// Plans a statement to describe its result, e.g. one with placeholders that are not values
+pub async fn describe_statement_to_cube_query(
+    stmt: ast::Statement,
+    meta: Arc<MetaContext>,
+    session: Arc<Session>,
+    qtrace: &mut Option<Qtrace>,
+    span_id: Option<Arc<SpanId>>,
+) -> CompilationResult<QueryPlan> {
+    let stmt = rewrite_planned_statement(stmt, qtrace);
+    let planner = QueryRouter::new(session.state.clone(), meta, session.session_manager.clone())
+        .describe_only();
+    planner.plan(stmt, qtrace, span_id).await
+}
+
+fn rewrite_planned_statement(stmt: ast::Statement, qtrace: &mut Option<Qtrace>) -> ast::Statement {
     let stmt = rewrite_statement(stmt);
 
     if let Some(qtrace) = qtrace {
         qtrace.set_visitor_replaced_statement(&stmt);
     }
 
-    let planner = QueryRouter::new(session.state.clone(), meta, session.session_manager.clone());
-    planner.plan(stmt, qtrace, span_id).await
+    stmt
 }
 
 pub async fn convert_sql_to_cube_query(
