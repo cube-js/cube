@@ -125,7 +125,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
             - Parent
               - Preset
             - Dynamic controls
-          - AI summary
+          - Analysis
           - Layout
             - Spacer
             - Divider
