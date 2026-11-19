@@ -3790,7 +3790,7 @@ __metadata:
   resolution: "@cubejs-backend/jdbc-driver@workspace:packages/cubejs-jdbc-driver"
   dependencies:
     "@cubejs-backend/base-driver": "npm:1.8.28"
-    "@cubejs-backend/jdbc": "npm:^0.9.0"
+    "@cubejs-backend/jdbc": "npm:^0.10.0"
     "@cubejs-backend/linter": "npm:1.8.28"
     "@cubejs-backend/node-java-maven": "npm:^0.1.3"
     "@cubejs-backend/shared": "npm:1.8.28"
@@ -3807,15 +3807,15 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@cubejs-backend/jdbc@npm:^0.9.0":
-  version: 0.9.0
-  resolution: "@cubejs-backend/jdbc@npm:0.9.0"
+"@cubejs-backend/jdbc@npm:^0.10.0":
+  version: 0.10.0
+  resolution: "@cubejs-backend/jdbc@npm:0.10.0"
   dependencies:
     async: "npm:^3.2.6"
     java: "npm:^0.18"
     uuid: "npm:^11.1.0"
     winston: "npm:^3.17.0"
-  checksum: 10c0/097448b177dc9fc0e30efddf77a5596648f2fedcd90dc992da1a63c9bf1b9b62007842777dcaaa0057683fe42f10d442c58c24880296165b40c87172155c5e20
+  checksum: 10c0/c314c4c01ef434c278e8b0c6658b55e4394781197fbec8f96c95231fe483356a029645e28ec338c63184408ef26be2fc4fbc6cab0e34b6f47cf2c66c50d802e7
   languageName: node
   linkType: hard
 
