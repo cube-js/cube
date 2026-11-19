@@ -487,6 +487,10 @@ async fn raw_date_bounds_off_the_grain_fall_back() {
         ("afterOrOnDate", vec!["2025-01-15"]),
         ("beforeOrOnDate", vec!["2025-01-15"]),
         ("afterDate", vec!["2025-01-15"]),
+        // Bounds the alignment check can't parse.
+        ("beforeDate", vec!["2025-01-15T00:00:00Z"]),
+        ("beforeDate", vec!["2025-01-15", "2025-01-20"]),
+        ("afterDate", vec!["2025-01-15T00:00:00.000+05:00"]),
     ] {
         let query = raw_filter(operator, &values);
         if let Some((rollup, source)) = fallback_vs_source(&query, "month_with_raw_dimension").await
@@ -623,6 +627,29 @@ async fn raw_date_range_aligned_with_the_grain_reads_it_on_a_non_strict_rollup()
     if let Some((rollup, source)) =
         rollup_vs_source(&query, "non_strict_month_with_raw_dimension").await
     {
+        assert_eq!(rollup, source);
+    }
+}
+
+// The filtered member is computed from the raw value, which a grain column
+// holds truncated.
+#[tokio::test(flavor = "multi_thread")]
+async fn date_filter_on_a_member_built_from_the_raw_dimension_falls_back() {
+    let query = indoc! {r#"
+        measures:
+          - activity.amount
+        dimensions:
+          - activity.app_name
+        filters:
+          - member: activity.cohort_date_shifted
+            operator: inDateRange
+            values:
+              - "2025-01-06"
+              - "2025-01-06"
+        order:
+          - id: activity.app_name
+    "#};
+    if let Some((rollup, source)) = fallback_vs_source(query, "day_with_raw_dimension").await {
         assert_eq!(rollup, source);
     }
 }

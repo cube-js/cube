@@ -50,6 +50,9 @@ pub struct DimensionMatcher<'a> {
     readable_time_columns: HashMap<MemberId, Vec<bool>>,
     pre_aggregation_segments: HashMap<MemberId, bool>,
     projects_stored_dimension: bool,
+    // Set for a date filter not matched as an aligned time-dimension read: it
+    // still renders from grain columns, which can't serve its bounds.
+    in_unaligned_date_filter: bool,
     result: MatchState,
 }
 
@@ -88,6 +91,7 @@ impl<'a> DimensionMatcher<'a> {
             readable_time_columns: HashMap::new(),
             pre_aggregation_segments,
             projects_stored_dimension: false,
+            in_unaligned_date_filter: false,
             result: MatchState::Full,
         }
     }
@@ -292,15 +296,17 @@ impl<'a> DimensionMatcher<'a> {
         dimension: &DimensionSymbol,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
-        if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
+        let stored_as_grain = self
+            .pre_aggregation_time_dimensions
+            .contains_key(dimension.id());
+        if stored_as_grain && self.in_unaligned_date_filter {
+            Ok(MatchState::NotMatched)
+        } else if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
             if add_to_matched_dimension {
                 *found = true;
             }
             Ok(MatchState::Full)
-        } else if self
-            .pre_aggregation_time_dimensions
-            .contains_key(dimension.id())
-        {
+        } else if stored_as_grain {
             // A grain column holds the value truncated and in the query
             // timezone, so a raw read needs the member listed as a dimension.
             Ok(MatchState::NotMatched)
@@ -524,6 +530,11 @@ impl<'a> DimensionMatcher<'a> {
         } else if let Some(read) = self.date_filter_as_time_dimension(filter) {
             // The rollup holds no raw value to stand for a misaligned range.
             return self.try_match_time_dimension(&read, add_to_matched_dimension, true);
+        } else if filter.operation().is_date_bounded() {
+            self.in_unaligned_date_filter = true;
+            let res = self.try_match_symbol(&filter.member_evaluator(), add_to_matched_dimension);
+            self.in_unaligned_date_filter = false;
+            return res;
         } else {
             filter.member_evaluator().clone()
         };

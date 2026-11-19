@@ -18,8 +18,8 @@ pub struct SqlEvaluatorVisitor {
     /// binding of a member renders, and whether its column carries an offset.
     filter_params_time_shifts: FilterParamsTimeShifts,
     ignore_tz_convert: bool,
-    /// The member is read as a time dimension: by a granularity or a date
-    /// filter, which a stored grain column serves, not a raw one.
+    // The member is read as a time dimension: by a granularity or a date
+    // filter, which a stored grain column serves, not a raw one.
     time_dimension_read: bool,
     /// When `true`, the caller (typically a `SqlCall` substitution site) expects
     /// the rendered expression to be safe for embedding next to operators —
