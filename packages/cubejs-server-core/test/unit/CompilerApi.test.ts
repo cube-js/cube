@@ -82,16 +82,16 @@ describe('CompilerApi', () => {
       expect(() => queryFactory.createQuery).toThrow(/disposed CompilerApi instance/);
     });
 
-    test('should set graphqlSchema to undefined on dispose', async () => {
+    test('should drop cached GraphQL schemas on dispose', async () => {
       const mockSchema = {} as any;
-      compilerApi.setGraphQLSchema(mockSchema);
+      compilerApi.setGraphQLSchema('compiler-id', mockSchema);
 
-      expect(compilerApi.getGraphQLSchema()).toBe(mockSchema);
+      expect(compilerApi.getGraphQLSchema('compiler-id')).toBe(mockSchema);
+      expect(compilerApi.getGraphQLSchema('other-compiler-id')).toBeUndefined();
 
       compilerApi.dispose();
 
-      // Schema should be undefined
-      expect(compilerApi.getGraphQLSchema()).toBeUndefined();
+      expect(compilerApi.getGraphQLSchema('compiler-id')).toBeUndefined();
     });
 
     test('should be safe to call dispose multiple times', async () => {
@@ -217,6 +217,204 @@ views:
     test('absolute date ranges keep the cached SQL', async () => {
       const { first, nextMinute } = await sqlInTwoMinutes(compilerApiFor('["2026-10-01", "2026-10-07"]'));
       expect(nextMinute).toBe(first);
+    });
+
+    // Counts the queries planned, which is most of the cost of getSql
+    class PlanCountingCompilerApi extends CompilerApi {
+      public plans = 0;
+
+      public failures = 0;
+
+      protected async createSqlGenerator(compilers: Compilers, query: any) {
+        this.plans++;
+        if (this.failures > 0) {
+          this.failures--;
+          throw new Error('planning failed');
+        }
+        return super.createSqlGenerator(compilers, query);
+      }
+    }
+
+    const countingCompilerApi = () => new PlanCountingCompilerApi(
+      {
+        localPath: () => '/mock/path',
+        dataSchemaFiles: () => Promise.resolve([{ fileName: 'orders.yml', content: model('["2026-10-01", "2026-10-07"]') }]),
+      },
+      async () => 'postgres',
+      {
+        logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+        sqlCache: true,
+      }
+    );
+
+    test('reuses the SQL of another request without planning the query again', async () => {
+      const compilerApi = countingCompilerApi();
+
+      try {
+        const query = (requestId: string): any => ({ measures: ['customers.count'], timezone: 'UTC', requestId });
+        const first = await compilerApi.getSql(query('request-1'), { requestId: 'request-1' });
+        const second = await compilerApi.getSql(query('request-2'), { requestId: 'request-2' });
+        expect(second).toBe(first);
+        expect(compilerApi.plans).toBe(1);
+      } finally {
+        compilerApi.dispose();
+      }
+    });
+
+    test('collects the member names of a query once across requests', async () => {
+      const compilerApi = countingCompilerApi();
+
+      try {
+        const query = (requestId: string): any => ({
+          measures: ['shops.latest_order.amount'],
+          dimensions: ['shops.id'],
+          timezone: 'UTC',
+          requestId,
+        });
+        const first = await compilerApi.getQueryMemberNames(query('request-1'), 'request-1');
+        const second = await compilerApi.getQueryMemberNames(query('request-2'), 'request-2');
+        expect(second).toBe(first);
+        expect(compilerApi.plans).toBe(1);
+        // The same members the SQL reads
+        const sql = await compilerApi.getSql(query('request-3'));
+        expect([...first].sort()).toEqual([...sql.memberNames].sort());
+      } finally {
+        compilerApi.dispose();
+      }
+    });
+
+    test('plans the query again after a failure', async () => {
+      const compilerApi = countingCompilerApi();
+      compilerApi.failures = 1;
+
+      try {
+        const query: any = { measures: ['customers.count'], timezone: 'UTC' };
+        await expect(compilerApi.getSql(query)).rejects.toThrow('planning failed');
+        const sql = await compilerApi.getSql(query);
+        expect(sql.sql[0]).toContain('customers');
+        expect(compilerApi.plans).toBe(2);
+      } finally {
+        compilerApi.dispose();
+      }
+    });
+  });
+
+  describe('metaConfig visibility by access policy', () => {
+    const model = `
+cubes:
+  - name: orders
+    sql: SELECT * FROM orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+      - name: region
+        sql: region
+        type: string
+    measures:
+      - name: count
+        type: count
+    access_policy:
+      - group: admin
+        member_level:
+          includes: "*"
+      - group: basic
+        member_level:
+          includes:
+            - region
+            - count
+`;
+
+    let compilerApi: CompilerApi;
+
+    beforeEach(() => {
+      compilerApi = new CompilerApi(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{ fileName: 'orders.yml', content: model }]),
+        },
+        async () => 'postgres',
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          contextToGroups: (context: any) => context.securityContext.groups,
+        }
+      );
+    });
+
+    afterEach(() => {
+      compilerApi.dispose();
+    });
+
+    const meta = (requestId: string, groups: string[], extra: Record<string, unknown> = {}) => compilerApi.metaConfig(
+      { requestId, securityContext: { groups, ...extra } } as any,
+      { includeCompilerId: true }
+    );
+    const visible = (result: any) => result.cubes[0].config.dimensions
+      .filter((d: any) => d.isVisible)
+      .map((d: any) => d.name);
+
+    test('reuses the visibility of another request with the same applicable policies', async () => {
+      const first = await meta('request-1', ['basic']);
+      const second = await meta('request-2', ['basic'], { email: 'someone@example.com' });
+      expect(second.cubes).toBe(first.cubes);
+      expect(second.compilerId).toBe(first.compilerId);
+      expect(visible(first)).toEqual(['orders.region']);
+    });
+
+    test('resolves the groups of a request once, whatever number of cubes have access policies', async () => {
+      const cubeWithPolicy = (name: string) => `
+  - name: ${name}
+    sql: SELECT * FROM ${name}
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+    access_policy:
+      - group: basic
+        member_level:
+          includes: "*"
+`;
+      const contextToGroups = jest.fn((context: any) => context.securityContext.groups);
+      const api = new CompilerApi(
+        {
+          localPath: () => '/mock/path',
+          dataSchemaFiles: () => Promise.resolve([{
+            fileName: 'cubes.yml',
+            content: `cubes:${['a', 'b', 'c', 'd'].map(cubeWithPolicy).join('')}`,
+          }]),
+        },
+        async () => 'postgres',
+        {
+          logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+          contextToGroups,
+        }
+      );
+
+      try {
+        await api.metaConfig({ requestId: 'request-1', securityContext: { groups: ['basic'] } } as any, {});
+        expect(contextToGroups).toHaveBeenCalledTimes(1);
+
+        await api.metaConfig({ requestId: 'request-2', securityContext: { groups: ['basic'] } } as any, {});
+        expect(contextToGroups).toHaveBeenCalledTimes(2);
+      } finally {
+        api.dispose();
+      }
+    });
+
+    test('patches another set of applicable policies on its own', async () => {
+      const basic = await meta('request-1', ['basic']);
+      const admin = await meta('request-2', ['admin']);
+      expect(visible(admin)).toEqual(['orders.status', 'orders.region']);
+      expect(visible(basic)).toEqual(['orders.region']);
+      expect(admin.compilerId).not.toBe(basic.compilerId);
     });
   });
 

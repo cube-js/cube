@@ -41,22 +41,22 @@ impl PgCatalogLocksBuilder {
         let capacity = 1;
 
         Self {
-            locktype: StringBuilder::new(capacity),
-            database: UInt32Builder::new(capacity),
-            relation: UInt32Builder::new(capacity),
-            page: Int32Builder::new(capacity),
-            tuple: Int16Builder::new(capacity),
-            virtualxid: StringBuilder::new(capacity),
-            transactionid: UInt32Builder::new(capacity),
-            classid: UInt32Builder::new(capacity),
-            objid: UInt32Builder::new(capacity),
-            objsubid: Int16Builder::new(capacity),
-            virtualtransaction: StringBuilder::new(capacity),
-            pid: Int32Builder::new(capacity),
-            mode: StringBuilder::new(capacity),
-            granted: BooleanBuilder::new(capacity),
-            fastpath: BooleanBuilder::new(capacity),
-            waitstart: TimestampNanosecondBuilder::new(capacity),
+            locktype: StringBuilder::with_capacity(capacity, capacity),
+            database: UInt32Builder::with_capacity(capacity),
+            relation: UInt32Builder::with_capacity(capacity),
+            page: Int32Builder::with_capacity(capacity),
+            tuple: Int16Builder::with_capacity(capacity),
+            virtualxid: StringBuilder::with_capacity(capacity, capacity),
+            transactionid: UInt32Builder::with_capacity(capacity),
+            classid: UInt32Builder::with_capacity(capacity),
+            objid: UInt32Builder::with_capacity(capacity),
+            objsubid: Int16Builder::with_capacity(capacity),
+            virtualtransaction: StringBuilder::with_capacity(capacity, capacity),
+            pid: Int32Builder::with_capacity(capacity),
+            mode: StringBuilder::with_capacity(capacity, capacity),
+            granted: BooleanBuilder::with_capacity(capacity),
+            fastpath: BooleanBuilder::with_capacity(capacity),
+            waitstart: TimestampNanosecondBuilder::with_capacity(capacity),
         }
     }
 

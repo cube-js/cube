@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(sql.to_string(), DatabaseProtocol::PostgreSQL).await?"
+---
++--------------------------------------------------------------+
+| generate_series(Float64(1),Float64(5),CAST(NULL AS Float64)) |
++--------------------------------------------------------------+
++--------------------------------------------------------------+

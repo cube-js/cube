@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/filter_join_path.rs
+expression: result
+---
+sales_by_gross_brand__amount
+----------------------------
+40.00

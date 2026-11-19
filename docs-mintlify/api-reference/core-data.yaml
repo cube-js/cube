@@ -29,6 +29,9 @@ paths:
     post:
       summary: JSON query
       operationId: loadV1
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/Traceparent'
       requestBody:
         content:
           application/json:
@@ -82,6 +85,43 @@ paths:
                 timezone:
                   type: string
                   description: Time zone for the query in TZ database name format, e.g. America/Los_Angeles.
+                params:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - value
+                      - type
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        oneOf:
+                          - type: string
+                            nullable: true
+                          - type: number
+                            nullable: true
+                          - type: boolean
+                            nullable: true
+                      type:
+                        type: string
+                        enum:
+                          - number
+                          - string
+                          - time
+                          - boolean
+                          - expr
+                  description: >-
+                    Values of the `:name` parameters in `query`, e.g. `[{"name": "status", "value":
+                    "shipped", "type": "string"}]`. `number`, `string`, `time` (an ISO 8601
+                    timestamp string) and `boolean` values are literals of that type; a `time`
+                    offset is converted to UTC, and a `time` without one is UTC. An `expr` value is
+                    a SQL expression, which can't contain subqueries or parameters. A `null` value
+                    is SQL `NULL` of any type. Names are case-sensitive: `:Status` takes the
+                    `Status` value. Each name may appear only once. Every parameter in `query` needs
+                    a value; values not used in `query` are ignored, but must still match their
+                    `type`.
                 cache:
                   type: string
                   enum:
@@ -174,6 +214,9 @@ paths:
       summary: Load Metadata
       description: ''
       operationId: metaV1
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/Traceparent'
       responses:
         '200':
           description: successful operation
@@ -206,6 +249,32 @@ components:
       description: >-
         Cube API token (a JWT). Sent directly in the Authorization header, e.g. `Authorization:
         <CUBE_API_TOKEN>` (no "Bearer" prefix).
+  parameters:
+    RequestId:
+      in: header
+      name: x-request-id
+      required: false
+      description: >-
+        Request id for tracing; for security, it must be unique and unpredictable, e.g., a random
+        UUID. A request with an invalid id is rejected with 400. Generated when neither this header
+        nor traceparent is sent.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: ^[A-Za-z0-9+/=._:@~-]+$
+    Traceparent:
+      in: header
+      name: traceparent
+      required: false
+      description: >-
+        W3C trace context header, used as the request id when x-request-id is absent. Same rules as
+        x-request-id.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: ^[A-Za-z0-9+/=._:@~-]+$
   schemas:
     V1CubeMeta:
       type: object
@@ -332,6 +401,13 @@ components:
         key:
           type: string
           description: Key reference for the dimension
+        values:
+          type: array
+          description: >-
+            Declared values of a `switch` dimension, in declaration order. Present only on `switch`
+            dimensions, whose `type` is reported as `string`
+          items:
+            type: string
     V1CubeMetaDimensionGranularity:
       type: object
       required:
@@ -586,10 +662,6 @@ components:
             $ref: '#/components/schemas/V1LoadRequestQueryFilterItem'
         ungrouped:
           type: boolean
-        subqueryJoins:
-          type: array
-          items:
-            $ref: '#/components/schemas/V1LoadRequestQueryJoinSubquery'
         joinHints:
           type: array
           items:
@@ -637,22 +709,6 @@ components:
           type: array
           items:
             type: object
-    V1LoadRequestQueryJoinSubquery:
-      type: object
-      properties:
-        sql:
-          type: string
-        'on':
-          type: string
-        joinType:
-          type: string
-        alias:
-          type: string
-      required:
-        - sql
-        - 'on'
-        - joinType
-        - alias
     V1LoadRequestQueryTimeDimension:
       type: object
       required:

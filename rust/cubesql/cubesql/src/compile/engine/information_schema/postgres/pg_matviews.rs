@@ -29,13 +29,13 @@ impl PgCatalogMatviewsBuilder {
         let capacity = 1;
 
         Self {
-            schemaname: StringBuilder::new(capacity),
-            matviewname: StringBuilder::new(capacity),
-            matviewowner: StringBuilder::new(capacity),
-            tablespace: StringBuilder::new(capacity),
-            hasindexes: BooleanBuilder::new(capacity),
-            ispopulated: BooleanBuilder::new(capacity),
-            definition: StringBuilder::new(capacity),
+            schemaname: StringBuilder::with_capacity(capacity, capacity),
+            matviewname: StringBuilder::with_capacity(capacity, capacity),
+            matviewowner: StringBuilder::with_capacity(capacity, capacity),
+            tablespace: StringBuilder::with_capacity(capacity, capacity),
+            hasindexes: BooleanBuilder::with_capacity(capacity),
+            ispopulated: BooleanBuilder::with_capacity(capacity),
+            definition: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 

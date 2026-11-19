@@ -23,9 +23,9 @@ struct PgCatalogShdescriptionBuilder {
 impl PgCatalogShdescriptionBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            objoid: UInt32Builder::new(capacity),
-            classoid: UInt32Builder::new(capacity),
-            description: StringBuilder::new(capacity),
+            objoid: UInt32Builder::with_capacity(capacity),
+            classoid: UInt32Builder::with_capacity(capacity),
+            description: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 

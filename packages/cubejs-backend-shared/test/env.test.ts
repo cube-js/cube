@@ -760,3 +760,49 @@ describe('the NODE_ENV deprecation warning', () => {
     expect(nodeEnvWarnings()).toHaveLength(1);
   });
 });
+
+describe('getEnv(sqlIncludeTraceId)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_SQL_INCLUDE_TRACE_ID;
+  });
+
+  test('defaults to off', () => {
+    expect(getEnv('sqlIncludeTraceId')).toBe(false);
+  });
+
+  test('sqlIncludeTraceId', () => {
+    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'true';
+    expect(getEnv('sqlIncludeTraceId')).toBe(true);
+
+    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'false';
+    expect(getEnv('sqlIncludeTraceId')).toBe(false);
+  });
+
+  test('rejects a non-boolean value', () => {
+    process.env.CUBEJS_SQL_INCLUDE_TRACE_ID = 'yes';
+    expect(() => getEnv('sqlIncludeTraceId')).toThrow();
+  });
+});
+
+describe('getEnv(preAggregationsOrchestratorIdFromRouter)', () => {
+  afterEach(() => {
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER;
+  });
+
+  test('defaults to off', () => {
+    expect(getEnv('preAggregationsOrchestratorIdFromRouter')).toBe(false);
+  });
+
+  test('reads the flag', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER = 'true';
+    expect(getEnv('preAggregationsOrchestratorIdFromRouter')).toBe(true);
+
+    process.env.CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER = 'false';
+    expect(getEnv('preAggregationsOrchestratorIdFromRouter')).toBe(false);
+  });
+
+  test('rejects a non-boolean value', () => {
+    process.env.CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER = 'yes';
+    expect(() => getEnv('preAggregationsOrchestratorIdFromRouter')).toThrow();
+  });
+});

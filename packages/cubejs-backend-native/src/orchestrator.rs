@@ -301,7 +301,7 @@ pub fn parse_cubestore_result_message(mut cx: FunctionContext) -> JsResult<JsPro
 pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
     let result = cx.argument::<JsBox<Arc<QueryResult>>>(0)?;
 
-    let js_array = cx.execute_scoped(|mut cx| {
+    let js_array = cx.compute_scoped(|mut cx| {
         let js_keys: Vec<Handle<JsString>> =
             result.members().iter().map(|k| cx.string(k)).collect();
 
@@ -313,7 +313,7 @@ pub fn get_cubestore_result(mut cx: FunctionContext) -> JsResult<JsValue> {
         let js_array = JsArray::new(&mut cx, row_count);
 
         for row_idx in 0..row_count {
-            let js_row = cx.execute_scoped(|mut cx| {
+            let js_row = cx.compute_scoped(|mut cx| {
                 let js_row = JsObject::new(&mut cx);
 
                 for (js_key, column) in js_keys.iter().zip(columns.iter()) {

@@ -124,6 +124,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
             - Field switcher
             - Parent
               - Preset
+            - Dynamic controls
           - AI summary
           - Layout
             - Spacer
@@ -132,8 +133,12 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
             - Grid
             - Tabs container
     - **Dashboard**
-      - Scheduled refresh
-        - Data alert
+      - Cross-filtering
+      - Full screen
+      - Schedules ("Refreshes, deliveries and alerts"; "schedule" where the kind is unknown)
+        - Refresh (notifies nobody; not the dashboard's auto-refresh)
+        - Dashboard delivery (sends by Email and/or Slack; How: "Every time")
+          - Alert (a dashboard delivery with a condition; How: "Alert on condition")
       - Review (revisions, reviewers, approvals)
     - **Semantic Model**
       - Semantic Model IDE (short: "IDE")
@@ -216,7 +221,7 @@ Guidance for the transitional period:
 
 ### Agent Terminology
 
-Every [Deployment](#product-taxonomy) ships with **one agent** by default. The agent powers AI features (Analytics Chat, ad-hoc queries, etc.) and is configured per-deployment with rules, certified queries, and other customizations. Multi-agent (multiple agents per deployment) is also supported, but the documentation primarily covers the default single-agent setup; multi-agent docs will follow.
+Every [Deployment](#product-taxonomy) ships with **one agent** by default. The agent powers AI features (Analytics Chat, ad-hoc queries, etc.) and is configured per-deployment with rules, certified queries, and other customizations. Multi-agent (multiple agents per deployment) is documented in `admin/ai/multi-agent.mdx`; other pages describe the default single-agent setup.
 
 #### Naming
 
@@ -245,6 +250,17 @@ Benchmarking the agent's answers against a known-correct ground truth.
   replaced by **Evals**. (Generic verb uses like "evaluate the expression" are
   unrelated and fine.)
 
+## Analytics and cookie consent
+
+`consent.js` is the only place that starts trackers (Google Tag Manager, Clay, Cube's page tracking), and it
+starts them only when the visitor's consent allows it. Mintlify runs every `.js` file in this folder on every
+page and loads `docs.json` integrations on its own, so do not add an analytics integration to `docs.json` or
+another `.js` file that starts a tracker: it would run before the visitor has chosen. Add a new tracker to
+`consent.js` instead.
+
+Embed YouTube videos with `https://www.youtube-nocookie.com/embed/<id>`, not `youtube.com`: the plain domain
+sets cookies as soon as the page loads.
+
 ## Writing style
 
 - **Tone**: professional, direct, instructive. Address the reader as "you" (second person).
@@ -255,9 +271,8 @@ Benchmarking the agent's answers against a known-correct ground truth.
 
 ### Be concise; prefer surgical edits over new content
 
-**Be explicit with yourself about length: most doc changes are small.** Do not
-produce walls of text. Be less verbose. Write the shortest version that fully
-answers "how do I use this?" and stop.
+Most doc changes are small: write the shortest version that fully answers
+"how do I use this?".
 
 - **Default to editing existing pages, not creating new ones.** A new feature
   usually extends a page that already exists — add a row to a table, a config

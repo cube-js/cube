@@ -2,6 +2,7 @@ use cubenativeutils::CubeError;
 
 use super::pretty_print::*;
 use crate::planner::collectors::has_multi_stage_members;
+use crate::planner::query_properties::member_chain_eq;
 use crate::planner::{MemberId, MemberSymbol};
 use std::fmt;
 use std::rc::Rc;
@@ -42,6 +43,31 @@ impl LogicalSchema {
     pub fn into_rc(self) -> Rc<Self> {
         Rc::new(self)
     }
+
+    pub fn map_symbols(
+        &self,
+        f: &impl Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    ) -> Result<Self, CubeError> {
+        let map = |members: &Vec<Rc<MemberSymbol>>| -> Result<Vec<_>, CubeError> {
+            members.iter().map(f).collect()
+        };
+        Ok(Self {
+            time_dimensions: map(&self.time_dimensions)?,
+            dimensions: map(&self.dimensions)?,
+            measures: map(&self.measures)?,
+        })
+    }
+
+    pub fn visit_symbols(
+        &self,
+        f: &mut impl FnMut(&Rc<MemberSymbol>) -> Result<(), CubeError>,
+    ) -> Result<(), CubeError> {
+        self.time_dimensions
+            .iter()
+            .chain(self.dimensions.iter())
+            .chain(self.measures.iter())
+            .try_for_each(f)
+    }
 }
 
 impl LogicalSchema {
@@ -55,7 +81,7 @@ impl LogicalSchema {
         for (i, m) in self.time_dimensions.iter().enumerate() {
             if m.id() == id {
                 result.push(i + self.dimensions.len());
-            } else if let Ok(time_dimension) = m.as_time_dimension() {
+            } else if let Some(time_dimension) = m.time_dimension_behind_references() {
                 if time_dimension.base_symbol().id() == id {
                     result.push(i + self.dimensions.len());
                 }
@@ -75,6 +101,11 @@ impl LogicalSchema {
 
     pub fn all_members(&self) -> impl Iterator<Item = &Rc<MemberSymbol>> {
         self.all_dimensions().chain(self.measures.iter())
+    }
+
+    /// Whether a dimension of the schema is `member`, references followed.
+    pub fn has_dimension(&self, member: &Rc<MemberSymbol>) -> bool {
+        self.all_dimensions().any(|d| member_chain_eq(d, member))
     }
 
     pub fn has_dimensions(&self) -> bool {
@@ -225,6 +256,42 @@ mod tests {
         assert_eq!(
             result2.as_ref().map(|r| r.full_name()),
             Some(measure.full_name())
+        );
+
+        Ok(())
+    }
+
+    /// ORDER BY names the base dimension, so the lookup has to see through a
+    /// reference to the time dimension, or the sort key is silently dropped.
+    #[test]
+    fn test_find_member_positions_for_a_referenced_time_dimension() -> Result<(), CubeError> {
+        let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+        let ctx = TestContext::new(schema)?;
+
+        let time_dim_base = ctx.create_dimension("visitors.created_at")?;
+        let time_dim = MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(
+            time_dim_base,
+            Some("day".to_string()),
+            None,
+            None,
+        ));
+        let reference = MemberSymbol::new_column_ref(
+            &time_dim,
+            Some("src".to_string()),
+            "created_at_day".to_string(),
+        );
+
+        let logical_schema = LogicalSchema::default().set_time_dimensions(vec![reference]);
+
+        assert_eq!(
+            logical_schema.find_member_positions(&member_id("visitors.created_at")),
+            vec![0],
+            "the base id must find the referenced time dimension"
+        );
+        assert_eq!(
+            logical_schema.find_member_positions(time_dim.id()),
+            vec![0],
+            "so must the granular id the reference carries"
         );
 
         Ok(())

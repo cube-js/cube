@@ -69,6 +69,7 @@ class Configuration:
     context_to_app_id: Union[str, Callable[[RequestContext], str]]
     context_to_orchestrator_id: Union[str, Callable[[RequestContext], str]]
     context_to_cube_store_router_id: Union[str, Callable[[RequestContext], str]]
+    context_to_pre_aggregation_orchestrator_id: Union[str, Callable[[RequestContext], str]]
     driver_factory: Callable[[RequestContext], Dict]
     external_driver_factory: Callable[[RequestContext], Dict]
     check_auth: Callable
@@ -117,6 +118,7 @@ class Configuration:
         self.context_to_app_id = None
         self.context_to_orchestrator_id = None
         self.context_to_cube_store_router_id = None
+        self.context_to_pre_aggregation_orchestrator_id = None
         self.driver_factory = None
         self.external_driver_factory = None
         self.check_auth = None
@@ -167,8 +169,6 @@ class AttrRef:
         return func
 
 config = Configuration()
-# backward compatibility
-settings = config
 
 class TemplateException(Exception):
     pass
@@ -414,10 +414,6 @@ def _in_template_context(context, func):
     return _cube_template_call
 
 
-def context_func(func):
-    func.cube_context_func = True
-    return func
-
 class SafeString(str):
     is_safe: bool
 
@@ -425,7 +421,6 @@ class SafeString(str):
         self.is_safe = True
 
 __all__ = [
-    'context_func',
     'memo',
     'TemplateContext',
     'SafeString',

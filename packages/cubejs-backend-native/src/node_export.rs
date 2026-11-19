@@ -1,6 +1,7 @@
-use cubesql::compile::engine::df::scan::parse_used_pre_aggregations;
+use cubesql::compile::engine::df::scan::{parse_used_pre_aggregations, RecordBatch};
+use cubesql::compile::parameters::{bind_parameters, ParameterValue};
 use cubesql::compile::parser::parse_sql_to_statement;
-use cubesql::compile::{convert_statement_to_cube_query, get_df_batches};
+use cubesql::compile::{convert_statement_to_cube_query, get_df_batches, DatabaseProtocol};
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::config::ConfigObj;
 use cubesql::sql::dataframe::arrow_to_column_type;
@@ -18,6 +19,7 @@ use crate::channel::call_js_fn;
 use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCubeServices};
 use crate::cross::CLRepr;
 use crate::cubesql_utils::with_session;
+use crate::describe_sql_params::describe_sql_params;
 use crate::logger::NodeBridgeLogger;
 use crate::rest4sql::rest4sql;
 use crate::sql4sql::sql4sql;
@@ -27,7 +29,9 @@ use crate::sql_filters::{
 use crate::stream::{OnCloseHandler, OnDrainHandler};
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
-use crate::utils::{batch_to_rows, NonDebugInRelease};
+use crate::utils::{
+    batch_to_dataframe, ColumnarDataChunk, DataChunk, NonDebugInRelease, SqlResponseFormat,
+};
 use cubenativeutils::wrappers::neon::neon_guarded_funcion_call;
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
@@ -225,22 +229,30 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
-const CHUNK_DELIM: &str = "\n";
+/// Bytes rather than a `String`: a JS string would cost a UTF-8 -> V8 transcode
+/// here and another one back in `res.write`.
+fn to_jsonl_line<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, CubeError> {
+    let mut line = Vec::new();
+    serde_json::to_writer(&mut line, value)?;
+    line.push(b'\n');
 
-async fn write_jsonl_message(
+    Ok(line)
+}
+
+async fn write_jsonl_message<T: Serialize + ?Sized>(
     channel: Arc<Channel>,
     write_fn: Arc<Root<JsFunction>>,
     stream: Arc<Root<JsObject>>,
-    value: serde_json::Value,
+    value: &T,
 ) -> Result<bool, CubeError> {
-    let message = format!("{}{}", serde_json::to_string(&value)?, CHUNK_DELIM);
+    let message = to_jsonl_line(value)?;
 
     call_js_fn(
         channel,
         write_fn,
         Box::new(move |cx| {
-            let arg = cx.string(message).upcast::<JsValue>();
-            Ok(vec![arg.upcast::<JsValue>()])
+            let arg = JsBuffer::external(cx, message).upcast::<JsValue>();
+            Ok(vec![arg])
         }),
         Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
             Ok(v) => Ok(v.value(cx)),
@@ -317,6 +329,18 @@ async fn log_continue_wait(session: &Arc<Session>, span_id: &Arc<SpanId>) -> Res
         .await
 }
 
+/// The statement with its parameters bound, as an error may quote it; `None` when there are
+/// no parameters or binding fails.
+fn bound_sql_query(sql_query: &str, params: &[ParameterValue]) -> Option<String> {
+    if params.is_empty() {
+        return None;
+    }
+    let mut stmt =
+        parse_sql_to_statement(sql_query, DatabaseProtocol::PostgreSQL, &mut None).ok()?;
+    bind_parameters(&mut stmt, params).ok()?;
+    Some(stmt.to_string())
+}
+
 async fn handle_sql_query(
     services: Arc<NodeCubeServices>,
     native_auth_ctx: Arc<NativeSQLAuthContext>,
@@ -327,6 +351,8 @@ async fn handle_sql_query(
     timezone: Option<String>,
     throw_continue_wait: bool,
     request_id: Option<String>,
+    response_format: SqlResponseFormat,
+    params: Vec<ParameterValue>,
 ) -> Result<SqlQueryOutcome, CubeError> {
     let config = services
         .injector()
@@ -401,12 +427,14 @@ async fn handle_sql_query(
             OnCloseHandler::new(channel.clone(), stream_methods.stream.clone(), close_tx);
         close_handler.handle(stream_methods.on.clone()).await?;
 
+        let params_for_log = params.clone();
         let execute = || async move {
             // todo: can we use compiler_cache?
             let meta_context = transport_service.meta(native_auth_ctx).await?;
 
-            let stmt =
+            let mut stmt =
                 parse_sql_to_statement(sql_query, session.state.protocol.clone(), &mut None)?;
+            bind_parameters(&mut stmt, &params)?;
             let query_plan = convert_statement_to_cube_query(
                 stmt,
                 meta_context.clone(),
@@ -434,7 +462,7 @@ async fn handle_sql_query(
             for field in stream.schema().fields().iter() {
                 let (format, currency) = field
                     .metadata()
-                    .and_then(|m| m.get("member_name"))
+                    .get("member_name")
                     .and_then(|member_name| {
                         meta_context
                             .find_measure_with_name(member_name)
@@ -540,26 +568,39 @@ async fn handle_sql_query(
                 channel.clone(),
                 stream_methods.write.clone(),
                 stream_methods.stream.clone(),
-                serde_json::Value::Object(schema_response),
+                &serde_json::Value::Object(schema_response),
             )
             .await?;
+
+            let write_chunk = |batch: RecordBatch| {
+                let channel = channel.clone();
+                let write = stream_methods.write.clone();
+                let stream = stream_methods.stream.clone();
+                async move {
+                    match response_format {
+                        SqlResponseFormat::Default => {
+                            let data_frame = batch_to_dataframe(batch)?;
+                            let chunk = DataChunk {
+                                data: data_frame.get_rows(),
+                            };
+                            write_jsonl_message(channel, write, stream, &chunk).await
+                        }
+                        SqlResponseFormat::Columnar => {
+                            let chunk = ColumnarDataChunk {
+                                data: batch.columns(),
+                            };
+                            write_jsonl_message(channel, write, stream, &chunk).await
+                        }
+                    }
+                }
+            };
 
             // Process all batches
             let mut has_data = false;
             while let Some(batch) = stream.next().await {
-                let (_, data) = batch_to_rows(batch?)?;
                 has_data = true;
 
-                let mut rows = Map::new();
-                rows.insert("data".into(), serde_json::Value::Array(data));
-
-                let should_pause = !write_jsonl_message(
-                    channel.clone(),
-                    stream_methods.write.clone(),
-                    stream_methods.stream.clone(),
-                    serde_json::Value::Object(rows),
-                )
-                .await?;
+                let should_pause = !write_chunk(batch?).await?;
 
                 if should_pause {
                     let permit = semaphore.acquire().await?;
@@ -569,16 +610,7 @@ async fn handle_sql_query(
 
             // If no data was processed, send empty data
             if !has_data {
-                let mut rows = Map::new();
-                rows.insert("data".into(), serde_json::Value::Array(vec![]));
-
-                write_jsonl_message(
-                    channel.clone(),
-                    stream_methods.write.clone(),
-                    stream_methods.stream.clone(),
-                    serde_json::Value::Object(rows),
-                )
-                .await?;
+                write_chunk(RecordBatch::new_empty(stream.schema())).await?;
             }
 
             Ok::<(), CubeError>(())
@@ -657,8 +689,12 @@ async fn handle_sql_query(
                         "error": err.message,
                     });
                     if config.log_redaction() {
-                        properties["redactedError"] =
-                            serde_json::json!(redact_error_message(&err.message, sql_query));
+                        let mut redacted = redact_error_message(&err.message, sql_query);
+                        // An error can also quote the statement with its parameters bound
+                        if let Some(bound) = bound_sql_query(sql_query, &params_for_log) {
+                            redacted = redact_error_message(&redacted, &bound);
+                        }
+                        properties["redactedError"] = serde_json::json!(redacted);
                     }
                     session_clone
                         .session_manager
@@ -746,6 +782,36 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         Err(_) => None,
     };
 
+    let response_format: SqlResponseFormat = match cx.argument::<JsValue>(8) {
+        Ok(val) => {
+            if val.is_a::<JsNull, _>(&mut cx) || val.is_a::<JsUndefined, _>(&mut cx) {
+                SqlResponseFormat::Default
+            } else {
+                let format = val
+                    .downcast_or_throw::<JsString, _>(&mut cx)?
+                    .value(&mut cx);
+                match format.parse() {
+                    Ok(format) => format,
+                    Err(err) => return cx.throw_error(err.to_string()),
+                }
+            }
+        }
+        Err(_) => SqlResponseFormat::Default,
+    };
+
+    let params: Vec<ParameterValue> = match cx.argument_opt(9) {
+        Some(val) if !val.is_a::<JsNull, _>(&mut cx) && !val.is_a::<JsUndefined, _>(&mut cx) => {
+            let json = val
+                .downcast_or_throw::<JsString, _>(&mut cx)?
+                .value(&mut cx);
+            match serde_json::from_str(&json) {
+                Ok(params) => params,
+                Err(err) => return cx.throw_error(format!("Invalid params: {err}")),
+            }
+        }
+        _ => Vec::new(),
+    };
+
     let js_stream_on_fn = Arc::new(
         node_stream
             .get::<JsFunction, _, _>(&mut cx, "on")?
@@ -799,6 +865,8 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             timezone,
             throw_continue_wait,
             request_id,
+            response_format,
+            params,
         )
         .await;
 
@@ -823,13 +891,9 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
                     if let Some(req_id) = &request_id_for_error {
                         error_response.insert("requestId".into(), req_id.clone().into());
                     }
-                    let error_message = format!(
-                        "{}{}",
-                        serde_json::to_string(&serde_json::Value::Object(error_response))
-                            .expect("Failed to serialize error response to JSON"),
-                        CHUNK_DELIM
-                    );
-                    let arg = cx.string(error_message).upcast::<JsValue>();
+                    let error_message = to_jsonl_line(&serde_json::Value::Object(error_response))
+                        .expect("Failed to serialize error response to JSON");
+                    let arg = JsBuffer::external(&mut cx, error_message).upcast::<JsValue>();
 
                     vec![arg]
                 }
@@ -1014,6 +1078,7 @@ pub fn register_module_exports<C: NodeConfiguration + 'static>(
     cx.export_function("execSql", exec_sql)?;
     cx.export_function("sql4sql", sql4sql)?;
     cx.export_function("rest4sql", rest4sql)?;
+    cx.export_function("describeSqlParams", describe_sql_params)?;
     cx.export_function("getSqlFilters", get_sql_filters)?;
     cx.export_function("addSqlFilters", add_sql_filters)?;
     cx.export_function("setSqlFilters", set_sql_filters)?;

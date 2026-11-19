@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import * as stream from 'stream';
+import crypto from 'crypto';
 import { assertNever } from 'assert-never';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
@@ -91,7 +92,9 @@ import { LocalSubscriptionStore } from './ws/local-subscription-store';
 import {
   getPivotQuery,
   cubeSqlRequestSchema,
+  cubeSqlParamsRequestSchema,
   getQueryGranularity,
+  isSerializedMemberExpression,
   normalizeQuery,
   normalizeQueryCancelPreAggregations,
   normalizeQueryPreAggregationPreview,
@@ -424,16 +427,17 @@ class ApiGateway {
 
         const compilerApi = await this.getCompilerApi(req.context);
 
-        // Cache unfiltered schema - RBAC enforcement happens at query execution time
-        // via annotation-based validation in the Rust result transform layer
-        let schema = compilerApi.getGraphQLSchema();
+        // Built from the caller's visibility-patched meta so introspection doesn't list members
+        // their access policies hide. The compiler id carries the visibility mask, so callers
+        // with the same visible members share a schema.
+        const { cubes, compilerId } = await compilerApi.metaConfig(req.context, {
+          requestId: req.context.requestId,
+          includeCompilerId: true,
+        });
+        let schema = compilerApi.getGraphQLSchema(compilerId);
         if (!schema) {
-          const metaConfig = await compilerApi.metaConfig(req.context, {
-            requestId: req.context.requestId,
-            skipVisibilityPatch: true,
-          });
-          schema = makeSchema(metaConfig);
-          compilerApi.setGraphQLSchema(schema);
+          schema = makeSchema(cubes);
+          compilerApi.setGraphQLSchema(compilerId, schema);
         }
         return graphqlHTTP({
           schema,
@@ -659,7 +663,7 @@ class ApiGateway {
             throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
           }
 
-          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache, body.timezone, body.throwContinueWait, req.context?.requestId);
+          await this.sqlServer.execSql(body.query, res, req.context?.securityContext, body.cache, body.timezone, body.throwContinueWait, req.context?.requestId, body.responseFormat, body.params);
         } catch (e: any) {
           // Quickfix for https://github.com/cube-js/cube/issues/10450,
           // Right now, it's too complicated to fix the issue correctly, because
@@ -672,6 +676,42 @@ class ApiGateway {
               sql: query,
             },
             redactedQuery: this.redactedSqlForLog(query),
+            context: req.context,
+            res: this.resToResultFn(res),
+            requestStarted
+          });
+        }
+      })
+    );
+
+    app.post(
+      `${this.basePath}/v1/cubesql/params`,
+      userMiddlewares,
+      userAsyncHandler(async (req, res) => {
+        const requestStarted = new Date();
+
+        try {
+          // The scopes running the query needs; planning reads the data model as `meta`
+          await this.assertApiScope('data', req.context?.securityContext);
+          await this.assertApiScope('meta', req.context?.securityContext);
+
+          const { error, value: body } = cubeSqlParamsRequestSchema.validate(req.body);
+          if (error) {
+            throw new UserError(`Invalid query format: ${error.message || error.toString()}`);
+          }
+
+          const result = await this.sqlServer.describeSqlParams(body.query, req.context?.securityContext);
+          if ('error' in result) {
+            throw new UserError(result.error);
+          }
+          res.json({ params: result.params });
+        } catch (e: any) {
+          this.handleError({
+            e,
+            query: {
+              sql: req.body?.query,
+            },
+            redactedQuery: this.redactedSqlForLog(req.body?.query),
             context: req.context,
             res: this.resToResultFn(res),
             requestStarted
@@ -972,8 +1012,8 @@ class ApiGateway {
       const preAggregations = await compilerApi.preAggregations();
 
       const refreshTimezones = this.scheduledRefreshTimeZones ? await this.scheduledRefreshTimeZones(context) : [];
-      const preAggregationPartitions = await this.refreshScheduler()
-        .preAggregationPartitions(
+      const preAggregationsWithRefreshSql = await this.refreshScheduler()
+        .preAggregationsWithRefreshSql(
           context,
           normalizeQueryPreAggregations(
             {
@@ -987,7 +1027,7 @@ class ApiGateway {
           )
         );
 
-      res({ preAggregations: preAggregationPartitions.map(({ preAggregation }) => preAggregation) });
+      res({ preAggregations: preAggregationsWithRefreshSql });
     } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
@@ -1177,6 +1217,7 @@ class ApiGateway {
       switch (query.action) {
         case 'post':
           result = await this.preAggregationsJobsPOST(
+            req,
             context,
             <PreAggsSelector>value.selector
           );
@@ -1189,6 +1230,7 @@ class ApiGateway {
           break;
         case 'get':
           result = await this.preAggregationsJobsGET(
+            req,
             context,
             <string[]>query.tokens,
             query.resType,
@@ -1210,6 +1252,7 @@ class ApiGateway {
    * Post pre-aggregations build jobs entry point.
    */
   private async preAggregationsJobsPOST(
+    req: Request,
     context: RequestContext,
     selector: PreAggsSelector,
   ): Promise<string[]> {
@@ -1230,13 +1273,11 @@ class ApiGateway {
 
     const promise = Promise.all(
       selector.contexts.map(async (config) => {
-        const ctx = <RequestContext>{
-          ...context,
-          ...config,
-        };
+        const ctx = await this.preAggregationsJobContext(req, config.securityContext, context.requestId);
         const _jobs = await this.postPreAggregationsBuildJobs(
           ctx,
           selector,
+          { securityContext: config.securityContext },
         );
         return _jobs;
       })
@@ -1250,11 +1291,24 @@ class ApiGateway {
   }
 
   /**
+   * Runs extendContext for the job's own security context; the caller's extensions are dropped.
+   * Each job gets its own request object, as contextByReq sets req.securityContext.
+   */
+  protected async preAggregationsJobContext(
+    req: Request,
+    securityContext: any,
+    requestId: string,
+  ): Promise<RequestContext> {
+    return this.contextByReq(Object.create(req), securityContext, requestId);
+  }
+
+  /**
    * Add pre-aggregations build job. Returns added jobs ids.
    */
   private async postPreAggregationsBuildJobs(
     context: RequestContext,
-    selector: PreAggsSelector
+    selector: PreAggsSelector,
+    jobContext: PreAggJob['context'],
   ): Promise<string[]> {
     const compiler = await this.getCompilerApi(context);
     const { timezones, dateRange } = selector;
@@ -1281,7 +1335,8 @@ class ApiGateway {
             })),
             forceBuildPreAggregations: false,
             throwErrors: false,
-          }
+          },
+          jobContext,
         );
       return jobs;
     }
@@ -1291,6 +1346,7 @@ class ApiGateway {
    * Get pre-aggregations build jobs entry point.
    */
   private async preAggregationsJobsGET(
+    req: Request,
     context: RequestContext,
     tokens: string[],
     resType = 'array',
@@ -1298,6 +1354,19 @@ class ApiGateway {
     const jobs: { job: PreAggJob | null, token: string }[] = await this
       .refreshScheduler()
       .getCachedBuildJobs(context, tokens);
+
+    // A selector context posts one job per partition, so many tokens share a
+    // security context: extend each distinct one once per request.
+    const jobContexts = new Map<string, Promise<RequestContext>>();
+    const jobContext = (securityContext: any): Promise<RequestContext> => {
+      const key = JSON.stringify(securityContext);
+      let ctx = jobContexts.get(key);
+      if (!ctx) {
+        ctx = this.preAggregationsJobContext(req, securityContext, context.requestId);
+        jobContexts.set(key, ctx);
+      }
+      return ctx;
+    };
 
     const response: PreAggJobStatusItem[] = await Promise.all(
       jobs.map(async ({ job, token }) => {
@@ -1308,7 +1377,7 @@ class ApiGateway {
           };
         }
 
-        const ctx = { ...context, ...job.context };
+        const ctx = await jobContext(job.context.securityContext);
         const orchestrator = await this.getAdapterApi(ctx);
         const compiler = await this.getCompilerApi(ctx);
         // TODO(1.8): drop the fallback, no job posted by 1.7 can still be in the cache.
@@ -1541,12 +1610,12 @@ class ApiGateway {
     const compilerApi = await this.getCompilerApi(context);
     // The data model is read only for queries it takes to tell their paths apart
     let resolver: ReturnType<ApiGateway['memberPathResolver']> | undefined;
-    const normalize = async (q: Query) => {
+    const normalize = async (q: Query, allowMemberExpressions: boolean) => {
       const resolve = this.hasLongMemberPaths(q)
         ? await (resolver ??= this.memberPathResolver(context, compilerApi))
         : undefined;
       return this.checkMemberPaths(
-        normalizeQuery(q, persistent, cacheMode, this.granularitySplitter(resolve)),
+        normalizeQuery(q, persistent, cacheMode, this.granularitySplitter(resolve), allowMemberExpressions),
         resolve
       );
     };
@@ -1557,20 +1626,21 @@ class ApiGateway {
     }> = await Promise.all(queries.map(async (currentQuery) => {
       const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
 
-      if (hasExpressionsInQuery) {
-        if (!memberExpressions) {
-          throw new Error('Expressions are not allowed in this context');
-        }
-
-        currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
+      if (hasExpressionsInQuery && !memberExpressions) {
+        throw new UserError('Expressions are not allowed in this context');
       }
 
       if ((currentQuery as any).maskedMembers) {
         throw new UserError('maskedMembers cannot be provided in the query');
       }
 
+      let normalizedQuery = await normalize(currentQuery, memberExpressions);
+      if (hasExpressionsInQuery) {
+        normalizedQuery = this.parseMemberExpressionsInQuery(normalizedQuery);
+      }
+
       return {
-        normalizedQuery: await normalize(currentQuery),
+        normalizedQuery,
         hasExpressionsInQuery
       };
     }));
@@ -1598,6 +1668,12 @@ class ApiGateway {
             context
           ) : queryWithRlsFilters;
 
+          if (!rewrittenQuery || typeof rewrittenQuery !== 'object') {
+            throw new UserError(
+              `queryRewrite must return the query, but it returned ${rewrittenQuery === null ? 'null' : typeof rewrittenQuery}`
+            );
+          }
+
           rewrittenQuery.maskedMembers = queryWithRlsFilters.maskedMembers;
 
           // applyRowLevelSecurity may add new filters which may contain raw member expressions
@@ -1608,7 +1684,8 @@ class ApiGateway {
             rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
           }
 
-          return normalize(rewrittenQuery);
+          // Row-level security and `queryRewrite` may add member expressions to any query
+          return normalize(rewrittenQuery, true);
         }
       )
     );
@@ -1867,7 +1944,7 @@ class ApiGateway {
         ...(query.segments || []),
         ...(query.timeDimensions || []).map(td => td.dimension),
         ...filterMembers(query.filters),
-      ],
+      ].filter(m => !isSerializedMemberExpression(m)),
       order: orderMembers,
     };
   }
@@ -1930,10 +2007,10 @@ class ApiGateway {
       (query.subqueryJoins ?? []).map(join => join.on),
     ];
 
-    return arraysToCheck.some(array => array?.some(item => typeof item === 'string' && item.startsWith('{')));
+    return arraysToCheck.some(array => array?.some(isSerializedMemberExpression));
   }
 
-  private parseMemberExpressionsInQuery(query: Query): Query {
+  protected parseMemberExpressionsInQuery<T extends Query>(query: T): T {
     return {
       ...query,
       measures: (query.measures || []).map(m => (typeof m === 'string' ? this.parseMemberExpression(m) : m)),
@@ -1947,7 +2024,7 @@ class ApiGateway {
   }
 
   private parseMemberExpression(memberExpression: string): string | ParsedMemberExpression {
-    if (memberExpression.startsWith('{')) {
+    if (isSerializedMemberExpression(memberExpression)) {
       const obj = parseInputMemberExpression(JSON.parse(memberExpression));
       let expression: ParsedMemberExpression['expression'];
       switch (obj.expr.type) {
@@ -2830,8 +2907,9 @@ class ApiGateway {
         apiType,
       });
 
+      const resultHash = result ? this.subscriptionResultHash(result) : undefined;
       const state = await subscriptionState();
-      if (result && (!state || JSON.stringify(state.result) !== JSON.stringify(result))) {
+      if (result && (!state || state.resultHash !== resultHash)) {
         // We prepare the full final JSON result on the native side
         await res(result.message, result.opts);
       } else if (error) {
@@ -2839,12 +2917,35 @@ class ApiGateway {
         await res(error.message, error.opts);
       }
 
-      await subscribe({ error, result });
+      await subscribe({ resultHash });
     } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
     }
+  }
+
+  public async unsubscribe({ context, res, unsubscribe }) {
+    try {
+      this.log({
+        type: 'Unsubscribe',
+      }, context);
+
+      await unsubscribe();
+    } catch (e: any) {
+      this.handleError({
+        e, context, res
+      });
+    }
+  }
+
+  /**
+   * Hash of the subscription result used to detect unchanged results between ticks.
+   * Stored instead of the result itself so that subscriptions don't retain the
+   * native result and its materialized JS rows.
+   */
+  protected subscriptionResultHash(result: { message: any, opts: any }): string {
+    return crypto.createHash('sha1').update(JSON.stringify(result)).digest('hex');
   }
 
   protected resToResultFn(res: ExpressResponse) {

@@ -26,7 +26,7 @@ import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
-import { disposedProxy, getEnv } from '@cubejs-backend/shared';
+import { disposedProxy, getEnv, memoizeByObject } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
 import { DriverCapabilities } from '@cubejs-backend/base-driver';
@@ -146,7 +146,15 @@ export class CompilerApi {
 
   protected readonly multiTenantSharing: boolean;
 
-  protected graphqlSchema?: GraphQLSchema;
+  /**
+   * Keyed by the compiler id `metaConfig` returns, which mixes in the caller's visibility mask:
+   * one schema per model version and set of members the access policies leave visible.
+   */
+  protected graphqlSchemas: LRUCache<string, GraphQLSchema> = new LRUCache({
+    max: 64,
+    ttl: 1000 * 60 * 5,
+    updateAgeOnGet: true,
+  });
 
   protected compilers?: Promise<Compilers>;
 
@@ -176,7 +184,9 @@ export class CompilerApi {
     this.convertTzForRawTimeDimension = this.options.convertTzForRawTimeDimension;
     this.localRefreshKey = this.options.localRefreshKey;
     this.schemaVersion = this.options.schemaVersion;
-    this.contextToGroups = this.options.contextToGroups;
+    // A request checks the access policies of every cube it touches, and `contextToGroups`
+    // can be costly user code, so it runs once per request context
+    this.contextToGroups = this.options.contextToGroups && memoizeByObject(this.options.contextToGroups);
     this.compileContext = options.compileContext;
     this.allowJsDuplicatePropsInSchema = options.allowJsDuplicatePropsInSchema;
     this.sqlCache = options.sqlCache;
@@ -229,7 +239,7 @@ export class CompilerApi {
     // using safeguard for potential dangling references.
     this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
     this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
-    this.graphqlSchema = undefined;
+    this.graphqlSchemas.clear();
 
     // A request can still hold this instance -- the gateway keeps one across
     // several awaits. Clearing the version makes its next getCompilers()
@@ -237,12 +247,12 @@ export class CompilerApi {
     this.compilerVersion = undefined;
   }
 
-  public setGraphQLSchema(schema: GraphQLSchema): void {
-    this.graphqlSchema = schema;
+  public setGraphQLSchema(compilerId: string, schema: GraphQLSchema): void {
+    this.graphqlSchemas.set(compilerId, schema);
   }
 
-  public getGraphQLSchema(): GraphQLSchema {
-    return this.graphqlSchema;
+  public getGraphQLSchema(compilerId: string): GraphQLSchema | undefined {
+    return this.graphqlSchemas.get(compilerId);
   }
 
   public createNativeInstance(): NativeInstance {
@@ -394,6 +404,11 @@ export class CompilerApi {
 
   public async getSqlGenerator(query: NormalizedQuery): Promise<{ sqlGenerator: any; compilers: Compilers }> {
     const compilers = await this.getCompilers({ requestId: query.requestId });
+    const sqlGenerator = await this.createSqlGenerator(compilers, query);
+    return { sqlGenerator, compilers };
+  }
+
+  protected async createSqlGenerator(compilers: Compilers, query: NormalizedQuery): Promise<any> {
     const plan = this.planQuery(compilers, query);
     const dataSource = plan.dataSource ?? 'default';
     const dbType = await this.getDbType(dataSource);
@@ -401,8 +416,7 @@ export class CompilerApi {
     if (!sqlGenerator) {
       throw new Error(`Can't find dialect for '${dataSource}' data source: ${dbType}`);
     }
-
-    return { sqlGenerator, compilers };
+    return sqlGenerator;
   }
 
   /**
@@ -415,10 +429,44 @@ export class CompilerApi {
   }
 
   public async getSql(query: NormalizedQuery, options: GetSqlOptions = {}): Promise<SqlResult> {
-    const { includeDebugInfo, exportAnnotatedSql, preAggregationsOnly, includeTransformedQuery = false } = options;
-    const { sqlGenerator, compilers } = await this.getSqlGenerator(query);
+    const compilers = await this.getCompilers({ requestId: query.requestId });
 
-    const getSqlFn = () => compilers.compiler.withQuery(sqlGenerator, () => {
+    // The query is planned only on a cache miss: planning is most of the cost of a hit otherwise
+    const getSqlFn = async () => {
+      const sqlGenerator = await this.createSqlGenerator(compilers, query);
+      return this.buildSql(compilers, sqlGenerator, options);
+    };
+
+    if (this.sqlCache) {
+      // The request id differs per request, so neither the query's nor the options' is part of the key
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { requestId, ...keyOptions } = query;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { requestId: optionsRequestId, ...keyGetSqlOptions } = options;
+      const key = { query: keyOptions, options: keyGetSqlOptions };
+      const sql = await compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
+      // Relative date ranges in the data model resolve to the current time, so
+      // SQL reaching a cube with one is reused within the minute only.
+      const { cubeEvaluator } = compilers;
+      const { relativeDateFilterCubes } = cubeEvaluator;
+      const isRelative = relativeDateFilterCubes.size > 0 &&
+        sql.memberNames?.some((member: string) => relativeDateFilterCubes.has(
+          cubeEvaluator.resolveMemberPath(member)?.targetCube ?? member.split('.')[0]
+        ));
+      if (!isRelative) {
+        return sql;
+      }
+      return compilers.compilerCache
+        .getQueryCache({ ...key, minute: Math.floor(Date.now() / 60000) })
+        .cache(['sql'], getSqlFn);
+    } else {
+      return getSqlFn();
+    }
+  }
+
+  protected buildSql(compilers: Compilers, sqlGenerator: any, options: GetSqlOptions): SqlResult {
+    const { includeDebugInfo, exportAnnotatedSql, preAggregationsOnly, includeTransformedQuery = false } = options;
+    return compilers.compiler.withQuery(sqlGenerator, () => {
       // Build first: Tesseract matches pre-aggregations during the build, so `external` and
       // the descriptions below reuse that match instead of running the planner again
       const sql = preAggregationsOnly ? null : sqlGenerator.buildSqlAndParams(exportAnnotatedSql);
@@ -440,29 +488,25 @@ export class CompilerApi {
         memberNames: sqlGenerator.collectAllMemberNames(),
       };
     });
+  }
 
-    if (this.sqlCache) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { requestId, ...keyOptions } = query;
-      const key = { query: keyOptions, options };
-      const sql = await compilers.compilerCache.getQueryCache(key).cache(['sql'], getSqlFn);
-      // Relative date ranges in the data model resolve to the current time, so
-      // SQL reaching a cube with one is reused within the minute only.
-      const { cubeEvaluator } = compilers;
-      const { relativeDateFilterCubes } = cubeEvaluator;
-      const isRelative = relativeDateFilterCubes.size > 0 &&
-        sql.memberNames?.some((member: string) => relativeDateFilterCubes.has(
-          cubeEvaluator.resolveMemberPath(member)?.targetCube ?? member.split('.')[0]
-        ));
-      if (!isRelative) {
-        return sql;
-      }
-      return compilers.compilerCache
-        .getQueryCache({ ...key, minute: Math.floor(Date.now() / 60000) })
-        .cache(['sql'], getSqlFn);
-    } else {
-      return getSqlFn();
+  /**
+   * The members the query reads, for matching access policies: collected from the planned
+   * query without rendering its SQL, and kept across requests.
+   */
+  public async getQueryMemberNames(query: NormalizedQuery, requestId?: string): Promise<string[]> {
+    const compilers = await this.getCompilers({ requestId: requestId ?? query.requestId });
+    const getMemberNames = async () => {
+      const sqlGenerator = await this.createSqlGenerator(compilers, query);
+      return compilers.compiler.withQuery(sqlGenerator, () => sqlGenerator.collectAllMemberNames());
+    };
+
+    if (!this.sqlCache) {
+      return getMemberNames();
     }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { requestId: queryRequestId, ...keyQuery } = query;
+    return compilers.compilerCache.getQueryCache({ query: keyQuery }).cache(['memberNames'], getMemberNames);
   }
 
   protected async getGroupsFromContext(context: Context): Promise<Set<string>> {
@@ -492,8 +536,8 @@ export class CompilerApi {
   }
 
   protected async getCubesFromQuery(query: NormalizedQuery, context?: Context): Promise<Set<string>> {
-    const sql = await this.getSql(query, { requestId: context?.requestId });
-    return new Set(sql.memberNames.map(memberName => memberName.split('.')[0]));
+    const memberNames = await this.getQueryMemberNames(query, context?.requestId);
+    return new Set(memberNames.map(memberName => memberName.split('.')[0]));
   }
 
   protected hashRequestContext(context: Context): string {
@@ -584,10 +628,9 @@ export class CompilerApi {
       return { query, denied: false };
     }
 
-    // Get the SQL to extract member names from the query
-    const sql = await this.getSql(evaluatedQuery, { requestId: context?.requestId });
-    const queryMemberNames = new Set(sql.memberNames);
-    const queryCubes = new Set(sql.memberNames.map(memberName => memberName.split('.')[0]));
+    const memberNames = await this.getQueryMemberNames(evaluatedQuery, context?.requestId);
+    const queryMemberNames = new Set(memberNames);
+    const queryCubes = new Set(memberNames.map(memberName => memberName.split('.')[0]));
 
     // A member reached through a join alias belongs to a cube instance: the
     // policies of the cube it instantiates apply to it, and they constrain that
@@ -1235,18 +1278,51 @@ export class CompilerApi {
     context: Context,
     cubes: any[]
   ): Promise<{ cubes: any[]; visibilityMaskHash: string | null }> {
-    const isMemberVisibleInContext: Record<string, boolean> = {};
     const { cubeEvaluator } = compilers;
 
     if (!cubeEvaluator.isRbacEnabled()) {
       return { cubes, visibilityMaskHash: null };
     }
 
+    // Visibility depends only on which policies apply to the user, so the patch is kept per
+    // set of applicable policies, whatever else the context holds
+    const applicablePolicies = new Map<string, any[]>();
+    const signature: string[] = [];
+
     for (const cube of cubes) {
       const evaluatedCube = cubeEvaluator.cubeFromPath(cube.config.name);
       if (cubeEvaluator.isRbacEnabledForCube(evaluatedCube)) {
-        const applicablePolicies = await this.getApplicablePolicies(evaluatedCube, context, compilers);
+        const policies = await this.getApplicablePolicies(evaluatedCube, context, compilers);
+        applicablePolicies.set(cube.config.name, policies);
+        signature.push(`${cube.config.name}:${policies.map((p: any) => evaluatedCube.accessPolicy.indexOf(p)).join(',')}`);
+      }
+    }
 
+    // Only the compiled model's own cubes are patched the same way for every caller
+    if (cubes !== compilers.metaTransformer?.cubes) {
+      return this.computeVisibilityPatch(compilers, cubes, applicablePolicies);
+    }
+    const cache = compilers.compilerCache.getVisibilityCacheInstance();
+    const key = signature.join(';');
+    let patch = cache.get(key);
+    if (!patch) {
+      patch = this.computeVisibilityPatch(compilers, cubes, applicablePolicies);
+      cache.set(key, patch);
+    }
+    return patch;
+  }
+
+  protected computeVisibilityPatch(
+    compilers: Compilers,
+    cubes: any[],
+    applicablePoliciesByCube: Map<string, any[]>
+  ): { cubes: any[]; visibilityMaskHash: string | null } {
+    const isMemberVisibleInContext: Record<string, boolean> = {};
+    const { cubeEvaluator } = compilers;
+
+    for (const cube of cubes) {
+      const applicablePolicies = applicablePoliciesByCube.get(cube.config.name);
+      if (applicablePolicies) {
         const computeMemberVisibility = (item: any): boolean => {
           for (const policy of applicablePolicies) {
             if (policy.memberLevel) {
@@ -1291,11 +1367,16 @@ export class CompilerApi {
       if (!cubeEvaluator.isRbacEnabledForCube(evaluatedCube)) {
         return (item: any) => item;
       }
-      return (item: any) => ({
-        ...item,
-        isVisible: item.isVisible && isMemberVisibleInContext[item.name],
-        public: item.public && isMemberVisibleInContext[item.name]
-      });
+      return (item: any) => {
+        const isVisible = item.isVisible && isMemberVisibleInContext[item.name];
+        const isPublic = item.public && isMemberVisibleInContext[item.name];
+        // A member the policies leave as it is stays the compiled object, so a cached patch
+        // copies only the members it hides
+        if (isVisible === item.isVisible && isPublic === item.public) {
+          return item;
+        }
+        return { ...item, isVisible, public: isPublic };
+      };
     };
 
     const visibilityMask = JSON.stringify(isMemberVisibleInContext, Object.keys(isMemberVisibleInContext).sort());

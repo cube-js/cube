@@ -16,6 +16,16 @@ transforms its SQL result. Its chart then renders the script's **output** instea
 of the raw SQL rows. This turns an analysis that would otherwise scroll away in a
 chat transcript into a saved, re-runnable, shareable analysis.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/RVn11KueI7s"
+  title="Python analysis in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 Use it for work SQL can't express — forecasting, regression, cohort analysis,
 statistical tests, clustering, and anomaly detection.
 
@@ -119,6 +129,14 @@ restores the starter template.
   after the last run. Run to refresh the saved result."*
 - **Run** executes the stored script in the sandbox and persists the refreshed
   result.
+- On a workbook report, the input SQL can use the workbook's SQL parameters
+  (`:name` placeholders). **Run** fills each one with the value set on the report,
+  or with the parameter's default if the report doesn't set one, and passes the
+  filled SQL to the sandbox. Changing the value of a parameter that the input SQL
+  uses counts as a change to the input SQL, so it marks the result **Outdated**.
+  If a value can't be filled, for example because the parameter isn't declared in
+  the workbook, the run fails with the same error the report shows and nothing is
+  saved.
 - The **Output** tab shows what the last run printed — the script's stdout and
   stderr, so `print()` is how you inspect intermediate values. Both are captured up
   to the cap in [Limits](#limits), so a chatty script gets truncated.

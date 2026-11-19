@@ -18,14 +18,14 @@ pre-aggregations; the Explorer and Viewer roles can't open it. To let other user
 check pre-aggregation status without building, give them a [custom
 role][ref-custom-roles-deployment-permissions] (Enterprise plan) with
 **Access deployment** and **View pre-aggregations**. They see the page
-read-only: **Build All**, **Build Selected**, and the controls that cancel
+read-only: **Build all**, **Build Selected**, and the controls that cancel
 queued or running builds are hidden.
 
 ## Exploring pre-aggregations
 
 You can switch between [pre-aggregations](#pre-aggregations) and
 [build history](#build-history) by switching between the 
-​**Pre-Aggregations** and **Build History** tabs.
+​**Pre-Aggregations** and **Build history** tabs.
 
 ## Pre-aggregations
 
@@ -59,7 +59,7 @@ taking significantly longer to build than others, it may be worth investigating
 why.
 
 If the pre-aggregation requires rebuilding (usually due to the underlying data
-changing in a significant way), clicking **Build All** rebuilds **all**
+changing in a significant way), clicking **Build all** rebuilds **all**
 partitions of the pre-aggregation:
 
 <Frame>
@@ -104,7 +104,7 @@ built correctly.
 
 ### Used By
 
-The **Used By** tab shows recent queries that used this pre-aggregation
+The **Used by** tab shows recent queries that used this pre-aggregation
 for acceleration:
 
 <Frame>
@@ -126,7 +126,7 @@ indexes for this pre-aggregation:
 
 ## Build History
 
-The **Build History** tab shows the last 24 hours of build history for
+The **Build history** tab shows the last 24 hours of build history for
 all pre-aggregations in the deployment. From here, you can see if a
 pre-aggregation build succeeded (or failed), how the build was triggered, when
 the build started, and how long it took to complete.

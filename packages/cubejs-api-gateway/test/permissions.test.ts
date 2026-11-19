@@ -143,6 +143,24 @@ describe('Gateway Api Scopes', () => {
     apiGateway.release();
   });
 
+  test.each(['data', 'meta'])('/v1/cubesql/params declined without %s scope', async (missing) => {
+    const { app, apiGateway } = createApiGateway({
+      contextToApiScopes: async () => (missing === 'data' ? ['meta', 'sql'] : ['data', 'sql']),
+    });
+
+    const res = await request(app)
+      .post('/cubejs-api/v1/cubesql/params')
+      .set('Content-type', 'application/json')
+      .set('Authorization', AUTH_TOKEN)
+      .send({ query: 'SELECT :x' })
+      .expect(403);
+
+    expect(res.body && res.body.error)
+      .toStrictEqual(`API scope is missing: ${missing}`);
+
+    apiGateway.release();
+  });
+
   test('GraphQL to JSON allowed with meta scope but no graphql scope', async () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => ['meta', 'data', 'jobs'],

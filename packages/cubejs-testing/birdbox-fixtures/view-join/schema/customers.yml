@@ -1,0 +1,32 @@
+# Shared dimension cube. Every fact joins to it; views expose `city` via
+# `join_path: customers` (not through the fact) so the shared key resolves
+# to one member on both sides of a SQL API join.
+#
+#   id  city     created_at
+#   1   Austin   2024-01-01
+#   2   Austin   2024-01-01
+#   3   Boston   2024-01-02
+#   4   Chicago  2024-01-03
+#   5   Denver   2024-01-03
+cubes:
+  - name: customers
+    sql: >
+      SELECT 1 AS id, 'Austin' AS city, TIMESTAMP '2024-01-01 10:00:00' AS created_at UNION ALL
+      SELECT 2 AS id, 'Austin' AS city, TIMESTAMP '2024-01-01 12:00:00' AS created_at UNION ALL
+      SELECT 3 AS id, 'Boston' AS city, TIMESTAMP '2024-01-02 10:00:00' AS created_at UNION ALL
+      SELECT 4 AS id, 'Chicago' AS city, TIMESTAMP '2024-01-03 10:00:00' AS created_at UNION ALL
+      SELECT 5 AS id, 'Denver' AS city, TIMESTAMP '2024-01-03 12:00:00' AS created_at
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: city
+        sql: city
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time

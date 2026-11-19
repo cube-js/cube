@@ -28,14 +28,14 @@ struct PgCatalogPartitionedTableBuilder {
 impl PgCatalogPartitionedTableBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            partrelid: UInt32Builder::new(capacity),
-            partstrat: StringBuilder::new(capacity),
-            partnatts: Int16Builder::new(capacity),
-            partdefid: UInt32Builder::new(capacity),
-            partattrs: ListBuilder::new(Int16Builder::new(capacity)),
-            partclass: ListBuilder::new(UInt32Builder::new(capacity)),
-            partcollation: ListBuilder::new(UInt32Builder::new(capacity)),
-            partexprs: StringBuilder::new(capacity),
+            partrelid: UInt32Builder::with_capacity(capacity),
+            partstrat: StringBuilder::with_capacity(capacity, capacity),
+            partnatts: Int16Builder::with_capacity(capacity),
+            partdefid: UInt32Builder::with_capacity(capacity),
+            partattrs: ListBuilder::new(Int16Builder::with_capacity(capacity)),
+            partclass: ListBuilder::new(UInt32Builder::with_capacity(capacity)),
+            partcollation: ListBuilder::new(UInt32Builder::with_capacity(capacity)),
+            partexprs: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
@@ -88,17 +88,17 @@ impl TableProvider for PgCatalogPartitionedTableProvider {
             Field::new("partdefid", DataType::UInt32, false),
             Field::new(
                 "partattrs",
-                DataType::List(Box::new(Field::new("item", DataType::Int16, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::Int16, true))),
                 false,
             ),
             Field::new(
                 "partclass",
-                DataType::List(Box::new(Field::new("item", DataType::UInt32, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::UInt32, true))),
                 false,
             ),
             Field::new(
                 "partcollation",
-                DataType::List(Box::new(Field::new("item", DataType::UInt32, true))),
+                DataType::List(Arc::new(Field::new("item", DataType::UInt32, true))),
                 false,
             ),
             Field::new("partexprs", DataType::Utf8, true),

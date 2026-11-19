@@ -101,6 +101,7 @@ impl DimensionDefinition for MockDimensionDefinition {
         Ok(self.case.as_ref().map(|c| match &**c {
             CaseVariant::Case(def) => CaseVariant::Case(def.clone()),
             CaseVariant::CaseSwitch(def) => CaseVariant::CaseSwitch(def.clone()),
+            CaseVariant::CaseContext(def) => CaseVariant::CaseContext(def.clone()),
         }))
     }
 

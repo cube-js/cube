@@ -1,0 +1,27 @@
+# Core sets a missing pre-aggregation `type` to `rollup` in views as well as in cubes.
+cubes:
+  - name: orders
+    sql_table: orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: created_at
+        sql: created_at
+        type: time
+
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+    pre_aggregations:
+      - name: main
+        measures:
+          - count
+        time_dimension: created_at
+        granularity: day

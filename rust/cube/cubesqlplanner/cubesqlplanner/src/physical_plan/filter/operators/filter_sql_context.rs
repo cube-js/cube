@@ -7,8 +7,12 @@ use crate::utils::sql_expression_scanner::{ends_in_line_comment, is_top_level_co
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-const FROM_PARTITION_RANGE: &str = "__FROM_PARTITION_RANGE";
-const TO_PARTITION_RANGE: &str = "__TO_PARTITION_RANGE";
+// Digits with an optional minus only: a `+`, spaces or an exponent may fail an
+// integer cast that a float cast accepts.
+fn is_int64_literal(value: &str) -> bool {
+    let digits = value.strip_prefix('-').unwrap_or(value);
+    !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) && value.parse::<i64>().is_ok()
+}
 
 #[derive(Clone, Copy)]
 enum DateBound {
@@ -72,14 +76,17 @@ impl<'a> FilterSqlContext<'a> {
 
     pub fn cast_param(
         &self,
+        placeholder: &str,
         value: &str,
         member_type: &Option<String>,
     ) -> Result<String, CubeError> {
         match member_type.as_deref() {
-            Some("boolean") => self.plan_templates.bool_param_cast(value),
-            Some("number") => self.plan_templates.number_param_cast(value),
-            Some("time") => self.plan_templates.time_param_cast(value),
-            _ => Ok(value.to_string()),
+            Some("boolean") => self.plan_templates.bool_param_cast(placeholder),
+            Some("number") => self
+                .plan_templates
+                .number_param_cast(placeholder, is_int64_literal(value)),
+            Some("time") => self.plan_templates.time_param_cast(placeholder),
+            _ => Ok(placeholder.to_string()),
         }
     }
 
@@ -100,7 +107,7 @@ impl<'a> FilterSqlContext<'a> {
         member_type: &Option<String>,
     ) -> Result<String, CubeError> {
         let allocated = self.allocate_param(value);
-        self.cast_param(&allocated, member_type)
+        self.cast_param(&allocated, value, member_type)
     }
 
     pub fn allocate_and_cast_values(
@@ -168,7 +175,7 @@ impl<'a> FilterSqlContext<'a> {
         if self.use_raw_values {
             return Ok(value.to_string());
         }
-        if self.is_partition_range(value) {
+        if QueryDateTimeHelper::is_partition_range(value) {
             return allocate(value);
         }
         let precision = self.plan_templates.timestamp_precision()?;
@@ -182,10 +189,6 @@ impl<'a> FilterSqlContext<'a> {
             formatted
         };
         allocate(&formatted)
-    }
-
-    fn is_partition_range(&self, value: &str) -> bool {
-        value == FROM_PARTITION_RANGE || value == TO_PARTITION_RANGE
     }
 
     fn apply_db_time_zone(&self, value: String) -> Result<String, CubeError> {

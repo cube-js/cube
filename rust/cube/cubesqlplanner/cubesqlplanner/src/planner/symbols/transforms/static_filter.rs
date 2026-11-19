@@ -1,10 +1,12 @@
 use super::super::common::Case;
 use super::super::dimension_kinds::DimensionKind;
 use super::super::{DimensionSymbol, MeasureSymbol, MemberSymbol};
+use crate::cube_bridge::query_context::QueryContextData;
 use crate::planner::filter::{Filter, FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::symbols::deps::{DepVisitorMut, SymbolDeps};
-use crate::planner::SqlCallFilterParamsItem;
+use crate::planner::{QueryProperties, SqlCall, SqlCallFilterParamsItem};
 use cubenativeutils::CubeError;
+use std::cell::OnceCell;
 use std::rc::Rc;
 
 pub fn find_value_restriction(
@@ -39,45 +41,172 @@ pub fn get_filtered_values(symbol: &Rc<MemberSymbol>, filter: &Option<Filter>) -
     vec![]
 }
 
-pub fn apply_static_filter_to_symbol(
-    symbol: &Rc<MemberSymbol>,
-    filters: &Vec<FilterItem>,
-) -> Result<Rc<MemberSymbol>, CubeError> {
-    symbol.apply_recursive(&|symbol: &Rc<MemberSymbol>| {
+/// Specializes symbols against the query node that computes them: prunes
+/// `case` branches the node's filters rule out, picks the branch of a
+/// QUERY_CONTEXT case and marks which `FILTER_PARAMS` bindings they reach.
+pub struct Specializer {
+    case_filters: Vec<FilterItem>,
+    activity_filters: FilterItem,
+    reach: Reach,
+    state: Rc<QueryProperties>,
+    query: Rc<QueryProperties>,
+    // Built on first use: only a QUERY_CONTEXT case reads it.
+    query_context: OnceCell<QueryContextData>,
+}
+
+enum Reach {
+    // A multi-stage stage's member: the members it reads are planned with
+    // states of their own.
+    OwnNode,
+    // Every member the query computes itself, stopping at the ones another
+    // query computes.
+    ComputedHere { plans_multi_stage: bool },
+}
+
+impl Specializer {
+    pub fn for_query(query: &Rc<QueryProperties>, plans_multi_stage: bool) -> Self {
+        Self::new(query, query, Reach::ComputedHere { plans_multi_stage })
+    }
+
+    pub fn for_stage_member(state: &Rc<QueryProperties>, query: &Rc<QueryProperties>) -> Self {
+        Self::new(state, query, Reach::OwnNode)
+    }
+
+    // A FILTER_PARAMS binding may name any filtered member, not only a
+    // dimension, so its activity is matched against the whole set.
+    fn new(state: &Rc<QueryProperties>, query: &Rc<QueryProperties>, reach: Reach) -> Self {
+        Self {
+            case_filters: state.dimensions_filters().clone(),
+            activity_filters: FilterItem::Group(Rc::new(FilterGroup {
+                operator: FilterGroupOperator::And,
+                items: state.all_filter_items(),
+            })),
+            reach,
+            state: state.clone(),
+            query: query.clone(),
+            query_context: OnceCell::new(),
+        }
+    }
+
+    fn query_context(&self) -> &QueryContextData {
+        self.query_context
+            .get_or_init(|| QueryContextData::from_node(&self.state, &self.query))
+    }
+
+    pub fn specialize(&self, symbol: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
+        let pruned = self.prune_case(symbol)?;
+        // Checked after pruning: a multi-stage case pruned to one branch is
+        // computed here as a regular member.
+        if self.computed_elsewhere(&pruned) {
+            return Ok(symbol.clone());
+        }
+        let mut node = pruned.as_ref().clone();
+        node.visit_deps_mut(&mut SpecializeVisitor { specializer: self })?;
+        Ok(Rc::new(node))
+    }
+
+    fn prune_case(&self, symbol: &Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError> {
         match symbol.as_ref() {
             MemberSymbol::Dimension(dim) => {
                 if let Some(case) = dim.case() {
-                    if let Some(new_case) = case.apply_static_filter(filters) {
+                    if let Some(new_case) = case.apply_static_filter(&self.case_filters) {
                         return Ok(MemberSymbol::new_dimension(replace_dimension_case(
                             dim, new_case,
                         )));
                     }
                 }
             }
-            MemberSymbol::Measure(meas) => {
-                if let Some(case) = meas.case() {
-                    if let Some(new_case) = case.apply_static_filter(filters) {
+            MemberSymbol::Measure(meas) => match meas.case() {
+                // The stage computing a multi-stage measure resolves it at its own grain.
+                Some(Case::CaseContext(case)) if !self.computed_elsewhere(symbol) => {
+                    let sql = case.resolve(
+                        symbol.cube_id().target(),
+                        self.query_context(),
+                        self.state.query_tools().query_tools().base_tools().as_ref(),
+                    )?;
+                    return Ok(MemberSymbol::new_measure(resolve_measure_case(meas, sql)));
+                }
+                Some(case) => {
+                    if let Some(new_case) = case.apply_static_filter(&self.case_filters) {
                         return Ok(MemberSymbol::new_measure(replace_measure_case(
                             meas, new_case,
                         )));
                     }
                 }
-            }
+                None => {}
+            },
             MemberSymbol::TimeDimension(_)
             | MemberSymbol::MemberExpression(_)
             | MemberSymbol::Ref(_) => {}
         }
         Ok(symbol.clone())
-    })
+    }
+
+    // Whether another query computes `symbol`, so this one leaves it as is.
+    fn computed_elsewhere(&self, symbol: &MemberSymbol) -> bool {
+        match self.reach {
+            Reach::ComputedHere { plans_multi_stage } => {
+                is_computed_elsewhere(symbol, plans_multi_stage)
+            }
+            Reach::OwnNode => false,
+        }
+    }
 }
 
-pub fn apply_static_filter_to_filter_item(
-    filter_item: &FilterItem,
-    filters: &Vec<FilterItem>,
-) -> Result<FilterItem, CubeError> {
-    super::map_filter_item_symbols(filter_item, &|symbol| {
-        apply_static_filter_to_symbol(symbol, filters)
-    })
+// The body of a subquery dimension, and of a multi-stage member when the query
+// plans those as stages, is computed by another query against its own filters.
+// A view member or a time dimension only wraps a member, so it is looked through.
+fn is_computed_elsewhere(symbol: &MemberSymbol, plans_multi_stage: bool) -> bool {
+    match symbol {
+        MemberSymbol::Dimension(d) => (plans_multi_stage && d.is_multi_stage()) || d.is_sub_query(),
+        MemberSymbol::Measure(m) => plans_multi_stage && m.is_multi_stage(),
+        MemberSymbol::TimeDimension(_)
+        | MemberSymbol::Ref(_)
+        | MemberSymbol::MemberExpression(_) => false,
+    }
+}
+
+struct SpecializeVisitor<'a> {
+    specializer: &'a Specializer,
+}
+
+impl DepVisitorMut for SpecializeVisitor<'_> {
+    fn symbol(&mut self, slot: &mut Rc<MemberSymbol>) -> Result<(), CubeError> {
+        if let Reach::ComputedHere { .. } = self.specializer.reach {
+            *slot = self.specializer.specialize(slot)?;
+        }
+        Ok(())
+    }
+
+    fn filter_params_group(
+        &mut self,
+        items: &mut [SqlCallFilterParamsItem],
+    ) -> Result<(), CubeError> {
+        // Matched against the whole group, since that is the predicate the group
+        // renders: an OR group survives only when every member of it matches.
+        let members = items
+            .iter()
+            .map(|item| &item.filter_symbol_name)
+            .collect::<Vec<_>>();
+        let active = self
+            .specializer
+            .activity_filters
+            .find_subtree_for_members(&members)
+            .is_some();
+        for item in items.iter_mut() {
+            item.active = active;
+        }
+        Ok(())
+    }
+}
+
+// The measure computing the chosen branch: its kind aggregates that branch's
+// SQL in place of the case.
+fn resolve_measure_case(measure: &MeasureSymbol, sql: Rc<SqlCall>) -> Rc<MeasureSymbol> {
+    let mut new = measure.clone();
+    new.kind = measure.kind.over_input_sql(sql);
+    new.case = None;
+    Rc::new(new)
 }
 
 fn replace_measure_case(measure: &MeasureSymbol, new_case: Case) -> Rc<MeasureSymbol> {
@@ -96,68 +225,4 @@ fn replace_dimension_case(dimension: &DimensionSymbol, new_case: Case) -> Rc<Dim
         new.kind = DimensionKind::Case(c.replace_case(new_case));
     }
     Rc::new(new)
-}
-
-/// Marks every `FILTER_PARAMS` binding in the symbol by whether `filters` reach
-/// the members it renders from. A binding renders only where its filters do, so
-/// only there do the members its column reads count among the symbol's
-/// dependencies and pull their cubes into the join.
-pub fn apply_filter_params_activity_to_symbol(
-    symbol: &Rc<MemberSymbol>,
-    filters: &FilterItem,
-) -> Result<Rc<MemberSymbol>, CubeError> {
-    let mut visitor = ActivityVisitor { filters };
-    let mut result = symbol.as_ref().clone();
-    result.visit_deps_mut(&mut visitor)?;
-    Ok(Rc::new(result))
-}
-
-/// The filter set as the one item `apply_filter_params_activity_to_symbol`
-/// matches against.
-pub fn filter_params_activity_filters(filters: &[FilterItem]) -> FilterItem {
-    FilterItem::Group(Rc::new(FilterGroup {
-        operator: FilterGroupOperator::And,
-        items: filters.to_vec(),
-    }))
-}
-
-struct ActivityVisitor<'a> {
-    filters: &'a FilterItem,
-}
-
-impl DepVisitorMut for ActivityVisitor<'_> {
-    fn symbol(&mut self, slot: &mut Rc<MemberSymbol>) -> Result<(), CubeError> {
-        let mut symbol = slot.as_ref().clone();
-        symbol.visit_deps_mut(self)?;
-        *slot = Rc::new(symbol);
-        Ok(())
-    }
-
-    fn filter_params_group(
-        &mut self,
-        items: &mut [SqlCallFilterParamsItem],
-    ) -> Result<(), CubeError> {
-        // Matched against the whole group, since that is the predicate the group
-        // renders: an OR group survives only when every member of it matches.
-        let members = items
-            .iter()
-            .map(|item| &item.filter_symbol_name)
-            .collect::<Vec<_>>();
-        let active = self.filters.find_subtree_for_members(&members).is_some();
-        for item in items.iter_mut() {
-            item.active = active;
-        }
-        Ok(())
-    }
-}
-
-/// `apply_filter_params_activity_to_symbol` over every symbol a filter item
-/// carries.
-pub fn apply_filter_params_activity_to_filter_item(
-    filter_item: &FilterItem,
-    filters: &FilterItem,
-) -> Result<FilterItem, CubeError> {
-    super::map_filter_item_symbols(filter_item, &|symbol| {
-        apply_filter_params_activity_to_symbol(symbol, filters)
-    })
 }

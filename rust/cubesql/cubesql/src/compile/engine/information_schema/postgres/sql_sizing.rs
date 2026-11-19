@@ -23,10 +23,10 @@ struct InfoSchemaSqlSizingBuilder {
 impl InfoSchemaSqlSizingBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            sizing_id: UInt32Builder::new(capacity),
-            sizing_name: StringBuilder::new(capacity),
-            supported_value: UInt32Builder::new(capacity),
-            comments: StringBuilder::new(capacity),
+            sizing_id: UInt32Builder::with_capacity(capacity),
+            sizing_name: StringBuilder::with_capacity(capacity, capacity),
+            supported_value: UInt32Builder::with_capacity(capacity),
+            comments: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
@@ -37,10 +37,10 @@ impl InfoSchemaSqlSizingBuilder {
         supported_value: Option<u32>,
         comments: Option<&str>,
     ) {
-        self.sizing_id.append_value(sizing_id).unwrap();
-        self.sizing_name.append_value(sizing_name).unwrap();
-        self.supported_value.append_option(supported_value).unwrap();
-        self.comments.append_option(comments).unwrap();
+        self.sizing_id.append_value(sizing_id);
+        self.sizing_name.append_value(sizing_name);
+        self.supported_value.append_option(supported_value);
+        self.comments.append_option(comments);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

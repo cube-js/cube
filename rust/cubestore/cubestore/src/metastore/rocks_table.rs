@@ -986,7 +986,9 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         row_id: u64,
         secondary_index: &'a impl RocksSecondaryIndex<Self::T, K>,
         secondary_key_hash: SecondaryKeyHash,
-        extended: RocksSecondaryIndexValueTTLExtended,
+        merge: impl FnOnce(
+            Option<&RocksSecondaryIndexValueTTLExtended>,
+        ) -> Result<RocksSecondaryIndexValueTTLExtended, CubeError>,
         batch_pipe: &mut BatchPipe<'_, S>,
     ) -> Result<bool, CubeError>
     where
@@ -1004,12 +1006,13 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
                 index_value_version,
             )? {
                 RocksSecondaryIndexValue::Hash(hash) => {
-                    RocksSecondaryIndexValue::HashAndTTLExtended(hash, None, extended)
+                    RocksSecondaryIndexValue::HashAndTTLExtended(hash, None, merge(None)?)
                 }
                 RocksSecondaryIndexValue::HashAndTTL(hash, ttl) => {
-                    RocksSecondaryIndexValue::HashAndTTLExtended(hash, ttl, extended)
+                    RocksSecondaryIndexValue::HashAndTTLExtended(hash, ttl, merge(None)?)
                 }
-                RocksSecondaryIndexValue::HashAndTTLExtended(hash, ttl, _) => {
+                RocksSecondaryIndexValue::HashAndTTLExtended(hash, ttl, old) => {
+                    let extended = merge(Some(&old))?;
                     RocksSecondaryIndexValue::HashAndTTLExtended(hash, ttl, extended)
                 }
             };

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/multi_granularity.rs
+assertion_line: 264
+expression: result
+---
+activity__app_name | activity__amount_early_january
+-------------------+-------------------------------
+alpha              | 126                           
+beta               | 12600

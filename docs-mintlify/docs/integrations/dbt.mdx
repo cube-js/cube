@@ -16,6 +16,16 @@ converts each dbt model into a cube — including dimensions, measures, descript
 and joins — and, by default, commits the generated files to a branch where you review
 them before they reach production.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/sYGq5v79zOQ"
+  title="Turn dbt Models into Cubes in Minutes — dbt Pull in Cube (Preview)"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 Cube can either clone and parse your dbt project's Git repository, or accept the
 `target/manifest.json` your own CI job produced. Uploading the manifest converts the
 exact artifact your pipeline validated and doesn't require Cube to have a credential
@@ -83,6 +93,16 @@ including several dbt projects in one deployment, are collected in
 ## Connect your dbt repository
 
 The dbt connection is configured on your deployment's **default data source**.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/fLYE07s-AyY"
+  title="Using SSH Keys for dbt Git Repository Authentication in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 <Info>
 
@@ -196,6 +216,16 @@ declared-vs-resolved breakdown in the sync logs for a given pull.)
 Pull options are saved on the integration itself. Options that shape conversion apply
 to Git and uploaded-manifest pulls. A manifest pull without an integration uses the
 defaults below. Options that require Cube to run dbt apply only to the Git source.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/mPshbCILKpw"
+  title="dbt Pull Demo: Environment Variables, Type Inference, Primary Keys, and Reverse Joins"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 | Option | Default | Description |
 | --- | --- | --- |
@@ -492,7 +522,7 @@ that folder that no longer correspond to a dbt model. See
 
 <Step title="Start the pull">
 
-Click **Start Pull**. A progress toast tracks the pull and ends with
+Click **Start pull**. A progress toast tracks the pull and ends with
 **"dbt pull completed (N cubes)"**. The generated files appear in your file tree
 under the output path, on your development branch.
 
@@ -515,6 +545,16 @@ cubes**:
 - **Your CI commits them** — [`cube dbt generate`](#generate-into-your-own-repository)
   writes the cubes into your own working copy and commits nothing, so they go through
   your repository's review, CODEOWNERS and branch protection like any other change.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/se4cvB6s2ds"
+  title="Automate dbt Pull Synchronization in Cube with Webhooks and API Triggers"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
 
 Pick the second when your data model lives in your own Git repository and you want
 Cube to stay out of it. Everything else below applies to both.
@@ -721,7 +761,7 @@ creates a review branch and sends the usual review notification. Files outside t
 output path and preserved cubes for models outside the pull's selection do not count
 as changes.
 
-If nothing changed, the run appears in sync history as **COMPLETED**, without a
+If nothing changed, the run appears in [sync history](#review-sync-history) as **Completed**, without a
 review branch link or notification email — for example, after a push that only changes a README,
 CI configuration, or an unselected dbt model. While the generated changes remain
 unmerged, subsequent webhook syncs create another review branch and send another
@@ -737,7 +777,8 @@ even when the generated files are unchanged. Files-only generation
 Ask [the agent](/docs/explore-analyze/analytics-chat) to check for and pull dbt updates —
 for example, "check for dbt updates and pull them." The agent starts a sync, follows its
 progress, opens the review branch it produces, and summarizes the generated cubes. Ask
-"what happened with my recent dbt syncs?" to have it answer from sync history instead.
+"what happened with my recent dbt syncs?" to have it answer from
+[sync history](#review-sync-history) instead.
 
 ### Review notifications
 
@@ -747,6 +788,36 @@ straight to the review. No one has to poll the UI to notice that dbt changed. Re
 who can edit the data model land on the branch in [development
 mode](/docs/data-modeling/dev-mode), ready to make changes; recipients without edit access
 see a read-only diff instead.
+
+## Review sync history
+
+Every sync appears in the deployment's sync history, however it started: a manual pull,
+the CLI or API, a webhook, or the agent. To see the history, go to **Settings → Data
+Sources**, edit the **default data source**, expand **dbt project**, and expand **Sync
+history**. It lists the last 20 syncs, newest first. Each row shows:
+
+- **Status** — **Running**, **Completed**, **Failed**, **Cancelled**, or **Unknown**.
+  **Unknown** means Cube could not determine the outcome of the sync. It does not mean
+  that the sync failed.
+- **Trigger** — **Manual**, **API**, **Webhook**, **AI agent**, or **Unknown trigger**.
+- **Branch** — the Cube branch that the sync wrote the generated cubes to. It is empty
+  when the sync wrote no branch, for example a webhook sync that found no changes.
+- **Start time** and **duration**.
+
+Click a row to see its details: the **dbt ref** of a sync pinned to a ref, the
+**Pushed branch** and **Commit** of a webhook sync, the **Failed step** and the error text of a
+failed sync, and the duration of each step.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/integrations/dbt/sync-history.png"
+    alt="Sync history section of the dbt settings card, with a failed webhook sync expanded to show its commit, failed step, error text and step durations"
+  />
+</Frame>
+
+To read the same history from the command line, run `cube dbt history DEPLOYMENT_ID`.
+To see the details of one sync, run `cube dbt logs DEPLOYMENT_ID SYNC_JOB_ID`. See
+[sync history and logs](/reference/cli#sync-history-and-logs) in the CLI reference.
 
 ## Multiple dbt projects
 
@@ -930,6 +1001,16 @@ reviewed pull request. A cube you built in Cube on an inline `sql:` becomes a db
 a `<model>.sql` plus a per-model `<model>.yml` properties file — validated by a real
 `dbt parse` in Cube's sandbox **before** the PR is opened, so the change arrives green.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/Xtq-8HZUdww"
+  title="Push Cube models to dbt — auto-generate dbt models & open a PR [Preview]"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 This closes the modeling loop: prototype fast in Cube, then harden the logic in dbt where
 it's materialized, tested, and owned by analytics engineering. Once the pull request
 merges, your existing [pull](#keep-cube-in-sync-automatically) picks the new model back up.
@@ -1092,7 +1173,9 @@ The message identifies the cause:
 
 <Accordion title="A pull fails partway through">
 
-The error message describes what failed. Common causes:
+The error message describes what failed. For a sync you didn't start, expand it in
+[sync history](#review-sync-history) to see the failed step and the error text. Common
+causes:
 
 - The dbt project doesn't exist at the configured **Project path** (no
   `dbt_project.yml` there).
@@ -1129,8 +1212,9 @@ Check that:
 <Accordion title="A webhook sync completed but has no review branch or email">
 
 [Skip unchanged webhook syncs](#skip-unchanged-webhook-syncs) may have found no changes.
-Run `cube dbt history DEPLOYMENT_ID --trigger webhook`: an unchanged run has status
-**COMPLETED** and an empty **BRANCH** column. If no matching run appears, follow
+Check [sync history](#review-sync-history), or run
+`cube dbt history DEPLOYMENT_ID --trigger webhook`: an unchanged run has completed
+status and no branch. If no matching run appears, follow
 **A webhook push doesn't trigger a sync** above.
 
 </Accordion>

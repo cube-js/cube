@@ -57,6 +57,7 @@ tags:
   - name: Dashboard Embed Access
   - name: Usage Analytics
   - name: OpenAPI Spec
+  - name: Audit Log
   - name: Chat History
   - name: Ossie Conversion
   - name: Report Deliveries
@@ -155,6 +156,60 @@ paths:
       summary: Get app config
       tags:
         - App Theme
+  /api/v1/audit-logs/export:
+    get:
+      operationId: exportAuditLog
+      parameters:
+        - in: query
+          name: start
+          required: true
+          description: First day of the range, `YYYY-MM-DD`.
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end
+          required: true
+          description: Last day of the range, `YYYY-MM-DD`.
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: search
+          required: false
+          description: Free-text filter.
+          schema:
+            type: string
+        - in: query
+          name: eventName
+          required: false
+          description: Only events with this name.
+          schema:
+            type: string
+        - in: query
+          name: userEmail
+          required: false
+          description: Only events by the user with this email.
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                format: binary
+                type: string
+          description: The audit log events in the range.
+      summary: Export the audit log
+      tags:
+        - Audit Log
+      x-mint:
+        content: >-
+          Stream the account audit log for a date range as a CSV attachment. Requires the
+          `AuditLogManage` action.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /api/v1/deployments:
     get:
       operationId: getDeployments
@@ -509,6 +564,7 @@ paths:
                     - slack_dm
                     - published-dashboard
                     - sheets
+                    - scheduled-task
                 type: array
                 maxItems: 100
               - type: 'null'
@@ -666,6 +722,10 @@ paths:
       summary: Advance a deployment to a given onboarding step (e.g. after connecting a source)
       tags:
         - Deployments
+      x-mint:
+        content: >-
+          It neither connects nor tests a source. Connecting one is done separately, by setting the
+          database variables with PUT /:deploymentId/env-vars.
   /api/v1/deployments/{deploymentId}/creation-step/reset:
     post:
       operationId: resetCreationStep
@@ -727,20 +787,23 @@ paths:
 
 
           Pass `filters`, `timeGrains` and `memberSwitchers` to render the board with specific
-          control values, exactly as a scheduled notification does; omit them to render its saved
-          defaults.
+          control values, exactly as a scheduled notification does; omit them and the dashboard's
+          published defaults apply.
 
 
-          Pass `layout: print` with `format: pdf` for the paginated A4 document the dashboard's
-          "Download print version" menu item produces — one column, every table row, the filter
-          state as a summary line — instead of the default `screenshot` of the board. `print` with
-          `format: png` returns `400`.
+          `format` and `layout` are the Format and Layout of the dashboard's Download settings. The
+          default `screenshot` is Snapshot: the board as laid out, with the rows each table shows
+          and the control widgets. Pass `layout: print` with `format: pdf` for Print version — a
+          paginated A4 document with every tab and every table row, and the control values listed at
+          the top instead of the control widgets — instead of the default `screenshot`. Print
+          version is PDF only: `print` with `format: png` returns `400`.
 
 
           By default the dashboard renders under the calling user's own security context, so the
-          file shows what that user would see. Requires **manage** access to the dashboard's
-          workbook — the same permission the console's own "Download as PNG / PDF" actions require,
-          because a whole-dashboard render is a bulk data export.
+          file shows what that user would see. Requires **read** access to the dashboard's workbook
+          and the **download data** permission on the deployment — the same rule the console's own
+          Download settings follow. **Manage** access to the workbook also passes, as it did before
+          the download data permission was required.
 
 
           To export on someone else's behalf, pass `renderAs`: the queries behind the image then run
@@ -861,15 +924,16 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DatabricksMetricViewIntegrationResponse'
+                $ref: '#/components/schemas/DatabricksMetricViewIntegrationWithBuildsResponse'
           description: ''
       summary: Get Databricks Metric View publication settings
       tags:
         - Databricks Metric View Integration
       x-mint:
         content: >-
-          Requires a Databricks datasource. This is currently in preview — reach out to the Cube
-          support team to activate it for your account.
+          Also returns the deployment's newest successful build and the build last published, so
+          automation can tell when Databricks lags the deployed model. This is currently in preview
+          — reach out to the Cube support team to activate it for your account.
     put:
       operationId: saveIntegration
       parameters:
@@ -903,8 +967,9 @@ paths:
       x-mint:
         content: >-
           Uses optimistic configuration versioning. Pass `expectedConfigurationVersion` 0 to create.
-          Requires a Databricks datasource. This is currently in preview — reach out to the Cube
-          support team to activate it for your account.
+          Requires a Databricks datasource defined in environment variables, or a `connection` for
+          one with none, such as a datasource driver_factory in cube.py serves. This is currently in
+          preview — reach out to the Cube support team to activate it for your account.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs:
     get:
       operationId: listSyncs
@@ -947,8 +1012,8 @@ paths:
       x-mint:
         content: >-
           Durable run history for this datasource, newest first. It remains available after a run
-          finishes. Requires a Databricks datasource. This is currently in preview — reach out to
-          the Cube support team to activate it for your account.
+          finishes. This is currently in preview — reach out to the Cube support team to activate it
+          for your account.
     post:
       operationId: startSync
       parameters:
@@ -982,14 +1047,19 @@ paths:
       x-mint:
         content: >-
           Converts the configured Cube views from the deployment's latest successful build and
-          creates or replaces each one's managed Databricks Metric View. Views publish
-          independently: one that is incompatible, fails Databricks validation, or whose destination
-          belongs to another integration keeps its last good definition and does not stop the
-          others, and a view whose definition is unchanged is skipped without a Databricks write.
+          creates or replaces each one's managed Databricks Metric View. For a caller with
+          `SqlRunnerRead`, other than an embedded analytics session, Jinja-templated YAML files are
+          first rendered in the deployment's Cube runtime with its default context, and the request
+          returns 409 while a rollout leaves that runtime on another build; otherwise a templated
+          file fails the request. Views publish independently: one that is incompatible, fails
+          Databricks validation, or whose destination belongs to another integration keeps its last
+          good definition and does not stop the others, and a view whose definition is unchanged is
+          skipped without a Databricks write. A view whose destination already holds an object this
+          integration does not manage is refused unless `takeOverTargets` names that destination.
           One run per integration at a time; a second start while one is active returns 409.
-          Requires a Databricks datasource, enabled publication settings, and SchemaUpdate access.
-          This is currently in preview — reach out to the Cube support team to activate it for your
-          account.
+          Requires a Databricks connection (env-defined, or the integration's own credential),
+          enabled publication settings, and SchemaUpdate access. This is currently in preview —
+          reach out to the Cube support team to activate it for your account.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}:
     delete:
       operationId: cancelSync
@@ -1083,15 +1153,25 @@ paths:
         - Databricks Metric View Publication
       x-mint:
         content: >-
-          Queues an offline conversion of static YAML from the deployment's latest successful build
-          and returns polling URLs immediately. Exact retries while the same content-addressed
-          preview is running reuse that work; a later submission starts a fresh execution. Preview
-          payloads and results are retained for at most seven days. The conversion supports scalar
-          dimensions, common and calculated measures, and acyclic many-to-one equi-joins from one
-          Databricks datasource. Access policies, templating, extends, unsafe fanout, unsupported
-          expressions, multiple datasources, and converter loss are blocked per view. Two-part
-          schema.table sources are qualified with `CUBEJS_DB_DATABRICKS_CATALOG` for the selected
-          datasource; without that setting they fail closed with an actionable issue. Requires
+          Queues an offline conversion of the YAML data model from the deployment's latest
+          successful build and returns polling URLs immediately. For a caller with `SqlRunnerRead`,
+          other than an embedded analytics session, Jinja-templated YAML files are first rendered in
+          the deployment's Cube runtime with its default context, and the request returns 409 while
+          a rollout leaves that runtime on another build; otherwise a templated file fails the
+          request. With `source: 'files'`, it converts the YAML `files` sent with the request
+          instead, such as a pull request's checkout, so CI can compare that preview with one of the
+          deployment before merging; the response then has no `buildJobId`, and a Jinja-templated
+          file fails the request. Exact retries while the same content-addressed preview is running
+          reuse that work; a later submission starts a fresh execution. Preview payloads and results
+          are retained for at most seven days. The conversion supports scalar dimensions, common and
+          calculated measures, and acyclic many-to-one equi-joins from one Databricks datasource.
+          Access policies (including a cube's inherited ones), `extends` of a cube outside the YAML
+          model, unsafe fanout, unsupported expressions, multiple datasources, and converter loss
+          are blocked per view. Two-part schema.table sources are qualified with the integration
+          credential's `catalog`, or with `CUBEJS_DB_DATABRICKS_CATALOG` for the selected datasource
+          when the integration has no credential; without either they fail closed with an actionable
+          issue. A datasource with no env-defined Databricks connection, such as one driver_factory
+          in cube.py serves, previews only once its integration has a credential. Requires
           `SchemaRead` or `SchemaUpdate` access. This is currently in preview — reach out to the
           Cube support team to activate it for your account.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}:
@@ -1480,14 +1560,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/EnvVariablesListResponse'
           description: ''
-      summary: Get env variables
+      summary: List environment variables, including the database connection settings
       tags:
         - Env Variables
       x-mint:
         content: >-
           Lists the deployment environment variables, cursor-paginated via `first`/`after`. Values
           of secret-named variables (containing PASS, SECRET, TOKEN, KEY, or CREDENTIAL) are
-          returned as `[ENCRYPTED]`.
+          returned as `[ENCRYPTED]`. A deployment connects to its databases through these variables
+          — there is no separate connections endpoint. The default data source uses `CUBEJS_DB_*`
+          (for example `CUBEJS_DB_TYPE`, `CUBEJS_DB_HOST`, `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`), plus
+          the `CUBEJS_JDBC_*`, `CUBEJS_AWS_*` or `CUBEJS_FIREBOLT_*` families some drivers use.
+          Additional data sources are listed in `CUBEJS_DATASOURCES` and configured as
+          `CUBEJS_DS_<NAME>_DB_*`.
     put:
       operationId: setEnvVariables
       parameters:
@@ -1510,7 +1595,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/EnvVariablesListResponse'
           description: ''
-      summary: Set env variables
+      summary: Set environment variables, including connecting or changing a database
       tags:
         - Env Variables
       x-mint:
@@ -1519,7 +1604,14 @@ paths:
           existing values. Passing the `[ENCRYPTED]` placeholder (the masked read value) is rejected
           — omit variables you do not intend to change. New variable names must be POSIX identifiers
           (`^[A-Za-z_][A-Za-z0-9_]*$`); names already stored on the deployment may be resent
-          unchanged so a legacy name can still be updated or removed.
+          unchanged so a legacy name can still be updated or removed. A deployment connects to its
+          databases through these variables — there is no separate connections endpoint. The default
+          data source uses `CUBEJS_DB_*` (for example `CUBEJS_DB_TYPE`, `CUBEJS_DB_HOST`,
+          `CUBEJS_DB_USER`, `CUBEJS_DB_PASS`), plus the `CUBEJS_JDBC_*`, `CUBEJS_AWS_*` or
+          `CUBEJS_FIREBOLT_*` families some drivers use. Additional data sources are listed in
+          `CUBEJS_DATASOURCES` and configured as `CUBEJS_DS_<NAME>_DB_*`. Saving does not test the
+          connection: a wrong value is accepted here and only fails when the deployment next
+          connects to the database.
   /api/v1/deployments/{deploymentId}/environments:
     get:
       operationId: getDeploymentEnvironments
@@ -2078,7 +2170,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NotificationDto'
+                $ref: '#/components/schemas/Notification'
           description: ''
       summary: Create a scheduled notification
       tags:
@@ -2151,7 +2243,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NotificationDto'
+                $ref: '#/components/schemas/Notification'
           description: ''
       summary: Get a scheduled notification
       tags:
@@ -2192,7 +2284,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NotificationDto'
+                $ref: '#/components/schemas/Notification'
           description: ''
       summary: Update a scheduled notification
       tags:
@@ -3271,6 +3363,7 @@ paths:
 
           Like connecting, this records nothing about the report's definition and so requires
           only read access: unplacing a report from your own sheet is not an edit to the report.
+          Removing a placement someone else made requires edit access to the report.
     put:
       operationId: connectReportToWorkbook
       parameters:
@@ -3309,7 +3402,8 @@ paths:
           This upserts only the placement for the given workbook and never changes the
           report's query, name, or other definition — so, like refresh, it requires only
           read access to the report. A user who can view a report can place its data into
-          their own sheet without being its creator or having edit rights.
+          their own sheet without being its creator or having edit rights. Re-placing or
+          moving a placement someone else made requires edit access to the report.
   /api/v1/deployments/{deploymentId}/reports/{reportId}/file:
     get:
       operationId: getReportFile
@@ -3329,7 +3423,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JsonConfigFileDto'
+                $ref: '#/components/schemas/JsonConfigFile'
           description: ''
       summary: Read a report definition as editable JSON text
       tags:
@@ -3369,7 +3463,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JsonConfigFileDto'
+                $ref: '#/components/schemas/JsonConfigFile'
           description: ''
       summary: Replace text in a report definition
       tags:
@@ -4194,6 +4288,10 @@ paths:
 
           - `name` — rename the workbook.
 
+          - `renamed` — set to `true` when a person renamed the workbook. A suggested name then
+          stops following the workbook's content. Without it, a `name` equal to a name a suggestion
+          replaced is ignored as a stale value.
+
           - `meta` — replace the workbook's metadata object.
 
           - `folderId` — move the workbook between folders. Set it to a folder id to move the
@@ -4208,6 +4306,109 @@ paths:
 
           To move a workbook you can use either this endpoint or the unified `POST /workspace/move`.
           Returns `404` if the workbook does not exist or belongs to a different deployment.
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/calculated-fields:
+    post:
+      operationId: createCalculatedField
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCalculatedFieldInput'
+        description: CreateCalculatedFieldInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculatedField'
+          description: ''
+      summary: Create a workbook calculated field
+      tags:
+        - Workbooks
+      x-mint:
+        content: >-
+          Add a calculated field to a workbook. Requires **edit** access to the workbook. Returns
+          `400` when the workbook already has a field with the same name (case-insensitive).
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/calculated-fields/{fieldId}:
+    delete:
+      operationId: deleteCalculatedField
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: fieldId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json: {}
+          description: Successful response
+      summary: Delete a workbook calculated field
+      tags:
+        - Workbooks
+      x-mint:
+        content: Remove a calculated field from a workbook. Requires **edit** access to the workbook.
+    patch:
+      operationId: updateCalculatedField
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: fieldId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCalculatedFieldInput'
+        description: UpdateCalculatedFieldInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculatedField'
+          description: ''
+      summary: Update a workbook calculated field
+      tags:
+        - Workbooks
+      x-mint:
+        content: >-
+          Change a calculated field of a workbook; only the fields you send are changed. Requires
+          **edit** access to the workbook.
   /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard:
     put:
       operationId: updateWorkbookDashboard
@@ -4289,7 +4490,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JsonConfigFileDto'
+                $ref: '#/components/schemas/JsonConfigFile'
           description: ''
       summary: Read the dashboard draft as editable JSON text
       tags:
@@ -4302,7 +4503,7 @@ paths:
 
           Use it with `PATCH /workbooks/{workbookId}/dashboard/file` to change part of the dashboard
           without resending the whole configuration. Returns `400` for a workbook whose dashboard is
-          a Dashboard App.
+          an app.
     patch:
       operationId: replaceWorkbookDashboardFileText
       parameters:
@@ -4328,7 +4529,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JsonConfigFileDto'
+                $ref: '#/components/schemas/JsonConfigFile'
           description: ''
       summary: Replace text in the dashboard draft
       tags:
@@ -4498,6 +4699,45 @@ paths:
           Requires **manage** access to the workbook. Returns `404` if the workbook or the named
           embed tenant does not exist, and `400` if the request specifies no change or sets
           `allowEmbed` on a workbook that has no published dashboard.
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/name-suggestion:
+    post:
+      operationId: suggestWorkbookName
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuggestWorkbookNameInput'
+        description: SuggestWorkbookNameInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workbook'
+          description: ''
+      summary: Suggest a workbook name
+      tags:
+        - Workbooks
+      x-mint:
+        content: >-
+          Names a workbook created with a placeholder name (`nameSource: "default"`) from its tabs
+          and dashboard tiles. The name follows the content, at most once per 5 minutes, until the
+          workbook is renamed. Returns the workbook, renamed or as it was.
+
+
+          Requires **edit** access to the workbook.
   /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion:
     get:
       operationId: getWorkbookPromotion
@@ -4585,7 +4825,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkbookPromotionPreviewDto'
+                $ref: '#/components/schemas/WorkbookPromotionPreview'
           description: ''
       summary: Preview a workbook promotion
       tags:
@@ -4658,7 +4898,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkbookPromotionDto'
+                $ref: '#/components/schemas/WorkbookPromotion'
           description: ''
       summary: Promote and publish a workbook
       tags:
@@ -4948,35 +5188,8 @@ paths:
         - Workspace
       x-mint:
         content: >-
-          Move any workspace item — a workbook, report, or folder — into a folder, in one unified
-          endpoint. Returns the moved item.
-
-
-          Request body:
-
-          - `type` — the item type: `WORKBOOK`, `REPORT`, or `FOLDER`.
-
-          - `id` — the id of the item to move.
-
-          - `folderId` — the destination folder id, or `null` to move the item to the workspace
-          root. For a folder, this becomes its new parent.
-
-
-          Access requirements depend on the item type and mirror the per-type rules:
-
-          - **Workbook** — manage access to the workbook, plus edit access to the destination folder
-          when moving into one.
-
-          - **Report** — manage access to the report, plus edit access to the destination folder, which
-          must belong to the same deployment.
-
-          - **Folder** — manage access to the folder being moved, plus manage or edit access to the
-          destination parent folder.
-
-
-          Moving a folder into one of its own descendants, or exceeding the maximum folder depth, is
-          rejected with `400`. Returns `404` if the item does not exist or belongs to a different
-          deployment.
+          Move a workbook, report, or folder to folderId (null for root). Source and destination
+          permissions are checked, and a report's destination must be in the route deployment.
   /api/v1/embed-tenants:
     get:
       operationId: listEmbedTenants
@@ -5106,7 +5319,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserGroupDTO'
+                $ref: '#/components/schemas/UserGroup'
           description: ''
       summary: Create an embed group
       tags:
@@ -5176,7 +5389,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserGroupDTO'
+                $ref: '#/components/schemas/UserGroup'
           description: ''
       summary: Get an embed group
       tags:
@@ -5216,7 +5429,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserGroupDTO'
+                $ref: '#/components/schemas/UserGroup'
           description: ''
       summary: Update an embed group
       tags:
@@ -5673,7 +5886,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmbedDashboardCommentDto'
+                $ref: '#/components/schemas/EmbedDashboardComment'
           description: ''
       summary: Post a comment on an embeddable dashboard
       tags:
@@ -5786,7 +5999,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmbedDashboardCommentDto'
+                $ref: '#/components/schemas/EmbedDashboardComment'
           description: ''
       summary: Edit a comment on an embeddable dashboard
       tags:
@@ -5824,7 +6037,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EmbedDashboardCommentThreadDto'
+                $ref: '#/components/schemas/EmbedDashboardCommentThread'
           description: ''
       summary: Resolve or re-open a comment thread
       tags:
@@ -5895,7 +6108,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/GenerateSession'
-        description: GenerateSessionDTO
+        description: GenerateSession
         required: false
       responses:
         '200':
@@ -5999,7 +6212,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostTokenBySessionIdInput'
-        description: PostTokenBySessionIdInputDTO
+        description: PostTokenBySessionIdInput
         required: false
       responses:
         '200':
@@ -6026,6 +6239,38 @@ paths:
           This endpoint is unauthenticated — it is called from the embedding client and the session
           id itself is the credential. Returns `401` if the session id is unknown or has already
           been redeemed.
+  /api/v1/external-documents/{externalWorkbookId}/placement-proof:
+    post:
+      operationId: issuePlacementProof
+      parameters:
+        - in: path
+          name: externalWorkbookId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssuePlacementProofInput'
+        description: IssuePlacementProofInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuePlacementProofResponse'
+          description: ''
+      summary: Prove the caller has an external spreadsheet open
+      tags:
+        - External Documents
+      x-mint:
+        content: >-
+          Returns a single-use `proof` valid for 15 minutes and one placement operation. Send it as
+          `placementProof` when placing into this spreadsheet. `EXCEL` sends the workbook's
+          `documentKey`; `GOOGLE_SHEETS` sends identity and spreadsheet access tokens from the
+          add-on's Apps Script.
   /api/v1/external-documents/{externalWorkbookId}/placements:
     get:
       operationId: listExternalDocumentPlacements
@@ -6507,12 +6752,12 @@ paths:
           To scope the role to specific deployments, send a `Deployment` policy whose `resources`
           are the deployment ids as strings. A role usually also needs a `Global` policy naming the
           holder's license tier — `AIBIView`, `AIBIExplore` or `AIBIDevelop` — which is what the
-          console calls the role's Base Role. Pick a tier that covers the deployment actions you
-          grant: apart from the handful of actions available at every tier, the console forces
-          Developer (`AIBIDevelop`), so a lower tier here produces a role its role builder would not
-          have let you save. The current list of those actions is in [Auto-bump to
-          Developer](https://docs.cube.dev/admin/users-and-permissions/custom-roles#auto-bump-to-developer).
-          For example:
+          console calls the role's Base Role. List `SignIn` in that `Global` policy too: a role sent
+          without it does not let its holders sign in to the console. Pick a tier that covers the
+          deployment actions you grant: the console forces Developer (`AIBIDevelop`) for every
+          deployment action except `DeploymentRead`, `DeploymentAgentRead`, `DownloadData` and
+          `ChatHistoryRead`, so a lower tier here produces a role its role builder would not have
+          let you save:
 
 
           ```json
@@ -6522,7 +6767,7 @@ paths:
             "policies": [
               {
                 "resourceType": "Global",
-                "actions": ["AIBIDevelop"],
+                "actions": ["AIBIDevelop", "SignIn"],
                 "resources": ["All"]
               },
               {
@@ -6658,7 +6903,8 @@ paths:
 
           Updates the fields present in the body and leaves the rest alone. Sending `policies`
           replaces the role's policies outright, so read the role first if you mean to add one
-          rather than start over. Renaming to a name another role already holds answers `409`.
+          rather than start over. Policies sent without a `Global` `SignIn` stop the role's holders
+          signing in to the console. Renaming to a name another role already holds answers `409`.
           Built-in roles cannot be updated.
 
 
@@ -7295,7 +7541,8 @@ paths:
         content: >-
           Scaffolds an empty starter project and triggers the first build. When `creationMethod` is
           `github`, no starter project is scaffolded — connect a repository afterwards via POST
-          /build/api/v1/deployments/:deploymentId/github/connect.
+          /build/api/v1/deployments/:deploymentId/github/connect. The deployment starts with no
+          database connection: set one with PUT /api/v1/deployments/:deploymentId/env-vars.
   /build/api/v1/deployments/{deploymentId}/branches:
     delete:
       operationId: removeBranch
@@ -8546,6 +8793,86 @@ components:
         - ACTIVATE
         - DELETE
       type: string
+    CalculatedField:
+      properties:
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        createdBy:
+          type: number
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        expression:
+          type: string
+        format:
+          oneOf:
+            - $ref: '#/components/schemas/CalculatedFieldFormat'
+            - type: 'null'
+        id:
+          type: string
+        memberRole:
+          $ref: '#/components/schemas/CalculatedFieldMemberRole'
+        name:
+          type: string
+        semanticView:
+          type: string
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        valueType:
+          $ref: '#/components/schemas/CalculatedFieldValueType'
+      required:
+        - id
+        - name
+        - semanticView
+        - expression
+        - memberRole
+        - valueType
+        - createdBy
+        - createdAt
+        - updatedAt
+      type: object
+    CalculatedFieldFormat:
+      enum:
+        - percent
+        - currency
+        - imageUrl
+        - id
+        - link
+      type: string
+    CalculatedFieldMemberRole:
+      enum:
+        - measure
+        - dimension
+      type: string
+    CalculatedFieldValueType:
+      enum:
+        - string
+        - time
+        - boolean
+        - number
+        - number_agg
+        - count
+        - count_distinct
+        - count_distinct_approx
+        - sum
+        - avg
+        - min
+        - max
+        - geo
+      type: string
     ChatHistoryQuery:
       properties:
         columns:
@@ -8867,11 +9194,11 @@ components:
             - type: integer
             - type: 'null'
         type:
-          $ref: '#/components/schemas/ColumnFormatOverrideDtoType'
+          $ref: '#/components/schemas/ColumnFormatOverrideType'
       required:
         - type
       type: object
-    ColumnFormatOverrideDtoType:
+    ColumnFormatOverrideType:
       enum:
         - currency
         - percent
@@ -8940,6 +9267,10 @@ components:
             - $ref: '#/components/schemas/ConnectReportToWorkbookInputHost'
             - type: 'null'
         placementId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placementProof:
           oneOf:
             - type: string
             - type: 'null'
@@ -9066,6 +9397,66 @@ components:
       required:
         - name
       type: object
+    CreateCalculatedFieldInput:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        expression:
+          type: string
+        format:
+          oneOf:
+            - $ref: '#/components/schemas/CreateCalculatedFieldInputFormat'
+            - type: 'null'
+        memberRole:
+          $ref: '#/components/schemas/CreateCalculatedFieldInputMemberRole'
+        name:
+          type: string
+        semanticView:
+          type: string
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        valueType:
+          $ref: '#/components/schemas/CreateCalculatedFieldInputValueType'
+      required:
+        - name
+        - semanticView
+        - expression
+        - memberRole
+        - valueType
+      type: object
+    CreateCalculatedFieldInputFormat:
+      enum:
+        - percent
+        - currency
+        - imageUrl
+        - id
+        - link
+      type: string
+    CreateCalculatedFieldInputMemberRole:
+      enum:
+        - measure
+        - dimension
+      type: string
+    CreateCalculatedFieldInputValueType:
+      enum:
+        - string
+        - time
+        - boolean
+        - number
+        - number_agg
+        - count
+        - count_distinct
+        - count_distinct_approx
+        - sum
+        - avg
+        - min
+        - max
+        - geo
+      type: string
     CreateDeploymentEnvironmentTokenInput:
       properties:
         expires_in:
@@ -9211,6 +9602,28 @@ components:
       type: object
     CreateNotificationInput:
       properties:
+        addedControls:
+          description: >-
+            Controls added through the dashboard's Dynamic controls area that the notification
+            renders with. Each needs a field the area allows; its value goes in filters, timeGrains
+            or memberSwitchers.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardAddedControlInput'
+              type: array
+              maxItems: 50
+            - type: 'null'
+        crossFilters:
+          description: >-
+            Cross-filters the notification renders with: each is one chart's selection ("Filter
+            dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
+            every other chart renders filtered by it. The chart must be on the published dashboard,
+            with Cross-filtering on.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardCrossFilterInput'
+              type: array
+            - type: 'null'
         customCron:
           description: Custom cron expression (required if scheduleType is CUSTOM)
           oneOf:
@@ -9468,9 +9881,17 @@ components:
             - maxLength: 255
               type: string
             - type: 'null'
+        nameSource:
+          oneOf:
+            - $ref: '#/components/schemas/CreateReportInputNameSource'
+            - type: 'null'
         pivotItems:
           oneOf:
             - $ref: '#/components/schemas/PivotItemsInput'
+            - type: 'null'
+        placementProof:
+          oneOf:
+            - type: string
             - type: 'null'
         publicId:
           oneOf:
@@ -9518,6 +9939,11 @@ components:
         - GOOGLE_SHEETS
         - EXCEL
       type: string
+    CreateReportInputNameSource:
+      enum:
+        - default
+        - auto
+      type: string
     CreateReportInputSource:
       enum:
         - GOOGLE_SHEETS
@@ -9537,8 +9963,10 @@ components:
             Notify only when: on each fire the measure is read once, before the agent runs, and the
             agent runs only when the condition starts to hold, with the crossing facts at the top of
             its thread; it runs again only after the condition has stopped holding. A `change` or
-            `anomaly` rule needs `timeDimension` and `granularity`. The creator gets an inbox row
-            only with `notificationEnabled: true`. Omit to run the agent on every fire.
+            `anomaly` rule needs `timeDimension` and `granularity`. A request that sends
+            `notification` must leave a task with a condition notifying someone (`400` otherwise);
+            one that does not, on the deprecated `notificationEnabled` shape, keeps its earlier
+            behaviour. Omit to run the agent on every fire.
           oneOf:
             - $ref: '#/components/schemas/ScheduledTaskCondition'
             - type: 'null'
@@ -9565,10 +9993,21 @@ components:
           maxLength: 255
           minLength: 1
           type: string
-        notificationEnabled:
+        notification:
           description: >-
-            Notify the creator in Cube's notification inbox when a run finishes, whether it succeeds
-            or fails. Defaults to `false`.
+            Who a finished run notifies, and how. Replaces the stored setting. Picked users and
+            groups are shared the task, view-only, so they can open the run. An id that is not an
+            active workspace member or a group answers `400`. Wins over `notificationEnabled` when
+            both are sent. Omit it, and `notificationEnabled`, to notify nobody.
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskNotificationInput'
+            - type: 'null'
+        notificationEnabled:
+          deprecated: true
+          description: >-
+            Deprecated: send `notification` instead. `true` adds the creator to `notification` with
+            Inbox on; `false` takes the creator off it only when they get Inbox, so a creator who
+            gets only Email keeps it.
           oneOf:
             - type: boolean
             - type: 'null'
@@ -9603,7 +10042,15 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        nameSource:
+          oneOf:
+            - $ref: '#/components/schemas/CreateWorkbookInputNameSource'
+            - type: 'null'
       type: object
+    CreateWorkbookInputNameSource:
+      enum:
+        - default
+      type: string
     CreatedDeploymentEnvironmentToken:
       properties:
         created_at:
@@ -9804,7 +10251,7 @@ components:
             - type: boolean
             - type: 'null'
         status:
-          $ref: '#/components/schemas/DashboardDtoStatus'
+          $ref: '#/components/schemas/DashboardStatus'
         title:
           oneOf:
             - type: string
@@ -9831,6 +10278,53 @@ components:
         - versionId
         - reportSnapshots
       type: object
+    DashboardAddedControl:
+      properties:
+        config:
+          additionalProperties: true
+          type: object
+        key:
+          type: string
+        type:
+          $ref: '#/components/schemas/DashboardAddedControlType'
+      required:
+        - key
+        - type
+        - config
+      type: object
+    DashboardAddedControlInput:
+      properties:
+        config:
+          additionalProperties: true
+          description: >-
+            The added control's settings, as its `dc_` link param holds them: `dimension`
+            ("View.member") and, by type, `title`, `filterType`, `isMultipleSelectionAllowed`,
+            `allowedGrains`, `memberKind`, `options`, `optionGrains`. Other keys are dropped.
+          type: object
+        key:
+          description: The control's key, unique within the run, e.g. "k1"
+          pattern: ^[A-Za-z0-9_-]{1,32}$
+          type: string
+        type:
+          $ref: '#/components/schemas/DashboardAddedControlInputType'
+          description: The control type
+      required:
+        - key
+        - type
+        - config
+      type: object
+    DashboardAddedControlInputType:
+      enum:
+        - FILTER
+        - TIME_GRAIN
+        - FIELD
+      type: string
+    DashboardAddedControlType:
+      enum:
+        - FILTER
+        - TIME_GRAIN
+        - FIELD
+      type: string
     DashboardAppManifest:
       properties:
         dependencies:
@@ -9923,7 +10417,7 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
-      title: DashboardBreakpointColsDto
+      title: DashboardBreakpointCols
       type: object
     DashboardBreakpointColsInput:
       properties:
@@ -9971,7 +10465,7 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
-      title: DashboardBreakpointsDto
+      title: DashboardBreakpoints
       type: object
     DashboardBreakpointsInput:
       properties:
@@ -10127,12 +10621,95 @@ components:
         - CLASSIC
         - APP
       type: string
-    DashboardDtoStatus:
+    DashboardCrossFilter:
+      properties:
+        dimensions:
+          items:
+            $ref: '#/components/schemas/DashboardCrossFilterDimension'
+          type: array
+        sourceWidgetId:
+          type: string
+        view:
+          type: string
+      required:
+        - sourceWidgetId
+        - view
+        - dimensions
+      type: object
+    DashboardCrossFilterDimension:
+      properties:
+        grain:
+          oneOf:
+            - type: string
+            - type: 'null'
+        member:
+          type: string
+        operator:
+          $ref: '#/components/schemas/DashboardCrossFilterDimensionOperator'
+        values:
+          items:
+            oneOf:
+              - type: string
+              - type: number
+          type: array
+      required:
+        - member
+        - operator
+        - values
+      type: object
+    DashboardCrossFilterDimensionInput:
+      properties:
+        grain:
+          description: A time member's granularity, e.g. "month", for a clicked period
+          oneOf:
+            - type: string
+            - type: 'null'
+        member:
+          description: The member's bare name in the cross filter's view, e.g. "status"
+          type: string
+        operator:
+          $ref: '#/components/schemas/DashboardCrossFilterDimensionInputOperator'
+          description: '"equals" (any of `values`) or "between" (`values` is [start, end], inclusive)'
+        values:
+          description: The selected values
+          items:
+            oneOf:
+              - type: string
+              - type: number
+          type: array
+      required:
+        - member
+        - operator
+        - values
+      type: object
+    DashboardCrossFilterDimensionInputOperator:
       enum:
-        - draft
-        - published
-        - archived
+        - equals
+        - between
       type: string
+    DashboardCrossFilterDimensionOperator:
+      enum:
+        - equals
+        - between
+      type: string
+    DashboardCrossFilterInput:
+      properties:
+        dimensions:
+          description: The selected values, one entry per dimension of the chart
+          items:
+            $ref: '#/components/schemas/DashboardCrossFilterDimensionInput'
+          type: array
+        sourceWidgetId:
+          description: The id of the chart widget the cross filter comes from
+          type: string
+        view:
+          description: The view the chart queries, e.g. "orders"
+          type: string
+      required:
+        - sourceWidgetId
+        - view
+        - dimensions
+      type: object
     DashboardEmbeddingResponse:
       properties:
         allowEmbed:
@@ -10253,8 +10830,10 @@ components:
         value:
           description: >-
             Filter value. Omit for is_null / is_not_null / is_empty / is_not_empty; provide a
-            2-element [start, end] array for between. An empty array or empty string with no
-            operator renders the filter cleared; with an operator, the filter keeps that operator.
+            2-element [start, end] array for between; a whole number of members of at least 1
+            for top_n / bottom_n, which set a Top N control and rank by the measure it is
+            configured with. An empty array or empty string with no operator renders the filter
+            cleared; with an operator, the filter keeps that operator.
           oneOf:
             - oneOf:
                 - type: string
@@ -10291,6 +10870,8 @@ components:
         - is_empty
         - is_not_empty
         - between
+        - top_n
+        - bottom_n
         - custom
       type: string
     DashboardFilterOperator:
@@ -10318,6 +10899,8 @@ components:
         - is_empty
         - is_not_empty
         - between
+        - top_n
+        - bottom_n
         - custom
       type: string
     DashboardLayout:
@@ -10443,6 +11026,12 @@ components:
             - $ref: '#/components/schemas/DashboardWidgetPositionInput'
             - type: 'null'
       type: object
+    DashboardStatus:
+      enum:
+        - draft
+        - published
+        - archived
+      type: string
     DashboardThemeInput:
       properties:
         backgroundColor:
@@ -10529,7 +11118,7 @@ components:
               additionalProperties: true
             - type: 'null'
         type:
-          $ref: '#/components/schemas/DashboardWidgetDtoType'
+          $ref: '#/components/schemas/DashboardWidgetType'
       required:
         - id
         - type
@@ -10575,19 +11164,7 @@ components:
         - PARENT
         - SPACER
         - DIVIDER
-        - CONTAINER
-      type: string
-    DashboardWidgetDtoType:
-      enum:
-        - CHART
-        - TEXT
-        - FILTER
-        - AI
-        - TIME_GRAIN
-        - FIELD
-        - PARENT
-        - SPACER
-        - DIVIDER
+        - DYNAMIC_CONTROLS
         - CONTAINER
       type: string
     DashboardWidgetInput:
@@ -10629,6 +11206,7 @@ components:
         - PARENT
         - SPACER
         - DIVIDER
+        - DYNAMIC_CONTROLS
         - CONTAINER
       type: string
     DashboardWidgetPosition:
@@ -10663,6 +11241,20 @@ components:
         - w
         - h
       type: object
+    DashboardWidgetType:
+      enum:
+        - CHART
+        - TEXT
+        - FILTER
+        - AI
+        - TIME_GRAIN
+        - FIELD
+        - PARENT
+        - SPACER
+        - DIVIDER
+        - DYNAMIC_CONTROLS
+        - CONTAINER
+      type: string
     DataModelFileContent:
       properties:
         content:
@@ -10738,8 +11330,78 @@ components:
       required:
         - success
       type: object
+    DatabricksMetricViewBuildResponse:
+      properties:
+        buildJobId:
+          type: integer
+        commit:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - buildJobId
+      type: object
+    DatabricksMetricViewConnectionInput:
+      properties:
+        catalog:
+          description: >-
+            Catalog for two-part sql_table names, as CUBEJS_DB_DATABRICKS_CATALOG is for an
+            env-defined connection.
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        clientId:
+          description: OAuth client ID of the Databricks service principal.
+          maxLength: 255
+          type: string
+        clientSecret:
+          description: >-
+            OAuth secret of the service principal. Write-only, never returned. Omit to keep the
+            stored secret, which is kept only while host and clientId are unchanged.
+          oneOf:
+            - maxLength: 1024
+              type: string
+            - type: 'null'
+        host:
+          description: Workspace hostname, without https://.
+          maxLength: 255
+          type: string
+        httpPath:
+          description: SQL warehouse HTTP path, like /sql/1.0/warehouses/<id>.
+          maxLength: 255
+          type: string
+      required:
+        - host
+        - httpPath
+        - clientId
+      type: object
+    DatabricksMetricViewConnectionResponse:
+      properties:
+        catalog:
+          oneOf:
+            - type: string
+            - type: 'null'
+        clientId:
+          type: string
+        host:
+          type: string
+        httpPath:
+          type: string
+      required:
+        - host
+        - httpPath
+        - clientId
+      type: object
     DatabricksMetricViewIntegrationConfigurationResponse:
       properties:
+        connection:
+          description: >-
+            The integration's own credential, without its secret. Absent when the datasource's
+            env-defined connection is used.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewConnectionResponse'
+            - type: 'null'
         deletionPolicy:
           $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponseDeletionPolicy'
         enabled:
@@ -10752,6 +11414,9 @@ components:
               additionalProperties:
                 type: string
             - type: 'null'
+        syncOnDeploy:
+          description: True when a successful build of the deployment starts a publication run.
+          type: boolean
         targetCatalog:
           type: string
         targetNamePrefix:
@@ -10781,6 +11446,7 @@ components:
       required:
         - version
         - enabled
+        - syncOnDeploy
         - targetCatalog
         - targetSchema
         - selectionMode
@@ -10823,6 +11489,58 @@ components:
           type: integer
         publicId:
           type: string
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+      required:
+        - publicId
+        - deploymentId
+        - dataSourceName
+        - configurationVersion
+        - configuration
+        - createdAt
+        - updatedAt
+      type: object
+    DatabricksMetricViewIntegrationWithBuildsResponse:
+      properties:
+        accessTest:
+          oneOf:
+            - type: object
+            - type: 'null'
+        configuration:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponse'
+        configurationVersion:
+          type: integer
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        dataSourceName:
+          type: string
+        deployedBuild:
+          description: >-
+            The deployment's newest successful build: the one a publication run converts. Null when
+            the deployment has none.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewBuildResponse'
+            - type: 'null'
+        deploymentId:
+          type: integer
+        publicId:
+          type: string
+        publishedBuild:
+          description: >-
+            The build the newest COMPLETED or PARTIAL run converted. Null when no run has published
+            or that run recorded no build; absent when the run history could not be read. Databricks
+            lags the deployed model while its buildJobId differs from deployedBuild.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewBuildResponse'
+            - type: 'null'
         updatedAt:
           oneOf:
             - format: date
@@ -10911,11 +11629,30 @@ components:
       properties:
         dataSourceName:
           type: string
+        files:
+          description: >-
+            With source 'files' only. `.yml`/`.yaml` paths relative to the model folder, mapped to
+            their contents. A path has no `.` or `..` segments and uses only letters, digits, `_`,
+            `-`, `.` and `/`. Jinja-templated files are refused: only a deployed model can be
+            rendered.
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
         selectionMode:
           $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInputSelectionMode'
           description: >-
             Choose every deployed Cube view ('all'), an exact ordered list ('selected'), or names
             matching viewNameRegex ('pattern').
+        source:
+          description: >-
+            'deployment' (the default) converts the YAML data model of the deployment's latest
+            successful build; 'files' converts the `files` sent with the request, such as a pull
+            request's checkout, so CI can compare it with a preview of the deployment.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInputSource'
+            - type: 'null'
         sourceOverrides:
           description: >-
             Optional map of Cube view name to the root source dataset the view projects from, for
@@ -10956,10 +11693,18 @@ components:
         - selected
         - pattern
       type: string
+    DatabricksMetricViewPublicationPreviewInputSource:
+      enum:
+        - deployment
+        - files
+      type: string
     DatabricksMetricViewPublicationPreviewResultResponse:
       properties:
         buildJobId:
-          type: integer
+          description: The converted build. Absent for source 'files'.
+          oneOf:
+            - type: integer
+            - type: 'null'
         commit:
           oneOf:
             - type: string
@@ -10991,7 +11736,6 @@ components:
         - previewId
         - deploymentId
         - dataSourceName
-        - buildJobId
         - completedAt
         - durationMs
         - version
@@ -11013,7 +11757,10 @@ components:
     DatabricksMetricViewPublicationPreviewStartResponse:
       properties:
         buildJobId:
-          type: integer
+          description: The converted build. Absent for source 'files'.
+          oneOf:
+            - type: integer
+            - type: 'null'
         commit:
           oneOf:
             - type: string
@@ -11036,7 +11783,6 @@ components:
         - previewId
         - deploymentId
         - dataSourceName
-        - buildJobId
         - reused
         - status
         - statusUrl
@@ -11307,6 +12053,11 @@ components:
           description: >-
             PARTIAL means at least one view published and another did not. Every non-successful view
             keeps its previous Databricks definition.
+        takeOverTargets:
+          description: Destinations, as catalog.schema.name, this run was started to take over.
+          items:
+            type: string
+          type: array
         targetCatalog:
           oneOf:
             - type: string
@@ -11317,6 +12068,9 @@ components:
             - type: 'null'
         trigger:
           $ref: '#/components/schemas/DatabricksMetricViewSyncRunResponseTrigger'
+          description: >-
+            MANUAL for a run a user started, DEPLOYMENT for one a successful build of the deployment
+            started.
         viewNames:
           description: The Cube views this run was planned against.
           items:
@@ -11334,6 +12088,7 @@ components:
         - trigger
         - status
         - viewNames
+        - takeOverTargets
         - views
         - incompleteViewCount
         - createdAt
@@ -11351,6 +12106,7 @@ components:
     DatabricksMetricViewSyncRunResponseTrigger:
       enum:
         - MANUAL
+        - DEPLOYMENT
       type: string
     DatabricksMetricViewSyncStartResponse:
       properties:
@@ -11388,12 +12144,20 @@ components:
         cubeViewName:
           type: string
         detail:
-          description: A stable reason code, never raw Databricks output.
+          description: >-
+            A stable reason code, never raw Databricks output. `unmanaged-target` and
+            `ownership-conflict` mean an object this integration does not manage holds the
+            destination; pass its `target` in `takeOverTargets` to replace it.
           oneOf:
             - type: string
             - type: 'null'
         outcome:
           $ref: '#/components/schemas/DatabricksMetricViewSyncViewOutcomeResponseOutcome'
+        target:
+          description: The destination, as catalog.schema.name; null when conversion blocked the view.
+          oneOf:
+            - type: string
+            - type: 'null'
         withheldMembers:
           description: >-
             Measures this view published without, as 'cube.member'. Non-empty means the Metric View
@@ -11502,12 +12266,33 @@ components:
       type: object
     DbtSyncManifestStats:
       properties:
+        importedMetrics:
+          description: Number of imported dbt semantic metrics, when import is enabled.
+          oneOf:
+            - type: integer
+            - type: 'null'
         macros:
           type: integer
         models:
           type: integer
+        skippedMetrics:
+          description: >-
+            The first 25 skipped metrics by unique ID, with the reason for each;
+            `unsupportedMetrics` counts them all.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DbtSyncSkippedMetric'
+              type: array
+            - type: 'null'
         sources:
           type: integer
+        unsupportedMetrics:
+          description: >-
+            Number of dbt semantic metrics skipped because they cannot be imported exactly, when
+            import is enabled.
+          oneOf:
+            - type: integer
+            - type: 'null'
       required:
         - models
         - sources
@@ -11723,6 +12508,11 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        importedMetrics:
+          description: Number of imported dbt semantic metrics, when import is enabled.
+          oneOf:
+            - type: integer
+            - type: 'null'
         macros:
           description: dbt macros found in the manifest.
           oneOf:
@@ -11743,6 +12533,13 @@ components:
             - type: 'null'
         sources:
           description: dbt sources found in the manifest.
+          oneOf:
+            - type: integer
+            - type: 'null'
+        unsupportedMetrics:
+          description: >-
+            Number of dbt semantic metrics skipped because they cannot be imported exactly, when
+            import is enabled.
           oneOf:
             - type: integer
             - type: 'null'
@@ -11778,6 +12575,22 @@ components:
         - agent
         - unknown
       type: string
+    DbtSyncSkippedMetric:
+      properties:
+        name:
+          description: The dbt metric name.
+          type: string
+        reason:
+          description: Why the metric cannot be imported exactly.
+          type: string
+        uniqueId:
+          description: The dbt metric unique ID.
+          type: string
+      required:
+        - name
+        - uniqueId
+        - reason
+      type: object
     DbtSyncStatusResponse:
       properties:
         error:
@@ -12404,7 +13217,7 @@ components:
         - read
         - none
       type: string
-    EmbedDashboardCommentDto:
+    EmbedDashboardComment:
       properties:
         body:
           type: string
@@ -12447,11 +13260,11 @@ components:
         - createdAt
         - isOwn
       type: object
-    EmbedDashboardCommentThreadDto:
+    EmbedDashboardCommentThread:
       properties:
         replies:
           items:
-            $ref: '#/components/schemas/EmbedDashboardCommentDto'
+            $ref: '#/components/schemas/EmbedDashboardComment'
           type: array
         resolvedAt:
           oneOf:
@@ -12466,7 +13279,7 @@ components:
             - type: integer
             - type: 'null'
         root:
-          $ref: '#/components/schemas/EmbedDashboardCommentDto'
+          $ref: '#/components/schemas/EmbedDashboardComment'
       required:
         - root
         - replies
@@ -12475,7 +13288,7 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/EmbedDashboardCommentThreadDto'
+            $ref: '#/components/schemas/EmbedDashboardCommentThread'
           type: array
         pageInfo:
           $ref: '#/components/schemas/PageInfo'
@@ -12526,7 +13339,7 @@ components:
         - addedMembers
         - unchangedMembers
       type: object
-    EmbedMentionableUserDto:
+    EmbedMentionableUser:
       properties:
         email:
           oneOf:
@@ -12548,7 +13361,7 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/EmbedMentionableUserDto'
+            $ref: '#/components/schemas/EmbedMentionableUser'
           type: array
         pageInfo:
           $ref: '#/components/schemas/PageInfo'
@@ -12593,8 +13406,10 @@ components:
             agent cannot save or update standalone explorations/reports, create or modify workbooks,
             create or publish dashboards, or direct users to those Cube UI surfaces. Omit or set to
             `true` to preserve the session user's role-derived authoring capabilities; `true` never
-            grants access the user does not already have. This setting changes only AI Chat tools
-            and instructions. It does not change user roles or permissions for direct API calls.
+            grants access the user does not already have. For an `externalId` session, authoring
+            also requires `creatorMode: true`: outside creator mode the agent never saves workspace
+            content. This setting changes only AI Chat tools and instructions. It does not change
+            user roles or permissions for direct API calls.
           oneOf:
             - type: boolean
             - type: 'null'
@@ -13155,7 +13970,7 @@ components:
         position:
           type: integer
         type:
-          $ref: '#/components/schemas/FolderDtoType'
+          $ref: '#/components/schemas/FolderType'
         updatedAt:
           oneOf:
             - format: date
@@ -13179,7 +13994,7 @@ components:
         - updatedAt
         - type
       type: object
-    FolderDtoType:
+    FolderType:
       enum:
         - FOLDER
         - WORKBOOK
@@ -13557,7 +14372,54 @@ components:
       required:
         - name
       type: object
-    JsonConfigFileDto:
+    IssuePlacementProofInput:
+      properties:
+        documentKey:
+          oneOf:
+            - type: string
+            - type: 'null'
+        googleAccessToken:
+          description: Apps Script OAuth token with access to the requested spreadsheet.
+          oneOf:
+            - type: string
+            - type: 'null'
+        googleIdToken:
+          oneOf:
+            - type: string
+            - type: 'null'
+        host:
+          $ref: '#/components/schemas/IssuePlacementProofInputHost'
+        operation:
+          description: Placement operation that will consume this proof.
+          oneOf:
+            - $ref: '#/components/schemas/IssuePlacementProofInputOperation'
+            - type: 'null'
+      required:
+        - host
+      type: object
+    IssuePlacementProofInputHost:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+      type: string
+    IssuePlacementProofInputOperation:
+      enum:
+        - create
+        - update
+        - connect
+        - upsert
+      type: string
+    IssuePlacementProofResponse:
+      properties:
+        expiresAt:
+          type: string
+        proof:
+          type: string
+      required:
+        - proof
+        - expiresAt
+      type: object
+    JsonConfigFile:
       properties:
         content:
           description: >-
@@ -13613,6 +14475,9 @@ components:
             - type: boolean
             - type: 'null'
         message:
+          description: >-
+            Commit message for the merge. If empty or missing, the agent writes it from the branch's
+            diff; if AI is not available, Git's default merge message is used.
           oneOf:
             - type: string
             - type: 'null'
@@ -13642,13 +14507,16 @@ components:
         branchName:
           type: string
         message:
-          type: string
+          description: >-
+            Commit message for the merge. If empty or missing, the agent writes it from the branch's
+            diff; if AI is not available, Git's default merge message is used.
+          oneOf:
+            - type: string
+            - type: 'null'
         removeBranchAfterMerge:
           oneOf:
             - type: boolean
             - type: 'null'
-      required:
-        - message
       type: object
     MoveWorkspaceObjectInput:
       properties:
@@ -13670,10 +14538,30 @@ components:
         - WORKBOOK
         - REPORT
       type: string
-    NotificationDto:
+    Notification:
       properties:
+        addedControls:
+          description: >-
+            Controls added through the dashboard's Dynamic controls area that the notification
+            renders with.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardAddedControl'
+              type: array
+            - type: 'null'
         cronExpression:
           type: string
+        crossFilters:
+          description: >-
+            Cross-filters the notification renders with: each is one chart's selection ("Filter
+            dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
+            every other chart renders filtered by it. The chart must be on the published dashboard,
+            with Cross-filtering on.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardCrossFilter'
+              type: array
+            - type: 'null'
         dashboardId:
           type: integer
         deploymentId:
@@ -13883,7 +14771,7 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/NotificationDto'
+            $ref: '#/components/schemas/Notification'
           type: array
         pageInfo:
           oneOf:
@@ -14218,15 +15106,19 @@ components:
       type: string
     OssieConversionRuntime:
       properties:
+        convertersCommit:
+          description: The apache/ossie-converters commit the Cube converter was built from.
+          type: string
         cubeConverterVersion:
           type: string
         ossieCommit:
-          description: The apache/ossie commit the converter was built from.
+          description: The apache/ossie commit the Ossie core package was built from.
           type: string
         ossieCoreVersion:
           type: string
       required:
         - ossieCommit
+        - convertersCommit
         - ossieCoreVersion
         - cubeConverterVersion
       type: object
@@ -14482,6 +15374,7 @@ components:
             enum:
               - All
               - DeploymentsManage
+              - SignIn
               - DeploymentCreate
               - DeploymentRead
               - DeploymentUpdate
@@ -14585,14 +15478,14 @@ components:
       required:
         - targetDeploymentId
       type: object
-    PromotionActorDto:
+    PromotionActor:
       properties:
         apiKeyId:
           oneOf:
             - type: integer
             - type: 'null'
         authenticationMethod:
-          $ref: '#/components/schemas/PromotionActorDtoAuthenticationMethod'
+          $ref: '#/components/schemas/PromotionActorAuthenticationMethod'
         displayName:
           type: string
         userId:
@@ -14602,15 +15495,15 @@ components:
         - displayName
         - authenticationMethod
       type: object
-    PromotionActorDtoAuthenticationMethod:
+    PromotionActorAuthenticationMethod:
       enum:
         - session
         - apiKey
       type: string
-    PromotionReferenceDto:
+    PromotionReference:
       properties:
         availability:
-          $ref: '#/components/schemas/PromotionReferenceDtoAvailability'
+          $ref: '#/components/schemas/PromotionReferenceAvailability'
         deploymentId:
           oneOf:
             - type: integer
@@ -14626,7 +15519,7 @@ components:
       required:
         - availability
       type: object
-    PromotionReferenceDtoAvailability:
+    PromotionReferenceAvailability:
       enum:
         - available
         - unavailable
@@ -15055,7 +15948,7 @@ components:
             - type: 'null'
         source:
           oneOf:
-            - $ref: '#/components/schemas/ReportDtoSource'
+            - $ref: '#/components/schemas/ReportSource'
             - type: 'null'
         sqlQuery:
           oneOf:
@@ -15066,7 +15959,7 @@ components:
             - type: string
             - type: 'null'
         type:
-          $ref: '#/components/schemas/ReportDtoType'
+          $ref: '#/components/schemas/ReportType'
         updatedAt:
           oneOf:
             - format: date
@@ -15518,19 +16411,6 @@ components:
       required:
         - columns
       type: object
-    ReportDtoSource:
-      enum:
-        - GOOGLE_SHEETS
-        - EXCEL
-        - PLAYGROUND
-        - D3
-      type: string
-    ReportDtoType:
-      enum:
-        - FOLDER
-        - WORKBOOK
-        - REPORT
-      type: string
     ReportPlacement:
       properties:
         anchorCell:
@@ -15704,7 +16584,7 @@ components:
             - type: 'null'
         kind:
           oneOf:
-            - $ref: '#/components/schemas/ReportSnapshotDtoKind'
+            - $ref: '#/components/schemas/ReportSnapshotKind'
             - type: 'null'
         meta:
           oneOf:
@@ -15756,7 +16636,7 @@ components:
         - reportId
         - versionNumber
       type: object
-    ReportSnapshotDtoKind:
+    ReportSnapshotKind:
       enum:
         - vega
         - table
@@ -15774,6 +16654,19 @@ components:
                 $ref: '#/components/schemas/ColumnFormatOverride'
             - type: 'null'
       type: object
+    ReportSource:
+      enum:
+        - GOOGLE_SHEETS
+        - EXCEL
+        - PLAYGROUND
+        - D3
+      type: string
+    ReportType:
+      enum:
+        - FOLDER
+        - WORKBOOK
+        - REPORT
+      type: string
     ReportsListResponse:
       properties:
         count:
@@ -15950,6 +16843,7 @@ components:
             enum:
               - All
               - DeploymentsManage
+              - SignIn
               - DeploymentCreate
               - DeploymentRead
               - DeploymentUpdate
@@ -16039,11 +16933,21 @@ components:
       type: object
     SaveDatabricksMetricViewIntegrationInput:
       properties:
+        connection:
+          description: >-
+            The integration's own Databricks service-principal credential, for a datasource with no
+            env-defined Databricks connection (for example one served by driver_factory in cube.py).
+            When set, it is used instead of the datasource's env vars. Omit to keep the stored one;
+            null removes it.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewConnectionInput'
+            - type: 'null'
         deletionPolicy:
           $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputDeletionPolicy'
           description: >-
-            Use retain. The delete-managed value is deprecated and currently retains obsolete Metric
-            Views; it does not delete them.
+            What a sync does with a Metric View Cube created once it is obsolete: its Cube view left
+            the scope or its target name changed. retain keeps it; delete-managed drops it, under
+            fixed safety rules. Omitted, it saves retain, also on an update.
         enabled:
           type: boolean
         expectedConfigurationVersion:
@@ -16056,6 +16960,11 @@ components:
           additionalProperties:
             type: string
           type: object
+        syncOnDeploy:
+          description: >-
+            Start a publication run after each successful build of the deployment, while enabled is
+            also true. Defaults to false.
+          type: boolean
         targetCatalog:
           maxLength: 255
           type: string
@@ -16085,13 +16994,10 @@ components:
         - selectionMode
       type: object
     SaveDatabricksMetricViewIntegrationInputDeletionPolicy:
-      oneOf:
-        - const: retain
-          type: string
-        - const: delete-managed
-          type: string
-          deprecated: true
-          description: Managed deletion is not implemented. Use retain.
+      enum:
+        - retain
+        - delete-managed
+      type: string
     SaveDatabricksMetricViewIntegrationInputSelectionMode:
       enum:
         - all
@@ -16274,6 +17180,93 @@ components:
         - items
         - pageInfo
       type: object
+    ScheduledTaskNotification:
+      properties:
+        channels:
+          $ref: '#/components/schemas/ScheduledTaskNotificationChannels'
+        groupIds:
+          description: >-
+            User groups whose members are notified by Inbox and Email, as they are when a run
+            finishes.
+          items:
+            type: integer
+          maxItems: 200
+          type: array
+        optedOutUserIds:
+          description: >-
+            Users who unsubscribed from this task's email. Returned only to the task's creator or an
+            admin.
+          oneOf:
+            - items:
+                type: integer
+              type: array
+            - type: 'null'
+        slackChannels:
+          items:
+            $ref: '#/components/schemas/ScheduledTaskSlackChannel'
+          maxItems: 50
+          type: array
+        userIds:
+          description: >-
+            The users notified by Inbox and Email. The creator is notified only when listed here. A
+            failed run notifies only the creator.
+          items:
+            type: integer
+          maxItems: 1000
+          type: array
+      required:
+        - channels
+        - userIds
+        - groupIds
+        - slackChannels
+      type: object
+    ScheduledTaskNotificationChannels:
+      properties:
+        email:
+          description: Email, for the picked people. Each email carries an unsubscribe link.
+          type: boolean
+        inbox:
+          description: Cube's notification inbox, for the picked people.
+          type: boolean
+        slack:
+          description: One Slack post to each of `slackChannels`.
+          type: boolean
+      required:
+        - inbox
+        - email
+        - slack
+      type: object
+    ScheduledTaskNotificationInput:
+      properties:
+        channels:
+          $ref: '#/components/schemas/ScheduledTaskNotificationChannels'
+        groupIds:
+          description: >-
+            User groups whose members are notified by Inbox and Email, as they are when a run
+            finishes.
+          items:
+            type: integer
+          maxItems: 200
+          type: array
+        slackChannels:
+          items:
+            $ref: '#/components/schemas/ScheduledTaskSlackChannel'
+          maxItems: 50
+          type: array
+        userIds:
+          description: >-
+            The users notified by Inbox and Email. The creator is notified only when listed here. A
+            failed run notifies only the creator.
+          items:
+            type: integer
+          maxItems: 1000
+          type: array
+      required:
+        - channels
+        - userIds
+        - groupIds
+        - slackChannels
+      type: object
     ScheduledTaskResponse:
       properties:
         agentId:
@@ -16286,8 +17279,10 @@ components:
             Notify only when: on each fire the measure is read once, before the agent runs, and the
             agent runs only when the condition starts to hold, with the crossing facts at the top of
             its thread; it runs again only after the condition has stopped holding. A `change` or
-            `anomaly` rule needs `timeDimension` and `granularity`. The creator gets an inbox row
-            only with `notificationEnabled: true`. Null runs the agent on every fire.
+            `anomaly` rule needs `timeDimension` and `granularity`. A request that sends
+            `notification` must leave a task with a condition notifying someone (`400` otherwise);
+            one that does not, on the deprecated `notificationEnabled` shape, keeps its earlier
+            behaviour. Null runs the agent on every fire.
           oneOf:
             - $ref: '#/components/schemas/ScheduledTaskCondition'
             - type: 'null'
@@ -16322,8 +17317,14 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        notification:
+          $ref: '#/components/schemas/ScheduledTaskNotification'
+          description: Who a finished run notifies, and how.
         notificationEnabled:
-          description: Whether a finished run notifies the creator in Cube's notification inbox.
+          deprecated: true
+          description: >-
+            Deprecated: read `notification` instead. Whether a finished run notifies the creator in
+            Cube's notification inbox.
           type: boolean
         prompt:
           description: >-
@@ -16335,8 +17336,8 @@ components:
           type: string
         userId:
           description: >-
-            The creator. Every run executes as this user, and only they, an admin or a role granting
-            `ScheduledTasksManage` on the deployment may change, delete or run the task.
+            The creator. Every run executes as this user, and only they or an admin may change,
+            delete or run the task.
           type: integer
       required:
         - id
@@ -16346,6 +17347,7 @@ components:
         - timezone
         - isEnabled
         - notificationEnabled
+        - notification
         - userId
       type: object
     ScheduledTaskRunResponse:
@@ -16377,6 +17379,22 @@ components:
       required:
         - items
         - pageInfo
+      type: object
+    ScheduledTaskSlackChannel:
+      properties:
+        id:
+          description: The Slack channel id, e.g. `C0123ABC`.
+          maxLength: 64
+          minLength: 1
+          type: string
+        name:
+          description: The channel name, without `#`.
+          maxLength: 255
+          minLength: 1
+          type: string
+      required:
+        - id
+        - name
       type: object
     SetBranchStagingEnvironmentRequest:
       properties:
@@ -16587,14 +17605,17 @@ components:
             - type: 'null'
         format:
           $ref: '#/components/schemas/StartDashboardExportInputFormat'
-          description: 'Output format: `png` or `pdf`.'
+          description: >-
+            Output format, the Format of the dashboard's Download settings: `png` (PNG) or `pdf`
+            (PDF).
         layout:
           default: screenshot
           description: >-
-            How the dashboard is laid out. `screenshot` (the default) renders the board as it looks
-            on screen. `print` renders the paginated A4 document the dashboard's 'Download print
-            version' menu item produces: one column, every table row, and the filter state as a
-            summary line instead of filter controls. `print` is available for `format: 'pdf'` only.
+            How the dashboard is laid out, the Layout of the dashboard's Download settings.
+            `screenshot` (the default) is Snapshot: the board as laid out, with the rows each table
+            shows and the control widgets. `print` is Print version: a paginated A4 document with
+            every tab and every table row, and the control values listed at the top instead of the
+            control widgets. `print` is available for `format: 'pdf'` only.
           oneOf:
             - $ref: '#/components/schemas/StartDashboardExportInputLayout'
             - type: 'null'
@@ -16648,6 +17669,19 @@ components:
           oneOf:
             - format: uuid
               type: string
+            - type: 'null'
+        takeOverTargets:
+          description: >-
+            Destinations, each as catalog.schema.name (a refused view's `target` in run history),
+            that this run replaces whatever Databricks object holds them and records as managed by
+            this integration — including one another integration manages. Each must be where a Cube
+            view in the integration's scope publishes; every other destination stays guarded. Omit
+            it and no object Cube does not manage is overwritten.
+          oneOf:
+            - items:
+                type: string
+              type: array
+              maxItems: 128
             - type: 'null'
       required:
         - configurationVersion
@@ -16838,6 +17872,19 @@ components:
         - transaction
         - deploymentName
       type: object
+    SuggestWorkbookNameInput:
+      properties:
+        fallbackName:
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        language:
+          maxLength: 35
+          type: string
+      required:
+        - language
+      type: object
     TenantSettings:
       properties:
         aiTokensAutoPurchaseAmount:
@@ -16973,6 +18020,70 @@ components:
             - type: string
             - type: 'null'
       type: object
+    UpdateCalculatedFieldInput:
+      properties:
+        description:
+          oneOf:
+            - type: string
+            - type: 'null'
+        expression:
+          oneOf:
+            - type: string
+            - type: 'null'
+        format:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateCalculatedFieldInputFormat'
+            - type: 'null'
+        memberRole:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateCalculatedFieldInputMemberRole'
+            - type: 'null'
+        name:
+          oneOf:
+            - type: string
+            - type: 'null'
+        semanticView:
+          oneOf:
+            - type: string
+            - type: 'null'
+        title:
+          oneOf:
+            - type: string
+            - type: 'null'
+        valueType:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateCalculatedFieldInputValueType'
+            - type: 'null'
+      type: object
+    UpdateCalculatedFieldInputFormat:
+      enum:
+        - percent
+        - currency
+        - imageUrl
+        - id
+        - link
+      type: string
+    UpdateCalculatedFieldInputMemberRole:
+      enum:
+        - measure
+        - dimension
+      type: string
+    UpdateCalculatedFieldInputValueType:
+      enum:
+        - string
+        - time
+        - boolean
+        - number
+        - number_agg
+        - count
+        - count_distinct
+        - count_distinct_approx
+        - sum
+        - avg
+        - min
+        - max
+        - geo
+      type: string
     UpdateDashboardEmbeddingInput:
       properties:
         allowEmbed:
@@ -17169,6 +18280,27 @@ components:
       type: object
     UpdateNotificationInput:
       properties:
+        addedControls:
+          description: >-
+            Controls added through the dashboard's Dynamic controls area. Replaces the stored set
+            when provided.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardAddedControlInput'
+              type: array
+              maxItems: 50
+            - type: 'null'
+        crossFilters:
+          description: >-
+            Cross-filters the notification renders with: each is one chart's selection ("Filter
+            dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
+            every other chart renders filtered by it. The chart must be on the published dashboard,
+            with Cross-filtering on. Replaces the stored set when provided; [] clears it.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DashboardCrossFilterInput'
+              type: array
+            - type: 'null'
         customCron:
           oneOf:
             - type: string
@@ -17364,7 +18496,7 @@ components:
         ownerUserId:
           description: >-
             Transfer the delivery to this active user, who must be able to read its report. They
-            become owner and run-as user. Admins and roles granting `ScheduledTasksManage` only.
+            become owner and run-as user. Admins only.
           oneOf:
             - type: integer
             - type: 'null'
@@ -17434,11 +18566,19 @@ components:
             - maxLength: 255
               type: string
             - type: 'null'
+        nameSource:
+          oneOf:
+            - $ref: '#/components/schemas/UpdateReportInputNameSource'
+            - type: 'null'
         pivotItems:
           oneOf:
             - $ref: '#/components/schemas/PivotItems'
             - type: 'null'
         placementId:
+          oneOf:
+            - type: string
+            - type: 'null'
+        placementProof:
           oneOf:
             - type: string
             - type: 'null'
@@ -17448,6 +18588,10 @@ components:
               type: string
               minLength: 12
               maxLength: 12
+            - type: 'null'
+        renamed:
+          oneOf:
+            - type: boolean
             - type: 'null'
         resultChecksum:
           oneOf:
@@ -17484,6 +18628,10 @@ components:
         - GOOGLE_SHEETS
         - EXCEL
       type: string
+    UpdateReportInputNameSource:
+      enum:
+        - auto
+      type: string
     UpdateScheduledTaskInput:
       properties:
         agentId:
@@ -17498,9 +18646,11 @@ components:
             Notify only when: on each fire the measure is read once, before the agent runs, and the
             agent runs only when the condition starts to hold, with the crossing facts at the top of
             its thread; it runs again only after the condition has stopped holding. A `change` or
-            `anomaly` rule needs `timeDimension` and `granularity`. The creator gets an inbox row
-            only with `notificationEnabled: true`. Omit to leave unchanged; null removes it. A
-            changed condition starts its breach state fresh.
+            `anomaly` rule needs `timeDimension` and `granularity`. A request that sends
+            `notification` must leave a task with a condition notifying someone (`400` otherwise);
+            one that does not, on the deprecated `notificationEnabled` shape, keeps its earlier
+            behaviour. Omit to leave unchanged; null removes it. A changed condition starts its
+            breach state fresh.
           oneOf:
             - $ref: '#/components/schemas/ScheduledTaskCondition'
             - type: 'null'
@@ -17531,10 +18681,21 @@ components:
               type: string
               minLength: 1
             - type: 'null'
-        notificationEnabled:
+        notification:
           description: >-
-            Turn the inbox notification for finished runs on or off. Omit to leave unchanged.
-            Explicit null answers `400`.
+            Who a finished run notifies, and how. Replaces the stored setting. Picked users and
+            groups are shared the task, view-only, so they can open the run. An id that is not an
+            active workspace member or a group answers `400`. Wins over `notificationEnabled` when
+            both are sent. Omit to leave unchanged. Explicit null answers `400`.
+          oneOf:
+            - $ref: '#/components/schemas/ScheduledTaskNotificationInput'
+            - type: 'null'
+        notificationEnabled:
+          deprecated: true
+          description: >-
+            Deprecated: send `notification` instead. `true` adds the creator to `notification` with
+            Inbox on; `false` takes the creator off it only when they get Inbox, so a creator who
+            gets only Email keeps it. Omit to leave unchanged. Explicit null answers `400`.
           oneOf:
             - type: boolean
             - type: 'null'
@@ -17569,6 +18730,10 @@ components:
         name:
           oneOf:
             - type: string
+            - type: 'null'
+        renamed:
+          oneOf:
+            - type: boolean
             - type: 'null'
         slug:
           oneOf:
@@ -17667,7 +18832,7 @@ components:
           type: integer
         impersonation:
           oneOf:
-            - $ref: '#/components/schemas/UserImpersonationDTO'
+            - $ref: '#/components/schemas/UserImpersonation'
             - type: 'null'
         isAdmin:
           type: boolean
@@ -17740,7 +18905,7 @@ components:
         id:
           type: integer
         source:
-          $ref: '#/components/schemas/UserAliasDTOSource'
+          $ref: '#/components/schemas/UserAliasSource'
         updatedAt:
           pattern: \d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d.\d+Z?
           type: string
@@ -17756,7 +18921,7 @@ components:
         - createdAt
         - updatedAt
       type: object
-    UserAliasDTOSource:
+    UserAliasSource:
       enum:
         - ldap
         - saml
@@ -17836,12 +19001,12 @@ components:
         name:
           type: string
         type:
-          $ref: '#/components/schemas/UserAttributeDefinitionDTOType'
+          $ref: '#/components/schemas/UserAttributeDefinitionType'
       required:
         - name
         - type
       type: object
-    UserAttributeDefinitionDTOType:
+    UserAttributeDefinitionType:
       enum:
         - string
         - number
@@ -18021,7 +19186,7 @@ components:
         - email
         - username
       type: object
-    UserGroupDTO:
+    UserGroup:
       properties:
         description:
           oneOf:
@@ -18043,7 +19208,7 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/UserGroupDTO'
+            $ref: '#/components/schemas/UserGroup'
           type: array
         pageInfo:
           $ref: '#/components/schemas/PageInfo'
@@ -18051,7 +19216,7 @@ components:
         - items
         - pageInfo
       type: object
-    UserImpersonationDTO:
+    UserImpersonation:
       properties:
         expiresAt:
           oneOf:
@@ -18391,7 +19556,7 @@ components:
           type: string
         promotion:
           oneOf:
-            - $ref: '#/components/schemas/WorkbookPromotionSummaryDto'
+            - $ref: '#/components/schemas/WorkbookPromotionSummary'
             - type: 'null'
         publishedDashboard:
           oneOf:
@@ -18402,7 +19567,7 @@ components:
             - type: string
             - type: 'null'
         type:
-          $ref: '#/components/schemas/WorkbookDtoType'
+          $ref: '#/components/schemas/WorkbookType'
         updatedAt:
           oneOf:
             - format: date
@@ -18445,13 +19610,7 @@ components:
             - $ref: '#/components/schemas/DashboardConfigDraftInput'
             - type: 'null'
       type: object
-    WorkbookDtoType:
-      enum:
-        - FOLDER
-        - WORKBOOK
-        - REPORT
-      type: string
-    WorkbookPromotionDto:
+    WorkbookPromotion:
       properties:
         completedAt:
           oneOf:
@@ -18468,18 +19627,18 @@ components:
         linkId:
           type: integer
         outcome:
-          $ref: '#/components/schemas/WorkbookPromotionDtoOutcome'
+          $ref: '#/components/schemas/WorkbookPromotionOutcome'
         overrideRequested:
           type: boolean
         performedBy:
-          $ref: '#/components/schemas/PromotionActorDto'
+          $ref: '#/components/schemas/PromotionActor'
         source:
           oneOf:
-            - $ref: '#/components/schemas/PromotionReferenceDto'
+            - $ref: '#/components/schemas/PromotionReference'
             - type: 'null'
         target:
           oneOf:
-            - $ref: '#/components/schemas/PromotionReferenceDto'
+            - $ref: '#/components/schemas/PromotionReference'
             - type: 'null'
         targetDashboardVersionId:
           type: integer
@@ -18494,18 +19653,12 @@ components:
         - destinationChangedSincePreview
         - targetDashboardVersionId
       type: object
-    WorkbookPromotionDtoOutcome:
-      enum:
-        - created
-        - updated
-        - unchanged
-      type: string
-    WorkbookPromotionLinkDto:
+    WorkbookPromotionLink:
       properties:
         id:
           type: integer
         target:
-          $ref: '#/components/schemas/PromotionReferenceDto'
+          $ref: '#/components/schemas/PromotionReference'
       required:
         - id
         - target
@@ -18514,7 +19667,7 @@ components:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/WorkbookPromotionLinkDto'
+            $ref: '#/components/schemas/WorkbookPromotionLink'
           type: array
         pageInfo:
           $ref: '#/components/schemas/PageInfo'
@@ -18522,7 +19675,13 @@ components:
         - items
         - pageInfo
       type: object
-    WorkbookPromotionPreviewDto:
+    WorkbookPromotionOutcome:
+      enum:
+        - created
+        - updated
+        - unchanged
+      type: string
+    WorkbookPromotionPreview:
       properties:
         destinationHash:
           oneOf:
@@ -18546,22 +19705,22 @@ components:
         - reportCount
         - sourceHash
       type: object
-    WorkbookPromotionSummaryDto:
+    WorkbookPromotionSummary:
       properties:
         firstPromotion:
           oneOf:
-            - $ref: '#/components/schemas/WorkbookPromotionDto'
+            - $ref: '#/components/schemas/WorkbookPromotion'
             - type: 'null'
         lastPromotion:
           oneOf:
-            - $ref: '#/components/schemas/WorkbookPromotionDto'
+            - $ref: '#/components/schemas/WorkbookPromotion'
             - type: 'null'
         linkId:
           type: integer
         origin:
-          $ref: '#/components/schemas/PromotionReferenceDto'
+          $ref: '#/components/schemas/PromotionReference'
         parent:
-          $ref: '#/components/schemas/PromotionReferenceDto'
+          $ref: '#/components/schemas/PromotionReference'
       required:
         - linkId
         - parent
@@ -18571,14 +19730,14 @@ components:
       properties:
         promotion:
           oneOf:
-            - $ref: '#/components/schemas/WorkbookPromotionSummaryDto'
+            - $ref: '#/components/schemas/WorkbookPromotionSummary'
             - type: 'null'
       type: object
     WorkbookPromotionsListResponse:
       properties:
         items:
           items:
-            $ref: '#/components/schemas/WorkbookPromotionDto'
+            $ref: '#/components/schemas/WorkbookPromotion'
           type: array
         pageInfo:
           $ref: '#/components/schemas/PageInfo'
@@ -18586,6 +19745,12 @@ components:
         - items
         - pageInfo
       type: object
+    WorkbookType:
+      enum:
+        - FOLDER
+        - WORKBOOK
+        - REPORT
+      type: string
     WorkbooksListResponse:
       properties:
         count:

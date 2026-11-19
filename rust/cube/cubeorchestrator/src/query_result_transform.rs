@@ -174,10 +174,35 @@ pub fn empty_vanilla_row(capacity: usize) -> VanillaRow {
     IndexMap::with_capacity_and_hasher(capacity, PrehashedBuildHasher)
 }
 
+/// Whether `s` is already `YYYY-MM-DDTHH:MM:SS.sss`, the output format of [`transform_value`]
+/// for `time` members. None of its parsers accept this format (no offset, no space separator,
+/// and `%Y-%m-%dT%H:%M:%S` rejects the fraction), so passing it through keeps the output identical.
+fn is_standard_time_format(s: &str) -> bool {
+    // `0` stands for a digit, any other byte must match as is.
+    const FORMAT: &[u8; 23] = b"0000-00-00T00:00:00.000";
+
+    s.len() == FORMAT.len()
+        && s.bytes().zip(FORMAT).all(|(c, &f)| {
+            if f == b'0' {
+                c.is_ascii_digit()
+            } else {
+                c == f
+            }
+        })
+}
+
 /// Transform specified `value` with specified `type` to the network protocol type.
 pub fn transform_value(value: DBResponsePrimitive, type_: &str) -> DBResponsePrimitive {
     match value {
         DBResponsePrimitive::String(ref s) if type_ == "time" => {
+            // Fast path: drivers are expected to return `time` values already in
+            // `YYYY-MM-DDTHH:MM:SS.sss`, which is passed through as is.
+            if is_standard_time_format(s) {
+                return value;
+            }
+
+            // Slow path for drivers that return other formats. Please do not add more
+            // formats here - fix the driver to return the format of the fast path instead.
             let formatted = DateTime::parse_from_rfc3339(s)
                 .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
                 .or_else(|_| {
@@ -2361,6 +2386,36 @@ mod tests {
             }
             _ => Err(TestError("Mismatched TransformedData types".to_string())),
         }
+    }
+
+    #[test]
+    fn test_transform_value_keeps_standard_time_format() {
+        let time = |s: &str| transform_value(DBResponsePrimitive::String(s.to_string()), "time");
+
+        assert_eq!(
+            time("2024-01-01T00:01:00.000"),
+            DBResponsePrimitive::String("2024-01-01T00:01:00.000".to_string())
+        );
+        assert_eq!(
+            time("1999-12-31T23:59:59.999"),
+            DBResponsePrimitive::String("1999-12-31T23:59:59.999".to_string())
+        );
+        // Not a valid date, but no parser accepts it either, so it was
+        // returned unchanged before the fast path as well.
+        assert_eq!(
+            time("2024-13-45T99:99:99.999"),
+            DBResponsePrimitive::String("2024-13-45T99:99:99.999".to_string())
+        );
+
+        assert!(is_standard_time_format("2024-01-01T00:01:00.000"));
+        assert!(!is_standard_time_format("2024-01-01T00:01:00.000Z"));
+        assert!(!is_standard_time_format("2024-01-01 00:01:00.000"));
+        assert!(!is_standard_time_format("2024-01-01T00:01:00"));
+        assert!(!is_standard_time_format("2024-01-01T00:01:00.0000"));
+        // Bytes right outside `'0'..='9'`.
+        assert!(!is_standard_time_format("/024-01-01T00:01:00.000"));
+        assert!(!is_standard_time_format("2024-01-:1T00:01:00.000"));
+        assert!(!is_standard_time_format("2024-01-01T00:01:00.00:"));
     }
 
     #[test]

@@ -8,6 +8,16 @@ platform. Use it to create and manage deployments, deploy data model code,
 work with the data model Git workflow, connect GitHub repositories, tail
 deployment logs, and automate workspace administration from scripts and CI.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/yttn0xdQlbk"
+  title="Cube CLI and AI agents"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 <Info>
 
 The Cube CLI works with the Cube cloud platform. It is not required for
@@ -29,15 +39,16 @@ Windows (PowerShell):
 irm https://raw.githubusercontent.com/cube-js/cube/master/install-cli.ps1 | iex
 ```
 
-The installer downloads the release binary for your platform and adds it to
-your `PATH`. Set `CUBE_VERSION` to pin a release tag, or `CUBE_INSTALL_DIR`
-to change the install location.
+The installer downloads the binary of the newest release that ships one for
+your platform and adds it to your `PATH`. Set `CUBE_VERSION` to pin a release
+tag, or `CUBE_INSTALL_DIR` to change the install location. In CI, set
+`GITHUB_TOKEN` to avoid GitHub's rate limit on release lookups.
 
 The CLI checks for new releases in the background and prints a notice when
 one is available. Update in place at any time:
 
 ```bash
-cube update          # install the latest release
+cube update          # install the newest release for your platform
 cube update --check  # only report what's available
 ```
 
@@ -65,6 +76,21 @@ cube login --api-key sk-YOUR_API_KEY --url https://TENANT.cubecloud.dev
 # or, without a config file:
 CUBE_API_URL=https://TENANT.cubecloud.dev CUBE_API_KEY=sk-YOUR_API_KEY cube deployments list
 ```
+
+## Onboarding
+
+`cube onboarding` prints the full setup sequence — log in, create an empty
+data model deployment, connect a data source, add a data model, build, and
+connect AI tools — with the commands for each step. It is written for coding agents as
+much as for people: point your agent at it to have it configure your Cube
+account for you.
+
+```bash
+cube onboarding
+```
+
+When the tenant URL is known (a saved login, `--api-url` or `CUBE_API_URL`), the
+guide fills it in. Pass `--json` to get it as `{ "url", "guide" }`.
 
 ## Deploy a project
 
@@ -174,6 +200,7 @@ Run `cube <command> --help` for the full options of any command.
 | Command | Description |
 | --- | --- |
 | `login`, `logout`, `whoami`, `context` | Authentication and saved contexts — see [Authentication commands](#authentication-commands) |
+| `onboarding` | Step-by-step setup instructions — see [Onboarding](#onboarding) |
 | `deployments` | List, get, create, update and delete deployments — see [Deployment commands](#deployment-commands) |
 | `deploy` | Upload a local project directory and build it (`--directory`, `--keep-missing`, `-m`); `--branch` uploads onto a data model branch instead |
 | `validate` | Compile a deployment's data model and report compilation errors (`--branch`, `--dev-mode`) |
@@ -506,6 +533,10 @@ cube data-model merge-to-default DEPLOYMENT_ID --branch my-branch -m "add orders
 `commit` pushes the dev branch's edits to the shared branch it was forked from, and
 `merge-to-default` merges that branch into the deploy branch, rebuilds production, and
 **deletes the branch it merged** — pass `--keep-branch` to keep it.
+`data-model merge`, which merges a branch into its parent, takes no message: the agent
+writes the merge commit's message, as in
+[Development mode](/docs/data-modeling/dev-mode#merge-or-create-a-pull-request).
+`merge-to-default` needs `-m`.
 
 <Warning>
 
@@ -945,6 +976,8 @@ cube ossie cancel DEPLOYMENT_ID CONVERSION_ID
 | `CUBEJS_TELEMETRY=false` | Legacy alias for `CUBE_NO_TELEMETRY`, kept for compatibility with the previous `cubejs` CLI |
 | `CUBE_VERSION` | Installer only: release tag to install |
 | `CUBE_INSTALL_DIR` | Installer only: install directory |
+| `CUBE_RELEASES_URL` | Installer only: GitHub releases API endpoint to pick the release from (for mirrors and tests) |
+| `GITHUB_TOKEN` | Installer only: sent to `api.github.com` (never to a `CUBE_RELEASES_URL` mirror) to avoid its unauthenticated rate limit |
 
 ## Telemetry
 

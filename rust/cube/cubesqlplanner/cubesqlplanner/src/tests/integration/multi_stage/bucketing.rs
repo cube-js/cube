@@ -233,3 +233,37 @@ async fn test_bucketing_with_two_dims_concated() {
         insta::assert_snapshot!(result);
     }
 }
+
+/// A calc group pinned to one value has no values table, so the multi-stage
+/// dimension join condition must render the value itself.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_calc_group_pinned_value_in_multistage_dimension_join() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.count
+        dimensions:
+          - orders.change_type
+          - orders.report_mode
+        filters:
+          - member: orders.report_mode
+            operator: equals
+            values:
+              - summary
+        order:
+          - id: orders.change_type
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+
+    assert!(
+        sql.contains("\"orders__report_mode\" = 'summary'"),
+        "Expected the join condition to compare the CTE column with the pinned value:\n{}",
+        sql
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

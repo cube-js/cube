@@ -28,6 +28,7 @@ Then paste the iframe code into your application:
 <iframe
   title="Dashboard"
   src="https://your-account.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID"
+  allow="microphone; fullscreen"
   width="100%"
   height="800"
 ></iframe>
@@ -52,12 +53,15 @@ To embed a dashboard for external/customer-facing applications, generate a sessi
 <iframe
   title="Dashboard"
   src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID"
+  allow="microphone; fullscreen"
   width="100%"
   height="800"
 ></iframe>
 ```
 
 See [Signed embedding](/embedding/iframe/auth/signed) for the full session generation flow, API key setup, and a complete working example.
+
+To let viewers present an [app's slide deck](/docs/explore-analyze/apps#present-a-slide-deck) full screen, include `fullscreen` in the iframe's `allow` attribute, as in the snippets above. Without it, the deck shows no **Full screen** button.
 
 ## Pre-set dashboard filters, granularities, and tabs via URL {#pre-set-dashboard-filters-via-url}
 
@@ -70,6 +74,7 @@ URL parameters:
 | Filter | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders_transactions.users_country={"value":"USA"}` |
 | Time granularity switcher | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders_transactions.created_at=week` |
 | Field switcher | `ms_<semantic_view>.<replaced_member>=<selected_member>` | `ms_orders_transactions.status=users_city` |
+| Control added to the [Dynamic controls](/docs/explore-analyze/dashboards/widgets/controls#dynamic-controls) widget | `dc_<key>=<JSON>` | `dc_h87irx={"type":"FILTER","config":{"dimension":"orders_transactions.users_country"}}` |
 | Tabs container | `tab_<widget_id>=<tab_id>` | `tab_tabs_container_widget_1737045120000=tab_1737045187000` |
 
 The semantic view and member must match the internal names (not display titles)
@@ -108,6 +113,22 @@ plus the member it replaces. An `f_` is also ignored for a filter whose
 **Disabled**, which opens on the value it would have without the link; a
 switcher set to **Disabled** still takes its `tg_` or `ms_`.
 
+A dashboard that is an [app](/docs/explore-analyze/apps#apps-in-embedded-analytics)
+is the exception: it has no controls, so it ignores `tg_`, `ms_`, `dc_` and
+`tab_`, and every `f_` applies to every report that the app reads. The
+`{"value":[]}` form below clears a control; an app adds no condition for it,
+but a report on a view without that dimension still fails to load, as with any
+other filter. To remove a filter from an app, leave its `f_` out.
+
+A `dc_` parameter adds a control to the dashboard's [Dynamic
+controls](/docs/explore-analyze/dashboards/widgets/controls#dynamic-controls)
+widget, as a viewer does with the widget's add button, and that control then
+takes the `f_`, `tg_` or `ms_` for its field like a placed one. It is read on a
+published dashboard only, embedded or not, and only for a control type and
+field the widget allows; its JSON is described in [Controls → Sharing the current
+selection](/docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection).
+Viewers of an embedded dashboard can add controls to the widget themselves too.
+
 An empty value clears a control instead of setting it: `f_` with an empty
 `value` and no `type` (`{"value":[]}`), or an empty `tg_`
 (`tg_orders_transactions.created_at=`), opens that control cleared, and its
@@ -133,20 +154,25 @@ URL:
 https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true
 ```
 
-When enabled, each chart widget's ⋮ menu shows **Download as CSV**, **Download
-as PNG**, and **Download as PDF** actions, and a dashboard-level ⋮ appears —
-docked in the header in [Creator Mode](/embedding/iframe/creator-mode),
-floating over the dashboard in the published-dashboard embed — with **Download
-as PNG**, **Download as PDF**, and **Download print version** for the whole
-dashboard. **Download print version** downloads a PDF laid out for A4 paper
-rather than a capture of the screen (see [Print
+When enabled, each chart widget shows a **Download** button (the download icon)
+whose menu lists **Download as CSV**, **Download as PNG**, and **Download as
+PDF**, and a dashboard-level **Download** button appears — docked in the
+header in [Creator Mode](/embedding/iframe/creator-mode),
+floating over the dashboard in the published-dashboard embed. It opens the
+same **Download settings** dialog as a published dashboard in Cube (see
+[Download as PNG, PDF, or
+CSV](/docs/explore-analyze/dashboards#download-as-png-or-pdf)): **PNG** or
+**PDF**, **Snapshot** or **Print version**, and the control values the file
+takes. **Print version** downloads a PDF laid out for A4 paper rather than a
+capture of the screen (see [Print
 version](/docs/explore-analyze/dashboards#print-version)).
-Its summary line states the value of every control, [Hidden
+The print version's summary line states the value of every control, [Hidden
 ones](/docs/explore-analyze/dashboards/widgets/controls#visibility) included,
 so a tenant filter pre-set through `f_…` or taken from a user attribute appears
-as text in the file. A table widget's ⋮ also shows **Download print version**,
-the print version of that table alone, with the same summary line (see [Print a
-single table](/docs/explore-analyze/dashboards#print-a-single-table)).
+as text in the file. A table widget's download menu also shows **Download print
+version**, the print version of that table alone, with the same summary line
+(see [Print a single
+table](/docs/explore-analyze/dashboards#print-a-single-table)).
 `allowExport` is the single switch that grants all of these — there is no way
 to allow one format while blocking another. It also grants **Download as CSV**
 in the Creator Mode report builder; see [Show and hide
@@ -156,22 +182,24 @@ Only the exact literal string `true` opts in: `allowExport=1`,
 default) all leave every download action hidden.
 
 A widget's CSV is generated client-side from the data already loaded into the
-widget, so no additional query is issued. Inside an embed, `allowExport` —
+widget, so no additional query is issued. **Download as CSV** opens a dialog to choose the headers
+and the value format (see [Downloading results as
+CSV](/docs/explore-analyze/workbooks/querying-data#download-as-csv)). Inside an embed, `allowExport` —
 not the viewer's own Cube role — is the authority on whether the download
 actions appear. The account-wide **Allow data downloads** switch outranks it —
 see [Restricting data
 downloads](/admin/users-and-permissions/roles-and-permissions#restricting-data-downloads).
 
-To turn on per-widget downloads without the whole-dashboard ⋮ menu — for a
-host that surfaces its own dashboard-level export, for example — add
-`showDashboardExportMenu=false`:
+To turn on per-widget downloads without the whole-dashboard **Download**
+button — for a host that surfaces its own dashboard-level export, for example —
+add `showDashboardExportMenu=false`:
 
 ```text
 https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true&showDashboardExportMenu=false
 ```
 
 Like the header controls below, only the exact literal string `false` hides
-the menu; it has no effect unless `allowExport=true` is also set.
+the button; it has no effect unless `allowExport=true` is also set.
 
 ### Downloads in a sandboxed iframe {#sandboxed-iframe-downloads}
 
@@ -183,6 +211,7 @@ attribute blocks file downloads unless it includes `allow-downloads`:
 <iframe
   title="Dashboard"
   src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&allowExport=true"
+  allow="microphone; fullscreen"
   sandbox="allow-scripts allow-same-origin allow-downloads"
   width="100%"
   height="800"
@@ -230,6 +259,8 @@ This applies to embedded published dashboards; it does not affect the standalone
 chat is itself the opt-in. To withhold AI from a session entirely — every surface,
 enforced on the server — use `settings.allowAi` instead. See [Show and hide
 features](/embedding/iframe/feature-visibility).
+
+To let viewers [dictate messages](/docs/explore-analyze/analytics-chat#voice-input) in the AI chat, include `microphone` in the iframe's `allow` attribute, as in the snippets above. Without it, the chat shows no dictation control. The [Analytics Chat embed](/embedding/iframe/analytics-chat#voice-input) page lists the other requirements.
 
 ## Comments
 
@@ -308,6 +339,29 @@ These parameters are read from the URL the host loaded the iframe with and
 stay pinned for the life of the embed, so they survive in-app navigation
 (for example, from the home-page dashboard card, or after publishing a
 draft).
+
+## Keep the dashboard refreshing {#live-mode}
+
+Add `autoRefresh` to the embed iframe `src` to refresh the whole dashboard
+every few minutes while the host page shows it, as
+[live mode](/docs/explore-analyze/dashboards#live-mode) does in Cube:
+
+| Value | Refreshes |
+| --- | --- |
+| `autoRefresh=true` | At the interval the dashboard was published with; nothing when it was published with live mode off |
+| `autoRefresh=<minutes>` | Every that many minutes, a whole number from 1 to 1440, whatever the dashboard was published with |
+
+```text
+https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID&autoRefresh=10
+```
+
+Without the parameter, or with any other value, the embed doesn't refresh on
+its own. It works the same with private and signed embedding, and in
+[Creator Mode](/embedding/iframe/creator-mode) dashboards. Like the header
+parameters above, it is read from the URL the host loaded the iframe with and
+stays pinned for the life of the embed. An embedded dashboard has no **Enter
+live mode** or **Exit live mode** item: the host's `src` decides whether it
+refreshes.
 
 ## Set the language
 

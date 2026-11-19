@@ -137,6 +137,8 @@ export type DimensionConfig = {
   aliasMember?: string;
   granularities?: GranularityDefinition[];
   order?: 'asc' | 'desc';
+  /** Declared values of a `switch` dimension, in declaration order. */
+  values?: string[];
   key?: string;
   links?: LinkConfig[];
   synthetic?: boolean;
@@ -349,6 +351,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
                 }))
                 : undefined,
             order: extendedDimDef.order,
+            ...(extendedDimDef.values ? { values: [...extendedDimDef.values] } : {}),
             key: extendedDimDef.keyReference,
             ...(extendedDimDef.links ? { links: extendedDimDef.links.map((link: any) => ({
               name: link.name,

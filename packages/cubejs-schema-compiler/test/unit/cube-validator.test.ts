@@ -1,6 +1,6 @@
 import Joi from 'joi';
 
-import { CubeValidator, functionFieldsPatterns } from '../../src/compiler/CubeValidator';
+import { CubeValidator, describeModelSchemas, functionFieldsPatterns } from '../../src/compiler/CubeValidator';
 import {
   CubeRefreshKey,
   CubeSymbols,
@@ -26,6 +26,18 @@ describe('Cube Validation', () => {
     transpiledFieldsPatterns.push(/\.sql$/);
 
     console.log('CubePropContextTranspiler.transpiledFieldsPatterns =', transpiledFieldsPatterns);
+  });
+
+  it('describeModelSchemas returns plain JSON for cubes, views and view groups', () => {
+    const described = describeModelSchemas();
+
+    // The manifest is written as JSON, so nothing may be lost in a round trip.
+    expect(JSON.parse(JSON.stringify(described))).toEqual(described);
+    expect(described.cube.keys).toHaveProperty('dimensions');
+    expect(described.cube.keys).toHaveProperty('preAggregations');
+    expect(described.view.keys).toHaveProperty('cubes');
+    expect(described.view.keys).toHaveProperty('folders');
+    expect(described.viewGroup.keys).toHaveProperty('includes');
   });
 
   it('cube all ways - correct', async () => {
@@ -421,6 +433,97 @@ describe('Cube Validation', () => {
       } as any);
 
       expect(validationResult.error).toBeTruthy();
+    });
+
+    describe('case with QUERY_CONTEXT conditions', () => {
+      const contextCaseCube = (measure: Record<string, unknown>) => ({
+        name: 'name',
+        sql: () => '',
+        fileName: 'fileName',
+        measures: { amount: measure },
+      });
+
+      const validate = (cube: Record<string, unknown>) => {
+        const cubeValidator = new CubeValidator(new CubeSymbols());
+        const messages: string[] = [];
+        const result = cubeValidator.validate(cube, {
+          error: (message: any, _e: any) => {
+            messages.push(message);
+          }
+        } as any);
+        return { error: result.error, messages };
+      };
+
+      it('accepts when items with context and sql under multi_stage', async () => {
+        const { error } = validate(contextCaseCube({
+          multiStage: true,
+          type: 'number',
+          case: {
+            when: [
+              { context: () => true, sql: () => '' },
+              { context: () => false, sql: () => '' },
+            ],
+            else: { sql: () => '' },
+          },
+        }));
+
+        expect(error).toBeFalsy();
+      });
+
+      it('rejects a context case on a measure without multi_stage', async () => {
+        const { error, messages } = validate(contextCaseCube({
+          type: 'number',
+          sql: () => '',
+          case: {
+            when: [{ context: () => true, sql: () => '' }],
+            else: { sql: () => '' },
+          },
+        }));
+
+        expect(error).toBeTruthy();
+        expect(messages.join('\n')).toContain('(measures.amount.case');
+      });
+
+      it('rejects a when item that mixes value and context', async () => {
+        const { error, messages } = validate(contextCaseCube({
+          multiStage: true,
+          type: 'number',
+          case: {
+            when: [{ value: 'EUR', context: () => true, sql: () => '' }],
+            else: { sql: () => '' },
+          },
+        }));
+
+        expect(error).toBeTruthy();
+        expect(messages.join('\n')).toContain('(measures.amount.case');
+      });
+
+      it('requires else for a context case', async () => {
+        const { error, messages } = validate(contextCaseCube({
+          multiStage: true,
+          type: 'number',
+          case: {
+            when: [{ context: () => true, sql: () => '' }],
+          },
+        }));
+
+        expect(error).toBeTruthy();
+        expect(messages.join('\n')).toContain('(measures.amount.case.else) is required');
+      });
+
+      it('requires context to be a function', async () => {
+        const { error, messages } = validate(contextCaseCube({
+          multiStage: true,
+          type: 'number',
+          case: {
+            when: [{ context: 'QUERY_CONTEXT.has_dimension(CUBE.level9)', sql: () => '' }],
+            else: { sql: () => '' },
+          },
+        }));
+
+        expect(error).toBeTruthy();
+        expect(messages.join('\n')).toContain('(measures.amount.case.when[0].context');
+      });
     });
 
     it('2 timeShifts, 1 without timeDimension', async () => {

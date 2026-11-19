@@ -124,7 +124,7 @@ async fn test_reduce_by_max_of_sum() {
 
 // Calculated multi-stage measure summing two reduce_by Aggregate children.
 // Each child renders through the JOIN-model path independently; the parent
-// Calculate inode then stitches both via FullKeyAggregate on the query grain.
+// Calculate inode then stitches both via Merge on the query grain.
 // Expected per status (broadcast across categories):
 //   amount_reduce_category:           200 / 1400 / 650
 //   unique_customers_reduce_category:   3 /    3 /   3
@@ -146,7 +146,7 @@ async fn test_reduce_by_calculated_over_two() {
 
     // Mixed: the sum-of-sum child renders through window-path, the
     // count_distinct child through JOIN-model, and the parent Calculate
-    // stitches both via FullKeyAggregate. SQL contains at least one window.
+    // stitches both via Merge. SQL contains at least one window.
     let sql = ctx.build_sql(query).unwrap();
     assert_uses_window(&sql);
 

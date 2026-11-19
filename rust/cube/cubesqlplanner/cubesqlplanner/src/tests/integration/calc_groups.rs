@@ -12,7 +12,7 @@ const SEED: &str = "calc_groups_cross_join_tables.sql";
 // FIXME: case-switch multi-stage dim children project disjoint
 // column sets (each branch CTE has only its own source's columns —
 // `source_a__product_category` vs `source_b__product_category`), so
-// the FullKeyAggregate UNION ALL on `pk_aggregate_keys_source` fails
+// the Merge UNION ALL on `pk_aggregate_keys_source` fails
 // with `column "source_b__product_category" does not exist`.
 // Mirrors the JS `Calc-Groups › source product_category cross join`
 // case. Children should project a unified dim column (the case
@@ -26,6 +26,33 @@ async fn test_source_product_category_cross_join() {
     let query = indoc! {r#"
         dimensions:
           - source.product_category
+        order:
+          - id: source.product_category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Only the CTE of the multi-stage dimension is read here, with no join, while
+// the `currency` calc group and the filter on `product_category_ext` still apply.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_source_product_category_ext_filter() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        dimensions:
+          - source.product_category
+        measures:
+          - source.price
+        filters:
+          - dimension: source.product_category_ext
+            operator: equals
+            values:
+              - "some category B-EUR-EUR"
         order:
           - id: source.product_category
     "#};

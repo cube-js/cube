@@ -680,10 +680,15 @@ impl SqlTemplates {
             .templates
             .get("quotes/escape")
             .ok_or_else(|| CubeError::internal("quotes/escape template not found".to_string()))?;
+        let column_name = if escape.starts_with('\\') {
+            column_name.replace('\\', "\\\\")
+        } else {
+            column_name.to_string()
+        };
         Ok(format!(
             "{}{}{}",
             quote,
-            column_name.replace(quote, escape),
+            column_name.replace(quote.as_str(), escape),
             quote
         ))
     }
@@ -1141,7 +1146,7 @@ impl SqlTemplates {
     /// The `types/*` template a data type renders with, `None` for a type without one.
     fn sql_type_template(data_type: &DataType) -> Option<&'static str> {
         Some(match data_type {
-            DataType::Decimal(_, _) => "types/decimal",
+            DataType::Decimal128(_, _) => "types/decimal",
             // NULL is not a type in databases. In PostgreSQL, untyped NULL is TEXT
             DataType::Utf8 | DataType::LargeUtf8 | DataType::Null => "types/string",
             DataType::Boolean => "types/boolean",
@@ -1177,7 +1182,7 @@ impl SqlTemplates {
             )));
         };
         let ctx = match data_type {
-            DataType::Decimal(precision, scale) => context! {
+            DataType::Decimal128(precision, scale) => context! {
                 precision => precision,
                 scale => scale,
             },
@@ -1249,6 +1254,24 @@ mod tests {
             .map(|(name, template)| (name.to_string(), template.to_string()))
             .collect();
         SqlTemplates::new(templates, false).unwrap()
+    }
+
+    #[test]
+    fn quote_identifier_doubles_the_quote() {
+        let templates =
+            sql_templates_with(vec![("quotes/identifiers", "`"), ("quotes/escape", "``")]);
+
+        assert_eq!(templates.quote_identifier("a`b\\").unwrap(), "`a``b\\`");
+    }
+
+    #[test]
+    fn quote_identifier_escapes_backslashes_before_a_backslash_escaped_quote() {
+        let templates =
+            sql_templates_with(vec![("quotes/identifiers", "`"), ("quotes/escape", "\\`")]);
+
+        assert_eq!(templates.quote_identifier("a`b").unwrap(), "`a\\`b`");
+        assert_eq!(templates.quote_identifier("a\\`b").unwrap(), "`a\\\\\\`b`");
+        assert_eq!(templates.quote_identifier("a\\").unwrap(), "`a\\\\`");
     }
 
     #[test]

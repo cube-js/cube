@@ -7,6 +7,7 @@ use super::dimension_kinds::{
 };
 use super::SymbolPath;
 use super::{DimensionType, MemberSymbol, RefSymbol, SymbolFactory};
+use crate::cube_bridge::case_variant::CaseVariant;
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::member_sql::MemberSql;
@@ -417,6 +418,12 @@ impl SymbolFactory for DimensionSymbolFactory {
         }
 
         let case = if let Some(native_case) = definition.case()? {
+            if matches!(native_case, CaseVariant::CaseContext(_)) {
+                return Err(CubeError::user(format!(
+                    "QUERY_CONTEXT is only available in measure case.when[].context, found in dimension {}",
+                    path.full_name()
+                )));
+            }
             Some(Case::try_new(path.cube_id(), native_case, compiler)?)
         } else {
             None
@@ -584,8 +591,7 @@ fn with_granularity(
     match GranularityHelper::make_granularity_obj(
         cube_evaluator,
         compiler,
-        path.cube_id(),
-        path.symbol_name(),
+        &symbol,
         Some(granularity.clone()),
     )? {
         Some(granularity_obj) => Ok(MemberSymbol::new_time_dimension(TimeDimensionSymbol::new(

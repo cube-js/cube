@@ -2,7 +2,7 @@
 //! own: an access-policy mask, a custom granularity, a geo target.
 
 use crate::test_fixtures::cube_bridge::MockSchema;
-use crate::test_fixtures::test_utils::TestContext;
+use crate::test_fixtures::test_utils::{table_rows, TestContext};
 use indoc::indoc;
 
 const SEED: &str = "integration_multi_fact_tables.sql";
@@ -227,6 +227,46 @@ async fn test_view_custom_granularity_with_origin() {
     }
 }
 
+// A granularity declared on the view's own time dimension, not on the cube
+// member it reads.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_own_time_dimension_granularity() {
+    let ctx = create_context();
+
+    let view_query = indoc! {"
+        measures:
+          - orders_view.count
+        time_dimensions:
+          - dimension: orders_view.created_at_own
+            granularity: view_quarter
+        order:
+          - id: orders_view.created_at_own
+    "};
+    let cube_query = indoc! {"
+        measures:
+          - orders.count
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: quarter
+        order:
+          - id: orders.created_at
+    "};
+
+    ctx.build_sql(view_query).unwrap();
+    ctx.build_sql(cube_query).unwrap();
+
+    let (Some(view), Some(cube)) = (
+        ctx.try_execute_pg(view_query, SEED).await,
+        ctx.try_execute_pg(cube_query, SEED).await,
+    ) else {
+        return;
+    };
+    let view_rows = table_rows(&view);
+    assert!(!view_rows.is_empty(), "{view}");
+    assert_eq!(view_rows, table_rows(&cube), "view:\n{view}\ncube:\n{cube}");
+    insta::assert_snapshot!(view);
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_view_custom_granularity_with_offset() {
     let ctx = create_context();
@@ -405,19 +445,6 @@ async fn test_view_member_in_arithmetic_keeps_its_parentheses() {
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
     }
-}
-
-fn table_rows(result: &str) -> Vec<Vec<String>> {
-    result
-        .lines()
-        .skip(2)
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            line.split('|')
-                .map(|cell| cell.trim().to_string())
-                .collect()
-        })
-        .collect()
 }
 
 fn ungrouped_conditional_mask_query(prefix: &str, dimensions: &[&str]) -> String {

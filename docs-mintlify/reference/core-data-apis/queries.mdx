@@ -276,9 +276,9 @@ upstream [data source][ref-data-sources].
 Learn more in the [SQL API documentation][ref-sql-api-qpd].
 
 Queries with pushdown benefit from [in-memory cache][ref-caching]. They can
-also use pre-aggregations stored in the data source (`external: false`), but
-not ones stored in Cube Store unless
-[`CUBESQL_SQL_PUSH_DOWN_PRE_AGGREGATIONS`][ref-push-down-pre-aggs] is enabled.
+also use pre-aggregations stored in the data source (`external: false`) and,
+unless [`CUBESQL_SQL_PUSH_DOWN_PRE_AGGREGATIONS`][ref-push-down-pre-aggs] is
+disabled, ones stored in Cube Store.
 Queries with pushdown can also be modified before
 execution with [`query_rewrite`][ref-query-rewrite]; however, only applying
 additional filters is supported.

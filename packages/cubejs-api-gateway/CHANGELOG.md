@@ -3,6 +3,114 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+### Bug Fixes
+
+- **api-gateway:** Build the GraphQL schema from members visible to the caller ([#12833](https://github.com/cube-js/cube/issues/12833)) ([974dc5a](https://github.com/cube-js/cube/commit/974dc5a9c880916c0206bf0eefc4f0c6ecdfbcda)), closes [#10590](https://github.com/cube-js/cube/issues/10590)
+- **api-gateway:** Run extendContext on pre-aggregation job contexts ([#12579](https://github.com/cube-js/cube/issues/12579)) ([0373cfc](https://github.com/cube-js/cube/commit/0373cfc0cfe8916f328883e5fe12c2feb1a2d501))
+
+## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
+
+### Bug Fixes
+
+- **api-gateway:** Bump graphql to 15.11 to bound fragment validation ([#12823](https://github.com/cube-js/cube/issues/12823)) ([0da7aad](https://github.com/cube-js/cube/commit/0da7aadd25e0b25ba02fe666b51445c99ba6af1f))
+- **api-gateway:** Correct GraphQL request normalization ([#12822](https://github.com/cube-js/cube/issues/12822)) ([96c6354](https://github.com/cube-js/cube/commit/96c6354c7ac9160dde5b5dab4b2be1c1bb5d0a25))
+
+## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.25](https://github.com/cube-js/cube/compare/v1.8.24...v1.8.25) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.24](https://github.com/cube-js/cube/compare/v1.8.23...v1.8.24) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
+
+### Bug Fixes
+
+- **api-gateway:** Allow only one WS authorization at a time per connection ([#12748](https://github.com/cube-js/cube/issues/12748)) ([220a1b5](https://github.com/cube-js/cube/commit/220a1b52a7ab3112711f2e8beea8483294dba3e5))
+
+### Features
+
+- **cubesql:** Support :name parameters in /v1/cubesql ([#12612](https://github.com/cube-js/cube/issues/12612)) ([6ee7550](https://github.com/cube-js/cube/commit/6ee75508b4fd0bc5333b10290b8c541a217332fc))
+
+## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
+
+### Bug Fixes
+
+- **api-gateway:** Improve WS message validation ([#12712](https://github.com/cube-js/cube/issues/12712)) ([e167248](https://github.com/cube-js/cube/commit/e167248f24e7837b6b417345300fb0a3c7b8d506))
+
+## [1.8.21](https://github.com/cube-js/cube/compare/v1.8.20...v1.8.21) (2026-11-09)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.20](https://github.com/cube-js/cube/compare/v1.8.19...v1.8.20) (2026-11-06)
+
+### Bug Fixes
+
+- **api-gateway:** Stricter validation for member expressions ([#12626](https://github.com/cube-js/cube/issues/12626)) ([52060fd](https://github.com/cube-js/cube/commit/52060fdea92e956fb213c444f25e3325c5b28b2d))
+
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+### Bug Fixes
+
+- **server-core:** Don't expand partitions to list pre-aggregations ([#12617](https://github.com/cube-js/cube/issues/12617)) ([9a7337c](https://github.com/cube-js/cube/commit/9a7337cd9c760785138d3fa23fb6e0942420cf9f))
+
+### Features
+
+- **schema-compiler:** Expose switch dimension values in /v1/meta ([#12225](https://github.com/cube-js/cube/issues/12225)) ([53d7e73](https://github.com/cube-js/cube/commit/53d7e73de1bbd114072299df241b4c4312484ace))
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+### Features
+
+- **cubesql:** Support responseFormat columnar for /v1/cubesql ([#12503](https://github.com/cube-js/cube/issues/12503)) ([0ef0e62](https://github.com/cube-js/cube/commit/0ef0e628f7e60de3aa116e0b28d064568146ac33))
+
+## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
+
+### Performance Improvements
+
+- **api-gateway:** Store a hash instead of the full result for WS subscription dedupe, thanks @H31nz3l ([#12495](https://github.com/cube-js/cube/issues/12495)) ([7fa86c2](https://github.com/cube-js/cube/commit/7fa86c21a1ddb536c0b092edd67ea8706eaadc79))
+
+## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
+
+### Bug Fixes
+
+- Update tzdb to 2026e for the Canadian DST changes ([#12466](https://github.com/cube-js/cube/issues/12466)) ([b837c02](https://github.com/cube-js/cube/commit/b837c02a164fc651e0f95bd5d22332edb264ee0c)), closes [#12431](https://github.com/cube-js/cube/issues/12431)
+
+## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+### Performance Improvements
+
+- **backend-native:** Write /v1/cubesql JSONL chunks as external Buffers ([#12402](https://github.com/cube-js/cube/issues/12402)) ([babface](https://github.com/cube-js/cube/commit/babface12c0673d38a7bf545aad6896d7001b247))
+
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Bug Fixes
+
+- **api-gateway:** Report a queryRewrite that returns no query as a user error ([#12342](https://github.com/cube-js/cube/issues/12342)) ([0e82b7c](https://github.com/cube-js/cube/commit/0e82b7c5d7bdddf47a151cec6acee63201e346d6))
+
 ## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
 
 ### Bug Fixes

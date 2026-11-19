@@ -60,8 +60,7 @@ impl SqlNode for CalendarTimeShiftSqlNode {
                                 node_processor.clone(),
                                 templates,
                             )?;
-                            let res = templates
-                                .add_timestamp_interval(input, interval.inverse().to_sql())?;
+                            let res = templates.add_timestamp_interval(input, interval.to_sql())?;
                             format!("({})", res)
                         } else {
                             self.input.to_sql(

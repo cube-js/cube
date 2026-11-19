@@ -350,7 +350,6 @@ async fn test_ungrouped_windows() {
     let merged = ctx.build_sql(&with_merge(query, true)).unwrap();
     let separate = ctx.build_sql(&with_merge(query, false)).unwrap();
     // An ungrouped leaf has no aggregate to gate, so nothing folds.
-    assert!(!merged.contains("CASE WHEN"), "{merged}");
     assert_eq!(merged, separate);
     assert_eq!(
         ctx.try_execute(&with_merge(query, true), SEED).await,

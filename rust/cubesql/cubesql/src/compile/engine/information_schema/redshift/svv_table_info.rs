@@ -46,27 +46,27 @@ struct RedshiftSvvTableInfoBuilder {
 impl RedshiftSvvTableInfoBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            databases: StringBuilder::new(capacity),
-            schemas: StringBuilder::new(capacity),
-            table_ids: UInt32Builder::new(capacity),
-            tables: StringBuilder::new(capacity),
-            encoded: StringBuilder::new(capacity),
-            diststyles: StringBuilder::new(capacity),
-            sortkey1s: StringBuilder::new(capacity),
-            max_varchars: Int32Builder::new(capacity),
-            sortkey1_encs: StringBuilder::new(capacity),
-            sortkey_nums: Int32Builder::new(capacity),
-            sizes: Int64Builder::new(capacity),
-            pct_used: Float64Builder::new(capacity),
-            empty: Int64Builder::new(capacity),
-            unsorted: Float32Builder::new(capacity),
-            stats_off: Float32Builder::new(capacity),
-            tbl_rows: Float64Builder::new(capacity),
-            skew_sortkey1s: Float64Builder::new(capacity),
-            skew_rows: Float64Builder::new(capacity),
-            estimated_visible_rows: Float64Builder::new(capacity),
-            risk_events: StringBuilder::new(capacity),
-            vacuum_sort_benefits: Float64Builder::new(capacity),
+            databases: StringBuilder::with_capacity(capacity, capacity),
+            schemas: StringBuilder::with_capacity(capacity, capacity),
+            table_ids: UInt32Builder::with_capacity(capacity),
+            tables: StringBuilder::with_capacity(capacity, capacity),
+            encoded: StringBuilder::with_capacity(capacity, capacity),
+            diststyles: StringBuilder::with_capacity(capacity, capacity),
+            sortkey1s: StringBuilder::with_capacity(capacity, capacity),
+            max_varchars: Int32Builder::with_capacity(capacity),
+            sortkey1_encs: StringBuilder::with_capacity(capacity, capacity),
+            sortkey_nums: Int32Builder::with_capacity(capacity),
+            sizes: Int64Builder::with_capacity(capacity),
+            pct_used: Float64Builder::with_capacity(capacity),
+            empty: Int64Builder::with_capacity(capacity),
+            unsorted: Float32Builder::with_capacity(capacity),
+            stats_off: Float32Builder::with_capacity(capacity),
+            tbl_rows: Float64Builder::with_capacity(capacity),
+            skew_sortkey1s: Float64Builder::with_capacity(capacity),
+            skew_rows: Float64Builder::with_capacity(capacity),
+            estimated_visible_rows: Float64Builder::with_capacity(capacity),
+            risk_events: StringBuilder::with_capacity(capacity, capacity),
+            vacuum_sort_benefits: Float64Builder::with_capacity(capacity),
         }
     }
 
@@ -77,29 +77,29 @@ impl RedshiftSvvTableInfoBuilder {
         table_id: u32,
         table: impl AsRef<str>,
     ) {
-        self.databases.append_value(database).unwrap();
-        self.schemas.append_value(schema).unwrap();
-        self.table_ids.append_value(table_id).unwrap();
-        self.tables.append_value(table).unwrap();
-        self.encoded.append_value("N").unwrap();
-        self.diststyles.append_value("AUTO(ALL)").unwrap();
-        self.sortkey1s.append_value("AUTO(SORTKEY)").unwrap();
-        self.max_varchars.append_value(0).unwrap();
-        self.sortkey1_encs.append_null().unwrap();
-        self.sortkey_nums.append_value(0).unwrap();
-        self.sizes.append_value(5).unwrap();
-        self.pct_used.append_value(0.0013).unwrap();
-        self.empty.append_value(0).unwrap();
-        self.unsorted.append_null().unwrap();
-        self.stats_off.append_value(100.0).unwrap();
+        self.databases.append_value(database);
+        self.schemas.append_value(schema);
+        self.table_ids.append_value(table_id);
+        self.tables.append_value(table);
+        self.encoded.append_value("N");
+        self.diststyles.append_value("AUTO(ALL)");
+        self.sortkey1s.append_value("AUTO(SORTKEY)");
+        self.max_varchars.append_value(0);
+        self.sortkey1_encs.append_null();
+        self.sortkey_nums.append_value(0);
+        self.sizes.append_value(5);
+        self.pct_used.append_value(0.0013);
+        self.empty.append_value(0);
+        self.unsorted.append_null();
+        self.stats_off.append_value(100.0);
         // Use an arbitrarily high value of estimated number of rows
-        self.tbl_rows.append_value(100000.0).unwrap();
-        self.skew_sortkey1s.append_null().unwrap();
-        self.skew_rows.append_null().unwrap();
+        self.tbl_rows.append_value(100000.0);
+        self.skew_sortkey1s.append_null();
+        self.skew_rows.append_null();
         // Use an arbitrarily high value of estimated number of rows
-        self.estimated_visible_rows.append_value(100000.0).unwrap();
-        self.risk_events.append_null().unwrap();
-        self.vacuum_sort_benefits.append_null().unwrap();
+        self.estimated_visible_rows.append_value(100000.0);
+        self.risk_events.append_null();
+        self.vacuum_sort_benefits.append_null();
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

@@ -10,11 +10,11 @@ use std::{
 
 use crate::{
     compile::rewrite::{
-        rules::utils::granularity_str_to_int_order, AggregateFunctionExprDistinct, CubeScanLimit,
-        CubeScanUngrouped, CubeScanWrapped, DimensionName, LogicalPlanLanguage,
-        MemberErrorPriority, ScalarUDFExprFun, ScanWrapping, TimeDimensionGranularity,
-        WrappedSelectLimit, WrappedSelectPushToCube, WrappedSelectUngroupedScan,
-        WRAPPED_SELECT_LIMIT,
+        rules::utils::granularity_str_to_int_order, AggregateFunctionExprDistinct,
+        AllMembersSelected, CubeScanLimit, CubeScanUngrouped, CubeScanWrapped, DimensionName,
+        LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun, ScanWrapping,
+        TimeDimensionGranularity, WrappedSelectLimit, WrappedSelectPushToCube,
+        WrappedSelectUngroupedScan, WRAPPED_SELECT_LIMIT,
     },
     transport::{MetaContext, V1CubeMetaDimensionExt},
 };
@@ -42,8 +42,8 @@ pub struct BestCubePlan {
     // Whether to extract the plan that reads Cube Store pre-aggregations wherever it can,
     // or the plan that never does
     prefer_pre_aggregations: bool,
-    // Scans over pre-aggregations, as egraph e-nodes, that Cube matched no rollup for:
-    // the plan extracted next reads them from the data source
+    // Scans over pre-aggregations, and push-to-Cube selects over them, as egraph e-nodes,
+    // that Cube matched no rollup for: the plan extracted next has none of them
     rejected_pre_aggregation_scans: HashSet<LogicalPlanLanguage>,
 }
 
@@ -79,7 +79,7 @@ impl BestCubePlan {
                 LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(
                     ScanWrapping::PreAggregation,
                 )) if !self.prefer_pre_aggregations => 1,
-                LogicalPlanLanguage::CubeScan(_)
+                LogicalPlanLanguage::CubeScan(_) | LogicalPlanLanguage::WrappedSelect(_)
                     if self.rejected_pre_aggregation_scans.contains(enode) =>
                 {
                     1
@@ -179,6 +179,7 @@ impl BestCubePlan {
             LogicalPlanLanguage::ChangeUser(_) => 1,
             LogicalPlanLanguage::VirtualField(_) => 1,
             LogicalPlanLanguage::LiteralMember(_) => 1,
+            LogicalPlanLanguage::AllMembersSelected(AllMembersSelected(true)) => 1,
             LogicalPlanLanguage::TimeDimensionGranularity(TimeDimensionGranularity(Some(_))) => 1,
             // MemberError must be present here as well in order to preserve error priority
             LogicalPlanLanguage::MemberError(_) => 1,

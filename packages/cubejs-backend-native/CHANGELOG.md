@@ -3,6 +3,119 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+### Features
+
+- **schema-compiler:** QUERY_CONTEXT conditions in measure case ([#12473](https://github.com/cube-js/cube/issues/12473)) ([8441639](https://github.com/cube-js/cube/commit/8441639c7a5d42aefaaa5156b0aed8d35adb2fb2))
+- **server-core:** Add contextToPreAggregationOrchestratorId ([#12808](https://github.com/cube-js/cube/issues/12808)) ([2ae7d97](https://github.com/cube-js/cube/commit/2ae7d97b9b284132b69afed1a62f6ecd3a89b31c))
+
+## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.25](https://github.com/cube-js/cube/compare/v1.8.24...v1.8.25) (2026-11-14)
+
+### Performance Improvements
+
+- **tesseract:** Share scans and fuse calculations across multi-stage measures ([#12783](https://github.com/cube-js/cube/issues/12783)) ([8f7aa59](https://github.com/cube-js/cube/commit/8f7aa59b07f29ba2c154239fab12021440d80d6d))
+
+## [1.8.24](https://github.com/cube-js/cube/compare/v1.8.23...v1.8.24) (2026-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.23](https://github.com/cube-js/cube/compare/v1.8.22...v1.8.23) (2026-11-13)
+
+### Bug Fixes
+
+- **cubesql:** Fix COUNT over NULL and reject aggregate FILTER ([#12724](https://github.com/cube-js/cube/issues/12724)) ([935e9b0](https://github.com/cube-js/cube/commit/935e9b01d187edb5dfc81523ab5f9642fac9231d))
+- **cubesql:** Hide other users' query text in pg_stat_activity ([#12720](https://github.com/cube-js/cube/issues/12720)) ([904eeda](https://github.com/cube-js/cube/commit/904eeda0908475a22ba69f91f33d22f521806291))
+
+### Features
+
+- **cubesql:** Support :name parameters in /v1/cubesql ([#12612](https://github.com/cube-js/cube/issues/12612)) ([6ee7550](https://github.com/cube-js/cube/commit/6ee75508b4fd0bc5333b10290b8c541a217332fc))
+
+## [1.8.22](https://github.com/cube-js/cube/compare/v1.8.21...v1.8.22) (2026-11-11)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.21](https://github.com/cube-js/cube/compare/v1.8.20...v1.8.21) (2026-11-09)
+
+### Features
+
+- **cubesql:** Upgrade DataFusion to Arrow 60 ([#12550](https://github.com/cube-js/cube/issues/12550)) ([c5d6fea](https://github.com/cube-js/cube/commit/c5d6fead08eac71a1df986c884ce108c4ba56c09)), closes [cube-js/arrow-datafusion#233](https://github.com/cube-js/arrow-datafusion/issues/233)
+- Upgrade pyo3 to 0.29 ([#12606](https://github.com/cube-js/cube/issues/12606)) ([15ad7e5](https://github.com/cube-js/cube/commit/15ad7e55989da338fd3b6a91e5bbd63e2581e8d2))
+
+## [1.8.20](https://github.com/cube-js/cube/compare/v1.8.19...v1.8.20) (2026-11-06)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.19](https://github.com/cube-js/cube/compare/v1.8.18...v1.8.19) (2026-11-05)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.18](https://github.com/cube-js/cube/compare/v1.8.17...v1.8.18) (2026-11-03)
+
+### Performance Improvements
+
+- **cubesql:** Deserialize streamed columnar chunks straight into Arrow builders ([#12556](https://github.com/cube-js/cube/issues/12556)) ([20d7246](https://github.com/cube-js/cube/commit/20d724651d97b6ad162eaede74e5caf47780f87d))
+
+## [1.8.17](https://github.com/cube-js/cube/compare/v1.8.16...v1.8.17) (2026-11-02)
+
+### Features
+
+- **cubesql:** Support responseFormat columnar for /v1/cubesql ([#12503](https://github.com/cube-js/cube/issues/12503)) ([0ef0e62](https://github.com/cube-js/cube/commit/0ef0e628f7e60de3aa116e0b28d064568146ac33))
+
+### Performance Improvements
+
+- **backend-native:** Move stream chunk parsing off the JS main thread ([#12520](https://github.com/cube-js/cube/issues/12520)) ([a15c1fd](https://github.com/cube-js/cube/commit/a15c1fd65582690d213e8a22a0fcbeaea40df2d0))
+
+## [1.8.16](https://github.com/cube-js/cube/compare/v1.8.15...v1.8.16) (2026-10-31)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.15](https://github.com/cube-js/cube/compare/v1.8.14...v1.8.15) (2026-10-29)
+
+### Bug Fixes
+
+- **backend-native:** Bump neon to 1.1.2 to stop leaking N-API async work, thanks [@cavi21](https://github.com/cavi21) ([#12461](https://github.com/cube-js/cube/issues/12461)) ([62dbc3f](https://github.com/cube-js/cube/commit/62dbc3f9a92c8b449638cdcfbe1241feae364590)), closes [neon-bindings/neon#1145](https://github.com/neon-bindings/neon/issues/1145)
+- **cubesql:** Keep join side of same-named columns when dropping projections ([#12456](https://github.com/cube-js/cube/issues/12456)) ([8827668](https://github.com/cube-js/cube/commit/882766810067650a8b56f1681ca47dd67784e450)), closes [cube-js/arrow-datafusion#231](https://github.com/cube-js/arrow-datafusion/issues/231)
+- **cubesql:** Return NULL from variance with too few values ([#12453](https://github.com/cube-js/cube/issues/12453)) ([f5c727a](https://github.com/cube-js/cube/commit/f5c727a5606f327e768d152f9c59546933cd0cb9))
+- Update tzdb to 2026e for the Canadian DST changes ([#12466](https://github.com/cube-js/cube/issues/12466)) ([b837c02](https://github.com/cube-js/cube/commit/b837c02a164fc651e0f95bd5d22332edb264ee0c)), closes [#12431](https://github.com/cube-js/cube/issues/12431)
+
+## [1.8.14](https://github.com/cube-js/cube/compare/v1.8.13...v1.8.14) (2026-10-27)
+
+### Features
+
+- **tesseract:** Combine multi-stage results with UNION ALL on Trino ([#12425](https://github.com/cube-js/cube/issues/12425)) ([f37f2d1](https://github.com/cube-js/cube/commit/f37f2d16546c481e98d39dc1799b0b2e8b4486f0))
+
+## [1.8.13](https://github.com/cube-js/cube/compare/v1.8.12...v1.8.13) (2026-10-25)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.12](https://github.com/cube-js/cube/compare/v1.8.11...v1.8.12) (2026-10-23)
+
+### Performance Improvements
+
+- **backend-native:** Avoid re-creating JsString keys in object (de)serializers ([#12394](https://github.com/cube-js/cube/issues/12394)) ([9129eda](https://github.com/cube-js/cube/commit/9129eda5a5b77a27969b93d5e9699628ec68a367))
+- **backend-native:** Write /v1/cubesql JSONL chunks as external Buffers ([#12402](https://github.com/cube-js/cube/issues/12402)) ([babface](https://github.com/cube-js/cube/commit/babface12c0673d38a7bf545aad6896d7001b247))
+- **cubesql:** Format Decimal128Value without per-cell allocations ([#12396](https://github.com/cube-js/cube/issues/12396)) ([90021ea](https://github.com/cube-js/cube/commit/90021eaad594e04388956c534c34623ddb5eb8ff))
+- **cubesql:** Serialize /v1/cubesql rows without a serde_json::Value tree ([#12393](https://github.com/cube-js/cube/issues/12393)) ([ae0de43](https://github.com/cube-js/cube/commit/ae0de43c510fb87e2c967d6b27703e6281064abf))
+
+## [1.8.11](https://github.com/cube-js/cube/compare/v1.8.10...v1.8.11) (2026-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+## [1.8.10](https://github.com/cube-js/cube/compare/v1.8.9...v1.8.10) (2026-10-22)
+
+### Bug Fixes
+
+- **cubesql:** Push down variance and standard deviation aggregates ([#12349](https://github.com/cube-js/cube/issues/12349)) ([0c695a5](https://github.com/cube-js/cube/commit/0c695a5e1c124b8427587f75a3b431c0ca87d07f))
+
 ## [1.8.9](https://github.com/cube-js/cube/compare/v1.8.8...v1.8.9) (2026-10-21)
 
 ### Bug Fixes

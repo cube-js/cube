@@ -7,7 +7,7 @@ use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
 use chrono::serde::{ts_seconds, ts_seconds_option};
 use chrono::{DateTime, Duration, Utc};
 use cuberockstore::rocksdb::WriteBatch;
-use std::cmp::Ordering;
+use std::cmp::{max, Ordering};
 
 use crate::cachestore::QueueKey;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -159,8 +159,13 @@ impl QueueItem {
             } else {
                 None
             },
+            // Never shorter than an item without ORPHANED gets, so sending it by default can't evict sooner
             expire: if let Some(orphaned) = orphaned {
-                created + Duration::seconds(orphaned as i64) + Duration::hours(2)
+                created
+                    + max(
+                        Duration::seconds(orphaned as i64) + Duration::hours(2),
+                        Duration::hours(4),
+                    )
             } else {
                 created.clone() + Duration::hours(4)
             },
@@ -257,6 +262,32 @@ impl QueueItem {
 
     pub fn update_heartbeat(&mut self) {
         self.heartbeat = Some(Utc::now());
+    }
+
+    /// A re-add leaves at least `orphaned` seconds before the item is orphaned, writing at most once
+    /// per half timeout (the deadline is set to 1.5× and only rewritten once less than 1×
+    /// is left). `None` when nothing is written, otherwise whether the expiry moved too.
+    pub fn touch_orphaned(&mut self, orphaned: u32) -> Option<bool> {
+        let now = Utc::now();
+        let timeout = Duration::seconds(orphaned as i64);
+        if let Some(current) = self.orphaned {
+            if current >= now + timeout {
+                return None;
+            }
+        }
+
+        let deadline = now + timeout + Duration::seconds((orphaned / 2) as i64);
+
+        self.orphaned = Some(deadline);
+
+        let min_expire = deadline + Duration::hours(2);
+        if self.expire < min_expire {
+            self.expire = min_expire;
+
+            Some(true)
+        } else {
+            Some(false)
+        }
     }
 
     pub fn merge_extra(&self, payload: String) -> Result<Self, CubeError> {

@@ -29,14 +29,14 @@ struct InfoSchemaRoleColumnGrantsBuilder {
 impl InfoSchemaRoleColumnGrantsBuilder {
     fn new(capacity: usize) -> Self {
         Self {
-            grantor: StringBuilder::new(capacity),
-            grantee: StringBuilder::new(capacity),
-            table_catalog: StringBuilder::new(capacity),
-            table_schema: StringBuilder::new(capacity),
-            table_name: StringBuilder::new(capacity),
-            column_name: StringBuilder::new(capacity),
-            privilege_type: StringBuilder::new(capacity),
-            is_grantable: StringBuilder::new(capacity),
+            grantor: StringBuilder::with_capacity(capacity, capacity),
+            grantee: StringBuilder::with_capacity(capacity, capacity),
+            table_catalog: StringBuilder::with_capacity(capacity, capacity),
+            table_schema: StringBuilder::with_capacity(capacity, capacity),
+            table_name: StringBuilder::with_capacity(capacity, capacity),
+            column_name: StringBuilder::with_capacity(capacity, capacity),
+            privilege_type: StringBuilder::with_capacity(capacity, capacity),
+            is_grantable: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
@@ -49,14 +49,14 @@ impl InfoSchemaRoleColumnGrantsBuilder {
         column_name: impl AsRef<str>,
         privilege_type: impl AsRef<str>,
     ) {
-        self.grantor.append_value(&user).unwrap();
-        self.grantee.append_value(&user).unwrap();
-        self.table_catalog.append_value(&table_catalog).unwrap();
-        self.table_schema.append_value(&table_schema).unwrap();
-        self.table_name.append_value(&table_name).unwrap();
-        self.column_name.append_value(&column_name).unwrap();
-        self.privilege_type.append_value(&privilege_type).unwrap();
-        self.is_grantable.append_value(&"YES").unwrap();
+        self.grantor.append_value(&user);
+        self.grantee.append_value(&user);
+        self.table_catalog.append_value(&table_catalog);
+        self.table_schema.append_value(&table_schema);
+        self.table_name.append_value(&table_name);
+        self.column_name.append_value(&column_name);
+        self.privilege_type.append_value(&privilege_type);
+        self.is_grantable.append_value(&"YES");
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

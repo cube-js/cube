@@ -29,14 +29,14 @@ impl InfoSchemaCharacterSetsBuilder {
         let capacity = 10;
 
         Self {
-            character_set_catalog: StringBuilder::new(capacity),
-            character_set_schema: StringBuilder::new(capacity),
-            character_set_name: StringBuilder::new(capacity),
-            character_repertoire: StringBuilder::new(capacity),
-            form_of_use: StringBuilder::new(capacity),
-            default_collate_catalog: StringBuilder::new(capacity),
-            default_collate_schema: StringBuilder::new(capacity),
-            default_collate_name: StringBuilder::new(capacity),
+            character_set_catalog: StringBuilder::with_capacity(capacity, capacity),
+            character_set_schema: StringBuilder::with_capacity(capacity, capacity),
+            character_set_name: StringBuilder::with_capacity(capacity, capacity),
+            character_repertoire: StringBuilder::with_capacity(capacity, capacity),
+            form_of_use: StringBuilder::with_capacity(capacity, capacity),
+            default_collate_catalog: StringBuilder::with_capacity(capacity, capacity),
+            default_collate_schema: StringBuilder::with_capacity(capacity, capacity),
+            default_collate_name: StringBuilder::with_capacity(capacity, capacity),
         }
     }
 
@@ -48,24 +48,17 @@ impl InfoSchemaCharacterSetsBuilder {
         default_collate_schema: impl AsRef<str>,
         default_collate_name: impl AsRef<str>,
     ) {
-        self.character_set_catalog.append_null().unwrap();
-        self.character_set_schema.append_null().unwrap();
+        self.character_set_catalog.append_null();
+        self.character_set_schema.append_null();
         self.character_set_name
-            .append_value(character_set_name.clone())
-            .unwrap();
-        self.character_repertoire
-            .append_value(character_repertoire)
-            .unwrap();
-        self.form_of_use.append_value(character_set_name).unwrap();
+            .append_value(character_set_name.clone());
+        self.character_repertoire.append_value(character_repertoire);
+        self.form_of_use.append_value(character_set_name);
         self.default_collate_catalog
-            .append_value(default_collate_catalog)
-            .unwrap();
+            .append_value(default_collate_catalog);
         self.default_collate_schema
-            .append_value(default_collate_schema)
-            .unwrap();
-        self.default_collate_name
-            .append_value(default_collate_name)
-            .unwrap();
+            .append_value(default_collate_schema);
+        self.default_collate_name.append_value(default_collate_name);
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {

@@ -21,6 +21,16 @@ API, in both directions:
   embed from your app — switch the color scheme, set a filter, navigate, or
   refresh the data.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/6ee0cwBUjcA"
+  title="Cube iframe events for embedded analytics"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 No SDK is required — it's plain `window.postMessage` and a `message` listener.
 
 ## Message envelope
@@ -172,6 +182,10 @@ mirror the embed's location in your own router or analytics.
 
 Emitted when a dashboard has finished rendering all of its widgets — the "fully
 painted" signal (distinct from `ready`, which fires at mount, before data loads).
+For an [app][ref-apps], it is emitted once the app has loaded, or once it shows
+an error. The payload does not say whether the app loaded or failed. For an app,
+the payload carries `publicId`, and `widgetCount` is `0` because an app has no
+widgets.
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -194,7 +208,7 @@ the exported rows themselves.
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `format` | `"csv" \| "xlsx" \| "png" \| "pdf"` | The file format produced. **Download print version** reports `"pdf"`, from the dashboard's menu and from a table's. |
+| `format` | `"csv" \| "xlsx" \| "png" \| "pdf"` | The file format produced. A print version reports `"pdf"`, from the dashboard's **Download settings** and from a table's **Download print version**. |
 | `target` | `"widget" \| "dashboard"` | Whether a single widget or the whole dashboard was exported. |
 | `widgetId` | `string` _(optional)_ | Id of the source widget, when `target` is `"widget"`. |
 | `title` | `string` _(optional)_ | Title of the exported widget / dashboard. |
@@ -363,7 +377,7 @@ sendAction("cube:action:refresh");
 | [`cube:action:set-theme`](#cube-action-set-theme) | Apply a brand theme (colors, fonts) | `embedTheme` object |
 | [`cube:action:set-locale`](#cube-action-set-locale) | Switch the UI language | `{ locale }` |
 | [`cube:action:set-timezone`](#cube-action-set-timezone) | Switch the query time zone | `{ timezone }` |
-| [`cube:action:set-filter`](#cube-action-set-filter) | Push a filter into a dashboard | `{ filterUrlParameter }` |
+| [`cube:action:set-filter`](#cube-action-set-filter) | Push a filter into a dashboard or an app | `{ filterUrlParameter }` |
 | [`cube:action:navigate`](#cube-action-navigate) | Navigate the embed to a path | `{ path }` |
 | [`cube:action:refresh`](#cube-action-refresh) | Re-run the embed's queries | _none_ |
 | [`cube:action:set-session`](#cube-action-set-session) | Swap in a fresh signed session, in place (no iframe reload) | `{ sessionId }` |
@@ -425,10 +439,20 @@ sendAction("cube:action:set-timezone", { timezone: "Asia/Tokyo" });
 
 #### `cube:action:set-filter` {#cube-action-set-filter}
 
-Push a filter into a dashboard. The `filterUrlParameter` is the same
+Push a filter into a dashboard or an app. The `filterUrlParameter` is the same
 `f_<semantic_view>.<dimension>=<JSON>` form used to
 [pre-set filters via URL](/embedding/iframe/dashboards#pre-set-dashboard-filters-via-url),
 so you can capture a viewer's filters and restore them later.
+
+Each action replaces all filter parameters in the embed URL with the ones it
+sends. On a dashboard, a control whose filter a later action leaves out keeps
+its current value; to clear a control, send its filter with `{"value":[]}`.
+
+The same action filters an [app][ref-apps]. Cube applies the filters to every
+report that the app reads, and a report that cannot take a filter fails to
+load. Unlike a dashboard, an app keeps only the filters from the latest action,
+so a filter that the action leaves out is removed. Send an empty
+`filterUrlParameter` to remove them all.
 
 | Field | Type | Description |
 | --- | --- | --- |
@@ -454,7 +478,8 @@ sendAction("cube:action:navigate", { path: "/embed/d/42/app/workbook/130" });
 
 #### `cube:action:refresh` {#cube-action-refresh}
 
-Re-run the embed's queries and refresh its data. No payload.
+Re-run the embed's queries and refresh its data. An [app][ref-apps] reads its
+reports again. No payload.
 
 ```js
 sendAction("cube:action:refresh");
@@ -586,6 +611,7 @@ exposes buttons to drive it. Generate the `session` on your backend with the
       id="cube"
       title="Dashboard"
       src="https://your-tenant.cubecloud.dev/embed/dashboard/YOUR_DASHBOARD_PUBLIC_ID?session=YOUR_SESSION_ID"
+      allow="microphone; fullscreen"
       width="100%"
       height="800"
     ></iframe>
@@ -620,3 +646,5 @@ exposes buttons to drive it. Generate the `session` on your backend with the
   </body>
 </html>
 ```
+
+[ref-apps]: /docs/explore-analyze/apps#apps-in-embedded-analytics

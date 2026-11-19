@@ -7,6 +7,86 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-11-17" description="v0.27.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - `GET /api/v1/audit-logs/export` (`AuditLogPublicController.exportAuditLog`) streams the account audit log for a date range as CSV. Parameters: `start`, `end` (required, `YYYY-MM-DD`), `search`, `eventName`, `userEmail`. Requires the `AuditLogManage` action; an API key scoped to specific deployments answers `403`.
+  - `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/name-suggestion` (`WorkbooksPublicController.suggestWorkbookName`) names a workbook created with a placeholder name from its content and returns the workbook. Requires edit access. New schema: `SuggestWorkbookNameInput`.
+  - `nameSource` (`"default"`) on `CreateWorkbookInput` marks a workbook for name suggestions, and `renamed` on `UpdateWorkbookInput` stops them once a person has renamed it.
+  - dbt sync reports the semantic metrics it imports as Cube measures: `importedMetrics` and `unsupportedMetrics` on `DbtSyncManifestStats` and `DbtSyncRunStats`, and `skippedMetrics` on `DbtSyncManifestStats` (the first 25 metrics that cannot be imported exactly, with the reason for each). New schema: `DbtSyncSkippedMetric`.
+  - `crossFilters` on `CreateNotificationInput`, `UpdateNotificationInput` and `Notification`: a scheduled refresh, delivery or alert of a dashboard renders with the given charts' cross-filter selections, each one a `sourceWidgetId`, the `view` it queries and its `dimensions`. On an update, a set replaces the stored one and `[]` clears it. New schemas: `DashboardCrossFilter`, `DashboardCrossFilterDimension`, `DashboardCrossFilterInput`, `DashboardCrossFilterDimensionInput`.
+
+  ### Changed
+
+  - `MergeToDefaultBranchRequest.message` is optional, as on `MergeIntoParentBranchRequest`. When it is empty or missing, the agent writes the commit message from the branch's diff; without AI, Git's default merge message is used.
+  - `EmbedSessionSettings.allowChatWorkspaceAuthoring` on an embed session with an `externalId` lets the agent save workspace content only with `creatorMode: true`. Outside creator mode the agent never saves workspace content.
+</Update>
+
+<Update label="2026-11-07" description="v0.26.0" tags={["Added","Changed","Deprecated"]}>
+  ### Added
+
+  - Workbook calculated fields: `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/calculated-fields` (`WorkbooksPublicController.createCalculatedField`), `PATCH` (`updateCalculatedField`) and `DELETE` (`deleteCalculatedField`) on `.../calculated-fields/{fieldId}`. All three require edit access to the workbook. New schemas: `CalculatedField`, `CalculatedFieldFormat`, `CalculatedFieldMemberRole`, `CalculatedFieldValueType`.
+  - `dontWaitForDevWorker` on `GET /api/v1/deployments/{deploymentId}/agent-skills`, and `AgentSkillsResponse.devWorkerStarting`: with the parameter set, a dev branch whose worker is still starting answers at once with the system skills only and the flag set; ask again shortly for the branch's own skills. Without it, the call waits as before.
+
+  ### Changed
+
+  - Schema names no longer contain `Dto` or `DTO`, an internal server detail. 37 types are renamed: `AIEngineerCubeCredentialsDTO` → `AIEngineerCubeCredentials`, `AgentSpaceConfigDto` → `AgentSpaceConfig`, `ColumnFormatOverrideDtoType` → `ColumnFormatOverrideType`, `DashboardDtoStatus` → `DashboardStatus`, `DashboardWidgetDtoType` → `DashboardWidgetType`, `EmbedDashboardCommentDto` → `EmbedDashboardComment`, `EmbedDashboardCommentThreadDto` → `EmbedDashboardCommentThread`, `EmbedMentionableUserDto` → `EmbedMentionableUser`, `FolderDtoType` → `FolderType`, `InheritedGroupPolicyDto` → `InheritedGroupPolicy`, `InheritedGroupPolicyDtoAction` → `InheritedGroupPolicyAction`, `InheritedUserPolicyDto` → `InheritedUserPolicy`, `InheritedUserPolicyDtoAction` → `InheritedUserPolicyAction`, `JsonConfigFileDto` → `JsonConfigFile`, `NotificationDto` → `Notification`, `OidcTokenConfigDTOSubjectType` → `OidcTokenConfigSubjectType`, `PromotionActorDto` → `PromotionActor`, `PromotionActorDtoAuthenticationMethod` → `PromotionActorAuthenticationMethod`, `PromotionReferenceDto` → `PromotionReference`, `PromotionReferenceDtoAvailability` → `PromotionReferenceAvailability`, `ReportDtoSource` → `ReportSource`, `ReportDtoType` → `ReportType`, `ReportSnapshotDtoKind` → `ReportSnapshotKind`, `ResourceGroupPolicyDto` → `ResourceGroupPolicy`, `ResourceGroupPolicyDtoAction` → `ResourceGroupPolicyAction`, `ResourceUserPolicyDto` → `ResourceUserPolicy`, `ResourceUserPolicyDtoAction` → `ResourceUserPolicyAction`, `UserAliasDTOSource` → `UserAliasSource`, `UserAttributeDefinitionDTOType` → `UserAttributeDefinitionType`, `UserGroupDTO` → `UserGroup`, `UserImpersonationDTO` → `UserImpersonation`, `WorkbookDtoType` → `WorkbookType`, `WorkbookPromotionDto` → `WorkbookPromotion`, `WorkbookPromotionDtoOutcome` → `WorkbookPromotionOutcome`, `WorkbookPromotionLinkDto` → `WorkbookPromotionLink`, `WorkbookPromotionPreviewDto` → `WorkbookPromotionPreview`, `WorkbookPromotionSummaryDto` → `WorkbookPromotionSummary`. The wire format does not change.
+
+  ### Deprecated
+
+  - Each old name above stays as a deprecated alias of its new name for one minor release, then is removed. Replace `PlatformApiSchemas['<OldName>']` with the new name.
+</Update>
+
+<Update label="2026-11-02" description="v0.25.0" tags={["Added"]}>
+  ### Added
+
+  - `POST /api/v1/external-documents/{externalWorkbookId}/placement-proof` (`ExternalDocumentsPublicController.issuePlacementProof`) returns a 15-minute `proof` showing the caller has an external spreadsheet open. `host: EXCEL` sends the workbook's `documentKey`; `host: GOOGLE_SHEETS` sends a Google ID token (`googleIdToken`). New schemas: `IssuePlacementProofInput`, `IssuePlacementProofInputHost`, `IssuePlacementProofResponse`.
+  - `placementProof` on `CreateReportInput`, `UpdateReportInput` and `ConnectReportToWorkbookInput`, to send the proof when placing a report into an external spreadsheet.
+  - `voiceInput` on the `GET /api/v1/ai-engineer/settings` response (`AIEngineerSettings`) tells whether Analytics Chat offers dictation.
+</Update>
+
+<Update label="2026-10-29" description="v0.24.1" tags={["Added","Changed"]}>
+  ### Added
+
+  - `DYNAMIC_CONTROLS` widget type on dashboard widgets (`DashboardWidgetInputType`, `DashboardWidgetDtoType`, `DashboardWidgetDraftInputType`).
+  - `scheduled-task` value for the `initialContext` filter on `GET /api/v1/deployments/{deploymentId}/chat-history/threads`.
+
+  ### Changed
+
+  - `PUT` and `DELETE /api/v1/deployments/{deploymentId}/reports/{reportId}/connect-workbook` answer `403` when they would change or remove a placement made by another user (or one with no recorded placer) and the caller cannot edit the report. Placing, moving or removing your own placement still needs only read access.
+  - `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/dashboard/ai-widget-thread` answers `403` to an embed session not generated with `creatorMode: true`.
+</Update>
+
+<Update label="2026-10-24" description="v0.24.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - `notification` on the create and update scheduled task requests (`POST /api/v1/deployments/{deploymentId}/scheduled-tasks` and its update operation) chooses who a finished run notifies: users (`userIds`), user groups (`groupIds`) and Slack channels (`slackChannels`), over Inbox, Email and Slack (`channels`). Picked users and groups are shared the task view-only. An id that is not an active workspace member or a group answers `400`. The scheduled task response returns `notification`, and `optedOutUserIds` for the task's creator or an admin.
+
+  ### Changed
+
+  - `notificationEnabled` on scheduled tasks is deprecated; send and read `notification` instead. When both are sent, `notification` wins.
+  - A scheduled task request that sends `notification` and sets a condition must notify someone, or it answers `400`.
+</Update>
+
+<Update label="2026-10-23" description="v0.23.1" tags={["Changed"]}>
+  ### Changed
+
+  - `useCubePlatformApiLazyQuery` declares its parameters (`method`, `path`, `init`, `options`, `queryClient`) and is generic over the method and path. Calls stay the same. The hooks no longer infer their parameters over every path, which exceeded the compiler's type instantiation depth.
+  - The descriptions of `GET` and `PUT /api/v1/deployments/{deploymentId}/env-vars` now explain that a deployment connects to its databases through environment variables (`CUBEJS_DB_*` for the default data source, `CUBEJS_DS_<NAME>_DB_*` for additional ones) and that saving does not test the connection. Their summaries are now "List environment variables, including the database connection settings" and "Set environment variables, including connecting or changing a database".
+  - The descriptions of `POST /build/api/v1/deployments` and `POST /api/v1/deployments/{deploymentId}/creation-step/advance` now say that neither connects a data source; set the database variables with `PUT /api/v1/deployments/{deploymentId}/env-vars`.
+</Update>
+
+<Update label="2026-10-22" description="v0.23.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - `outputPath` and `namePrefix` on `StartDbtSyncInput` (`POST /api/v1/deployments/{deploymentId}/dbt-sync`) override the deployment's saved Output path and Name prefix for one sync, so several dbt projects can sync into one deployment, each into its own folder with its own prefix.
+
+  ### Changed
+
+  - A dbt sync that commits to a branch now deletes stale cube files only directly inside the folder it writes its cubes into, and leaves that folder's subfolders alone, so another project's folder nested under it survives the sync. An output path written with a trailing slash, such as `/model/cubes/dbt/`, no longer skips that cleanup: files there that no longer match a dbt model are now deleted.
+  - `POST /api/v1/deployments/{deploymentId}/dashboard-exports` now requires **read** access to the dashboard's workbook and the **download data** permission on the deployment, instead of **manage** access to the workbook. **Manage** access to the workbook still passes, so callers that were allowed before keep working.
+</Update>
+
 <Update label="2026-10-20" description="v0.22.0" tags={["Added"]}>
   ### Added
 
@@ -25,10 +105,12 @@ rss: true
 
   - `GET /api/v1/users/{id}/roles` (`UsersAdminPublicController.getUserRoles`) lists every role a user holds, built-in and custom, whether assigned directly or through a group. Each role carries `direct` and `groupIds`, so you can tell whether `DELETE /api/v1/roles/{roleId}/users/{userId}` will remove it, and the response reports `isAdmin`. Administrator privileges required. New schemas: `UserRolesResponse`, `UserRoleAssignmentResponse`.
   - `GET /api/v1/roles/{roleId}/users` (`RolesPublicController.getRoleHolders`) lists the users holding a role, directly or through a group, with cursor pagination. It accepts built-in role ids, includes deactivated users, and returns each user's full set of roles, so a combination such as "holds Explorer but not my custom role" is one pass over the pages. Administrator privileges required. New schemas: `RoleHolder`, `RoleHoldersListResponse`.
-  - `condition` on scheduled tasks (`CreateScheduledTaskInput`, `UpdateScheduledTaskInput`, `ScheduledTaskResponse`): run the agent only when a measure crosses a `threshold`, moves by a `change` percentage, or is flagged as an `anomaly`, instead of on every fire. `ScheduledTaskResponse.lastConditionCheck` reports the latest check. Send `condition: null` on update to remove it. New schemas: `ScheduledTaskCondition`, `ScheduledTaskLastConditionCheck`.
+  - `condition` on scheduled tasks (`CreateScheduledTaskInput`, `UpdateScheduledTaskInput`, `ScheduledTaskResponse`): run the agent only when a measure crosses a `threshold`, moves by a `change` percentage, or turns `anomaly`-ous, instead of on every fire. `ScheduledTaskResponse.lastConditionCheck` reports the latest check. Send `condition: null` on update to remove it. New schemas: `ScheduledTaskCondition`, `ScheduledTaskLastConditionCheck`.
+  - `securityContext` on the body of the start-eval-run operation: evaluate under a security context merged over the caller's own.
+  - `agentResponse`, `agentSql`, `groundTruthSql`, `analysis` and `scoreReasons` on `EvaluationResultResponse`, so a result explains why a question failed or needs review.
   - `pdf_print` for `notificationFormat` on `CreateNotificationInput` and `UpdateNotificationInput`: deliver the paginated print version of a dashboard.
   - `in_month`, `not_in_month`, `in_quarter`, `not_in_quarter`, `in_year` and `not_in_year` dashboard filter operators.
-  - `memory.generateFromChats` on `UserSettingsInput`: let a user turn off background memory from their chats.
+  - `memory.generateFromChats` on `UserSettingsInput`, and `memoryGenerationEnabled` in the settings response: let a user turn off background memory from their chats.
 
   ### Changed
 

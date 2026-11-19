@@ -1,6 +1,6 @@
 use crate::di_service;
 use crate::remotefs::{
-    CommonRemoteFsUtils, ExtendedRemoteFs, LocalDirRemoteFs, RemoteFile, RemoteFs,
+    join_remote_path, CommonRemoteFsUtils, ExtendedRemoteFs, LocalDirRemoteFs, RemoteFile, RemoteFs,
 };
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
@@ -180,6 +180,7 @@ impl RemoteFs for MINIORemoteFs {
         temp_upload_path: String,
         remote_path: String,
     ) -> Result<u64, CubeError> {
+        let local_path = join_remote_path(&self.dir, &remote_path)?;
         {
             let time = SystemTime::now();
             debug!("Uploading {}", remote_path);
@@ -203,7 +204,6 @@ impl RemoteFs for MINIORemoteFs {
         let size = fs::metadata(&temp_upload_path).await?.len();
         self.check_upload_file(remote_path.clone(), size).await?;
 
-        let local_path = self.dir.as_path().join(&remote_path);
         if Path::new(&temp_upload_path) != local_path {
             fs::create_dir_all(local_path.parent().unwrap())
                 .await
@@ -224,7 +224,7 @@ impl RemoteFs for MINIORemoteFs {
         remote_path: String,
         _expected_file_size: Option<u64>,
     ) -> Result<String, CubeError> {
-        let local_file = self.dir.as_path().join(&remote_path);
+        let local_file = join_remote_path(&self.dir, &remote_path)?;
         let local_dir = local_file.parent().unwrap();
         let downloads_dir = local_dir.join("downloads");
 
@@ -267,6 +267,7 @@ impl RemoteFs for MINIORemoteFs {
     }
 
     async fn delete_file(&self, remote_path: String) -> Result<(), CubeError> {
+        let local = join_remote_path(&self.dir, &remote_path)?;
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
         info!("remote_path {}", remote_path);
@@ -283,7 +284,6 @@ impl RemoteFs for MINIORemoteFs {
         }
 
         let _guard = acquire_lock("delete file", self.delete_mut.lock()).await?;
-        let local = self.dir.as_path().join(&remote_path);
         if fs::metadata(local.clone()).await.is_ok() {
             fs::remove_file(local.clone()).await?;
             LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone())
@@ -334,7 +334,7 @@ impl RemoteFs for MINIORemoteFs {
     }
 
     async fn local_file(&self, remote_path: String) -> Result<String, CubeError> {
-        let buf = self.dir.join(remote_path);
+        let buf = join_remote_path(&self.dir, &remote_path)?;
         fs::create_dir_all(buf.parent().unwrap()).await?;
         Ok(buf.to_str().unwrap().to_string())
     }

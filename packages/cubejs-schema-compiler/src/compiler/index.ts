@@ -1,6 +1,7 @@
 export * from './PrepareCompiler';
 export * from './UserError';
 export * from './converters';
+export { describeModelSchemas } from './CubeValidator';
 export type {
   CubeDefinition,
   AccessPolicyDefinition,
@@ -12,4 +13,5 @@ export type {
   EvaluatedCube,
   MemberSymbolDefinition,
 } from './CubeEvaluator';
+export type { QueryContextData, QueryContextFilter, QueryContextTimeDimension } from './QueryContext';
 export { internString, internStringsDeep, internedStringsStats } from './StringInterning';

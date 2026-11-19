@@ -1,3 +1,3 @@
 mod optimizer;
 
-pub use optimizer::FilteredLeafMergeOptimizer;
+pub use optimizer::{FilteredLeafMergeOptimizer, FoldedUsages};

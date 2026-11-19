@@ -19,6 +19,7 @@ import {
   MAX_SOURCE_ROW_LIMIT,
   QueryAlias,
   canonicalTimezone,
+  escapeIdentifierAnsi,
   getEnv,
   localTimestampToUtc,
   timeSeries as timeSeriesBase,
@@ -34,6 +35,7 @@ import type {
   MemberOrderBy,
   MemberSymbolDefinition,
 } from '../compiler/CubeEvaluator';
+import { QueryContextConditionFn, QueryContextData } from '../compiler/QueryContext';
 import {
   CubeSymbols,
   type PreAggregationIndexDefinition,
@@ -159,8 +161,10 @@ export type BaseQueryOptions = {
   localRefreshKey?: boolean;
   convertTzForRawTimeDimension?: boolean;
   multiStageLeafMerge?: boolean;
+  multiStageScanSharing?: boolean;
   cubestoreSupportMultistage?: boolean;
   cubestoreUnionFullKeyAggregate?: boolean;
+  unionFullKeyAggregate?: boolean;
   maxMultiStageDepth?: number;
   maxMultiStageStages?: number;
   maxMemberResolutionDepth?: number;
@@ -591,18 +595,17 @@ export class BaseQuery {
   }
 
   /**
-   * This function follows the same logic as in this.collectJoinHints()
-   * skipQueryJoinMap is used by PreAggregations to build join tree without user's query all members map
+   * Like this.collectJoinHints() for hints resolved outside this query (the native planner, a
+   * pre-aggregation). They are not rewritten through the query's view join maps: each one
+   * already follows the path of its own view, and another view's path says nothing about it.
    */
-  public joinTreeForHints(hints: Array<(Array<string> | string)>, skipQueryJoinMap: boolean = false): FinishedJoinTree {
-    const queryJoinMaps = skipQueryJoinMap ? {} : this.queryJoinMap();
+  public joinTreeForHints(hints: Array<(Array<string> | string)>): FinishedJoinTree {
     let newCollectedHints: any[] = [];
 
-    const constructJH = () => R.uniq(this.enrichHintsWithJoinMap([
+    const constructJH = () => R.uniq([
       ...newCollectedHints,
       ...hints,
-    ],
-    queryJoinMaps));
+    ]);
 
     let prevJoin: any = null;
     let newJoin: any = null;
@@ -795,8 +798,12 @@ export class BaseQuery {
     return this.options.dataSource ?? this.detectDataSource();
   }
 
+  public queryDataSources(): string[] {
+    return R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
+  }
+
   protected detectDataSource(): string | undefined {
-    const dataSources = R.uniq(this.allCubeNames.map(c => this.cubeDataSource(c)));
+    const dataSources = this.queryDataSources();
     if (dataSources.length > 1 && !this.externalPreAggregationQuery()) {
       throw new UserError(`To join across data sources use rollupJoin with Cube Store. If rollupJoin is defined, this error indicates it doesn't match the query. Please use Rollup Designer to verify it's definition. Found data sources: ${dataSources.join(', ')}`);
     }
@@ -967,7 +974,7 @@ export class BaseQuery {
    * Wrap specified column/table name with the double quote.
    */
   public escapeColumnName(name: string): string {
-    return `"${name}"`;
+    return escapeIdentifierAnsi(name);
   }
 
   /**
@@ -1059,6 +1066,10 @@ export class BaseQuery {
 
   public externalPreAggregationQuery() {
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+      // The legacy planner reads no pre-aggregation for member expressions, see `buildParamAnnotatedSql`
+      if (!this.canUseNativeSqlPlannerPreAggregation && this.allMembersConcat(false).some(m => m.isMemberExpression)) {
+        return false;
+      }
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery?.preAggregation.external) {
         return true;
@@ -1167,7 +1178,9 @@ export class BaseQuery {
       joinHints: this.options.joinHints,
       cubestoreSupportMultistage: this.options.cubestoreSupportMultistage ?? getEnv('cubeStoreRollingWindowJoin'),
       multiStageLeafMerge: this.options.multiStageLeafMerge ?? getEnv('tesseractMultiStageLeafMerge'),
+      multiStageScanSharing: this.options.multiStageScanSharing ?? getEnv('tesseractMultiStageScanSharing'),
       cubestoreUnionFullKeyAggregate: this.options.cubestoreUnionFullKeyAggregate ?? getEnv('tesseractCubeStoreUnionFullKeyAggregate'),
+      unionFullKeyAggregate: this.options.unionFullKeyAggregate ?? this.unionFullKeyAggregateEnabled(),
       maxMultiStageDepth: this.options.maxMultiStageDepth ?? getEnv('maxMultiStageDepth'),
       maxMultiStageStages: this.options.maxMultiStageStages ?? getEnv('maxMultiStageStages'),
       maxMemberResolutionDepth: this.options.maxMemberResolutionDepth ?? getEnv('maxMemberResolutionDepth'),
@@ -2701,7 +2714,7 @@ export class BaseQuery {
   }
 
   public subQueryName(cubeName: string, name: string): string {
-    return `${cubeName}_${name}_subquery`;
+    return `${this.cubeEvaluator.cubeFromPath(cubeName).sqlAlias || cubeName}_${name}_subquery`;
   }
 
   public regularMeasuresSubQuery(measures: BaseMeasure[], filters?: FilterToWhere[]) {
@@ -3472,6 +3485,10 @@ export class BaseQuery {
     return sql;
   }
 
+  public wrapBooleanDimension(sql: string) {
+    return sql;
+  }
+
   public pushCubeNameForCollectionIfNecessary(cubeName: string) {
     if ((this.evaluateSymbolContext || {}).cubeNames && cubeName) {
       this.evaluateSymbolContext.cubeNames.push(cubeName);
@@ -3614,6 +3631,9 @@ export class BaseQuery {
       }
 
       if (type === 'measure') {
+        if (!this.useNativeSqlPlanner && symbol.case?.when?.some((item: { context?: unknown }) => item.context)) {
+          throw new UserError(`Measure '${cubeName}.${name}' uses QUERY_CONTEXT conditions, which require the Tesseract SQL planner`);
+        }
         let parentMeasure;
         if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
           this.safeEvaluateSymbolContext().leafMeasures) {
@@ -4324,6 +4344,10 @@ export class BaseQuery {
       sql: this.evaluateSql(cubeName, w.sql),
       label: this.renderDimensionCaseLabel(w.label, cubeName)
     }));
+    // `CASE ELSE x END` is invalid SQL, so a branchless case is just its else value.
+    if (!when.length) {
+      return symbol.case.else ? this.renderDimensionCaseLabel(symbol.case.else.label, cubeName) : 'NULL';
+    }
     return this.caseWhenStatement(
       when,
       symbol.case.else && this.renderDimensionCaseLabel(symbol.case.else.label, cubeName)
@@ -4660,7 +4684,7 @@ export class BaseQuery {
 
   public preAggregationLoadSql(cube: string, preAggregation: EvaluatedPreAggregationDefinition, tableName: string) {
     const sqlAndParams = this.preAggregationSql(cube, preAggregation);
-    return [`CREATE TABLE ${tableName} ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
+    return [`CREATE TABLE ${tableName} AS ${sqlAndParams[0]}`, sqlAndParams[1]];
   }
 
   public preAggregationPreviewSql(tableName: string) {
@@ -4750,7 +4774,7 @@ export class BaseQuery {
             preAggregation
           );
           const cubeFromPath = this.cubeEvaluator.cubeFromPath(cube);
-          return this.paramAllocator.buildSqlAndParams(originalSqlPreAggregationQuery.evaluateSymbolSqlWithContext(
+          return originalSqlPreAggregationQuery.paramAllocator.buildSqlAndParams(originalSqlPreAggregationQuery.evaluateSymbolSqlWithContext(
             () => {
               if (cubeFromPath.sqlTable) {
                 return `SELECT * FROM ${originalSqlPreAggregationQuery.cubeSql(cube)}`;
@@ -4830,6 +4854,11 @@ export class BaseQuery {
     return false;
   }
 
+  // Takes effect only for a dialect whose templates define `tesseract.full_key_aggregate_union_null`.
+  protected unionFullKeyAggregateEnabled(): boolean {
+    return true;
+  }
+
   public sqlTemplates(): any {
     return {
       functions: {
@@ -4905,6 +4934,7 @@ export class BaseQuery {
         NULLIF: 'NULLIF({{ args_concat }})',
         ROUND: 'ROUND({{ args_concat }})',
 
+        TRIM: 'TRIM({{ args_concat }})',
         SUBSTR: 'SUBSTRING({{ args_concat }})',
         CHARACTERLENGTH: 'CHAR_LENGTH({{ args[0] }})',
 
@@ -5014,6 +5044,7 @@ export class BaseQuery {
         concat_strings: '{{ strings | join(\' || \' ) }}',
         wrap_segment_select: '{{ expr }}',
         wrap_segment_filter: '{{ expr }}',
+        wrap_boolean_dimension: '{{ expr }}',
         rolling_window_expr_timestamp_cast: '{{ value }}',
         // Timestamp constants arrive as ISO-8601 UTC strings ('2021-01-01T00:00:00.000Z').
         // ANSI CAST of the quoted value is the most portable default; dialects override
@@ -5356,7 +5387,7 @@ export class BaseQuery {
     preAggregation: EvaluatedPreAggregationDefinition & { refreshKey?: RefreshKeyDefinition },
     preAggregationName: string,
     queryForSqlEvaluation: BaseQuery,
-  ) {
+  ): unknown[][] {
     return this.cacheValue(
       ['preAggregationInvalidateKeyQueries', cube, JSON.stringify(preAggregation)],
       () => {
@@ -5490,7 +5521,7 @@ export class BaseQuery {
     return threshold;
   }
 
-  public preAggregationStartEndQueries(cube: string, preAggregation: PreAggregationDefinitionExtended) {
+  public preAggregationStartEndQueries(cube: string, preAggregation: EvaluatedPreAggregationDefinition) {
     const references = this.cubeEvaluator.evaluatePreAggregationReferences(cube, preAggregation);
     const timeDimension = this.newTimeDimension(references.timeDimensions[0]);
 
@@ -5514,7 +5545,8 @@ export class BaseQuery {
         sqlUtils: {
           convertTz: this.convertTz.bind(this),
           urlEncode: this.urlEncode.bind(this)
-        }
+        },
+        queryContext: CubeSymbols.queryContextUnavailable(),
       }, R.map(
         (symbols) => this.contextSymbolsProxy(symbols),
         this.contextSymbols
@@ -5532,6 +5564,7 @@ export class BaseQuery {
         urlEncode: (sql: string) => sql,
       },
       securityContext: CubeSymbols.contextSymbolsProxyFrom({}, allocateParam),
+      queryContext: CubeSymbols.queryContextUnavailable(),
     };
   }
 
@@ -5552,6 +5585,10 @@ export class BaseQuery {
   // module so it can be unit-tested in isolation.
   public compileMemberSql(sqlFn: Parameters<typeof compileMemberSql>[0], securityContext: unknown, argNames: string[]) {
     return compileMemberSql(sqlFn, argNames, securityContext, this.sqlUtilsForRust());
+  }
+
+  public evaluateQueryContextCondition(conditionFn: QueryContextConditionFn, cubeName: string, queryContext: QueryContextData): boolean {
+    return this.cubeEvaluator.evaluateQueryContextCondition(cubeName, conditionFn, this.cubeEvaluator.queryContextFor(queryContext));
   }
 
   public contextSymbolsProxy(symbols: object) {

@@ -342,6 +342,7 @@ impl MockSchemaBuilder {
             segments: HashMap::new(),
             pre_aggregations: Vec::new(),
             default_filters: Vec::new(),
+            granularities: HashMap::new(),
         }
     }
 
@@ -472,9 +473,23 @@ pub struct MockViewBuilder {
     segments: HashMap<String, Rc<MockSegmentDefinition>>,
     pre_aggregations: Vec<(String, Rc<MockPreAggregationDescription>)>,
     default_filters: Vec<MockViewFilterDefinition>,
+    granularities: HashMap<String, HashMap<String, Rc<MockGranularityDefinition>>>,
 }
 
 impl MockViewBuilder {
+    pub fn add_granularity(
+        mut self,
+        dimension_name: &str,
+        granularity_name: &str,
+        definition: MockGranularityDefinition,
+    ) -> Self {
+        self.granularities
+            .entry(dimension_name.to_string())
+            .or_default()
+            .insert(granularity_name.to_string(), Rc::new(definition));
+        self
+    }
+
     pub fn include_cube(mut self, join_path: impl Into<String>, includes: Vec<String>) -> Self {
         self.view_cubes.push(ViewCube {
             join_path: join_path.into(),
@@ -561,7 +576,7 @@ impl MockViewBuilder {
         let mut all_dimensions = self.dimensions;
         let mut all_measures = self.measures;
         let mut all_segments = self.segments;
-        let mut all_granularities = HashMap::new();
+        let mut all_granularities = self.granularities;
 
         for view_cube in &self.view_cubes {
             let join_path_parts: Vec<&str> = view_cube.join_path.split('.').collect();

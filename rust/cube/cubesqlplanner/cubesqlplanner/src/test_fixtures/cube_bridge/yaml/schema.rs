@@ -25,6 +25,8 @@ struct YamlCube {
     #[serde(default)]
     sql_table: Option<String>,
     #[serde(default)]
+    sql_alias: Option<String>,
+    #[serde(default)]
     calendar: Option<bool>,
     #[serde(default)]
     joins: Vec<YamlJoin>,
@@ -137,6 +139,7 @@ impl YamlSchema {
                 .name(cube.name.clone())
                 .sql_opt(cube.sql.clone())
                 .sql_table_opt(cube.sql_table.clone())
+                .sql_alias(cube.sql_alias.clone())
                 .is_calendar(cube.calendar)
                 .joins(joins)
                 .build();
@@ -187,8 +190,13 @@ impl YamlSchema {
             let mut view_builder = builder.add_view(view.name);
 
             for dim_entry in view.dimensions {
-                view_builder = view_builder
-                    .add_dimension(dim_entry.name, dim_entry.definition.build().definition);
+                let result = dim_entry.definition.build();
+                view_builder =
+                    view_builder.add_dimension(dim_entry.name.clone(), result.definition);
+                for (gran_name, gran_def) in result.granularities {
+                    view_builder =
+                        view_builder.add_granularity(&dim_entry.name, &gran_name, gran_def);
+                }
             }
 
             for meas_entry in view.measures {

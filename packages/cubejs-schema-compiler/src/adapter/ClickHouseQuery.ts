@@ -1,4 +1,4 @@
-import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
+import { escapeIdentifierBackslash, parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import type { QueryFilterTreeItem } from './QueryTypes';
@@ -77,18 +77,13 @@ export class ClickHouseQuery extends BaseQuery {
   }
 
   public escapeColumnName(name: string) {
-    return `\`${name}\``;
+    return escapeIdentifierBackslash(name);
   }
 
   public convertTz(field: string) {
-    //
-    // field yields a Date or a DateTime so add in the extra toDateTime64 to support the Date case
-    //
-    // https://clickhouse.yandex/docs/en/data_types/datetime/
-    // https://clickhouse.yandex/docs/en/query_language/functions/date_time_functions/
-    //
-    //
-    return `toTimeZone(toDateTime64(${field}, 0), '${this.timezone}')`;
+    // toTimeZone rejects a Date, hence the toDateTime64. Scale 6 keeps a DateTime64 column's
+    // sub-second part; 9 would cap the range at 2262.
+    return `toTimeZone(toDateTime64(${field}, 6), '${this.timezone}')`;
   }
 
   public timeGroupedColumn(granularity: string, dimension: string) {
@@ -168,10 +163,9 @@ export class ClickHouseQuery extends BaseQuery {
       return `toDateTime64(${value}, 3, '${timezone}')`;
     }
 
-    // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
-    // ClickHouse provides toDateTime which expects dates in UTC in format YYYY-MM-DD HH:MM:SS
-    // However parseDateTimeBestEffort works with ISO8601
-    return `parseDateTimeBestEffort(${value})`;
+    // value is an ISO8601 string. A second-precision DateTime would turn a range end at `23:59:59.999`
+    // into `23:59:59` and drop the rows within the range's last second
+    return `parseDateTime64BestEffort(${value}, ${this.timestampPrecision()})`;
   }
 
   public dimensionsJoinCondition(leftAlias: string, rightAlias: string) {
@@ -301,6 +295,15 @@ export class ClickHouseQuery extends BaseQuery {
     return `ALTER TABLE ${tableName} ADD INDEX ${indexName} (${escapedColumns.join(', ')}) TYPE minmax GRANULARITY 1`;
   }
 
+  // ClickHouse predicates evaluate to UInt8, which a pre-aggregation would store as an integer
+  public wrapBooleanDimension(sql: string) {
+    return `toBool(${sql})`;
+  }
+
+  public wrapSegmentForDimensionSelect(sql: string) {
+    return `toBool(${sql})`;
+  }
+
   public dimensionColumns(cubeAlias: string) {
     // For the top-level SELECT statement, explicitly set the column alias.
     // Clickhouse sometimes includes the "q_0" prefix in the column name, and this
@@ -316,6 +319,7 @@ export class ClickHouseQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.UTCTIMESTAMP = 'now(\'UTC\')';
+    templates.functions.APPROXDISTINCT = 'uniq({{ args_concat }})';
     templates.functions.STRING_AGG = 'arrayStringConcat(group{% if distinct %}Uniq{% endif %}Array({{ args[0] }}), {{ args[1] }})';
     // DATEADD is being rewritten to DATE_ADD. The operator form is used instead of
     // addDate(), which only exists since ClickHouse 23.9
@@ -333,6 +337,8 @@ export class ClickHouseQuery extends BaseQuery {
     // names the nullable form of the type instead
     templates.types.nullable = 'Nullable({{ data_type }})';
     templates.types.boolean = 'BOOL';
+    templates.expressions.wrap_boolean_dimension = 'toBool({{ expr }})';
+    templates.expressions.wrap_segment_select = 'toBool({{ expr }})';
     templates.types.timestamp = 'DATETIME';
     delete templates.types.time;
     // ClickHouse intervals have a distinct type for each granularity
