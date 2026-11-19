@@ -14,6 +14,9 @@ use std::rc::Rc;
 #[derive(Default, Clone)]
 pub struct PreAggregationColumns {
     columns: HashMap<String, QualifiedColumnName>,
+    // Grain columns of stored time dimensions, keyed by their base member,
+    // which may be stored raw in `columns` as well.
+    grain_columns: HashMap<String, QualifiedColumnName>,
 }
 
 impl PreAggregationColumns {
@@ -21,16 +24,27 @@ impl PreAggregationColumns {
         self.columns.insert(name, column);
     }
 
-    pub fn get(&self, name: &str) -> Option<&QualifiedColumnName> {
-        self.columns.get(name)
+    pub fn insert_grain(&mut self, name: String, column: QualifiedColumnName) {
+        self.grain_columns.insert(name, column);
+    }
+
+    /// A time-dimension read takes the grain column and any other read the
+    /// raw one, falling back to whichever column the member is stored as.
+    pub fn get(&self, name: &str, time_dimension_read: bool) -> Option<&QualifiedColumnName> {
+        let (preferred, other) = if time_dimension_read {
+            (&self.grain_columns, &self.columns)
+        } else {
+            (&self.columns, &self.grain_columns)
+        };
+        preferred.get(name).or_else(|| other.get(name))
     }
 
     pub fn is_empty(&self) -> bool {
-        self.columns.is_empty()
+        self.columns.is_empty() && self.grain_columns.is_empty()
     }
 
     pub fn contains_key(&self, name: &str) -> bool {
-        self.columns.contains_key(name)
+        self.columns.contains_key(name) || self.grain_columns.contains_key(name)
     }
 }
 
@@ -60,7 +74,10 @@ impl SqlNode for PreAggregationColumnSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        if let Some(column) = self.columns.get(&node.full_name()) {
+        if let Some(column) = self
+            .columns
+            .get(&node.full_name(), visitor.time_dimension_read())
+        {
             templates.column_reference(column.source(), column.name())
         } else {
             self.input.to_sql(

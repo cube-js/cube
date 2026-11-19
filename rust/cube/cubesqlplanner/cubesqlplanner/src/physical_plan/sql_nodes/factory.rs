@@ -190,6 +190,15 @@ impl SqlNodesFactory {
             .insert(name, column);
     }
 
+    pub fn add_pre_aggregation_time_dimension_reference(
+        &mut self,
+        name: String,
+        column: QualifiedColumnName,
+    ) {
+        self.pre_aggregation_dimensions_references
+            .insert_grain(name, column);
+    }
+
     pub fn set_original_sql_pre_aggregations(&mut self, value: HashMap<CubeId, String>) {
         self.original_sql_pre_aggregations = value;
     }

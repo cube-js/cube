@@ -40,7 +40,7 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
     ) -> Result<String, CubeError> {
         let ev = node.as_measure()?;
         Ok(
-            if let Some(column_name) = self.references.get(&node.full_name()) {
+            if let Some(column_name) = self.references.get(&node.full_name(), false) {
                 let table_ref = if let Some(table_name) = column_name.source() {
                     format!("{}.", templates.quote_identifier(table_name)?)
                 } else {

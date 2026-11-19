@@ -126,6 +126,29 @@ cubes:
           - dimension: cohort_date
             granularity: year
 
+      - name: day_with_raw_dimension
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimension: cohort_date
+        granularity: day
+
+      - name: rows_with_raw_dimension
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - id
+          - app_name
+          - cohort_date
+        time_dimension: cohort_date
+        granularity: day
+
       - name: month_with_raw_dimension
         type: rollup
         measures:

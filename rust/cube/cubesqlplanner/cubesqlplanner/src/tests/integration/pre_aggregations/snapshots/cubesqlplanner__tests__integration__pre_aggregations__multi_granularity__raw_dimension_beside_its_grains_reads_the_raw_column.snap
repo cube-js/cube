@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/multi_granularity.rs
+expression: result
+---
+activity__cohort_date    | activity__amount
+-------------------------+-----------------
+2025-01-30T13:00:00.000Z | 6767            
+2025-01-31T13:00:00.000Z | 6868            
+2025-02-01T13:00:00.000Z | 6969            
+2025-02-02T13:00:00.000Z | 7070

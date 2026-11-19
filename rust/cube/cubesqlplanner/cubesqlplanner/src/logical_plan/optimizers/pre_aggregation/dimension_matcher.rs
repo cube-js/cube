@@ -292,18 +292,18 @@ impl<'a> DimensionMatcher<'a> {
         dimension: &DimensionSymbol,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
-        if self
-            .pre_aggregation_time_dimensions
-            .contains_key(dimension.id())
-        {
-            // Its reads resolve to a stored grain column, which holds the value
-            // truncated and in the query timezone, not the raw value.
-            Ok(MatchState::NotMatched)
-        } else if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
+        if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
             if add_to_matched_dimension {
                 *found = true;
             }
             Ok(MatchState::Full)
+        } else if self
+            .pre_aggregation_time_dimensions
+            .contains_key(dimension.id())
+        {
+            // A grain column holds the value truncated and in the query
+            // timezone, so a raw read needs the member listed as a dimension.
+            Ok(MatchState::NotMatched)
         } else if dimension.is_calc_group() {
             // Calc-group dimensions are virtual enumerations: they carry no
             // stored data, so any rollup can serve them. At query time the

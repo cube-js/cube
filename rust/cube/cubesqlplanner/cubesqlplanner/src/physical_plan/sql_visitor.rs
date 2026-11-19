@@ -18,6 +18,9 @@ pub struct SqlEvaluatorVisitor {
     /// binding of a member renders, and whether its column carries an offset.
     filter_params_time_shifts: FilterParamsTimeShifts,
     ignore_tz_convert: bool,
+    /// The member is read as a time dimension: by a granularity or a date
+    /// filter, which a stored grain column serves, not a raw one.
+    time_dimension_read: bool,
     /// When `true`, the caller (typically a `SqlCall` substitution site) expects
     /// the rendered expression to be safe for embedding next to operators —
     /// i.e. a compound top-level result should be wrapped in parentheses.
@@ -40,6 +43,7 @@ impl SqlEvaluatorVisitor {
             all_filters,
             filter_params_time_shifts: FilterParamsTimeShifts::default(),
             ignore_tz_convert: false,
+            time_dimension_read: false,
             arg_needs_paren_safe: false,
             measure_row_condition: None,
         }
@@ -69,6 +73,16 @@ impl SqlEvaluatorVisitor {
         let mut self_copy = self.clone();
         self_copy.ignore_tz_convert = true;
         self_copy
+    }
+
+    pub fn with_time_dimension_read(&self) -> Self {
+        let mut self_copy = self.clone();
+        self_copy.time_dimension_read = true;
+        self_copy
+    }
+
+    pub fn time_dimension_read(&self) -> bool {
+        self.time_dimension_read
     }
 
     pub fn with_arg_needs_paren_safe(&self, value: bool) -> Self {

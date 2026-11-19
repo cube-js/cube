@@ -62,6 +62,19 @@ pub enum RollingScanBand {
 }
 
 impl FilterOp {
+    /// Whether the filter bounds the member by dates, which are resolved in
+    /// the query timezone.
+    pub fn is_date_bounded(&self) -> bool {
+        matches!(
+            self,
+            FilterOp::DateRange(_)
+                | FilterOp::DateSingle(_)
+                | FilterOp::RegularRollingWindow(_)
+                | FilterOp::RollingWindowOffset(_)
+                | FilterOp::ToDateRollingWindow(_)
+        )
+    }
+
     /// The band a rolling-window filter's base scan reads, or `None` for any
     /// other filter. `span_end` picks a series' upper bound, which depends on
     /// the shape the dialect renders the series in.

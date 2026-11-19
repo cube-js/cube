@@ -35,6 +35,11 @@ impl ToSql for TypedFilter {
         }
 
         let resolved = resolve_base_symbol(self.member_evaluator());
+        let visitor = if self.operation().is_date_bounded() {
+            visitor.with_time_dimension_read()
+        } else {
+            visitor.clone()
+        };
         let member_sql = visitor.apply_for_filter(&resolved, node_processor, templates)?;
 
         let ctx = FilterSqlContext::new(
