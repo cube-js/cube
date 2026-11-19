@@ -790,12 +790,20 @@ default. Users without it never see them.
 | `deleteDataModelFile` | Deletes a model source file on the dev branch. | Destructive — prompts |
 | `getDataModelChanges` | Shows the pending changes on the dev branch against its parent, for review before committing: the changed-file list with per-file line counts, the unified diff, and a link that opens the changes in the [Data model IDE][ref-reviewing-changes]. | Read-only |
 | `getBranchDiff` | Shows what **any** branch changed against the deploy branch: the changed-file list with per-file line counts, plus the unified diff. | Read-only |
+| `getDataModelHistory` | Lists the commits on the deploy branch, newest first: SHA, author, date, and subject. Pass `filePath` to limit the list to one file, `branchName` to read another branch, and `limit` to get up to 100 commits (20 by default). `hasMore: true` means older commits exist. Only committed work appears. | Read-only |
+| `getCommitDiff` | Shows what committed changes did: one commit against its parent (`toCommit` alone), or every change between two commits (`fromCommit` and `toCommit`). Pass `branchName` to read a branch other than the deploy branch. Returns the changed-file list with per-file line counts, plus the unified diff. | Read-only |
 | `getDeploymentEnv` | Lists the deployment's environment variables, with every secret-looking value redacted to `[ENCRYPTED]`. Useful for confirming configuration is present and shaped as expected. | Read-only |
 
 `getDataModelChanges` answers "what have I changed?" for your own dev branch against its
 immediate parent. `getBranchDiff` answers "what did this branch change?" for any branch,
 including feature branches — reach for it when a change edits existing cubes, where the
 file list looks identical on both branches and `listDataModelFiles` reveals nothing.
+
+`getDataModelHistory` answers "who changed this file, and when?", and `getCommitDiff`
+answers "what did this commit change?". Take the SHAs for `getCommitDiff` from
+`getDataModelHistory`. A large change can come back trimmed: `diffTruncated` and
+`diffOmittedReason` mean the patch was cut or left out, and `filesTruncated` means the
+file list was cut. The `insertions` and `deletions` totals always cover the whole change.
 
 <Note>
 
@@ -823,7 +831,7 @@ with one gap noted below:
   changes](#committing-and-publishing-changes).
 - **Registration is permission-gated.** Every tool in Data model editing, Committing and
   publishing changes, and Pre-aggregations — the six model-editing tools, `getBranchDiff`,
-  `getDeploymentEnv`, the six commit and branch tools, and both pre-aggregation tools — is
+  `getDataModelHistory`, `getCommitDiff`, `getDeploymentEnv`, the six commit and branch tools, and both pre-aggregation tools — is
   offered only to users whose role allows editing the semantic model. A Viewer never sees
   any of them.
 - **Deploy-branch writes are permission-checked at call time.** A role scoped to **Edit data
