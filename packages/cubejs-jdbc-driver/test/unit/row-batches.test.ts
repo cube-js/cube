@@ -152,8 +152,9 @@ describe('JDBCDriver row batches', () => {
     expect(events).toEqual(['batch', 'statement.close', 'pool.release']);
   });
 
-  it('releases a streamed connection when closing the statement fails', async () => {
+  it('logs a failed statement close and still releases the streamed connection', async () => {
     const released = jest.fn();
+    const logger = jest.fn();
     const resultSet = {
       _types: [],
       toObjectBatchIter: async () => ({ labels: ['id'], types: [4], next: async () => null }),
@@ -167,11 +168,13 @@ describe('JDBCDriver row batches', () => {
     const streamDriver: TestJDBCDriver = Object.create(TestJDBCDriver.prototype, {
       config: { value: { batchSize: 1024 } },
       pool: { value: { acquire: async () => conn, release: released } },
+      logger: { value: logger },
     });
 
     const { release } = await streamDriver.stream('SELECT 1', [], { highWaterMark: 16 });
 
-    await expect(release!()).rejects.toThrow('close failed');
+    await expect(release!()).resolves.toBeUndefined();
+    expect(logger).toHaveBeenCalledWith('Closing statement failed', { error: expect.stringContaining('close failed') });
     expect(released).toHaveBeenCalledWith(conn);
   });
 });

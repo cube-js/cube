@@ -338,7 +338,7 @@ export class JDBCDriver extends BaseDriver {
             try {
               await rowStream.close();
             } finally {
-              await promisify(statement.close.bind(statement))();
+              await this.closeStatement(statement);
             }
           } finally {
             await this.pool.release(conn);
@@ -395,6 +395,20 @@ export class JDBCDriver extends BaseDriver {
     }
 
     return resultSet;
+  }
+
+  /**
+   * Never throws: callers await `release` in a `finally`, where a failed close would replace
+   * the error of the query or fail one that has already succeeded.
+   */
+  protected async closeStatement(statement: any): Promise<void> {
+    try {
+      await promisify(statement.close.bind(statement))();
+    } catch (e: any) {
+      if (this.logger) {
+        this.logger('Closing statement failed', { error: (e.stack || e).toString() });
+      }
+    }
   }
 
   /**
