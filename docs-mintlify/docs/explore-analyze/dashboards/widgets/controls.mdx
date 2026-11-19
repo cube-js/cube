@@ -276,7 +276,7 @@ By default, viewers can choose between **day**, **week**, **month**, **quarter**
 
 For time dimensions backed by a `TIMESTAMP` or `DATETIME` column, sub-day granularities (**second**, **minute**, **hour**) are also available. `DATE`-typed columns don't expose sub-day granularities, since they would bucket the entire day into a single point.
 
-Custom granularities defined in the [data model][ref-granularities] aren't offered in this list yet — the switcher exposes the built-in granularities only.
+Custom granularities defined in the [data model][ref-granularities] aren't offered in this list yet — the widget's settings list the built-in granularities only. A custom granularity already saved on the switcher, such as one written through the API, stays allowed when you check or uncheck built-in ones, and the settings show it by its name, for example `fiscal_year`.
 
 ### Default granularity
 
