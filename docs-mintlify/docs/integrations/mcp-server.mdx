@@ -582,11 +582,11 @@ agent behind [`chat`](#deployments-and-chat) doing the deleting.
 
 Each tool is annotated as read-only, write, or destructive. MCP clients that honor these
 annotations — including Claude — run read-only tools automatically and **always ask for
-confirmation** before any destructive one. On this page, these are `updateReport`,
-`deleteReport`, `moveWorkspaceItem`, `renameFolder`, `deleteFolder`, `updateDashboard`,
-`publishDashboard`, `writeDataModelFile`, `deleteDataModelFile`, `mergeToDefaultBranch`,
-and `discardDataModelChanges`. A tool
-annotated write, not destructive, may run without a prompt — including
+confirmation** before any destructive one. The destructive tools on this page are
+`updateReport`, `deleteReport`, `moveWorkspaceItem`, `renameFolder`, `deleteFolder`,
+`updateDashboard`, `publishDashboard`, `writeDataModelFile`, `deleteDataModelFile`,
+`mergeToDefaultBranch`, and `discardDataModelChanges`. A tool annotated write, not
+destructive, may run without a prompt — including
 `commitDataModelChanges`, which can publish straight to production in one case; see [How
 model edits stay safe](#how-model-edits-stay-safe). A tool annotated read-only can still
 cause a write once it runs — `chat` is that case; see [Deployments and
@@ -609,9 +609,9 @@ work together.
 does in response. It's the same agent Analytics Chat uses, with the same write-capable
 tools — creating reports, organizing workspace folders — when the caller's access allows
 it, and the agent's own folder actions run with no confirmation step — unlike
-`moveWorkspaceItem`, `renameFolder`, and `deleteFolder` below, which a client prompts for. A client that runs `chat`
-automatically because the annotation says read-only can still cause an unconfirmed write
-through the agent's own reply.
+`moveWorkspaceItem`, `renameFolder`, and `deleteFolder` below, which a client prompts
+for. A client that runs `chat` automatically because the annotation says read-only can
+still cause an unconfirmed write through the agent's own reply.
 
 </Warning>
 
@@ -719,9 +719,12 @@ Workspace page but checks less too][ref-deleting-folders].
 
 When the user pastes a link to a dashboard, an embedded dashboard, or a workbook, call
 `listWorkspaceItems` with the link as `url`. It returns the workbook as one `WORKBOOK` item,
-and its `id` is the `workbookId`. If the link points to another deployment, the error names
-the `deploymentId` to pass with the link. If the link points to nothing the user can open,
-the call fails.
+and its `id` is the `workbookId`. If the link points to another deployment, the call fails
+with an error that names that deployment's `deploymentId`. Call `listWorkspaceItems` again
+with the link and that `deploymentId`, and pass the same `deploymentId` to the workbook
+tools that follow, such as `readWorkbook` and `updateDashboard`. Every tool in this section
+takes an optional `deploymentId`, and without it the tool uses the session's deployment.
+If the link points to nothing the user can open, the call fails.
 
 **To change an existing report, use `updateReport` — never recreate it.** A dashboard's
 chart widget points at a specific `reportId`, so replacing a report with a new one orphans
