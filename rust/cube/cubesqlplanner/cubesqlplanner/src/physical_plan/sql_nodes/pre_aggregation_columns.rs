@@ -28,15 +28,18 @@ impl PreAggregationColumns {
         self.grain_columns.insert(name, column);
     }
 
-    /// A time-dimension read takes the grain column and any other read the
-    /// raw one, falling back to whichever column the member is stored as.
-    pub fn get(&self, name: &str, time_dimension_read: bool) -> Option<&QualifiedColumnName> {
-        let (preferred, other) = if time_dimension_read {
-            (&self.grain_columns, &self.columns)
-        } else {
-            (&self.columns, &self.grain_columns)
-        };
-        preferred.get(name).or_else(|| other.get(name))
+    /// The raw column, or the grain column of a member stored only as one.
+    pub fn get(&self, name: &str) -> Option<&QualifiedColumnName> {
+        self.columns
+            .get(name)
+            .or_else(|| self.grain_columns.get(name))
+    }
+
+    /// The grain column, or the raw column of a member stored only as one.
+    pub fn get_for_time_dimension_read(&self, name: &str) -> Option<&QualifiedColumnName> {
+        self.grain_columns
+            .get(name)
+            .or_else(|| self.columns.get(name))
     }
 
     pub fn is_empty(&self) -> bool {
@@ -74,10 +77,13 @@ impl SqlNode for PreAggregationColumnSqlNode {
         node_processor: Rc<dyn SqlNode>,
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
-        if let Some(column) = self
-            .columns
-            .get(&node.full_name(), visitor.time_dimension_read())
-        {
+        let name = node.full_name();
+        let column = if visitor.time_dimension_read() {
+            self.columns.get_for_time_dimension_read(&name)
+        } else {
+            self.columns.get(&name)
+        };
+        if let Some(column) = column {
             templates.column_reference(column.source(), column.name())
         } else {
             self.input.to_sql(
