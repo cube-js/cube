@@ -68,8 +68,8 @@ deployment the single endpoint doesn't serve — see
 Each MCP endpoint serves a set of deployments. Some regions serve their deployments from an
 endpoint of their own; the others share one. A connection reaches only the deployments its
 endpoint serves, and the single endpoint serves the same set as the endpoint of the
-deployment you land on. If all your deployments share one endpoint, one connection reaches them all,
-whatever their region.
+deployment you land on. If all your deployments share one endpoint, one connection reaches
+them all, whatever their region.
 
 When your deployments are served by more than one endpoint, **Admin → MCP Server** lists
 every endpoint with the deployments it serves. Add one connector per endpoint through your
@@ -542,7 +542,8 @@ A typical client workflow:
     [Deployments in more than one region](#deployments-in-more-than-one-region).
   </Step>
   <Step title="Discover">
-    Call `listDeployments` to see the available `deploymentId` / `agentId` values.
+    Call `listDeployments` to see the `deploymentId` / `agentId` values you can target. It
+    also lists deployments behind other endpoints, each with the endpoint that serves it.
   </Step>
   <Step title="Chat">
     Call `chat` with your `input`, optionally passing `deploymentId` and/or `agentId` to
@@ -635,7 +636,7 @@ chat](#deployments-and-chat).
 
 | Tool | Description | Access |
 | --- | --- | --- |
-| `listDeployments` | Lists the deployments and agents you can reach over MCP. | Read-only |
+| `listDeployments` | Lists the deployments and agents you can access over MCP, and names the endpoint for each deployment this connection can't use. | Read-only |
 | `chat` | Asks a question of a Cube agent, optionally targeting a specific deployment and agent. Pass `branchName` to have the agent answer from a dev branch's model instead of the deployed one. | Read-only — see warning below |
 | `loadQueryResults` | Paginates through the results of a previous query. | Read-only |
 
@@ -981,7 +982,7 @@ and friends) are set.
 - **MCP OAuth integration is not configured**: Enable MCP in **Admin → Team & Security → OAuth Integrations**.
 - **No deployments available / MCP access is disabled**: In **Admin → MCP Server → Deployment access**, make sure **Limit available deployments** is off, or that at least one deployment is selected and the user has permission to access it.
 - **`Deployment <id> is not available via MCP for this account` (403)**: The requested deployment is excluded by the deployment-access allow-list or by the user's permissions. Call `listDeployments` to see which deployments are reachable, or adjust the allow-list in **Admin → MCP Server → Deployment access**.
-- **`Deployment <id> is served by the Cube MCP endpoint <endpoint>, which this session cannot reach`**: The deployment is served by another endpoint than the one this connection signed in on. Add a connector for that endpoint — see [Deployments in more than one region](#deployments-in-more-than-one-region). If the client already uses that endpoint, reconnect it so it signs in there again.
+- **`Deployment <id> is served by the Cube MCP endpoint <endpoint>, which this session cannot reach`**: The deployment is served by a different endpoint from the one this connection signed in on. Add a connector for that endpoint — see [Deployments in more than one region](#deployments-in-more-than-one-region). If the client already uses that endpoint, reconnect it so it signs in there again.
 
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-api-keys]: /admin/account-billing/api-keys
