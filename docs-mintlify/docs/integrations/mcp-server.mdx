@@ -569,22 +569,23 @@ queried.
 
 ## Available actions
 
-The MCP server exposes 30 tools, grouped below.
+The MCP server exposes the tools below, grouped by purpose.
 
 Every tool runs as the authenticated user. Queries respect the same
 [permissions][ref-roles] as the rest of Cube, including row-level security — MCP is a new
 way to reach your data, not a new access surface — with one exception, reachable two
 ways: deleting a [workspace folder][ref-folders] skips the content-permission check the
-Workspace page applies, whether it's [`manageFolders`](#dashboard-authoring) or the
+Workspace page applies, whether it's [`deleteFolder`](#dashboard-authoring) or the
 agent behind [`chat`](#deployments-and-chat) doing the deleting.
 
 ### Read and write tools
 
 Each tool is annotated as read-only, write, or destructive. MCP clients that honor these
 annotations — including Claude — run read-only tools automatically and **always ask for
-confirmation** before any of the nine destructive ones: `updateReport`, `deleteReport`,
-`manageFolders`, `updateDashboard`, `publishDashboard`, `writeDataModelFile`,
-`deleteDataModelFile`, `mergeToDefaultBranch`, and `discardDataModelChanges`. A tool
+confirmation** before any destructive one. On this page, these are `updateReport`,
+`deleteReport`, `moveWorkspaceItem`, `renameFolder`, `deleteFolder`, `updateDashboard`,
+`publishDashboard`, `writeDataModelFile`, `deleteDataModelFile`, `mergeToDefaultBranch`,
+and `discardDataModelChanges`. A tool
 annotated write, not destructive, may run without a prompt — including
 `commitDataModelChanges`, which can publish straight to production in one case; see [How
 model edits stay safe](#how-model-edits-stay-safe). A tool annotated read-only can still
@@ -608,7 +609,7 @@ work together.
 does in response. It's the same agent Analytics Chat uses, with the same write-capable
 tools — creating reports, organizing workspace folders — when the caller's access allows
 it, and the agent's own folder actions run with no confirmation step — unlike
-`manageFolders` below, which a client prompts for. A client that runs `chat`
+`moveWorkspaceItem`, `renameFolder`, and `deleteFolder` below, which a client prompts for. A client that runs `chat`
 automatically because the annotation says read-only can still cause an unconfirmed write
 through the agent's own reply.
 
@@ -698,7 +699,11 @@ programmatically. Creating and editing workbooks requires the Explorer role or h
 | `readReport` | Reads one workbook report or standalone exploration by id — its title, SQL, chart spec, placement, and a shareable URL. | Read-only |
 | `updateReport` | Edits an existing workbook report or exploration in place, keeping its `reportId`. Send only the fields you want to change — including `folderId` to move a standalone exploration into a [workspace folder][ref-folders]. | Destructive — prompts |
 | `deleteReport` | Deletes a workbook report or exploration. | Destructive — prompts |
-| `manageFolders` | Lists, creates, renames, moves, or deletes the [workspace folders][ref-folders] that standalone explorations, workbooks, and dashboards are filed in. | Destructive — prompts |
+| `listWorkspaceItems` | Lists the [workspace folders][ref-folders], workbooks, and standalone explorations, each with its `type`, `id`, `name`, and the `folderId` it's filed in. Lists one folder level, or pass `search` to match names across every folder. Pass `url` with a dashboard or workbook link the user pasted to get that one workbook and its `workbookId`. | Read-only |
+| `moveWorkspaceItem` | Moves a folder, workbook, or standalone exploration into another folder, or to the workspace root. A folder moves with everything inside it. | Destructive — prompts |
+| `createFolder` | Creates an empty workspace folder, at the root or inside another folder. | Write |
+| `renameFolder` | Renames a workspace folder. | Destructive — prompts |
+| `deleteFolder` | Deletes a workspace folder. The items inside it move to the workspace root. A folder that holds subfolders can't be deleted. | Destructive — prompts |
 | `updateDashboard` | Saves the dashboard layout to the workbook **draft**. Replaces the full widget set and does not go live. | Destructive — prompts |
 | `publishDashboard` | Publishes the current draft to make it live. Idempotent — republishing an unchanged draft is a no-op. | Destructive — prompts |
 
@@ -706,11 +711,17 @@ Drafts are the safety net here: `updateDashboard` only ever writes to the draft,
 published dashboard keeps serving its previous version until you approve
 `publishDashboard`. See [Build a dashboard](#build-a-dashboard) for the full sequence.
 
-Call `manageFolders` with `action: "list"` first to get a folder's numeric id — that id,
-not its name, is what `folderId` takes on `createReport` and `updateReport` to place a
-standalone exploration inside it. The annotation covers the whole tool, so a client
-prompts for `list` as it would for `delete`. Its delete [destroys less than the
+Call `listWorkspaceItems` to get the ids the other tools take: a folder's id is the
+`folderId` on `createReport`, `updateReport`, and `moveWorkspaceItem`, a workbook's id is the
+`workbookId` on `readWorkbook` and `updateDashboard`, and a standalone exploration's id is
+the `reportId` on `readReport` and `updateReport`. `deleteFolder` [destroys less than the
 Workspace page but checks less too][ref-deleting-folders].
+
+When the user pastes a link to a dashboard, an embedded dashboard, or a workbook, call
+`listWorkspaceItems` with the link as `url`. It returns the workbook as one `WORKBOOK` item,
+and its `id` is the `workbookId`. If the link points to another deployment, the error names
+the `deploymentId` to pass with the link. If the link points to nothing the user can open,
+the call fails.
 
 **To change an existing report, use `updateReport` — never recreate it.** A dashboard's
 chart widget points at a specific `reportId`, so replacing a report with a new one orphans
@@ -864,14 +875,16 @@ members, then run your own SQL with `runQuery`.
 
 Four of the dashboard tools build a new dashboard, and they are designed to be used in
 order. `readWorkbook`, `readReport`, `updateReport`, and `deleteReport` inspect and
-change one that already exists, and `manageFolders` organizes the workspace folders
-those workbooks and dashboards live in.
+change one that already exists. `listWorkspaceItems` finds it, and `moveWorkspaceItem`,
+`createFolder`, `renameFolder`, and `deleteFolder` organize the workspace folders those
+workbooks and dashboards live in.
 
 <Steps>
   <Step title="Create the workbook">
     Call `createWorkbook` with a name. It returns the `workbookId` every later step needs.
     If you were given an existing workbook to build into, call `readWorkbook` instead and
-    skip to the next step.
+    skip to the next step. If you were given a link to its dashboard, call
+    `listWorkspaceItems` with the link as `url` first to get the `workbookId`.
   </Step>
   <Step title="Create a report per chart">
     Call `createReport` once per chart, KPI tile, or table, passing the `workbookId` and
