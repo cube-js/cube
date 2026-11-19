@@ -83,13 +83,26 @@ Filters can allow either a single value or multiple values. The filter's edit si
 
 ### Allowed values
 
-A string filter using `is` offers every value of its dimension. To offer only some of them — three order statuses out of eleven, say — pick them under **Allowed values** in the filter's edit sidebar, below **Selection mode**. With nothing picked, the field reads **All values**. The picker lists the dimension's values the way the filter's own dropdown does: the first 100, with a search for the rest. Picked values keep the dimension's order.
+A string filter using `is` offers every value of its dimension. To offer only some of them — three order statuses out of eleven, say — pick them under **Allowed values** in the filter's edit sidebar, below **Selection mode** and **Display**. With nothing picked, the field reads **All values**. The picker lists the dimension's values the way the filter's own dropdown does: the first 100, with a search for the rest. Picked values keep the dimension's order.
 
 The filter then offers only the allowed values, and a viewer can't type another one. The list is still read from the data, so a value the viewer's [access policy][ref-access-policies] hides, or that has no rows under the [facets](#faceted-filters), drops out of it. A value outside the list is ignored wherever it comes from: a [URL parameter](#sharing-the-current-selection) or the embed API, a [parent control](#parent) preset, the [dashboard agent][ref-dashboard-agent], or a default [from a user attribute](#user-attribute-default) or [from the data](#defaults-resolved-from-the-data). When none of its values is allowed, the filter applies nothing.
 
 While **Default value** is **Saved widget value**, the filter can't be saved with a saved value outside the list: allow that value, or change the filter's value. The list is fixed when you save it, so values added to the data later are not offered until you allow them.
 
 Allowed values limit what a filter offers, not what a viewer can see. The other conditions a viewer can switch the filter to, such as `contains`, still match any value, and the data stays reachable through the dashboard's other paths. To limit the data itself, use an [access policy][ref-access-policies].
+
+### Buttons
+
+A string filter using `is` shows its values in a dropdown. To show them side by side instead, so one click applies a value and the current one is always visible, set **Display** to **Buttons** in the filter's edit sidebar. Buttons suit a short, fixed set: a few order statuses or regions.
+
+A filter shows at most 5 buttons, one per [allowed value](#allowed-values), in the order of the list. When you switch to **Buttons** with no allowed values picked, the list fills with the filter's saved value and the first values of the dimension, up to 5, and you can change them. While **Display** is **Buttons**, the list can't hold more than 5 values, and the filter can't be saved with none. Switching back to **Dropdown** before you change the filled-in values clears them again.
+
+How the buttons behave follows [**Selection mode**](#single-vs-multiple-selection):
+
+- **Single value:** the buttons form one row, and one value is selected at a time. Clicking the selected button again clears the filter.
+- **Multiple values:** each button turns its own value on or off, and ✕ clears them all.
+
+When the filter is too narrow for its buttons, it shows the dropdown instead, with the same values. A long value is shortened on its button, and its full text shows on hover. On a [faceted filter](#faceted-filters), a value with no rows under the other filters stays in place, disabled.
 
 ### Default values
 
