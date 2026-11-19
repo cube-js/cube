@@ -70,7 +70,7 @@ A chart that has a cross-filter of its own and is filtered by other charts shows
 
 Several charts can each have a cross-filter, and every other chart gets all of them at once: rows must match each one. A chart is never filtered by its own cross-filter, but it is filtered by the other charts'. Cross-filters combine with the dashboard's [controls][ref-controls] the same way, and clearing a control leaves the cross-filters in place, and the other way round.
 
-A cross-filter reaches a chart on the same semantic view through the same dimension. A chart on another semantic view gets it when that view includes the same cube dimension once; otherwise it isn't filtered. A cross-filter that holds several dimensions, such as a category and a color, reaches only the charts that can take all of them. [Python analysis][ref-python] reports and [AI summaries][ref-ai-summary] are never cross-filtered.
+A cross-filter reaches a chart on the same semantic view through the same dimension. A chart on another semantic view gets it when that view includes the same cube dimension once; otherwise it isn't filtered. A cross-filter that holds several dimensions, such as a category and a color, reaches only the charts that can take all of them. [Python analysis][ref-python] reports and [Analysis widgets][ref-analysis] are never cross-filtered.
 
 A [faceted filter][ref-faceted-filters] whose sources are left at **All** narrows its value list by the cross-filters too, and its tooltip names each as *Status (cross-filter)*. A cross-filter on the filter's own field, or one holding several periods of a date, doesn't narrow it, and neither does any cross-filter when you picked the filter's sources.
 
@@ -97,7 +97,7 @@ Other features read your cross-filters as they read your control selections:
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-faceted-filters]: /docs/explore-analyze/dashboards/widgets/controls#faceted-filters
 [ref-python]: /docs/explore-analyze/workbooks/python-analysis
-[ref-ai-summary]: /docs/explore-analyze/dashboards/widgets/ai-summary
+[ref-analysis]: /docs/explore-analyze/dashboards/widgets/analysis
 [ref-drill-down]: /docs/explore-analyze/charts/chart-types/table#cell-menu
 [ref-downloads]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
 [ref-print-version]: /docs/explore-analyze/dashboards#print-version

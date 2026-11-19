@@ -117,7 +117,7 @@
                       "docs/explore-analyze/dashboards/widgets/charts",
                       "docs/explore-analyze/dashboards/widgets/text",
                       "docs/explore-analyze/dashboards/widgets/controls",
-                      "docs/explore-analyze/dashboards/widgets/ai-summary",
+                      "docs/explore-analyze/dashboards/widgets/analysis",
                       "docs/explore-analyze/dashboards/widgets/layout"
                     ]
                   },
@@ -1334,6 +1334,10 @@
     ]
   },
   "redirects": [
+    {
+      "source": "/docs/explore-analyze/dashboards/widgets/ai-summary",
+      "destination": "/docs/explore-analyze/dashboards/widgets/analysis"
+    },
     {
       "source": "/docs/explore-analyze/scheduled-refreshes",
       "destination": "/docs/explore-analyze/dashboard-deliveries"
