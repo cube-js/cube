@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.29](https://github.com/cube-js/cube/compare/v1.8.28...v1.8.29) (2026-11-19)
+
+### Bug Fixes
+
+- **bigquery-driver:** Forward mid-stream errors in SQL API stream mode ([#10877](https://github.com/cube-js/cube/issues/10877)) ([e2b4c67](https://github.com/cube-js/cube/commit/e2b4c6726d1a0d712cf0ad7cc8b164d469d19e28)), closes [#10875](https://github.com/cube-js/cube/issues/10875)
+
 ## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
 
 ### Bug Fixes
