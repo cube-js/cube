@@ -872,6 +872,22 @@ filter_subq AS (
       expect(res.rows).toMatchSnapshot();
     });
 
+    // https://github.com/cube-js/cube/issues/12862
+    test.each([
+      ['without LIMIT', ''],
+      ['with LIMIT above the non-streaming row limit', ' LIMIT 50001'],
+      ['with LIMIT at the non-streaming row limit', ' LIMIT 50000'],
+    ])('streamed query served from a Cube Store pre-aggregation %s', async (_name, limit) => {
+      const query = `
+        SELECT DATE_TRUNC('week', event_date) AS week, MEASURE(sessions) AS sessions
+        FROM "StreamPreAggTest"
+        WHERE event_date >= '2026-09-01' AND event_date < '2026-10-01'
+        GROUP BY 1
+        ORDER BY 1${limit}`;
+      const res = await connection.query(query);
+      expect(res.rows.map((r) => Number(r.sessions))).toEqual([10, 20, 30]);
+    });
+
     test('tableau bi fiscal year query', async () => {
       const query = `
       SELECT
