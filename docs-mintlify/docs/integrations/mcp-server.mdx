@@ -831,9 +831,9 @@ with one gap noted below:
   changes](#committing-and-publishing-changes).
 - **Registration is permission-gated.** Every tool in Data model editing, Committing and
   publishing changes, and Pre-aggregations — the six model-editing tools, `getBranchDiff`,
-  `getDataModelHistory`, `getCommitDiff`, `getDeploymentEnv`, the six commit and branch tools, and both pre-aggregation tools — is
-  offered only to users whose role allows editing the semantic model. A Viewer never sees
-  any of them.
+  `getDataModelHistory`, `getCommitDiff`, `getDeploymentEnv`, the six commit and branch
+  tools, and both pre-aggregation tools — is offered only to users whose role allows
+  editing the semantic model. A Viewer never sees any of them.
 - **Deploy-branch writes are permission-checked at call time.** A role scoped to **Edit data
   model on dev branches** still sees every tool listed above registered, but `mergeToDefaultBranch`
   and `commitDataModelChanges` with `confirmPublishToDefaultBranch` fail for that role, the
