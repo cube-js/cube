@@ -20,15 +20,27 @@ interactive data tool that does not fit a standard [dashboard][ref-dashboards]
 layout. A workbook holds one dashboard, and that dashboard is either a standard
 dashboard or an app.
 
-## Turn a dashboard into an app
+## Create an app
 
-Open a workbook and switch to **Dashboard builder**. In the workbook menu, select
-**App mode**. Cube replaces the dashboard with a starter app that you can edit,
-and the **Dashboard builder** tab reads **App builder**.
+Open a workbook and switch to **Builder**. When the workbook has no dashboard
+or app yet, Cube asks **What do you want to build?** Select **App**. Cube creates
+a starter app that reads the workbook's first report, and the tab reads
+**App builder**.
 
-To go back to a standard dashboard, select **App mode** again. The tab reads
-**Dashboard builder** again. Cube keeps the standard dashboard's draft while the
-workbook is in app mode, so switching back restores it.
+Select **Dashboard** instead to build a standard dashboard. The tab then reads
+**Dashboard builder**.
+
+## Convert between a dashboard and an app
+
+To turn a standard dashboard into an app, select **Convert to app** at the right
+of the **Dashboard builder** toolbar, then confirm. The app starts from the
+workbook's first report.
+
+To turn an app back into a standard dashboard, select **Convert to dashboard** at
+the right of the **App builder** toolbar, then confirm.
+
+Cube keeps the dashboard's widgets and the app's files in the workbook, so
+converting back restores them.
 
 ## Build the app with the agent
 
