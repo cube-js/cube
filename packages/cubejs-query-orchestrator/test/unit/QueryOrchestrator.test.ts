@@ -2089,11 +2089,18 @@ describe('QueryOrchestrator', () => {
       const [appA, appB] = createApps(false);
       const tableName = 'stb_pre_aggregations.orders_own_keys';
 
+      const activeMarks = async () => (await appA.getQueryCache().getCacheDriver().keysStartingWith(''))
+        .filter(key => key.includes('#SQL_PRE_AGGREGATIONS_REFRESH_ACTIVE:'));
+      const activeMarksBefore = await activeMarks();
+
       await appA.getPreAggregations().updateLastTouch(tableName);
+      await appA.markRefreshActive();
       await appA.getPreAggregations().updateRefreshEndReached();
 
       expect(await appB.getPreAggregations().tablesTouched()).not.toContain(tableName);
       expect(await appB.getPreAggregations().getRefreshEndReached()).toBeFalsy();
+      // Nothing shares its cache, so nothing waits for it
+      expect(await activeMarks()).toEqual(activeMarksBefore);
     });
 
     test('cleanup keeps a table that another app touched', async () => {
