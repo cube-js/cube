@@ -176,9 +176,9 @@ deployment** in the **Databricks Metric Views** card and save. Through the API, 
 `syncOnDeploy: true`. The setting is off by default, and a save that omits it turns it off.
 
 After each successful build, Cube starts a run for every Databricks data source of the deployment,
-and every [publication target](#publish-to-staging-then-production) of one, that has publication
-and this setting turned on. Changes in development mode publish nothing until
-they are deployed. Each run:
+and for every [publication target](#publish-to-staging-then-production) of such a data source, that
+has publication and this setting turned on. Changes in development mode publish nothing until they
+are deployed. Each run:
 
 - Converts the build that just succeeded, with the saved settings: scope, target, and what happens
   when a view leaves the scope. Under **Delete the Metric View Cube created**, a deployment that
