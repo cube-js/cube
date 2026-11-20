@@ -884,9 +884,9 @@ Example response:
 ]
 ```
 
-With `"force": false`, only partitions without their current version are
-built: a job for a partition that is already up to date reports `done` without
-a rebuild.
+With `"force": false`, only partitions without their current version, or whose
+last build of it failed, are built: a job for a partition that is already up to
+date reports `done` without a rebuild.
 
 With `"dryRun": true`, nothing is built and no jobs are created. The response
 lists every partition the selector matches, in the format of

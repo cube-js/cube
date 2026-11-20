@@ -543,6 +543,35 @@ describe('pre-aggregation build jobs', () => {
       expect(failed.versionStatus).toEqual('missing_partition');
     });
 
+    test('an unforced job builds again a table whose last build failed', async () => {
+      const built = await buildAndWait('build before it fails');
+      await orchestrator.getPreAggregations().setPreAggregationBuildStatus(built, { status: 'failure', error: 'killed' });
+      // Table names carry the build time in seconds
+      mockDriver.now += 10000;
+      externalMockDriver.now += 10000;
+
+      const [{ targetTableName, queryKey }] = await orchestrator.fetchQuery(
+        jobQuery('unforced job after failure', { force: false })
+      );
+
+      expect(targetTableName).not.toEqual(built);
+      expect(await pollUntilSettled('unforced job after failure', targetTableName, queryKey)).toEqual('done');
+    });
+
+    test('an unforced job does not start a second build of a table being built', async () => {
+      const built = await buildAndWait('build before another one starts');
+      await orchestrator.getPreAggregations().setPreAggregationBuildStatus(built, {
+        status: 'building',
+        startedAt: Date.now(),
+      });
+
+      const [{ targetTableName }] = await orchestrator.fetchQuery(
+        jobQuery('unforced job during a build', { force: false })
+      );
+
+      expect(targetTableName).toEqual(built);
+    });
+
     test('a dry run reports a partition as outdated once its refresh key moves', async () => {
       const built = await buildAndWait('build before key moves');
 

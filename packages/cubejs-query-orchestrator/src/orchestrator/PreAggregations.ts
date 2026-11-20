@@ -442,7 +442,7 @@ export class PreAggregations {
    * that is still marked as running long past that timeout is one whose process
    * is gone and will never report an outcome.
    */
-  private async isBuildAbandoned(dataSource: string, buildStatus: PreAggregationBuildStatus): Promise<boolean> {
+  protected async isBuildAbandoned(dataSource: string, buildStatus: PreAggregationBuildStatus): Promise<boolean> {
     if (!buildStatus.startedAt) {
       return false;
     }
@@ -451,6 +451,19 @@ export class PreAggregations {
     const limit = (executionTimeout || getEnv('dbQueryTimeout')) * 1000 * ABANDONED_BUILD_TIMEOUT_FACTOR;
 
     return new Date().getTime() - buildStatus.startedAt > limit;
+  }
+
+  /**
+   * The table's last build failed or was abandoned, so the table may hold
+   * partial data. A build that is still running doesn't count.
+   */
+  public async isBuildFailed(dataSource: string, tableName: string): Promise<boolean> {
+    const buildStatus = await this.getPreAggregationBuildStatus(tableName);
+    if (buildStatus?.status === 'failure') {
+      return true;
+    }
+
+    return buildStatus?.status === 'building' && this.isBuildAbandoned(dataSource, buildStatus);
   }
 
   public async addTableUsed(tableName: string): Promise<void> {

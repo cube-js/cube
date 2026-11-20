@@ -261,7 +261,11 @@ export class PreAggregationLoader {
       return this.dryRunResult(versionEntries, versionEntryByContentVersion, structureVersion, contentVersion);
     }
 
-    if (versionEntryByContentVersion && !this.forceBuild) {
+    // A job's target whose last build failed is built again, even unforced
+    const builtTableFailed = async (entry: VersionEntry) => this.buildsJobTarget &&
+      this.preAggregations.isBuildFailed(this.preAggregation.dataSource || 'default', this.targetTableName(entry));
+
+    if (versionEntryByContentVersion && !this.forceBuild && !await builtTableFailed(versionEntryByContentVersion)) {
       const targetTableName = this.targetTableName(versionEntryByContentVersion);
       // No need to block here
       this.updateLastTouch(targetTableName);
