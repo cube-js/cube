@@ -2019,6 +2019,30 @@ describe('QueryOrchestrator', () => {
       expect(await appA.getPreAggregations().getRefreshEndReached()).toBeFalsy();
     });
 
+    test('an orchestrator id with a colon keeps a key Cube Store can list', async () => {
+      const sharedId = `SHARED_PRE_AGG_${sharedTestCount++}`;
+      const appA = createApp(`APP_A_${sharedTestCount++}`, sharedId);
+      const appB = createApp(`tenant:v2_${sharedTestCount++}`, sharedId);
+      apps.push(appA, appB);
+
+      await appB.markRefreshActive();
+      await appA.updateRefreshEndReached();
+
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeFalsy();
+
+      // Cube Store lists a key under the part before its last `:`, which has to be the catalog's
+      const activeKeys = await appB.getPreAggregationsQueryCache().getCacheDriver()
+        .keysStartingWith(`${sharedId}#SQL_PRE_AGGREGATIONS_REFRESH_ACTIVE:`);
+      expect(activeKeys).toHaveLength(1);
+      expect(activeKeys[0].slice(activeKeys[0].lastIndexOf(':'))).toEqual(
+        `:${encodeURIComponent(`tenant:v2_${sharedTestCount - 1}`)}`
+      );
+
+      await appB.updateRefreshEndReached();
+
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+    });
+
     test('an app whose orchestrator id is the shared id waits for the others too', async () => {
       const sharedId = `SHARED_PRE_AGG_${sharedTestCount++}`;
       const appA = createApp(sharedId, sharedId);

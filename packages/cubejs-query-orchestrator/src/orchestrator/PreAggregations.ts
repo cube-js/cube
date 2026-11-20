@@ -400,11 +400,12 @@ export class PreAggregations {
 
   protected refreshEndReachedKey(orchestratorId: string = this.options.sharedCacheOrchestratorId || '') {
     // TODO add dataSource?
-    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', orchestratorId);
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', encodeURIComponent(orchestratorId));
   }
 
+  // Encoded, as Cube Store lists keys by the part before their last `:`
   protected refreshActiveKey(orchestratorId: string) {
-    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_ACTIVE', orchestratorId);
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_ACTIVE', encodeURIComponent(orchestratorId));
   }
 
   protected preAggBuildStatusRedisKey(tableName: string): string {
@@ -573,7 +574,7 @@ export class PreAggregations {
     // Tables of an orchestrator whose refresh hasn't ended may not be touched yet
     const activePrefix = this.refreshActiveKey('');
     const activeOrchestratorIds = (await cacheDriver.keysStartingWith(activePrefix))
-      .map(key => key.replace(activePrefix, ''));
+      .map(key => decodeURIComponent(key.replace(activePrefix, '')));
     const refreshEnds = await Promise.all(
       activeOrchestratorIds.map(orchestratorId => cacheDriver.get(this.refreshEndReachedKey(orchestratorId)))
     );
