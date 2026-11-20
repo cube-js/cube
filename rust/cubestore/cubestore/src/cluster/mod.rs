@@ -1433,6 +1433,11 @@ impl ClusterImpl {
         Ok(())
     }
 
+    /// Cancelled when the processing loops are stopped.
+    pub fn stop_token(&self) -> CancellationToken {
+        self.stop_token.clone()
+    }
+
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
         self.stop_token.cancel();
 
