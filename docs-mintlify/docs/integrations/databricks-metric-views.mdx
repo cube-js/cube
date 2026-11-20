@@ -230,13 +230,14 @@ and sync can resolve different builds.
 This Bash step requires `curl` and `jq`. Set `CUBE_API_URL` to your tenant host without a trailing
 slash, `DEPLOYMENT_ID` to the deployment that just succeeded, and `CUBE_API_TOKEN` to the CI secret.
 Set `EXPECTED_BUILD_JOB_ID` if the deployment step returns one. The example uses the `default`
-data source; URL-encode a different name in the path, and add `?target=<name>` to both requests
-for a [publication target](#publish-to-staging-then-production) other than `default`. Set
-`SYNC_IDEMPOTENCY_KEY` to a UUID unique to this CI publication attempt and keep it unchanged
-across retries of that attempt. Do not reuse
-it for a later pipeline run: the API would return the earlier run without publishing again. Set
-`MAX_POLLS` to scale the wait for your view count and warehouse start-up time (default: 180
-attempts, 10 seconds apart, plus request time).
+data source; URL-encode a different name in the path. For a
+[publication target](#publish-to-staging-then-production) other than `default`, request
+`"$integration?target=<name>"` for the settings and `"$integration/syncs?target=<name>"` to start
+the run; the status poll needs no change. Set `SYNC_IDEMPOTENCY_KEY` to a UUID unique to this CI
+publication attempt and keep it unchanged across retries of that attempt. Do not reuse it for a
+later pipeline run: the API would return the earlier run without publishing again. Set `MAX_POLLS`
+to scale the wait for your view count and warehouse start-up time (default: 180 attempts, 10
+seconds apart, plus request time).
 
 ```bash
 set -euo pipefail
@@ -366,9 +367,10 @@ or [listing runs](/api-reference/databricks-metric-view-integration/list-databri
 and pass `target` in a [preview](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview)
 request body. Without it, a request uses `default`. Reading or cancelling a run by its `runId`
 needs no `target`. A name starts with a letter and has up to 63 letters, digits, `_`, and `-`;
-Cube lower-cases it. Saving with `expectedConfigurationVersion: 0` creates a publication target.
-Publication targets can't be listed or deleted, and a misspelled name creates a new one: to retire
-one, save it with `enabled: false`.
+Cube lower-cases it. Only saving with `expectedConfigurationVersion: 0` creates a publication
+target, so a misspelled name there creates a new one; reading settings, starting or listing runs,
+or previewing with a name that doesn't exist returns `404`. Publication targets can't be listed or
+deleted: to retire one, save it with `enabled: false`.
 
 To publish to production the build you tested in staging:
 
@@ -378,13 +380,17 @@ To publish to production the build you tested in staging:
 2. Once a staging run is **Completed**, run your own checks against the staging Metric Views. Cube
    doesn't know whether they passed.
 3. Start a production run with production's `configurationVersion` and `promoteFromRunId` set to
-   the staging run's `runId`:
+   the staging run's `runId`, here `STAGING_RUN_ID`:
 
 ```bash
-curl --fail-with-body -X POST -H "Authorization: Bearer $CUBE_API_TOKEN" \
-  -H 'Content-Type: application/json' \
-  --data '{"configurationVersion": 3, "promoteFromRunId": "<staging runId>"}' \
-  "$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/databricks-metric-view-integrations/default/syncs?target=production"
+integration="$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/databricks-metric-view-integrations/default"
+auth_header="Authorization: Bearer $CUBE_API_TOKEN"
+version=$(curl --fail --silent --show-error -H "$auth_header" \
+  "$integration?target=production" | jq -r '.configurationVersion')
+request=$(jq -n --argjson version "$version" --arg source "$STAGING_RUN_ID" \
+  '{configurationVersion: $version, promoteFromRunId: $source}')
+curl --fail-with-body -X POST -H "$auth_header" -H 'Content-Type: application/json' \
+  --data-binary "$request" "$integration/syncs?target=production"
 ```
 
 The promoted run converts the staging run's build with production's settings. Starting it fails
@@ -541,8 +547,8 @@ Preview **blocks** a view when it finds any of these conditions:
 An unsafe joined measure can be **withheld while the rest of its view is published**. That view
 may show **Created**, **Updated**, or **Unchanged**, and the run may show **Completed**, even
 though some measures are missing in Databricks. Check **Measures not published** in Preview and
-beside each view in run history before treating a run as complete. There is no opt-in gate for incomplete publication
-yet.
+beside each view in run history before treating a run as complete. There is no opt-in gate for
+incomplete publication yet.
 
 ### Jinja templates
 
