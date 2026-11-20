@@ -151,7 +151,7 @@ When several values tie on the measure, **Max value by measure** and **Min value
 The first and last value are offered on string, number and time dimensions. Picking either shows a sentence — *The first value of Status, according to the selected sort order.* — and a sort order dropdown beneath it:
 
 - **Natural**, the default, is the dimension's own order: alphabetical for a string, numeric for a number, chronological for a time dimension. The first value is the lowest, and the last value is the highest.
-- **Database** is the order this filter's own value list shows its values in, and is offered on a string dimension only. That list holds the first 100 values, so **Last value of dimension** under **Database** is the last of those 100 — not the last value the dimension holds.
+- **Database** is the order the database returns the dimension's values in when it's asked for no order, and is offered on a string dimension only. It reads the first 100 of them, so **Last value of dimension** under **Database** is the 100th value in that order, not the last value the dimension holds.
 
 The max and min options show a measure dropdown instead, grouped by semantic view, with nothing picked and the note *Measures of views that share this dimension.* under it. It lists the measures of the filter's own view first, followed by those of every other view that includes the same dimension — one the data model declares as the same underlying cube member, the way a **Customers** view and an **Orders** view can both include the users cube's city. For a measure of another view, the ranking query runs in that view, over its own copy of the dimension, and the value it returns is applied to this filter. A view is not matched by name: one holding a same-named dimension of a *different* cube offers no measures. Where no view has any measures to offer, neither option appears in the **Default value** dropdown.
 
@@ -182,6 +182,14 @@ When the data gives no value, the filter applies none: the note after its title 
 - A faceted filter's sibling condition has no matching dimension in the view of the measure you picked, so it cannot be carried over. The measure itself is fine; the sibling filter's dimension has no counterpart in that view.
 
 In the dashboard builder, clicking the warning icon opens the filter's settings, where you can pick another measure or option.
+
+### The value list
+
+A string filter's value list shows the dimension's values in ascending order, alphabetically for a string. It loads them 100 at a time: the second 100 load as soon as the list opens, and each next 100 load as you scroll toward the end, so you can scroll to any value the dimension holds. When you reach the end before the next values arrive, a *Loading…* row shows below the last value. The values you've selected are listed first.
+
+Typing in the list searches every value of the dimension, not only the ones loaded so far, and its matches load the same way.
+
+When the next values fail to load, the ones already listed stay, and the bottom of the list reads *Couldn't load more values*. Click **Try again** to load them.
 
 ### When the value list fails to load
 
