@@ -85,7 +85,7 @@ type JobedPreAggregation = {
   type: string,
   timezone: string,
   dataSource: string,
-  /** Set on a dry run: `done`, `outdated` or `missing_partition`. */
+  /** Set on a dry run only */
   versionStatus?: PreAggregationVersionStatus,
 };
 
