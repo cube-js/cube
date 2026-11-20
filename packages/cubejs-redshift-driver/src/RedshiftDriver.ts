@@ -129,6 +129,14 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     return super.createConnection({ ...poolConfig, user, password }, poolName);
   }
 
+  /**
+   * Redshift has no materialized view relkind or information_schema helpers in pg_catalog.
+   * @override
+   */
+  protected override listMaterializedViews(): boolean {
+    return false;
+  }
+
   protected primaryKeysQuery() {
     return null;
   }
