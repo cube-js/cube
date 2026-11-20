@@ -212,7 +212,10 @@ dedicated target catalog and schema, and publication enabled in **Settings → D
 **When a view leaves the scope** set to **Delete the Metric View Cube created**, each CI run also
 drops the Metric Views the deployment made obsolete (see [Removed views](#removed-views)). Run
 **Preview** and **Test access** before the first write. CI uses these saved settings; the API call
-does not override the scope or destination.
+does not override the scope or destination. The card shows only the `default`
+[publication target](#publish-to-staging-then-production): save another one's settings through
+the API with `?target=<name>`, and preview it with `"target": "<name>"` in the request body.
+**Test access** checks only `default`.
 
 Store a [Platform API key](/api-reference/authentication) with deployment `SchemaUpdate` access as
 a CI secret. The recipe reads the saved settings, starts a run with their `configurationVersion`,
@@ -376,7 +379,9 @@ needs no `target`. A name starts with a letter and has up to 63 letters, digits,
 Cube lower-cases it. Only saving with `expectedConfigurationVersion: 0` creates a publication
 target, so a misspelled name there creates a new one; reading settings, starting or listing runs,
 or previewing with a name that doesn't exist returns `404`. Publication targets can't be listed or
-deleted: to retire one, save it with `enabled: false`.
+deleted: to retire one, save it with `enabled: false`. That drops nothing: its Metric Views stay in
+Databricks and still belong to it, so another publication target that publishes to the same names
+is blocked with `ownership-conflict` until it [takes them over](#take-over-an-existing-metric-view).
 
 To publish to production the build you tested in staging:
 
@@ -630,7 +635,8 @@ until a run publishes, or when that run recorded no build, as a run from before 
 existed does. When run history can't be read, the response leaves out `publishedBuild`.
 Databricks is behind when both fields hold a build and their `buildJobId` values differ. The card
 doesn't show the warning when either field is `null` or missing, so automation can apply the same
-rule.
+rule. The card warns only for the `default` publication target; to check another, read its
+settings with `?target=<name>`.
 
 ### Take over an existing Metric View
 
