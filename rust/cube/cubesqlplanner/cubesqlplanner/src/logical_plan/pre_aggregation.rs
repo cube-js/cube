@@ -1,5 +1,8 @@
 use super::*;
-use crate::{physical_plan::QualifiedColumnName, planner::MemberSymbol};
+use crate::{
+    physical_plan::QualifiedColumnName,
+    planner::{time_dimension::Granularity, MemberSymbol},
+};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::{collections::HashMap, rc::Rc};
@@ -176,24 +179,34 @@ impl PreAggregation {
     /// The grain columns of the stored time dimensions, keyed by their base
     /// member. They are apart from `all_dimensions_refererences` because a
     /// member may also be stored raw, as a dimension, under the same key.
-    pub fn time_dimensions_references(&self) -> HashMap<String, QualifiedColumnName> {
-        let mut res = HashMap::new();
+    /// The grain column of each stored time dimension, with its granularity
+    /// where one is known, in declaration order.
+    pub fn time_dimensions_references(
+        &self,
+    ) -> Vec<(String, QualifiedColumnName, Option<Granularity>)> {
+        let mut res = Vec::new();
         for dim in self.time_dimensions().iter() {
-            let (base_symbol, granularity) = if let Ok(td) = dim.as_time_dimension() {
-                (td.base_symbol().clone(), td.granularity().clone())
-            } else {
-                (dim.clone(), None)
-            };
+            let (base_symbol, granularity, granularity_obj) =
+                if let Ok(td) = dim.as_time_dimension() {
+                    (
+                        td.base_symbol().clone(),
+                        td.granularity().clone(),
+                        td.granularity_obj().clone(),
+                    )
+                } else {
+                    (dim.clone(), None, None)
+                };
             let suffix = if let Some(granularity) = &granularity {
                 format!("_{}", granularity.clone())
             } else {
                 "".to_string()
             };
             let alias = format!("{}{}", base_symbol.canonical_alias(), suffix);
-            res.insert(
+            res.push((
                 base_symbol.peel_refs().full_name(),
                 QualifiedColumnName::new(None, alias),
-            );
+                granularity_obj,
+            ));
         }
         // The legs store no rollupJoin column of their own, so time-dimension
         // reads of a join key go to the key's column as well.
@@ -202,10 +215,11 @@ impl PreAggregation {
             for member in join.key_members() {
                 let key = member.symbol.peel_refs();
                 if member.granularity.is_none() || truncated.contains(key.id()) {
-                    res.insert(
+                    res.push((
                         key.full_name(),
                         QualifiedColumnName::new(None, member.column.clone()),
-                    );
+                        None,
+                    ));
                 }
             }
         }

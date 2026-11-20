@@ -37,16 +37,25 @@ impl ToSql for TypedFilter {
         let resolved = resolve_base_symbol(self.member_evaluator());
         let name = resolved.peel_refs().full_name();
         let columns = &filters_ctx.pre_aggregation_columns;
-        // A time dimension's range reads its grain column, any other filter the
-        // raw column wherever one is stored. Bounds take that column's timezone:
-        // the query's for a grain column, the database's for a raw one.
-        let reads_grain = filters_ctx.use_local_tz
-            && columns.has_grain(&name)
-            && (self.member_evaluator().as_time_dimension().is_ok() || !columns.has_raw(&name));
-        let visitor = if reads_grain {
-            visitor.with_time_dimension_read()
+        // A filter reads a grain column its bounds fall on, the raw one only
+        // where no grain holds them, and its bounds take that column's
+        // timezone: the query's for a grain column, the database's for a raw one.
+        let aligned_grain = match self.date_bounds() {
+            Some((from, to)) if filters_ctx.use_local_tz => {
+                columns.grain_column_for_range(&name, &from, &to, query_tools.timezone())?
+            }
+            _ => None,
+        };
+        let (visitor, reads_grain) = if !filters_ctx.use_local_tz || !columns.has_grain(&name) {
+            (visitor.clone(), false)
+        } else if self.member_evaluator().as_time_dimension().is_ok() {
+            (visitor.with_time_dimension_read(), true)
+        } else if let Some(column) = aligned_grain {
+            (visitor.with_stored_column(name, column.clone()), true)
+        } else if !columns.has_raw(&name) {
+            (visitor.with_time_dimension_read(), true)
         } else {
-            visitor.clone()
+            (visitor.clone(), false)
         };
         let member_sql = visitor.apply_for_filter(&resolved, node_processor, templates)?;
 

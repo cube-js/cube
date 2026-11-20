@@ -1,16 +1,10 @@
 use super::{CompiledPreAggregation, PreAggregationSource};
-use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem, FilterOperator};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::time_dimension::{
-    Granularity, QueryDateTime, QueryDateTimeHelper, SqlInterval,
-};
 use crate::planner::DimensionSymbol;
 use crate::planner::GranularityHelper;
 use crate::planner::TimeDimensionSymbol;
 use crate::planner::{MemberId, MemberSymbol};
-use chrono::{Duration, NaiveDateTime};
-use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -425,7 +419,7 @@ impl<'a> DimensionMatcher<'a> {
                 let derives = if let Some((from, to)) = &range {
                     !is_sql_granularity(td)
                         && td.granularity_obj().as_ref().is_some_and(|grain| {
-                            Self::range_on_grain(grain, from, to, tz).unwrap_or(false)
+                            grain.bounds_on_grain(from, to, tz).unwrap_or(false)
                         })
                 } else if is_exact(td) {
                     true
@@ -546,7 +540,7 @@ impl<'a> DimensionMatcher<'a> {
     }
 
     // A date filter reads the raw column of its member, or of the members it
-    // is computed from. A join key stored only truncated has no raw column.
+    // is computed from, and the grain column of a member stored only truncated.
     fn try_match_date_filter(
         &mut self,
         filter: &BaseFilter,
@@ -554,48 +548,24 @@ impl<'a> DimensionMatcher<'a> {
     ) -> Result<MatchState, CubeError> {
         let member = filter.member_evaluator();
         let id = member.peel_refs().id().clone();
-        if !self.truncated_join_keys.contains(&id) {
+        let truncated_key = self.truncated_join_keys.contains(&id);
+        let stored_truncated = self.pre_aggregation_time_dimensions.contains_key(&id);
+        if truncated_key && !stored_truncated {
+            // No time dimension states the key's grain to check the bounds against.
+            return self.try_match_symbol(&member, add_to_matched_dimension);
+        }
+        let stored_raw = self.pre_aggregation_dimensions.contains_key(&id) && !truncated_key;
+        if stored_raw || !stored_truncated {
             self.in_date_filter_dependencies = true;
             let res = self.try_match_symbol(&member, add_to_matched_dimension);
             self.in_date_filter_dependencies = false;
             return res;
-        }
-        if !self.pre_aggregation_time_dimensions.contains_key(&id) {
-            return self.try_match_symbol(&member, add_to_matched_dimension);
         }
         match self.date_filter_as_time_dimension(filter) {
             // The grain column holds no raw value to stand for a misaligned range.
             Some(read) => self.try_match_time_dimension(&read, add_to_matched_dimension, true),
             None => Ok(MatchState::NotMatched),
         }
-    }
-
-    fn range_on_grain(
-        grain: &Granularity,
-        from: &str,
-        to: &str,
-        tz: Tz,
-    ) -> Result<bool, CubeError> {
-        let on_grain = |date: QueryDateTime| -> Result<bool, CubeError> {
-            if grain.is_predefined_granularity() {
-                date.is_start_of(grain.granularity())
-            } else if Self::has_time_part(grain.granularity_interval()) {
-                // Its buckets follow the wall clock, which origin stepping does
-                // not across a DST change.
-                Ok(false)
-            } else {
-                Ok(grain.align_date_to_origin(date.clone())? == date)
-            }
-        };
-        let start =
-            QueryDateTime::from_date_str(tz, &QueryDateTimeHelper::format_from_date(from, 3)?)?;
-        let end = QueryDateTime::from_date_str(tz, &QueryDateTimeHelper::format_to_date(to, 3)?)?
-            .add_duration(Duration::milliseconds(1))?;
-        Ok(on_grain(start)? && on_grain(end)?)
-    }
-
-    fn has_time_part(interval: &SqlInterval) -> bool {
-        interval.hour != 0 || interval.minute != 0 || interval.second != 0
     }
 
     // A grain column serves a date filter whose bounds fall on its grain, as
@@ -606,44 +576,14 @@ impl<'a> DimensionMatcher<'a> {
     ) -> Option<Rc<TimeDimensionSymbol>> {
         let member = filter.member_evaluator();
         let id = member.peel_refs().id().clone();
-        if !self.pre_aggregation_time_dimensions.contains_key(&id)
-            || !self.pre_aggregation_dimensions.contains_key(&id)
-        {
+        if !self.pre_aggregation_time_dimensions.contains_key(&id) {
             return None;
         }
-        let values: Vec<&str> = filter
-            .values()
-            .iter()
-            .filter_map(|value| match value {
-                FilterValue::Str(value) => Some(value.as_str()),
-                _ => None,
-            })
-            .collect();
-        let date_range = match (filter.filter_operator(), values.as_slice()) {
-            (FilterOperator::Set | FilterOperator::NotSet, _) => None,
-            (FilterOperator::InDateRange | FilterOperator::NotInDateRange, [from, to]) => Some((
-                QueryDateTimeHelper::format_from_date(from, 3).ok()?,
-                QueryDateTimeHelper::inclusive_to_date(to).ok()?,
-            )),
-            (FilterOperator::BeforeDate | FilterOperator::AfterOrOnDate, [at]) => Some(
-                Self::boundary_at(&QueryDateTimeHelper::format_from_date(at, 3).ok()?, 0)?,
-            ),
-            (FilterOperator::BeforeOrOnDate | FilterOperator::AfterDate, [at]) => Some(
-                Self::boundary_at(&QueryDateTimeHelper::inclusive_to_date(at).ok()?, 1)?,
-            ),
-            _ => return None,
+        let date_range = match filter.filter_operator() {
+            FilterOperator::Set | FilterOperator::NotSet => None,
+            _ => Some(filter.typed_filter().date_bounds()?),
         };
         Some(TimeDimensionSymbol::new(member, None, None, date_range))
-    }
-
-    // An empty range whose alignment is that of the single bound starting
-    // `shift_ms` after `at`.
-    fn boundary_at(at: &str, shift_ms: i64) -> Option<(String, String)> {
-        let start = QueryDateTimeHelper::parse_native_date_time(at).ok()?
-            + Duration::milliseconds(shift_ms);
-        let end = start - Duration::milliseconds(1);
-        let format = |date: NaiveDateTime| date.format("%Y-%m-%dT%H:%M:%S%.3f").to_string();
-        Some((format(start), format(end)))
     }
 }
 

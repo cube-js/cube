@@ -226,3 +226,17 @@ cubes:
         time_dimension: cohort_date
         granularity: month
         allow_non_strict_date_range_match: true
+
+      - name: raw_week_and_month
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimensions:
+          - dimension: cohort_date
+            granularity: week
+          - dimension: cohort_date
+            granularity: month

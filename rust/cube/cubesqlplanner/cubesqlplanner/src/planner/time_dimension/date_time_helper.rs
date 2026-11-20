@@ -47,6 +47,14 @@ impl QueryDateTimeHelper {
         Err(CubeError::user(format!("Can't parse date: '{}'", date)))
     }
 
+    /// A date or date-time carrying no UTC offset, read in the query timezone.
+    pub fn is_local_date_time(date: &str) -> bool {
+        DATE_RE.is_match(date)
+            || ["%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S%.f"]
+                .iter()
+                .any(|format| NaiveDateTime::parse_from_str(date, format).is_ok())
+    }
+
     pub fn resolve_local_result(
         tz: &Tz,
         origin_date: &NaiveDateTime,

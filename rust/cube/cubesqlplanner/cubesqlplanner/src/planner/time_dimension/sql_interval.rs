@@ -29,6 +29,10 @@ impl SqlInterval {
             && self.second == 0
     }
 
+    pub fn has_time_part(&self) -> bool {
+        self.hour != 0 || self.minute != 0 || self.second != 0
+    }
+
     pub fn new(
         year: i32,
         quarter: i32,

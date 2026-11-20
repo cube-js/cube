@@ -12,7 +12,7 @@ use crate::physical_plan::QualifiedColumnName;
 use crate::planner::planners::multi_stage::{FilterParamsTimeShifts, TimeShiftState};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::symbols::CalendarDimensionTimeShift;
-use crate::planner::time_dimension::SqlInterval;
+use crate::planner::time_dimension::{Granularity, SqlInterval};
 use crate::planner::{CubeId, MemberId};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -198,9 +198,10 @@ impl SqlNodesFactory {
         &mut self,
         name: String,
         column: QualifiedColumnName,
+        granularity: Option<Granularity>,
     ) {
         self.pre_aggregation_dimensions_references
-            .insert_grain(name, column);
+            .insert_grain(name, column, granularity);
     }
 
     pub fn set_original_sql_pre_aggregations(&mut self, value: HashMap<CubeId, String>) {

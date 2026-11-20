@@ -129,8 +129,12 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
             for (name, column) in pre_aggregation.all_dimensions_refererences().into_iter() {
                 context_factory.add_pre_aggregation_dimension_reference(name, column);
             }
-            for (name, column) in pre_aggregation.time_dimensions_references().into_iter() {
-                context_factory.add_pre_aggregation_time_dimension_reference(name, column);
+            for (name, column, granularity) in pre_aggregation.time_dimensions_references() {
+                context_factory.add_pre_aggregation_time_dimension_reference(
+                    name,
+                    column,
+                    granularity,
+                );
             }
             for (name, column) in pre_aggregation.all_measures_refererences().into_iter() {
                 context_factory.add_pre_aggregation_measure_reference(name, column);

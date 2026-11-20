@@ -3,7 +3,9 @@ use crate::physical_plan::QualifiedColumnName;
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::time_dimension::Granularity;
 use crate::planner::MemberSymbol;
+use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::any::Any;
 use std::collections::HashMap;
@@ -17,6 +19,9 @@ pub struct PreAggregationColumns {
     // Grain columns of stored time dimensions, keyed by their base member,
     // which may be stored raw in `columns` as well.
     grain_columns: HashMap<String, QualifiedColumnName>,
+    // Every grain a member is stored at, for a filter to pick one its bounds
+    // fall on.
+    grains: HashMap<String, Vec<(QualifiedColumnName, Granularity)>>,
 }
 
 impl PreAggregationColumns {
@@ -24,8 +29,35 @@ impl PreAggregationColumns {
         self.columns.insert(name, column);
     }
 
-    pub fn insert_grain(&mut self, name: String, column: QualifiedColumnName) {
+    pub fn insert_grain(
+        &mut self,
+        name: String,
+        column: QualifiedColumnName,
+        granularity: Option<Granularity>,
+    ) {
+        if let Some(granularity) = granularity {
+            self.grains
+                .entry(name.clone())
+                .or_default()
+                .push((column.clone(), granularity));
+        }
         self.grain_columns.insert(name, column);
+    }
+
+    /// A grain column holding the inclusive range `[from, to]` exactly.
+    pub fn grain_column_for_range(
+        &self,
+        name: &str,
+        from: &str,
+        to: &str,
+        tz: Tz,
+    ) -> Result<Option<&QualifiedColumnName>, CubeError> {
+        for (column, granularity) in self.grains.get(name).into_iter().flatten() {
+            if granularity.bounds_on_grain(from, to, tz)? {
+                return Ok(Some(column));
+            }
+        }
+        Ok(None)
     }
 
     /// The raw column, or the grain column of a member stored only as one.
@@ -86,7 +118,9 @@ impl SqlNode for PreAggregationColumnSqlNode {
         templates: &PlanSqlTemplates,
     ) -> Result<String, CubeError> {
         let name = node.full_name();
-        let column = if visitor.time_dimension_read() {
+        let column = if let Some(column) = visitor.stored_column_for(&name) {
+            Some(column)
+        } else if visitor.time_dimension_read() {
             self.columns.get_for_time_dimension_read(&name)
         } else {
             self.columns.get(&name)
