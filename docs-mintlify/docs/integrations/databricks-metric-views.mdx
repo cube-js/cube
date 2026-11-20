@@ -335,7 +335,7 @@ conversion blocked the view), and a run carries the `takeOverTargets` it was sta
 Cube does not manage, and a `detail` of `taken-over` marks a view a take-over published. After
 you confirm that a blocked destination should belong to this data source, a CI job can pass its
 `target` in `takeOverTargets` to [take it over](#take-over-an-existing-metric-view). A `detail` of
-`metastore-changed` means the data source [moved to another metastore](#removed-views) during the
+`metastore-changed` means the data source [moved to another metastore](#move-to-another-metastore) during the
 run; start another run.
 `incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
 zero rejects definitions missing measures.
@@ -635,11 +635,7 @@ Cube drops a Metric View only when all of these hold:
   publishes to now, in the same Unity Catalog metastore. After you change the target catalog or
   schema, the Metric Views in the old location stay in Databricks and every sync labels them
   **Obsolete, kept** without a `detail`, so CI still passes. Drop them in Databricks yourself;
-  run history keeps listing them. After you point the data source at a workspace on another
-  metastore, the next sync creates its Metric Views there, or labels a view **Blocked** with
-  `unmanaged-target` when an object there already holds its name; if that object should belong to
-  this data source, [take it over](#take-over-an-existing-metric-view). The Metric Views in the
-  old metastore stay, and syncs no longer list them: drop them in Databricks yourself.
+  run history keeps listing them.
 - It is obsolete: its Cube view left the scope, or the view now publishes to another target
   name. A view still in scope whose conversion or write failed keeps its Metric View.
 - The object at that name is still a view, owned by the Databricks principal Cube publishes with.
@@ -665,3 +661,11 @@ A failed drop is labeled **Obsolete, kept** with its failure code, and the next 
 data model file that fails to load stops the sync before anything is written or dropped. Disabling
 publication, or Cube support deactivating the preview for your account, drops nothing. Dropping
 needs the same Databricks privileges on the target schema as replacing a view.
+
+### Move to another metastore
+
+After you point the data source at a workspace on another Unity Catalog metastore, the next sync
+creates its Metric Views there, or labels a view **Blocked** with `unmanaged-target` when an object
+there already holds its name; if that object should belong to this data source,
+[take it over](#take-over-an-existing-metric-view). The Metric Views in the old metastore stay, and
+syncs no longer list them: drop them in Databricks yourself.
