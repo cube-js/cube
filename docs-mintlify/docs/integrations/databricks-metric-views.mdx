@@ -335,8 +335,8 @@ conversion blocked the view), and a run carries the `takeOverTargets` it was sta
 Cube does not manage, and a `detail` of `taken-over` marks a view a take-over published. After
 you confirm that a blocked destination should belong to this data source, a CI job can pass its
 `target` in `takeOverTargets` to [take it over](#take-over-an-existing-metric-view). A `detail` of
-`metastore-changed` means the data source [moved to another metastore](#move-to-another-metastore) during the
-run; start another run.
+`metastore-changed` means the data source
+[moved to another metastore](#move-to-another-metastore) during the run; start another run.
 `incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
 zero rejects definitions missing measures.
 
