@@ -1,0 +1,8 @@
+altair
+pandas
+streamlit
+mysql-connector-python
+python-dotenv
+sqlalchemy
+pymysql
+transform
