@@ -180,8 +180,8 @@ impl PreAggregation {
     }
 
     /// The grain column of each stored time dimension, with its granularity
-    /// where one is known, in declaration order, followed by the columns of a
-    /// rollupJoin's keys. A member may also be stored raw under the same name.
+    /// where one is known, in declaration order, then the columns of a
+    /// rollupJoin's truncated keys.
     pub fn time_dimensions_references(
         &self,
     ) -> Vec<(String, QualifiedColumnName, Option<Granularity>)> {
@@ -220,13 +220,13 @@ impl PreAggregation {
                 granularity_obj,
             ));
         }
-        // The legs store no rollupJoin column of their own, so time-dimension
-        // reads of a join key go to the key's column as well.
+        // A key the legs store truncated is read from their grain column; one
+        // they store raw stays a raw column, in the database timezone.
         if let PreAggregationSource::Join(join) = self.source().as_ref() {
             let truncated = join.truncated_keys();
             for member in join.key_members() {
                 let key = member.symbol.peel_refs();
-                if member.granularity.is_none() || truncated.contains(key.id()) {
+                if truncated.contains(key.id()) {
                     res.push((
                         key.full_name(),
                         QualifiedColumnName::new(None, member.column.clone()),

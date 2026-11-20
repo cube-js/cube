@@ -245,6 +245,18 @@ async fn test_rollup_join_time_dimension_on_a_plainly_stored_key_matches_the_sou
         ("plainly_stored_key", TIME_DIMENSION_KEY_QUERY),
         ("plainly_stored_key_with_date_range", with_date_range),
     ] {
+        for timezone in ["America/Los_Angeles", "Asia/Kamchatka"] {
+            let query = format!("{query}timezone: {timezone}\n");
+            let served = ctx(&["td_rollup_join", "td_dates_rollup", "td_facts_rollup"]);
+            let (sql, usages) = served.build_sql_with_used_pre_aggregations(&query).unwrap();
+            assert!(
+                usages.iter().any(|u| u.name() == "td_rollup_join"),
+                "expected the rollupJoin to serve the query; SQL:\n{sql}"
+            );
+            let rollup = served.try_execute_pg(&query, SEED).await;
+            let source = ctx(&[]).try_execute_pg(&query, SEED).await;
+            assert_eq!(rollup, source, "{timezone}; SQL:\n{sql}");
+        }
         let served = ctx(&["td_rollup_join", "td_dates_rollup", "td_facts_rollup"]);
         let (sql, usages) = served.build_sql_with_used_pre_aggregations(query).unwrap();
         assert!(
