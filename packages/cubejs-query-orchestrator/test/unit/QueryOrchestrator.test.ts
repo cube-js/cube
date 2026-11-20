@@ -1925,7 +1925,7 @@ describe('QueryOrchestrator', () => {
 
     // Each app has its own orchestrator id, so its own query cache and queue, and only the
     // pre-aggregation id is shared, as `contextToPreAggregationOrchestratorId` sets it up
-    const createApp = (orchestratorId: string, preAggregationsRedisPrefix?: string) => new TestQueryOrchestrator(
+    const createApp = (orchestratorId: string, preAggregationsRedisPrefix?: string, touchTablePersistTime = 3600) => new TestQueryOrchestrator(
       orchestratorId,
       () => asDriver(mockDriver),
       testLogger,
@@ -1937,7 +1937,7 @@ describe('QueryOrchestrator', () => {
         preAggregationsOptions: {
           queueOptions: () => ({ executionTimeout: 2, concurrency: 2 }),
           dropPreAggregationsWithoutTouch: true,
-          touchTablePersistTime: 3600,
+          touchTablePersistTime,
           usedTablePersistTime: 1,
         },
       },
@@ -1999,6 +1999,24 @@ describe('QueryOrchestrator', () => {
 
       expect(await appA.getPreAggregations().getRefreshEndReached()).toBeTruthy();
       expect(await appB.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+    });
+
+    test('the refresh active mark outlives a touch timeout shorter than its interval', async () => {
+      const sharedId = `SHARED_PRE_AGG_${sharedTestCount++}`;
+      const appA = createApp(`APP_A_${sharedTestCount++}`, sharedId);
+      // A one second touch timeout, so the mark lives one second
+      const appB = createApp(`APP_B_${sharedTestCount++}`, sharedId, 1);
+      apps.push(appA, appB);
+
+      await appA.updateRefreshEndReached();
+
+      for (let i = 0; i < 3; i++) {
+        await appB.markRefreshActive();
+        await mockDriver.delay(600);
+      }
+
+      // App B kept refreshing for longer than its mark lives, without finishing
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeFalsy();
     });
 
     test('an app whose orchestrator id is the shared id waits for the others too', async () => {

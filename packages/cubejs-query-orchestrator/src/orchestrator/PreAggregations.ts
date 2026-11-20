@@ -547,7 +547,10 @@ export class PreAggregations {
   public async markRefreshActive(): Promise<void> {
     const { sharedCacheOrchestratorId } = this.options;
 
-    if (!sharedCacheOrchestratorId || Date.now() - this.refreshActiveMarkedAt < REFRESH_ACTIVE_MARK_INTERVAL) {
+    // Rewritten before it expires, even with a touch timeout shorter than the interval
+    const markInterval = Math.min(REFRESH_ACTIVE_MARK_INTERVAL, this.touchTablePersistTime * 1000 / 2);
+
+    if (!sharedCacheOrchestratorId || Date.now() - this.refreshActiveMarkedAt < markInterval) {
       return;
     }
 
