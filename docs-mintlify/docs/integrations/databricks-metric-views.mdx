@@ -375,13 +375,17 @@ card shows. Manage the others through the API: add `?target=<name>` when
 or [listing runs](/api-reference/databricks-metric-view-integration/list-databricks-metric-view-publication-runs),
 and pass `target` in a [preview](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview)
 request body. Without it, a request uses `default`. Reading or cancelling a run by its `runId`
-needs no `target`. A name starts with a letter and has up to 63 letters, digits, `_`, and `-`;
-Cube lower-cases it. Only saving with `expectedConfigurationVersion: 0` creates a publication
-target, so a misspelled name there creates a new one; reading settings, starting or listing runs,
-or previewing with a name that doesn't exist returns `404`. Publication targets can't be listed or
-deleted: to retire one, save it with `enabled: false`. That drops nothing: its Metric Views stay in
-Databricks and still belong to it, so another publication target that publishes to the same names
-is blocked with `ownership-conflict` until it [takes them over](#take-over-an-existing-metric-view).
+needs no `target`.
+
+- **Names:** a name starts with a letter and has up to 63 letters, digits, `_`, and `-`; Cube
+  lower-cases it.
+- **Creating:** only saving with `expectedConfigurationVersion: 0` creates a publication target,
+  so a misspelled name there creates a new one. Reading settings, starting or listing runs, or
+  previewing with a name that doesn't exist returns `404`.
+- **Retiring:** publication targets can't be listed or deleted. To retire one, save it with
+  `enabled: false`. That drops nothing: its Metric Views stay in Databricks and still belong to
+  it, so another publication target that publishes to the same names is blocked with
+  `ownership-conflict` until it [takes them over](#take-over-an-existing-metric-view).
 
 To publish to production the build you tested in staging:
 
