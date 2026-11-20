@@ -1,5 +1,6 @@
 use super::sql_nodes::SqlNode;
 use super::CubeRefEvaluator;
+use super::QualifiedColumnName;
 use crate::planner::filter::Filter;
 use crate::planner::planners::multi_stage::FilterParamsTimeShifts;
 use crate::planner::query_tools::QueryTools;
@@ -18,6 +19,11 @@ pub struct SqlEvaluatorVisitor {
     /// binding of a member renders, and whether its column carries an offset.
     filter_params_time_shifts: FilterParamsTimeShifts,
     ignore_tz_convert: bool,
+    // The member is read as a time dimension: by a granularity or a date
+    // filter, which a stored grain column serves, not a raw one.
+    time_dimension_read: bool,
+    // The stored column a member is read from, chosen by the caller.
+    stored_column: Option<(String, QualifiedColumnName)>,
     /// When `true`, the caller (typically a `SqlCall` substitution site) expects
     /// the rendered expression to be safe for embedding next to operators —
     /// i.e. a compound top-level result should be wrapped in parentheses.
@@ -40,6 +46,8 @@ impl SqlEvaluatorVisitor {
             all_filters,
             filter_params_time_shifts: FilterParamsTimeShifts::default(),
             ignore_tz_convert: false,
+            time_dimension_read: false,
+            stored_column: None,
             arg_needs_paren_safe: false,
             measure_row_condition: None,
         }
@@ -69,6 +77,37 @@ impl SqlEvaluatorVisitor {
         let mut self_copy = self.clone();
         self_copy.ignore_tz_convert = true;
         self_copy
+    }
+
+    pub fn with_time_dimension_read(&self) -> Self {
+        let mut self_copy = self.clone();
+        self_copy.time_dimension_read = true;
+        self_copy
+    }
+
+    /// The visitor reading each member from its default column.
+    pub fn with_default_read(&self) -> Self {
+        let mut self_copy = self.clone();
+        self_copy.time_dimension_read = false;
+        self_copy.stored_column = None;
+        self_copy
+    }
+
+    pub fn time_dimension_read(&self) -> bool {
+        self.time_dimension_read
+    }
+
+    pub fn with_stored_column(&self, member: String, column: QualifiedColumnName) -> Self {
+        let mut self_copy = self.clone();
+        self_copy.stored_column = Some((member, column));
+        self_copy
+    }
+
+    pub fn stored_column_for(&self, member: &str) -> Option<&QualifiedColumnName> {
+        match &self.stored_column {
+            Some((name, column)) if name == member => Some(column),
+            _ => None,
+        }
     }
 
     pub fn with_arg_needs_paren_safe(&self, value: bool) -> Self {
