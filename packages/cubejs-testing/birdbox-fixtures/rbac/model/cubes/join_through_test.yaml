@@ -1,0 +1,77 @@
+# A view joining through join_through_orders, whose policy hides all its
+# members, must still read its join keys and apply its row filter.
+
+cubes:
+  - name: join_through_line_items
+    sql_table: public.line_items
+
+    joins:
+      - name: join_through_orders
+        sql: "{CUBE}.order_id = {join_through_orders.id}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: order_id
+        sql: order_id
+        type: number
+
+    measures:
+      - name: count
+        type: count
+
+  - name: join_through_orders
+    sql_table: public.orders
+
+    joins:
+      - name: join_through_users
+        sql: "{CUBE.user_id} = {join_through_users.id}"
+        relationship: many_to_one
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: user_id
+        sql: user_id
+        type: number
+
+    access_policy:
+      - group: "*"
+        member_level:
+          includes: []
+        row_level:
+          filters:
+            - member: id
+              operator: lt
+              values: [100]
+
+  - name: join_through_users
+    sql_table: public.users
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: city
+        sql: city
+        type: string
+
+views:
+  - name: join_through_view
+    cubes:
+      - join_path: join_through_line_items
+        includes:
+          - count
+
+      - join_path: join_through_line_items.join_through_orders.join_through_users
+        includes:
+          - city
