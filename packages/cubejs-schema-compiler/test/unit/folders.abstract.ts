@@ -375,5 +375,49 @@ export function runFoldersTestSuite(
         ])
       );
     });
+
+    it('folders with join_path syntax inside nested folders', async () => {
+      const view = metaTransformer.cubes.find(
+        (it) => it.config.name === 'test_view_join_path_in_subfolders'
+      );
+
+      const ordersMembers = [
+        'test_view_join_path_in_subfolders.orders_orders_hierarchy',
+        'test_view_join_path_in_subfolders.orders_some_other_hierarchy',
+        'test_view_join_path_in_subfolders.orders_id',
+        'test_view_join_path_in_subfolders.orders_number',
+        'test_view_join_path_in_subfolders.orders_status',
+        'test_view_join_path_in_subfolders.orders_count',
+      ];
+      const usersMembers = [
+        'test_view_join_path_in_subfolders.users_age',
+        'test_view_join_path_in_subfolders.users_state',
+        'test_view_join_path_in_subfolders.users_city',
+      ];
+      const addressesMembers = [
+        'test_view_join_path_in_subfolders.addresses_street',
+        'test_view_join_path_in_subfolders.addresses_zip_code',
+      ];
+
+      expect(view?.config.nestedFolders).toEqual([
+        {
+          name: 'Everything',
+          members: [
+            { name: 'Orders', members: ordersMembers },
+            {
+              name: 'Customers',
+              members: [
+                ...usersMembers,
+                { name: 'Addresses', members: addressesMembers },
+              ],
+            },
+          ],
+        },
+      ]);
+
+      // Flat folders merge the members of nested folders into their parent
+      const everything = view?.config.folders.find((it) => it.name === 'Everything');
+      expect(everything?.members).toEqual([...ordersMembers, ...usersMembers, ...addressesMembers]);
+    });
   });
 }

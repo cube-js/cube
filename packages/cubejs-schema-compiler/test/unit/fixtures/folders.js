@@ -275,3 +275,45 @@ view('test_view_nested_join_path', {
     },
   ],
 });
+
+// join_path inside nested folders, at more than one depth
+view('test_view_join_path_in_subfolders', {
+  cubes: [
+    {
+      join_path: orders,
+      prefix: true,
+      includes: '*',
+    },
+    {
+      join_path: orders.users,
+      prefix: true,
+      includes: ['age', 'state'],
+    },
+    {
+      join_path: orders.users.addresses,
+      prefix: true,
+      includes: ['street', 'zip_code'],
+    },
+  ],
+  folders: [
+    {
+      name: 'Everything',
+      includes: [
+        {
+          name: 'Orders',
+          includes: [{ join_path: orders }],
+        },
+        {
+          name: 'Customers',
+          includes: [
+            { join_path: orders.users },
+            {
+              name: 'Addresses',
+              includes: [{ join_path: orders.users.addresses }],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+});
