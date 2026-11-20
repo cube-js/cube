@@ -2528,8 +2528,15 @@ impl MetaStore for RocksMetaStore {
     async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError> {
         self.write_operation("table_ready", move |db_ref, batch_pipe| {
             let rocks_table = TableRocksTable::new(db_ref.clone());
-            let entry =
-                rocks_table.update_with_fn(id, |r| r.update_is_ready(is_ready), batch_pipe)?;
+            let mut was_ready = false;
+            let entry = rocks_table.update_with_fn(
+                id,
+                |r| {
+                    was_ready = r.is_ready();
+                    r.update_is_ready(is_ready)
+                },
+                batch_pipe,
+            )?;
 
             if is_ready {
                 let schema = SchemaRocksTable::new(db_ref)
@@ -2540,8 +2547,20 @@ impl MetaStore for RocksMetaStore {
                     metastore.cached_tables.upsert_table_by_id(id, table_path);
                 });
             } else {
+                // Decided on the write loop, so concurrent deactivations of a table count once.
+                let deactivated_source = was_ready.then(|| {
+                    if entry.get_row().is_streaming() {
+                        "stream"
+                    } else {
+                        "batch"
+                    }
+                });
                 batch_pipe.set_post_commit_callback(move |metastore| {
                     metastore.cached_tables.remove_by_table_id_or_reset(id);
+                    if let Some(source) = deactivated_source {
+                        app_metrics::TABLES_DEACTIVATED
+                            .add_with_tags(1, Some(&vec![metrics::format_tag("source", source)]));
+                    }
                 });
             }
 
@@ -5214,16 +5233,6 @@ pub async fn deactivate_table_due_to_corrupt_data(
         message,
     );
     meta_store.table_ready(table_id, false).await?;
-    // Every corrupt chunk of a table lands here, so only the first deactivation is counted.
-    if table.get_row().is_ready() {
-        let source = if table.get_row().is_streaming() {
-            "stream"
-        } else {
-            "batch"
-        };
-        app_metrics::TABLES_DEACTIVATED
-            .add_with_tags(1, Some(&vec![metrics::format_tag("source", source)]));
-    }
     Ok(())
 }
 
