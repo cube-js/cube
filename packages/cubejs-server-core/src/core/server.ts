@@ -870,7 +870,7 @@ export class CubejsServerCore {
         contextToExternalDbType: () => externalDbType,
         redisPrefix: orchestratorId,
         // Left unset when it matches, so `orchestratorOptions.redisPrefix` still keys
-        // the pre-aggregation queues by default
+        // the pre-aggregation queues and caches by default
         preAggregationsRedisPrefix: preAggregationOrchestratorId !== orchestratorId
           ? preAggregationOrchestratorId
           : undefined,

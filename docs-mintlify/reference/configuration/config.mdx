@@ -501,13 +501,15 @@ of distinct ids should stay at or below **Number of clusters**.
 ### `context_to_pre_aggregation_orchestrator_id`
 
 `context_to_pre_aggregation_orchestrator_id` is a function used to determine the
-id that keys an orchestrator's pre-aggregation build queues. Orchestrators that
-resolve to the same id share those queues, so any of them can run a
-pre-aggregation build that another one queued, and they share its concurrency.
+id that keys an orchestrator's pre-aggregation queues and caches: builds, refresh
+key results, table versions, and the touches that decide which tables a cleanup
+keeps. Orchestrators that resolve to the same id share them. Any of them can run
+a pre-aggregation build that another one queued, they share its concurrency, and
+the cleanup of one keeps the tables that the others use.
 
 When this function is not set, the id comes from
 [`context_to_orchestrator_id`][self-orchestrator-id], and each orchestrator has
-its own queues. If
+its own queues and caches. If
 [`CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER`](/reference/configuration/environment-variables#cubejs_pre_aggregations_orchestrator_id_from_router)
 is `true`, the id comes from
 [`context_to_cube_store_router_id`](#context_to_cube_store_router_id) instead,

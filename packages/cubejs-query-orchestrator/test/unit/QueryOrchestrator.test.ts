@@ -1898,6 +1898,131 @@ describe('QueryOrchestrator', () => {
     // expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
   });
 
+  describe('shared pre-aggregation orchestrator id', () => {
+    let sharedTestCount = 1;
+
+    const preAggregation = (name: string, refreshKeySql: string = 'SELECT 1'): TestQueryBody['preAggregations'][number] => ({
+      preAggregationsSchema: 'stb_pre_aggregations',
+      tableName: `stb_pre_aggregations.${name}`,
+      loadSql: [`CREATE TABLE stb_pre_aggregations.${name} AS SELECT * FROM public.orders`, []],
+      invalidateKeyQueries: [[refreshKeySql, []]],
+    });
+
+    const query = (name: string, refreshKeySql?: string): TestQueryBody => ({
+      query: `SELECT * FROM stb_pre_aggregations.${name}`,
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [],
+      },
+      preAggregations: [preAggregation(name, refreshKeySql)],
+      requestId: `shared pre-aggregation orchestrator id ${name}`,
+    });
+
+    // Each app has its own orchestrator id, so its own query cache and queue, and only the
+    // pre-aggregation id is shared, as `contextToPreAggregationOrchestratorId` sets it up
+    const createApp = (orchestratorId: string, preAggregationsRedisPrefix?: string) => new TestQueryOrchestrator(
+      orchestratorId,
+      () => asDriver(mockDriver),
+      testLogger,
+      {
+        preAggregationsRedisPrefix,
+        queryCacheOptions: {
+          queueOptions: () => ({ concurrency: 2 }),
+        },
+        preAggregationsOptions: {
+          queueOptions: () => ({ executionTimeout: 2, concurrency: 2 }),
+          dropPreAggregationsWithoutTouch: true,
+          touchTablePersistTime: 3600,
+          usedTablePersistTime: 1,
+        },
+      },
+    );
+
+    let apps: TestQueryOrchestrator[] = [];
+
+    const createApps = (shared: boolean) => {
+      const id = sharedTestCount++;
+      const preAggregationsRedisPrefix = shared ? `SHARED_PRE_AGG_${id}` : undefined;
+      apps = [
+        createApp(`APP_A_${id}`, preAggregationsRedisPrefix),
+        createApp(`APP_B_${id}`, preAggregationsRedisPrefix),
+      ];
+      return apps;
+    };
+
+    afterEach(async () => {
+      await Promise.all(apps.map(app => app.cleanup()));
+      apps = [];
+    });
+
+    test('every pre-aggregation key is shared', async () => {
+      const [appA, appB] = createApps(true);
+      const tableName = 'stb_pre_aggregations.orders_shared_keys';
+
+      await appA.getPreAggregations().addTableUsed(tableName);
+      await appA.getPreAggregations().updateLastTouch(tableName);
+      await appA.getPreAggregations().updateRefreshEndReached();
+      await appA.getPreAggregations().updatePreAggBackoff(tableName, { backoffMultiplier: 2, nextTimestamp: new Date(0) });
+      await appA.getPreAggregations().setPreAggregationBuildStatus(tableName, { status: 'building', startedAt: 1 } as never);
+
+      expect(await appB.getPreAggregations().tablesUsed()).toContain(tableName);
+      expect(await appB.getPreAggregations().tablesTouched()).toContain(tableName);
+      expect(await appB.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+      expect(await appB.getPreAggregations().getPreAggBackoff(tableName)).toMatchObject({ backoffMultiplier: 2 });
+      expect(await appB.getPreAggregations().getPreAggregationBuildStatus(tableName)).toMatchObject({ status: 'building' });
+    });
+
+    test('pre-aggregation keys stay per orchestrator by default', async () => {
+      const [appA, appB] = createApps(false);
+      const tableName = 'stb_pre_aggregations.orders_own_keys';
+
+      await appA.getPreAggregations().updateLastTouch(tableName);
+      await appA.getPreAggregations().updateRefreshEndReached();
+
+      expect(await appB.getPreAggregations().tablesTouched()).not.toContain(tableName);
+      expect(await appB.getPreAggregations().getRefreshEndReached()).toBeFalsy();
+    });
+
+    test('cleanup keeps a table that another app touched', async () => {
+      const [appA, appB] = createApps(true);
+      // Built by an app outside the shared id, so nothing but app A's touch keeps it
+      const builder = createApp(`APP_BUILDER_${sharedTestCount++}`);
+      apps.push(builder);
+
+      await fetchLongPolling(builder, query('orders_touched_by_a'));
+      await fetchLongPolling(builder, query('orders_touched_by_nobody'));
+
+      const touchedByA = mockDriver.tables.find(t => t.includes('orders_touched_by_a'));
+      expect(touchedByA).toBeDefined();
+      expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_touched_by_nobody/));
+
+      await appA.getPreAggregations().updateLastTouch(touchedByA);
+      await appB.updateRefreshEndReached();
+
+      // App B's build drops the orphaned tables of the shared schema
+      await fetchLongPolling(appB, query('orders_built_by_b'));
+
+      expect(mockDriver.tables).toContain(touchedByA);
+      expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_built_by_b/));
+      expect(mockDriver.tables).not.toContainEqual(expect.stringMatching(/orders_touched_by_nobody/));
+    });
+
+    test('refresh key results are shared', async () => {
+      const [appA, appB] = createApps(true);
+      const refreshKeySql = 'SELECT shared_refresh_key';
+      const refreshKeyRuns = () => mockDriver.executedQueries.filter(q => JSON.stringify(q).includes(refreshKeySql)).length;
+
+      await fetchLongPolling(appA, query('orders_shared_refresh_key', refreshKeySql));
+      const runsAfterA = refreshKeyRuns();
+      expect(runsAfterA).toBeGreaterThan(0);
+
+      await fetchLongPolling(appB, query('orders_shared_refresh_key', refreshKeySql));
+
+      expect(refreshKeyRuns()).toEqual(runsAfterA);
+    });
+  });
+
   describe('Data Source Metadata Methods', () => {
     let metadataOrchestrator: TestQueryOrchestrator;
     let metadataMockDriver: MockDriver;
