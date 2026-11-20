@@ -219,8 +219,10 @@ const querySchema = Joi.object().keys({
   segments: Joi.array().items(memberPath(id)),
   timezone: timezoneSchema,
   // The result transform reads both as u32 (rust/cube/cubeorchestrator/src/transport.rs).
-  limit: Joi.number().integer().strict().min(0).max(MAX_U32),
-  offset: Joi.number().integer().strict().min(0).max(MAX_U32),
+  limit: Joi.number().integer().strict().min(0)
+    .max(MAX_U32),
+  offset: Joi.number().integer().strict().min(0)
+    .max(MAX_U32),
   total: Joi.boolean(),
   cacheMode: cacheModeSchema,
   cache: cacheModeSchema,
