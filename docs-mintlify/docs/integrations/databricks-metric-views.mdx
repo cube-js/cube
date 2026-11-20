@@ -207,15 +207,15 @@ measure notifies its user in the [Inbox](/docs/inbox).
 
 Run publication from CI after a successful Cube deployment when CI should check the result. To
 just publish after each deployment, [turn on the setting](#publish-after-each-deployment) instead;
-don't do both for one deployment, or each build starts two runs. First, configure **All views**, a
-dedicated target catalog and schema, and publication enabled in **Settings → Data Sources**. With
-**When a view leaves the scope** set to **Delete the Metric View Cube created**, each CI run also
-drops the Metric Views the deployment made obsolete (see [Removed views](#removed-views)). Run
-**Preview** and **Test access** before the first write. CI uses these saved settings; the API call
-does not override the scope or destination. The card shows only the `default`
-[publication target](#publish-to-staging-then-production): save another one's settings through
-the API with `?target=<name>`, and preview it with `"target": "<name>"` in the request body.
-**Test access** checks only `default`.
+don't do both for one publication target, or each build starts two runs there. First, configure
+**All views**, a dedicated target catalog and schema, and publication enabled in
+**Settings → Data Sources**. With **When a view leaves the scope** set to
+**Delete the Metric View Cube created**, each CI run also drops the Metric Views the deployment
+made obsolete (see [Removed views](#removed-views)). Run **Preview** and **Test access** before the
+first write. CI uses these saved settings; the API call does not override the scope or destination.
+The card shows only the `default` [publication target](#publish-to-staging-then-production): save
+another one's settings through the API with `?target=<name>`, and preview it with
+`"target": "<name>"` in the request body. **Test access** checks only `default`.
 
 Store a [Platform API key](/api-reference/authentication) with deployment `SchemaUpdate` access as
 a CI secret. The recipe reads the saved settings, starts a run with their `configurationVersion`,
@@ -395,7 +395,8 @@ To publish to production the build you tested in staging:
 3. Once a staging run is **Completed**, run your own checks against the staging Metric Views. Cube
    doesn't know whether they passed.
 4. Start a production run with production's `configurationVersion` and `promoteFromRunId` set to
-   the staging run's `runId`, here `STAGING_RUN_ID`:
+   the staging run's `runId`, here `STAGING_RUN_ID`. Set `PROMOTION_IDEMPOTENCY_KEY` to a UUID
+   unique to this promotion, so that retrying the step doesn't start a second run:
 
 ```bash
 set -euo pipefail
@@ -405,13 +406,15 @@ auth_header="Authorization: Bearer $CUBE_API_TOKEN"
 version=$(curl --fail --silent --show-error -H "$auth_header" \
   "$integration?target=production" | jq -r '.configurationVersion')
 request=$(jq -n --argjson version "$version" --arg source "$STAGING_RUN_ID" \
-  '{configurationVersion: $version, promoteFromRunId: $source}')
+  --arg key "$PROMOTION_IDEMPOTENCY_KEY" \
+  '{configurationVersion: $version, promoteFromRunId: $source, idempotencyKey: $key}')
 curl --fail-with-body -X POST -H "$auth_header" -H 'Content-Type: application/json' \
   --data-binary "$request" "$integration/syncs?target=production"
 ```
 
-The promoted run converts the staging run's build with production's settings. Starting it fails
-when:
+The request returns once the run starts: poll its `statusUrl` and check the result as the
+[CI recipe](#trigger-publication-from-ci) does. The promoted run converts the staging run's build
+with production's settings. Starting it fails when:
 
 - the source run is one of production's own (`400`) or of another data source (`404`);
 - the source run didn't end `COMPLETED`, or a view in production's scope didn't publish in it as
