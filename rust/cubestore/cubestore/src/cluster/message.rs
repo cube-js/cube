@@ -227,6 +227,8 @@ mod tests {
 
     #[tokio::test]
     async fn message_cut_short_is_a_closed_connection_not_a_decode_error() {
+        crate::util::metrics::test_capture::watch("cs.rpc.decode_errors");
+        let before = decode_errors("undecodable");
         let err = receive_bytes(|bytes| {
             header(bytes, NETWORK_MESSAGE_VERSION, 100);
             bytes.extend_from_slice(&[0; 10]);
@@ -239,6 +241,7 @@ mod tests {
             "{}",
             err.message
         );
+        assert_eq!(decode_errors("undecodable"), before);
     }
 
     fn decode_errors(reason: &str) -> usize {

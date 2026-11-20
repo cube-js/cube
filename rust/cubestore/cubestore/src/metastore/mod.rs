@@ -5214,13 +5214,16 @@ pub async fn deactivate_table_due_to_corrupt_data(
         message,
     );
     meta_store.table_ready(table_id, false).await?;
-    let source = if table.get_row().is_streaming() {
-        "stream"
-    } else {
-        "batch"
-    };
-    app_metrics::TABLES_DEACTIVATED
-        .add_with_tags(1, Some(&vec![metrics::format_tag("source", source)]));
+    // Every corrupt chunk of a table lands here, so only the first deactivation is counted.
+    if table.get_row().is_ready() {
+        let source = if table.get_row().is_streaming() {
+            "stream"
+        } else {
+            "batch"
+        };
+        app_metrics::TABLES_DEACTIVATED
+            .add_with_tags(1, Some(&vec![metrics::format_tag("source", source)]));
+    }
     Ok(())
 }
 
@@ -6041,6 +6044,14 @@ mod tests {
         let samples = test_capture::samples("cs.tables.deactivated");
         assert!(samples.contains(&(1, vec!["source:stream".to_string()])));
         assert!(samples.contains(&(1, vec!["source:batch".to_string()])));
+
+        deactivate_table_due_to_corrupt_data(
+            meta_store.clone(),
+            batch_table.get_id(),
+            "corrupt again".to_string(),
+        )
+        .await?;
+        assert_eq!(test_capture::samples("cs.tables.deactivated"), samples);
 
         RocksMetaStore::cleanup_test_metastore("table_deactivation_is_counted_by_source");
         Ok(())
