@@ -218,6 +218,7 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
           waitForRenew?: boolean;
           requestId?: string;
           renewCycle?: boolean;
+          staleIfSlow?: boolean;
         }
       ) => {
         // cacheQueryResult hashes options.renewalKey via queryCacheKey(),
@@ -231,9 +232,11 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         await seedCache(cacheKey, seededEntry);
 
         const fetchNewCalled = { value: false, blocked: false };
+        let fetchOptions: { background?: boolean } | undefined;
 
-        const spy = jest.spyOn(cache, 'queryWithRetryAndRelease').mockImplementation(async () => {
+        const spy = jest.spyOn(cache, 'queryWithRetryAndRelease').mockImplementation(async (_query, _values, queryOptions) => {
           fetchNewCalled.value = true;
+          fetchOptions = queryOptions;
           return 'new-result';
         });
 
@@ -250,12 +253,13 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
               requestId: opts.requestId,
               dataSource: 'default',
               renewCycle: opts.renewCycle,
+              staleIfSlow: opts.staleIfSlow,
             }
           );
 
           fetchNewCalled.blocked = result === 'new-result';
 
-          return { result, fetchNewCalled: fetchNewCalled.value, blocked: fetchNewCalled.blocked };
+          return { result, fetchNewCalled: fetchNewCalled.value, blocked: fetchNewCalled.blocked, fetchOptions };
         } finally {
           spy.mockRestore();
         }
@@ -321,6 +325,31 @@ export const QueryCacheTest = (name: string, options: QueryCacheTestOptions) => 
         expect(blocked).toBe(true);
         expect(result).toBe('new-result');
         expect(cache.logger.mock.calls.map(c => c[0])).toContain('Waiting for renew');
+      });
+
+      // The stale entry answers a slow stale-if-slow request, after which nobody waits for the refresh,
+      // so it must not be cancelled as an orphaned running query
+      it.each([
+        [true, true],
+        [false, undefined],
+      ])('key mismatch + waitForRenew + staleIfSlow %s: the refresh is background %s', async (staleIfSlow, background) => {
+        const cacheKey = QueryCache.queryCacheKey({ query: `key-mismatch-stale-if-slow-${staleIfSlow}`, values: [] });
+        const entry = {
+          time: Date.now() - 100 * 1000,
+          result: 'cached-data',
+          renewalKey: renewalKeyOld,
+        };
+
+        const { blocked, fetchOptions } = await callCacheQueryResult(cacheKey, entry, {
+          renewalThreshold: 600,
+          renewalKey: renewalKeyNew,
+          waitForRenew: true,
+          requestId: `req-stale-if-slow-${staleIfSlow}`,
+          staleIfSlow,
+        });
+
+        expect(blocked).toBe(true);
+        expect(fetchOptions?.background).toBe(background);
       });
 
       it('key mismatch + not expired + renew cycle: blocks on fetchNew', async () => {

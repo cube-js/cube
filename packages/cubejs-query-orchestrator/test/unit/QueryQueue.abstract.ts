@@ -1188,5 +1188,157 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions) => 
         }
       });
     });
+
+    describe('with cancelOrphanedRunningQueries', () => {
+      jest.setTimeout(15 * 1000);
+
+      const sameKey = (a: QueryKey) => (b: QueryKey) => JSON.stringify(a) === JSON.stringify(b);
+      const orphanLogger = jest.fn(testLogger);
+      // Rejects of the running queries by their cancel handle, as a driver rejects a stopped query
+      const runningRejects = new Map<string, (error: Error) => void>();
+      const cancelled: QueryKey[] = [];
+
+      // continueWaitTimeout + orphanedTimeout is 2s, and a 1s heartbeat checks for it
+      const orphanQueue = new QueryQueueExtended(`${tenantPrefix}#test_orphaned_running`, {
+        queryHandlers: {
+          running: async (query, setCancelHandler) => {
+            await setCancelHandler(query.result);
+
+            return new Promise((resolve, reject) => {
+              const timer = setTimeout(() => resolve(query.result), query.delay);
+              runningRejects.set(query.result, (error) => {
+                clearTimeout(timer);
+                reject(error);
+              });
+            });
+          },
+        },
+        cancelHandlers: {
+          running: async (query) => {
+            cancelled.push(query.queryKey);
+            runningRejects.get(query.cancelHandler)?.(new Error('Query was cancelled'));
+            runningRejects.delete(query.cancelHandler);
+          },
+        },
+        continueWaitTimeout: 1,
+        executionTimeout: 30,
+        orphanedTimeout: 1,
+        heartBeatInterval: 1,
+        concurrency: 2,
+        cancelOrphanedRunningQueries: true,
+        ...options,
+        logger: orphanLogger,
+      });
+
+      const waitUntil = async (condition: () => boolean, timeout: number) => {
+        const deadline = Date.now() + timeout;
+        while (!condition() && Date.now() < deadline) {
+          await pausePromise(100);
+        }
+      };
+
+      // Keeps asking for the result the way a client polling on ContinueWaitError does
+      const pollForResult = async (queryKey: QueryKey, query: Record<string, unknown>, timeout: number, requestId?: string) => {
+        const deadline = Date.now() + timeout;
+        while (Date.now() < deadline) {
+          try {
+            return await orphanQueue.executeInQueue('running', queryKey, query, QueuePriority.Interactive, { requestId });
+          } catch (e) {
+            if (!(e instanceof ContinueWaitError)) {
+              throw e;
+            }
+          }
+        }
+
+        throw new Error(`No result for ${JSON.stringify(queryKey)} in ${timeout}ms`);
+      };
+
+      afterAll(async () => {
+        // Nothing may keep running past the suite: the abandoned query's 30s timer is cleared by
+        // its cancellation, the others finish on their own
+        await waitUntil(() => runningRejects.size === 0, 5000);
+        await orphanQueue.shutdown();
+      });
+
+      test('a running query nobody waits for is cancelled and removed', async () => {
+        const queryKey: QueryKey = ['select * from abandoned_running', []];
+
+        // The only wait, after which the client is gone
+        await expect(
+          orphanQueue.executeInQueue('running', queryKey, { delay: 30 * 1000, result: 'abandoned', primaryQuery: true }, QueuePriority.Interactive)
+        ).rejects.toBeInstanceOf(ContinueWaitError);
+
+        await waitUntil(() => cancelled.some(sameKey(queryKey)), 6000);
+        expect(cancelled.some(sameKey(queryKey))).toBe(true);
+        expect(orphanLogger.mock.calls.map(([message]) => message)).toContain('Cancelling orphaned running query');
+
+        const connection = await orphanQueue.queueDriver.createConnection();
+
+        try {
+          // a waiter arriving now adds a fresh item rather than waiting on the cancelled one
+          expect(await connection.getQueryDef(orphanQueue.redisHash(queryKey), null)).toBeNull();
+        } finally {
+          orphanQueue.queueDriver.release(connection);
+        }
+      });
+
+      test('a running query somebody keeps waiting for is not cancelled', async () => {
+        const queryKey: QueryKey = ['select * from waited_running', []];
+
+        // Runs twice as long as the orphaned window, so only the waits keep it alive
+        expect(await pollForResult(queryKey, { delay: 4000, result: 'waited', primaryQuery: true }, 8000)).toBe('waited');
+        expect(cancelled.some(sameKey(queryKey))).toBe(false);
+      });
+
+      test('a query added by a node with the flag off is left to finish', async () => {
+        const queryKey: QueryKey = ['select * from unmarked_running', []];
+        const hash = orphanQueue.redisHash(queryKey);
+        // Not a literal at the call site, so its fields pass AddToQueueQuery's excess-property check
+        const unmarked = { isJob: false, delay: 30 * 1000, result: 'unmarked', primaryQuery: true };
+        const connection = await orphanQueue.queueDriver.createConnection();
+
+        try {
+          // Added the way a node with the flag off adds it: its waiters never stamp the item
+          await connection.addToQueue(
+            queryKey,
+            'running',
+            unmarked,
+            QueuePriority.Interactive,
+            { queueId: orphanQueue.generateQueueId(), stageQueryKey: queryKey, requestId: 'unmarked' }
+          );
+          await orphanQueue.reconcileQueue();
+          await waitUntil(() => runningRejects.has('unmarked'), 2000);
+          expect(runningRejects.has('unmarked')).toBe(true);
+
+          // Well past the orphaned window
+          await pausePromise(3500);
+          expect(cancelled.some(sameKey(queryKey))).toBe(false);
+        } finally {
+          // Stops the 30s handler, so nothing keeps running past the suite
+          await orphanQueue.cancelQuery(hash, null);
+          orphanQueue.queueDriver.release(connection);
+        }
+      });
+
+      // Each is waited for once per cycle at most, by a renewal, the refresh scheduler or nobody at all
+      test.each([
+        ['a background cache refresh', { primaryQuery: true, background: true }, undefined],
+        ['a renew cycle', { primaryQuery: true, renewCycle: true }, undefined],
+        ['a refresh key or pre-aggregation helper query', {}, undefined],
+        ['a query the refresh scheduler started', { primaryQuery: true }, 'scheduler-abc'],
+      ])('%s is left to finish', async (kind, flags, requestId) => {
+        const queryKey: QueryKey = [`select * from exempt_running -- ${kind}`, []];
+        const query = { delay: 4000, result: `exempt ${kind}`, ...flags };
+
+        await expect(
+          orphanQueue.executeInQueue('running', queryKey, query, QueuePriority.Background, { requestId })
+        ).rejects.toBeInstanceOf(ContinueWaitError);
+
+        // Past the orphaned window, then the result is there for the next waiter
+        await pausePromise(3500);
+        expect(cancelled.some(sameKey(queryKey))).toBe(false);
+        expect(await pollForResult(queryKey, query, 3000, requestId)).toBe(query.result);
+      });
+    });
   });
 };
