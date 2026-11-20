@@ -559,8 +559,8 @@ Not recommended to be used when [multiple data sources][ref-multiple-data-source
 can be configured **statically**. Use [`CUBEJS_DATASOURCES`](/reference/configuration/environment-variables#cubejs_datasources) and decorated environment
 variables in that case.
 
-If `CUBEJS_DATASOURCES` is set, it must list every data source the factory serves: Cube checks
-the list before it calls `driver_factory`.
+If `CUBEJS_DATASOURCES` is set, it must list every data source the factory serves: Cube rejects
+queries to a data source missing from the list, even though `driver_factory` serves it.
 
 In Python, should return a dictionary; in JavaScript, should return an object.
 It should contain the `type` element corresponding to data source type and other
