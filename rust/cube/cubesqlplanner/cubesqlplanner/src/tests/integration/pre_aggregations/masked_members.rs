@@ -492,12 +492,7 @@ async fn test_conditional_mask_with_a_date_bound_inside_a_day_is_rendered_over_r
     let (sql, usages) = build(query)?;
 
     assert_served_by_rollup(&sql, &usages);
-    for result in execute(
-        "conditional_mask_with_a_date_bound_inside_a_day_is_rendered_over_rollup",
-        query,
-    )
-    .await?
-    {
+    for result in execute("conditional_mask_with_a_date_bound_inside_a_day", query).await? {
         assert_eq!(
             column(&result, "workers__gender"),
             vec!["NULL", "NULL", "F"],
