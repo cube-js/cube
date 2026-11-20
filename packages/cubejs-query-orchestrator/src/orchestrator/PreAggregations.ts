@@ -481,6 +481,76 @@ export class PreAggregations {
     }
   }
 
+  /**
+   * Touches the table each partition is served from: the latest one with its current structure version.
+   * Partitions that aren't built yet are skipped. Returns the touched tables.
+   */
+  public async touchPartitions(
+    partitions: PreAggregationDescription[],
+    requestId: string,
+    loadCacheByDataSource: Record<string, PreAggregationLoadCache> = {},
+    concurrency: number = 10,
+  ): Promise<string[]> {
+    const loadCache = (dataSource: string, preAggregationsSchema: string) => {
+      const key = `${dataSource}_${preAggregationsSchema}`;
+      if (!loadCacheByDataSource[key]) {
+        loadCacheByDataSource[key] = new PreAggregationLoadCache(
+          () => this.driverFactory(dataSource, true),
+          this.queryCache,
+          this,
+          { requestId, dataSource }
+        );
+      }
+      return loadCacheByDataSource[key];
+    };
+
+    const touchPartition = async (partition: PreAggregationDescription): Promise<string | null> => {
+      const dataSource = partition.dataSource || 'default';
+      const { byStructure } = await loadCache(dataSource, partition.preAggregationsSchema).getVersionEntries(partition);
+      const versionEntry = byStructure[`${partition.tableName}_${getStructureVersion(partition)}`];
+      if (!versionEntry) {
+        return null;
+      }
+
+      const targetTableName = PreAggregations.targetTableName(versionEntry);
+      await this.updateLastTouch(targetTableName);
+      return targetTableName;
+    };
+
+    // Past the touch cache's capacity every partition is a cache store write: don't send them all at once
+    const touched: string[] = [];
+
+    for (const batch of R.splitEvery(concurrency, partitions)) {
+      touched.push(...(await Promise.all(batch.map(touchPartition))).filter((t): t is string => !!t));
+    }
+    return touched;
+  }
+
+  protected touchPassRedisKey(scope: string): string {
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TOUCH_PASS', scope);
+  }
+
+  /**
+   * Whether the scope's last complete touch pass is old enough to run another one: a quarter of the
+   * touch timeout, so a table that is only touched by these passes is touched again before it expires.
+   */
+  public async isTouchPassDue(scope: string): Promise<boolean> {
+    return !(await this.queryCache.getCacheDriver().get(this.touchPassRedisKey(scope)));
+  }
+
+  public async touchPassCompleted(scope: string): Promise<void> {
+    await this.queryCache.getCacheDriver().set(
+      this.touchPassRedisKey(scope),
+      new Date().getTime(),
+      Math.max(1, Math.floor(this.touchTablePersistTime / 4))
+    );
+  }
+
+  public async removeTouchPasses(): Promise<void> {
+    const keys = await this.queryCache.getCacheDriver().keysStartingWith(this.touchPassRedisKey(''));
+    await Promise.all(keys.map(key => this.queryCache.getCacheDriver().remove(key)));
+  }
+
   public async tablesTouched() {
     return (await this.queryCache.getCacheDriver().keysStartingWith(this.tablesTouchRedisKey('')))
       .map(k => k.replace(this.tablesTouchRedisKey(''), ''));
