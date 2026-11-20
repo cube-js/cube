@@ -85,6 +85,14 @@ impl SqlEvaluatorVisitor {
         self_copy
     }
 
+    /// The visitor reading each member from its default column.
+    pub fn with_default_read(&self) -> Self {
+        let mut self_copy = self.clone();
+        self_copy.time_dimension_read = false;
+        self_copy.stored_column = None;
+        self_copy
+    }
+
     pub fn time_dimension_read(&self) -> bool {
         self.time_dimension_read
     }

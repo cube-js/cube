@@ -506,3 +506,57 @@ async fn test_conditional_mask_with_a_date_bound_inside_a_day_is_rendered_over_r
     }
     Ok(())
 }
+
+// The mask's own filter reads the raw column, whichever column the member it
+// wraps is read from.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_conditional_mask_on_a_member_read_from_its_grain_column() -> Result<(), CubeError> {
+    let mask = indoc! {"
+        maskedMembers:
+          - member: workers.created_at
+            filter:
+              member: workers.created_at
+              operator: afterDate
+              values:
+                - '2024-01-02T11:30:00'
+    "};
+    let filtered = indoc! {"
+        dimensions:
+          - workers.full_name
+        measures:
+          - workers.count
+        filters:
+          - member: workers.created_at
+            operator: afterOrOnDate
+            values:
+              - '2024-01-02'
+        order:
+          - id: workers.full_name
+    "};
+    let grouped = indoc! {"
+        dimensions:
+          - workers.full_name
+        time_dimensions:
+          - dimension: workers.created_at
+            granularity: day
+        order:
+          - id: workers.full_name
+    "};
+    let source = TestContext::new(
+        MockSchema::from_yaml_file("common/masked_members_pre_agg.yaml").only_pre_aggregations(&[]),
+    )?;
+    for query in [filtered, grouped] {
+        let query = format!("{query}{mask}");
+        let (sql, usages) = build(&query)?;
+        assert_served_by_rollup(&sql, &usages);
+        // The rollup's timestamps carry their offset, the source's don't.
+        let rows = |result: Option<String>| result.map(|r| r.replace("+00 ", "    "));
+        let rollup = rows(context()?.try_execute_pg(&query, SEED).await);
+        assert_eq!(
+            rollup,
+            rows(source.try_execute_pg(&query, SEED).await),
+            "{sql}"
+        );
+    }
+    Ok(())
+}

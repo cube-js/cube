@@ -37,28 +37,32 @@ impl ToSql for TypedFilter {
         let resolved = resolve_base_symbol(self.member_evaluator());
         let name = resolved.peel_refs().full_name();
         let columns = &filters_ctx.pre_aggregation_columns;
-        // A filter reads a grain column its bounds fall on, the raw one only
-        // where no grain holds them, and its bounds take that column's
-        // timezone: the query's for a grain column, the database's for a raw one.
-        let aligned_grain = match self.date_bounds() {
-            Some((from, to)) if filters_ctx.use_local_tz => {
-                columns.grain_column_for_range(&name, &from, &to, query_tools.timezone())?
+        // A filter reads a grain column its bounds fall on, else the raw one, and
+        // its bounds take that column's timezone. The read mode of an enclosing
+        // render, such as the member a mask wraps, does not carry into it.
+        let visitor = visitor.with_default_read();
+        let aligned_grain = || match self.date_bounds() {
+            Some((from, to)) => {
+                columns.grain_column_for_range(&name, &from, &to, query_tools.timezone())
             }
-            _ => None,
+            None => Ok(None),
         };
         let (visitor, reads_grain) = if !filters_ctx.use_local_tz {
-            (visitor.clone(), false)
+            (visitor, false)
         } else if self.member_evaluator().as_time_dimension().is_ok() {
             let reads_grain = reads_a_grain_column(columns, &resolved);
             (visitor.with_time_dimension_read(), reads_grain)
         } else if !columns.has_grain(&name) {
-            (visitor.clone(), false)
-        } else if let Some(column) = aligned_grain {
-            (visitor.with_stored_column(name, column.clone()), true)
+            (visitor, false)
+        } else if let Some(column) = aligned_grain()? {
+            (
+                visitor.with_stored_column(name.clone(), column.clone()),
+                true,
+            )
         } else if !columns.has_raw(&name) {
             (visitor.with_time_dimension_read(), true)
         } else {
-            (visitor.clone(), false)
+            (visitor, false)
         };
         let member_sql = visitor.apply_for_filter(&resolved, node_processor, templates)?;
 

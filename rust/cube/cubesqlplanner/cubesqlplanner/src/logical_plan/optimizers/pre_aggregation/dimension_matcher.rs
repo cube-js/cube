@@ -1,5 +1,5 @@
 use super::{CompiledPreAggregation, PreAggregationSource};
-use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem, FilterOperator};
+use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::DimensionSymbol;
 use crate::planner::GranularityHelper;
@@ -578,11 +578,13 @@ impl<'a> DimensionMatcher<'a> {
         if !self.pre_aggregation_time_dimensions.contains_key(&id) {
             return None;
         }
-        let date_range = match filter.filter_operator() {
-            FilterOperator::Set | FilterOperator::NotSet => None,
-            _ => Some(filter.typed_filter().date_bounds()?),
-        };
-        Some(TimeDimensionSymbol::new(member, None, None, date_range))
+        let date_range = filter.typed_filter().date_bounds()?;
+        Some(TimeDimensionSymbol::new(
+            member,
+            None,
+            None,
+            Some(date_range),
+        ))
     }
 }
 
