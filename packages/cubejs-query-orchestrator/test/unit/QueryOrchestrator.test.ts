@@ -13,6 +13,10 @@ type TestQueryBody = OmitKnown<QueryBody, 'preAggregations'> & {
 };
 
 class TestQueryOrchestrator extends QueryOrchestrator {
+  public getPreAggregationsQueryCache() {
+    return this.preAggregationsQueryCache;
+  }
+
   public fetchQuery(queryBody: TestQueryBody) {
     return super.fetchQuery(queryBody as QueryBody);
   }
@@ -2014,6 +2018,32 @@ describe('QueryOrchestrator', () => {
       expect(mockDriver.tables).toContain(touchedByA);
       expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_built_by_b/));
       expect(mockDriver.tables).not.toContainEqual(expect.stringMatching(/orders_touched_by_nobody/));
+    });
+
+    test('the queues of the pre-aggregation cache are reconciled, cancelled and cleaned up', async () => {
+      const [appA] = createApps(true);
+      const preAggregationsQueryCache = appA.getPreAggregationsQueryCache();
+      expect(preAggregationsQueryCache).not.toBe(appA.getQueryCache());
+
+      const queue = await preAggregationsQueryCache.getQueue('default');
+      const cancelledQuery = { requestId: 'shared-pre-aggregation-request' } as never;
+      const reconcileQueue = jest.spyOn(queue, 'reconcileQueue');
+      jest.spyOn(queue, 'cancelQueryByRequestId').mockResolvedValue([cancelledQuery]);
+      const cleanup = jest.spyOn(preAggregationsQueryCache, 'cleanup');
+
+      await appA.forceReconcile('default');
+      expect(reconcileQueue).toHaveBeenCalled();
+
+      expect(await appA.cancelQueryByRequestId('shared-pre-aggregation-request')).toContain(cancelledQuery);
+
+      await appA.cleanup();
+      expect(cleanup).toHaveBeenCalled();
+    });
+
+    test('pre-aggregations use the query cache without a separate id', async () => {
+      const [appA] = createApps(false);
+
+      expect(appA.getPreAggregationsQueryCache()).toBe(appA.getQueryCache());
     });
 
     test('refresh key results are shared', async () => {
