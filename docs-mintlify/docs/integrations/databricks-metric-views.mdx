@@ -225,7 +225,9 @@ recipe retries a `409` for up to `MAX_START_ATTEMPTS` attempts, 10 seconds apart
 Run statuses are `QUEUED`, `RUNNING`, `CANCELLING`, `COMPLETED`, `PARTIAL`, `FAILED`, and `CANCELLED`.
 
 To reject incompatible changes before writing, CI can [preview](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview)
-with `{"dataSourceName": "default", "selectionMode": "all"}` and [inspect the result](/api-reference/databricks-metric-view-publication/get-a-completed-databricks-metric-view-preview-result).
+with `{"dataSourceName": "default", "selectionMode": "all"}`, plus `"target": "<name>"` for a
+[publication target](#publish-to-staging-then-production) other than `default`, and
+[inspect the result](/api-reference/databricks-metric-view-publication/get-a-completed-databricks-metric-view-preview-result).
 Require eligible views with no `withheldMembers`; avoid overlapping deployments because preview
 and sync can resolve different builds.
 
