@@ -150,7 +150,7 @@ export class QueryOrchestrator {
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.preAggregationsOptions,
-        orchestratorId: this.preAggregationsQueryCache === this.queryCache ? undefined : this.redisPrefix,
+        sharedCacheOrchestratorId: this.preAggregationsQueryCache === this.queryCache ? undefined : this.redisPrefix,
       }
     );
   }
@@ -492,6 +492,10 @@ export class QueryOrchestrator {
 
   public async updateRefreshEndReached() {
     return this.preAggregations.updateRefreshEndReached();
+  }
+
+  public async markRefreshActive() {
+    return this.preAggregations.markRefreshActive();
   }
 
   private createMetadataQuery(operation: string, params: Record<string, unknown>): QueryWithParams {

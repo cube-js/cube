@@ -286,6 +286,9 @@ export const tablesToVersionEntries = (schema: string, tables: TableCacheEntry[]
   }).filter(R.identity)
 );
 
+// The refresh scheduler runs every few seconds, the active mark lives for the touch timeout
+const REFRESH_ACTIVE_MARK_INTERVAL = 60 * 1000;
+
 export type PreAggregationsOptions = {
   maxPartitions?: number;
   maxSourceRowLimit?: number;
@@ -304,11 +307,10 @@ export type PreAggregationsOptions = {
   usedTablePersistTime?: number;
   externalRefresh?: boolean;
   /**
-   * Keeps the refresh end reached flag per orchestrator when orchestrators share the
-   * pre-aggregation cache, so one finishing its refresh doesn't let another drop tables
-   * its own refresh hasn't touched yet.
+   * Set by `QueryOrchestrator` when other orchestrators share this pre-aggregation cache.
+   * Each keeps its own refresh end, and drop without touch waits for every one refreshing.
    */
-  orchestratorId?: string;
+  sharedCacheOrchestratorId?: string;
 };
 
 export class PreAggregations {
@@ -335,6 +337,8 @@ export class PreAggregations {
   private readonly usedCache: LRUCache<string, true>;
 
   private readonly touchCache: LRUCache<string, true>;
+
+  private refreshActiveMarkedAt: number = 0;
 
   public constructor(
     private readonly redisPrefix: string,
@@ -394,9 +398,13 @@ export class PreAggregations {
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_BACKOFF', tableName);
   }
 
-  protected refreshEndReachedKey() {
+  protected refreshEndReachedKey(orchestratorId: string = this.options.sharedCacheOrchestratorId || '') {
     // TODO add dataSource?
-    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', this.options.orchestratorId || '');
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', orchestratorId);
+  }
+
+  protected refreshActiveKey(orchestratorId: string) {
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_ACTIVE', orchestratorId);
   }
 
   protected preAggBuildStatusRedisKey(tableName: string): string {
@@ -532,8 +540,42 @@ export class PreAggregations {
     return this.queryCache.getCacheDriver().set(this.refreshEndReachedKey(), new Date().getTime(), this.touchTablePersistTime);
   }
 
+  /**
+   * Records that this orchestrator refreshes pre-aggregations, so the others that share its
+   * cache wait for its refresh end before they drop tables without touch.
+   */
+  public async markRefreshActive(): Promise<void> {
+    const { sharedCacheOrchestratorId } = this.options;
+
+    if (!sharedCacheOrchestratorId || Date.now() - this.refreshActiveMarkedAt < REFRESH_ACTIVE_MARK_INTERVAL) {
+      return;
+    }
+
+    await this.queryCache.getCacheDriver().set(
+      this.refreshActiveKey(sharedCacheOrchestratorId),
+      new Date().getTime(),
+      this.touchTablePersistTime
+    );
+    this.refreshActiveMarkedAt = Date.now();
+  }
+
   public async getRefreshEndReached(): Promise<number> {
-    return this.queryCache.getCacheDriver().get(this.refreshEndReachedKey());
+    const cacheDriver = this.queryCache.getCacheDriver();
+    const refreshEndReached: number = await cacheDriver.get(this.refreshEndReachedKey());
+
+    if (!refreshEndReached || !this.options.sharedCacheOrchestratorId) {
+      return refreshEndReached;
+    }
+
+    // Tables of an orchestrator whose refresh hasn't ended may not be touched yet
+    const activePrefix = this.refreshActiveKey('');
+    const activeOrchestratorIds = (await cacheDriver.keysStartingWith(activePrefix))
+      .map(key => key.replace(activePrefix, ''));
+    const refreshEnds = await Promise.all(
+      activeOrchestratorIds.map(orchestratorId => cacheDriver.get(this.refreshEndReachedKey(orchestratorId)))
+    );
+
+    return refreshEnds.every(Boolean) ? refreshEndReached : null;
   }
 
   /**

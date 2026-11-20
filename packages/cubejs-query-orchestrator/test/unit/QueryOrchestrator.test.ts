@@ -1985,6 +1985,43 @@ describe('QueryOrchestrator', () => {
       expect(await appB.getPreAggregations().getRefreshEndReached()).toBeFalsy();
     });
 
+    test('the refresh end waits for every orchestrator that refreshes', async () => {
+      const [appA, appB] = createApps(true);
+
+      await appB.markRefreshActive();
+      await appA.markRefreshActive();
+      await appA.updateRefreshEndReached();
+
+      // App B refreshes but hasn't finished, so its tables may not be touched yet
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeFalsy();
+
+      await appB.updateRefreshEndReached();
+
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+      expect(await appB.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+    });
+
+    test('cleanup keeps untouched tables until every refreshing app finished its refresh', async () => {
+      const [appA, appB] = createApps(true);
+      const builder = createApp(`APP_BUILDER_${sharedTestCount++}`);
+      apps.push(builder);
+
+      // A table of app B that app B's refresh hasn't touched under the shared id yet
+      await fetchLongPolling(builder, query('orders_of_b'));
+      const tableOfB = mockDriver.tables.find(t => t.includes('orders_of_b'));
+
+      await appB.markRefreshActive();
+      await appA.updateRefreshEndReached();
+      await fetchLongPolling(appA, query('orders_built_by_a'));
+
+      expect(mockDriver.tables).toContain(tableOfB);
+
+      await appB.updateRefreshEndReached();
+      await fetchLongPolling(appA, query('orders_built_by_a_again'));
+
+      expect(mockDriver.tables).not.toContain(tableOfB);
+    });
+
     test('pre-aggregation keys stay per orchestrator by default', async () => {
       const [appA, appB] = createApps(false);
       const tableName = 'stb_pre_aggregations.orders_own_keys';

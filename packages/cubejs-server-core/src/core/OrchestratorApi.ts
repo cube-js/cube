@@ -348,4 +348,8 @@ export class OrchestratorApi {
   public async updateRefreshEndReached() {
     return this.orchestrator.updateRefreshEndReached();
   }
+
+  public async markRefreshActive() {
+    return this.orchestrator.markRefreshActive();
+  }
 }
