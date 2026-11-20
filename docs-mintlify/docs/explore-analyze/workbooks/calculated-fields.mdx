@@ -348,10 +348,13 @@ Select a query field in the sidebar to open the editor. You can change its
 **SQL expression**, then choose **Update** to apply.
 
 Select a workbook field in the sidebar to open the **Update calculated field**
-dialog. You can change its **Title**, **Description**, **Format** and
-**Expression**. Its **Name** does not change, because reports and dashboards
-find the field by it, and neither does the **Value type** of a dimension,
-because dashboard controls are set up for it.
+dialog. You can change its **Title**, **Description**, **Format**,
+**Expression** and **Value type**. Its **Name** does not change, because
+reports and dashboards find the field by it.
+
+When you change the **Value type** of a dimension, save again each dashboard
+control set up for the previous type before you publish the dashboard. See
+[After a field's type changes][ref-type-change].
 
 When you update the expression of a workbook dimension, every report of the
 workbook on that semantic view that still uses the previous expression gets
@@ -373,6 +376,7 @@ it; publish again to show your edits to viewers.
 [ref-promote]: #promoting-to-a-workbook-field
 [ref-filter]: /docs/explore-analyze/dashboards/widgets/controls#calculated-dimensions
 [ref-field-switcher]: /docs/explore-analyze/dashboards/widgets/controls#choosing-what-it-switches
+[ref-type-change]: /docs/explore-analyze/dashboards/widgets/controls#calculated-dimension-type-change
 [ref-model-agent]: /docs/getting-started/develop-in-ide#ai-assisted-development
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-deployment-permissions]: /admin/users-and-permissions/custom-roles#deployment-permissions
