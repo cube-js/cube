@@ -221,8 +221,8 @@ Store a [Platform API key](/api-reference/authentication) with deployment `Schem
 a CI secret. The recipe reads the saved settings, starts a run with their `configurationVersion`,
 then polls the returned `statusUrl`. The start endpoint returns `202` with a `runId`, `buildJobId`,
 optional `commit`, and root-relative `statusUrl`. It accepts an optional UUID `idempotencyKey` for
-safe retries. A start returns `409` while another run is active, while a
-[take-over](#take-over-an-existing-metric-view) runs in your account, and, for a data model with
+safe retries. A start returns `409` while another run of that publication target is active, while
+a [take-over](#take-over-an-existing-metric-view) runs in your account, and, for a data model with
 [Jinja templates](#jinja-templates), while the deployment is still rolling out the new build. The
 recipe retries a `409` for up to `MAX_START_ATTEMPTS` attempts, 10 seconds apart (default: 30).
 Run statuses are `QUEUED`, `RUNNING`, `CANCELLING`, `COMPLETED`, `PARTIAL`, `FAILED`, and `CANCELLED`.
@@ -424,6 +424,11 @@ with production's settings. Starting it fails when:
   did (`409`), as after a Cube update or with Jinja that renders differently: publish to staging
   again. A converter change found only during conversion fails the run before it writes to
   Databricks.
+
+A promotion can also get a temporary `409`, such as while a production run is active; a staging
+run doesn't block it (see [Trigger publication from CI](#trigger-publication-from-ci)). Only the
+message in the response body, which `--fail-with-body` prints, tells a temporary `409` from a
+refusal, so read it before you retry.
 
 A run returns its `targetName` and, when promoted, `promotedFromRunId`. Its `sourceSha256` hashes
 the model files it converted, and `runtime` names the converter version it used.
