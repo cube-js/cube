@@ -321,9 +321,12 @@ const END_DATE_OPERATORS = ['beforeOrOnDate', 'afterDate'];
 // may carry a UTC designator or offset (e.g. from the SQL API push-down).
 const AbsoluteDateTimeRegex = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}(:?\d{2})?)?)?$/;
 
+// A timestamp with a UTC designator or an offset names an instant
+const ZonedDateTimeRegex = /[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}(:?\d{2})?)$/;
+
 // Resolve a dateRange input — a relative string ("last 2 weeks"), a single
 // absolute date, or a 2-element array — to a normalized [startISO, endISO]
-// pair.
+// pair, local to the query timezone. A zoned timestamp is converted to it.
 export function resolveDateRange(input: string | string[], timezone: string): string[];
 export function resolveDateRange(input: unknown, timezone: string): unknown;
 export function resolveDateRange(input: unknown, timezone: string): unknown {
@@ -336,13 +339,14 @@ export function resolveDateRange(input: unknown, timezone: string): unknown {
     return input;
   }
 
-  return dateRange.map(
-    (d, i) => (
-      i === 0 ?
-        moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT00:00:00.000' : moment.HTML5_FMT.DATETIME_LOCAL_MS) :
-        moment.utc(d).format(d.match(DateRegex) ? 'YYYY-MM-DDT23:59:59.999' : moment.HTML5_FMT.DATETIME_LOCAL_MS)
-    )
-  );
+  return dateRange.map((d, i) => {
+    if (d.match(DateRegex)) {
+      return moment.utc(d).format(i === 0 ? 'YYYY-MM-DDT00:00:00.000' : 'YYYY-MM-DDT23:59:59.999');
+    }
+
+    const local = ZonedDateTimeRegex.test(d) ? moment.tz(d, timezone || 'UTC') : moment.utc(d);
+    return local.format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
+  });
 }
 
 // Resolve relative date strings inside a filter leaf's `values` so that
