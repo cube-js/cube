@@ -415,15 +415,18 @@ export class PreAggregationLoader {
    * A dry-run job's answer: the partition's target version, the one its current
    * refresh keys call for, and whether it is built. Nothing is built or touched.
    */
-  protected dryRunResult(
+  protected async dryRunResult(
     versionEntries: VersionEntriesObj,
     versionEntryByContentVersion: VersionEntry | undefined,
     structureVersion: string,
     contentVersion: string,
-  ): LoadPreAggregationResult {
-    if (versionEntryByContentVersion) {
+  ): Promise<LoadPreAggregationResult> {
+    const builtTableName = versionEntryByContentVersion && this.targetTableName(versionEntryByContentVersion);
+    // As in `isPartitionExist`: the table exists from the moment its build starts
+    // and stays when the build fails, so a build record outranks it.
+    if (builtTableName && !await this.preAggregations.getPreAggregationBuildStatus(builtTableName)) {
       return {
-        targetTableName: this.targetTableName(versionEntryByContentVersion),
+        targetTableName: builtTableName,
         refreshKeyValues: [],
         lastUpdatedAt: versionEntryByContentVersion.last_updated_at,
         buildRangeEnd: versionEntryByContentVersion.build_range_end,
@@ -439,7 +442,11 @@ export class PreAggregationLoader {
       last_updated_at: new Date().getTime(),
       naming_version: 2,
     };
-    const builtStructure = versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
+    const builtStructure = versionEntries.versionEntries.some(entry => (
+      entry.table_name === this.preAggregation.tableName &&
+      entry.structure_version === structureVersion &&
+      this.targetTableName(entry) !== builtTableName
+    ));
 
     return {
       targetTableName: this.targetTableName(targetVersionEntry),

@@ -525,6 +525,24 @@ describe('pre-aggregation build jobs', () => {
       expect(job.targetTableName).toEqual(built);
     });
 
+    test('a dry run does not report a table whose build has not finished as done', async () => {
+      const built = await buildAndWait('build before its record says building');
+      // A build into this table started again, or was killed, and left its record
+      await orchestrator.getPreAggregations().setPreAggregationBuildStatus(built, {
+        status: 'building',
+        startedAt: Date.now(),
+      });
+
+      const [job] = await orchestrator.fetchQuery(jobQuery('dry run, build in progress', { dryRun: true }));
+
+      expect(job.versionStatus).toEqual('missing_partition');
+
+      await orchestrator.getPreAggregations().setPreAggregationBuildStatus(built, { status: 'failure', error: 'killed' });
+      const [failed] = await orchestrator.fetchQuery(jobQuery('dry run, build failed', { dryRun: true }));
+
+      expect(failed.versionStatus).toEqual('missing_partition');
+    });
+
     test('a dry run reports a partition as outdated once its refresh key moves', async () => {
       const built = await buildAndWait('build before key moves');
 
