@@ -724,6 +724,8 @@ export class PreAggregations {
             maxSourceRowLimit: this.options.maxSourceRowLimit,
             isJob: queryBody.isJob,
             dryRun: queryBody.dryRun,
+            // Dependencies (rollupJoin, rollupLambda) come first, the job's target last
+            buildsJobTarget: i === preAggregations.length - 1,
             waitForRenew: queryBody.cacheMode === 'must-revalidate',
             // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
             forceBuild: i === preAggregations.length - 1 ? queryBody.forceBuildPreAggregations : false,

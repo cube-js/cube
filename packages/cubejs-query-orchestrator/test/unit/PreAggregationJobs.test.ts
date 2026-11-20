@@ -157,8 +157,9 @@ const PRE_AGGREGATION: Partial<PreAggregationDescription> = {
 
 const jobQuery = (
   requestId: string,
-  { preAggregation = PRE_AGGREGATION, force = true, dryRun = false }: {
+  { preAggregation = PRE_AGGREGATION, dependencies = [], force = true, dryRun = false }: {
     preAggregation?: Partial<PreAggregationDescription>,
+    dependencies?: Partial<PreAggregationDescription>[],
     force?: boolean,
     dryRun?: boolean,
   } = {},
@@ -166,7 +167,7 @@ const jobQuery = (
   // The jobs API posts a build query without `query`
   values: [] as string[],
   cacheKeyQueries: { queries: [] as QueryWithParams[] },
-  preAggregations: [preAggregation as PreAggregationDescription],
+  preAggregations: [...dependencies, preAggregation] as PreAggregationDescription[],
   continueWait: true,
   renewQuery: true,
   requestId,
@@ -181,6 +182,31 @@ const jobQuery = (
 const PRE_AGGREGATION_KEY_MOVED: Partial<PreAggregationDescription> = {
   ...PRE_AGGREGATION,
   invalidateKeyQueries: [['SELECT \'next refresh key\'', [], { renewalThreshold: 21600 }]],
+};
+
+// A rollupJoin-style pair: the target is built from its dependency's table.
+const DEPENDENCY: Partial<PreAggregationDescription> = {
+  ...PRE_AGGREGATION,
+  tableName: 'stb_pre_aggregations.orders_dep',
+  preAggregationId: 'orders.dep',
+  loadSql: ['CREATE TABLE stb_pre_aggregations.orders_dep AS SELECT * FROM public.orders', []],
+  indexesSql: [],
+};
+
+const DEPENDENCY_KEY_MOVED: Partial<PreAggregationDescription> = {
+  ...DEPENDENCY,
+  invalidateKeyQueries: [['SELECT \'next dependency key\'', [], { renewalThreshold: 21600 }]],
+};
+
+const DEPENDENT: Partial<PreAggregationDescription> = {
+  ...PRE_AGGREGATION,
+  tableName: 'stb_pre_aggregations.orders_joined',
+  preAggregationId: 'orders.joined',
+  loadSql: [
+    'CREATE TABLE stb_pre_aggregations.orders_joined AS SELECT * FROM stb_pre_aggregations.orders_dep',
+    [],
+  ],
+  indexesSql: [],
 };
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -540,6 +566,32 @@ describe('pre-aggregation build jobs', () => {
       );
       expect(dryRun.versionStatus).toEqual('done');
       expect(dryRun.targetTableName).toEqual(targetTableName);
+    });
+
+    test('a job loads an outdated dependency from a table that exists', async () => {
+      const [builtDependency, first] = await orchestrator.fetchQuery(
+        jobQuery('build with dependency', { preAggregation: DEPENDENT, dependencies: [DEPENDENCY] })
+      );
+      expect(await pollUntilSettled('build with dependency', first.targetTableName, first.queryKey)).toEqual('done');
+
+      const [dependency] = await orchestrator.fetchQuery(
+        jobQuery('dependency key moved', { preAggregation: DEPENDENT, dependencies: [DEPENDENCY_KEY_MOVED] })
+      );
+
+      // The target's build reads the dependency's table, so it gets the one already
+      // built rather than the name of a build the job does not wait for.
+      expect(dependency.targetTableName).toEqual(builtDependency.targetTableName);
+      expect(externalMockDriver.tables).toContain(dependency.targetTableName);
+    });
+
+    test('a dry run builds no dependency either', async () => {
+      const jobs = await orchestrator.fetchQuery(
+        jobQuery('dry run with dependency', { preAggregation: DEPENDENT, dependencies: [DEPENDENCY], dryRun: true })
+      );
+
+      expect(jobs.map(({ versionStatus }: { versionStatus?: string }) => versionStatus)).toEqual(['missing_partition', 'missing_partition']);
+      await delay(200);
+      expect(externalMockDriver.tables).toEqual([]);
     });
   });
 

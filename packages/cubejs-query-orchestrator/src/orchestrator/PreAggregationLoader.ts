@@ -54,6 +54,12 @@ export type PreAggregationLoaderOptions = {
    * without building anything. Takes effect together with `isJob`.
    */
   dryRun?: boolean;
+  /**
+   * The pre-aggregation is the target of a build job rather than one of its
+   * dependencies: it is built in the version its refresh keys call for, never
+   * answered with an older one, and without waiting for the build.
+   */
+  buildsJobTarget?: boolean;
   waitForRenew?: boolean;
   forceBuild?: boolean;
   orphanedTimeout?: number;
@@ -109,6 +115,8 @@ export class PreAggregationLoader {
 
   protected readonly dryRun: boolean;
 
+  protected readonly buildsJobTarget: boolean;
+
   private readonly waitForRenew: boolean;
 
   private readonly forceBuild: boolean;
@@ -142,6 +150,7 @@ export class PreAggregationLoader {
     this.preAggregationsTablesToTempTables = preAggregationsTablesToTempTables;
     this.isJob = !!options.isJob;
     this.dryRun = this.isJob && !!options.dryRun;
+    this.buildsJobTarget = this.isJob && !!options.buildsJobTarget;
     this.waitForRenew = options.waitForRenew;
     this.forceBuild = options.forceBuild;
     this.orphanedTimeout = options.orphanedTimeout;
@@ -265,8 +274,9 @@ export class PreAggregationLoader {
     }
 
     // A job is asked for the version its refresh keys call for: never answer it
-    // with an older version of the same structure.
-    if (!this.waitForRenew && !this.forceBuild && !this.isJob) {
+    // with an older version of the same structure. Its dependencies load as
+    // for a query, so the target is built from tables that exist.
+    if (!this.waitForRenew && !this.forceBuild && !this.buildsJobTarget) {
       const versionEntryByStructureVersion = versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (versionEntryByStructureVersion) {
         const targetTableName = this.targetTableName(versionEntryByStructureVersion);
@@ -322,7 +332,7 @@ export class PreAggregationLoader {
 
     // A job builds its target version whether forced or not: without `forceBuild`
     // it only gets here when that version is not built yet.
-    if (this.forceBuild || this.isJob) {
+    if (this.forceBuild || this.buildsJobTarget) {
       this.logger(this.forceBuild ? 'Force build pre-aggregation' : 'Build pre-aggregation for a job', {
         preAggregation: this.preAggregation,
         requestId: this.requestId,

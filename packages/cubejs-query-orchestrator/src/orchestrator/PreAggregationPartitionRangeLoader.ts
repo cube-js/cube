@@ -49,6 +49,7 @@ export interface PreAggsPartitionRangeLoaderOpts {
   lambdaQuery?: LambdaQuery;
   isJob?: boolean;
   dryRun?: boolean;
+  buildsJobTarget?: boolean;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 }
 
