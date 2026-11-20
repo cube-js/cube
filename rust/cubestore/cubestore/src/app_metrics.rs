@@ -27,7 +27,8 @@ pub static WORKER_POOL_PROCESS_EXITS: Counter = metrics::counter("cs.worker_pool
 pub static TABLES_DEACTIVATED: Counter = metrics::counter("cs.tables.deactivated");
 pub static REMOTE_FS_FILE_SIZE_MISMATCH: Counter =
     metrics::counter("cs.remote_fs.file_size_mismatch");
-/// Inter-node messages that could not be decoded, usually wire-format skew between builds.
+/// Inter-node messages that could not be decoded, tagged `reason`: `version_mismatch` is protocol
+/// skew between builds, `undecodable` a payload this build can't read.
 pub static RPC_DECODE_ERRORS: Counter = metrics::counter("cs.rpc.decode_errors");
 
 /// Errors in IPC.

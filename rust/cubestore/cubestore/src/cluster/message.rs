@@ -2,6 +2,7 @@ use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::trace::{MainTrace, WorkerTrace};
+use crate::util::metrics;
 use crate::{app_metrics, CubeError};
 use datafusion::arrow::datatypes::SchemaRef;
 use serde::{Deserialize, Serialize};
@@ -151,7 +152,7 @@ impl NetworkMessage {
         }
         let ver = socket.read_u32().await?;
         if ver != NETWORK_MESSAGE_VERSION {
-            app_metrics::RPC_DECODE_ERRORS.increment();
+            count_decode_error("version_mismatch");
             return Err(CubeError::user(format!("Network protocol version mismatch. Expected {} but received {}. It seems multiple versions of Cube Store images running within the same cluster.", NETWORK_MESSAGE_VERSION, ver)));
         }
         let len = socket.read_u64().await?;
@@ -185,10 +186,15 @@ impl NetworkMessage {
             .map_err(CubeError::from)
             .and_then(|r| Ok(Self::deserialize(r)?));
         if decoded.is_err() {
-            app_metrics::RPC_DECODE_ERRORS.increment();
+            count_decode_error("undecodable");
         }
         Ok(Some(decoded?))
     }
+}
+
+fn count_decode_error(reason: &'static str) {
+    app_metrics::RPC_DECODE_ERRORS
+        .add_with_tags(1, Some(&vec![metrics::format_tag("reason", reason)]));
 }
 
 // Anything larger is considered to be an invalid message.
@@ -235,19 +241,30 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn undecodable_message_is_counted() {
-        use crate::util::metrics::test_capture;
-        test_capture::watch("cs.rpc.decode_errors");
-        let before = test_capture::samples("cs.rpc.decode_errors").len();
+    fn decode_errors(reason: &str) -> usize {
+        let tags = vec![format!("reason:{}", reason)];
+        crate::util::metrics::test_capture::samples("cs.rpc.decode_errors")
+            .iter()
+            .filter(|(_, t)| *t == tags)
+            .count()
+    }
 
+    #[tokio::test]
+    async fn decode_errors_are_counted_by_reason() {
+        crate::util::metrics::test_capture::watch("cs.rpc.decode_errors");
+
+        let before = decode_errors("undecodable");
         let err = receive_bytes(|bytes| {
             header(bytes, NETWORK_MESSAGE_VERSION, 4);
             bytes.extend_from_slice(&[0xff; 4]);
         })
         .await;
-
         assert!(err.is_err());
-        assert!(test_capture::samples("cs.rpc.decode_errors").len() > before);
+        assert!(decode_errors("undecodable") > before);
+
+        let before = decode_errors("version_mismatch");
+        let err = receive_bytes(|bytes| header(bytes, NETWORK_MESSAGE_VERSION + 1, 0)).await;
+        assert!(err.unwrap_err().message.contains("version mismatch"));
+        assert!(decode_errors("version_mismatch") > before);
     }
 }
