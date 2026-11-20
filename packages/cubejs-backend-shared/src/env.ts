@@ -458,7 +458,7 @@ const variables: Record<string, (...args: any) => any> = {
   preAggregationsBuilder: () => get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
   /**
    * Use `contextToCubeStoreRouterId` as the default `contextToPreAggregationOrchestratorId`,
-   * so orchestrators routed to one Cube Store share its pre-aggregation queues.
+   * so orchestrators routed to one Cube Store share its pre-aggregation queues and caches.
    */
   preAggregationsOrchestratorIdFromRouter: () => get('CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER')
     .default('false')

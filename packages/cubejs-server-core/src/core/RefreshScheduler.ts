@@ -724,6 +724,8 @@ export class RefreshScheduler {
     const { securityContext } = context;
     const { queryIteratorState, concurrency, workerIndices } = queryingOptions;
 
+    await (await this.serverCore.getOrchestratorApi(context)).markRefreshActive();
+
     const preAggregationsLoadCacheByDataSource = {};
     const queriesCache: { [key: string]: Promise<PreAggregationDescription[][]> } = {};
     await Promise.all(R.range(0, concurrency)

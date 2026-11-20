@@ -79,6 +79,16 @@ describe('contextToPreAggregationOrchestratorId', () => {
     expect(await preAggregationsRedisPrefix(core)).toBeUndefined();
   });
 
+  test('a configured id equal to the orchestrator id is still passed on', async () => {
+    delete process.env.CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER;
+
+    const core = createServerCore({
+      contextToPreAggregationOrchestratorId: ({ securityContext }: RequestContext) => `ORCH_${securityContext.tenant}`,
+    });
+
+    expect(await preAggregationsRedisPrefix(core)).toEqual('ORCH_tenant-1');
+  });
+
   test('an explicit option wins over the env flag', async () => {
     process.env.CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER = 'true';
 
