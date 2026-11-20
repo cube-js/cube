@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.31](https://github.com/cube-js/cube/compare/v1.8.30...v1.8.31) (2026-11-20)
+
+### Bug Fixes
+
+- **cubestore:** Keep in-memory compaction and chunk GC alive under load ([#12767](https://github.com/cube-js/cube/issues/12767)) ([fd7c40e](https://github.com/cube-js/cube/commit/fd7c40e939ecdc0bef6e799e213a9b106e5442bf))
+
 ## [1.8.30](https://github.com/cube-js/cube/compare/v1.8.29...v1.8.30) (2026-11-19)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
