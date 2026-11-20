@@ -153,6 +153,7 @@ Every endpoint of the Console Server public API is covered:
 | `workbooks` | list, get, create, update, delete, duplicate, publish, dashboard, ai-thread |
 | `reports` | list, get, create, update, delete, refresh, connect-workbook, folders |
 | `workspace` | list, shared, move |
+| `query-history` (`qh`) | list (`--from`, `--to`, `--status`, `--api-type`, `--min-duration-ms`, `--search`) a deployment's API requests, newest first; get one request with the SQL it generated |
 | `notifications` | list, get, create, update, delete, recipients list/add/remove |
 | `users` | list, me, create, update, delete, embed-theme |
 | `groups` | list, delete |
