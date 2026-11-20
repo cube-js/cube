@@ -22,18 +22,18 @@ the driver's error and saves nothing.
 
 The first named source also creates `CUBEJS_DATASOURCES` (see
 [Under the hood](#under-the-hood)). Once it's set, Cube rejects queries to
-any data source it doesn't list, so Cube Cloud first shows the list it will
+any data source it doesn't list, so the page first shows the list it will
 save and asks you to confirm it:
 
 - The list holds the data sources configured on this page and the ones your
-  data model uses. A data source whose driver fails to load while Cube Cloud
+  data model uses. A data source whose driver fails to load while the page
   reads the data model is left out.
-- If Cube Cloud can't read which data sources your data model uses, the
+- If the page can't read which data sources your data model uses, the
   dialog says so, and the list holds only the ones configured on this page.
 - If a data source is missing, click **Cancel**, which saves nothing. Add
   `CUBEJS_DATASOURCES` with every data source name in
   [**Settings → Environment Variables**][ref-config-ref-env], then add the
-  source again: Cube Cloud keeps every name the variable lists. You can
+  source again: the page keeps every name the variable lists. You can
   also save and add the missing name afterwards, but queries to that data
   source fail until you do.
 
@@ -44,7 +44,7 @@ remove the source. Deleting a named source removes its `CUBEJS_DS_<NAME>_*`
 variables. Deleting the **default** source clears only its connection
 variables, since other bare `CUBEJS_*` variables apply to the whole
 deployment; cubes without a `data_source` stop working until you set up a
-new default. Either way, Cube Cloud removes the source's name from
+new default. Either way, the page removes the source's name from
 `CUBEJS_DATASOURCES`.
 
 ## Data sources served by `driver_factory` {#data-sources-served-by-driver_factory}
@@ -57,7 +57,7 @@ including the ones [`driver_factory`](/reference/configuration/config#driver_fac
 The clickhouse data source is missing in the declared CUBEJS_DATASOURCES.
 ```
 
-Cube Cloud adds the data sources your data model uses when it creates the variable (see
+The Data Sources page adds the data sources your data model uses when it creates the variable (see
 [Adding a data source](#adding-a-data-source)). If `driver_factory` serves a data source that
 isn't in the list, such as one no cube uses yet, add its name to `CUBEJS_DATASOURCES` in
 [**Settings → Environment Variables**][ref-config-ref-env]. Names are case-sensitive.
@@ -131,7 +131,7 @@ variables — inspect or hand-edit them from
 
 The default source uses bare `CUBEJS_DB_*` variables; each named source
 uses a `CUBEJS_DS_<NAME>_*` prefix. `CUBEJS_DATASOURCES` lists the data
-sources Cube accepts queries for, and Cube Cloud sets it whenever at least
+sources Cube accepts queries for, and the page sets it whenever at least
 one named source exists:
 
 - The save that creates it, usually adding the first named source, lists
