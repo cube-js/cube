@@ -31,6 +31,8 @@ const MIN_TEST_CONNECTION_TIMEOUT = 45000;
 export class OrchestratorApi {
   private seenDataSources: Record<string, boolean> = {};
 
+  protected released = false;
+
   protected orchestrator: QueryOrchestrator;
 
   protected readonly continueWaitTimeout: number;
@@ -267,7 +269,13 @@ export class OrchestratorApi {
     );
   }
 
+  public isReleased(): boolean {
+    return this.released;
+  }
+
   public async release() {
+    this.released = true;
+
     try {
       return await Promise.all([
         ...Object.keys(this.seenDataSources).map(ds => this.releaseDriver(this.driverFactory, ds)),

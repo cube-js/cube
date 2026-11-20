@@ -136,6 +136,7 @@ export type DatabaseType =
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToGroupsFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
+export type DriverVersionFn = (context: RequestContext) => string | undefined | Promise<string | undefined>;
 export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToPreAggregationOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 
@@ -207,6 +208,11 @@ export interface CreateOptions {
   contextToAppId?: ContextToAppIdFn;
   contextToGroups?: ContextToGroupsFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
+  /**
+   * Version of the credentials `driverFactory` resolves for a context. When it
+   * changes, the orchestrator's cached drivers are rebuilt from the new context.
+   */
+  driverVersion?: DriverVersionFn;
   contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;
   /**
    * Id the pre-aggregation queues of an orchestrator are keyed by. Defaults to
