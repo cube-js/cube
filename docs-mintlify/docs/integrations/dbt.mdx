@@ -238,6 +238,7 @@ defaults below. Options that require Cube to run dbt apply only to the Git sourc
 | **Primary key column suffixes** | `_id` | Comma-separated suffixes treated as key columns, e.g. `_sk, _key`. The default `_id` also matches a column named `id`. Only shown when **Auto-detect primary keys from column names** is on. |
 | **Detect primary keys from `unique` + `not_null` tests** | On | Treats a column carrying both dbt tests as the cube's primary key. Outranks the column-name guess. |
 | **Add default measures** | On | Adds a `count` measure to every cube, and `sum` measures for additive numeric columns. |
+| **Import dbt semantic metrics** | Off | Imports supported simple metrics as Cube measures. The pull stops if any selected metric can't be reproduced exactly. See [below](#import-dbt-semantic-metrics). |
 | **Include descriptions** | On | Carries dbt model and column descriptions into cubes and dimensions. |
 | **Generate joins** | On | Infers joins between cubes from dbt `relationships` tests and foreign-key constraints. |
 | **Also generate reverse joins** | Off | Adds a `one_to_many` join back to the referencing cube, so a query can start from either side. Only shown when **Generate joins** is on. |
@@ -344,6 +345,79 @@ An explicit `data_type` in your dbt YAML still wins; the catalog only fills the 
 - **Best-effort.** If catalog generation or the catalog read fails — no connectivity,
   unbuilt models, unreadable file — it's logged and skipped, and the pull completes on
   declared and name-based types exactly as it would with the option off.
+
+### Import dbt semantic metrics
+
+<Warning>
+
+This option is currently in preview, and its behavior may still change. Reach out to the
+[Cube support team](/admin/account-billing/support) if you run into issues.
+
+</Warning>
+
+Enable this option to bring [dbt semantic metrics](https://docs.getdbt.com/docs/build/metrics-overview) into Cube as measures, so
+you don't define them twice. Your dbt models still compute the columns; each imported
+measure applies the metric's aggregation to one of those columns.
+
+The pull imports a metric only when it can reproduce it exactly. If any metric of a pulled
+model falls outside the supported subset, **the pull fails** and writes no files. The error
+lists every unsupported metric by name with its reason. Cube never generates an approximate
+measure or skips a metric silently. Metrics of models that the pull doesn't generate, for
+example models outside the **Model selector**, are ignored.
+
+Both ways of declaring metrics are supported: dbt 1.12's, where semantics are declared on
+model columns, and the older one, where measures are declared on `semantic_models` and a
+simple metric refers to one of them through `type_params.measure`.
+
+A metric is imported when all of these hold:
+
+- **It's a `simple` metric** of one semantic model, over one dbt model.
+- **Its aggregation is supported:**
+
+  | dbt aggregation | Cube measure type |
+  | --- | --- |
+  | `sum` | `sum` |
+  | `average` | `avg` |
+  | `min` | `min` |
+  | `max` | `max` |
+  | `count_distinct` | `count_distinct` |
+  | `count` | `count` |
+
+- **Its `expr` is a plain column of the dbt model**, not a SQL expression. A `count` metric
+  must use `expr: 1`, because a Cube `count` measure counts rows, not column values.
+- **It uses no modifiers:** no `filter`, `time_granularity`, `fill_nulls_with`,
+  `join_to_timespine`, `non_additive_dimension`, or aggregation parameters such as a
+  percentile.
+- **Its name is a valid Cube member name** and doesn't match a column of the model or
+  another metric on the same model.
+- **Its aggregation time dimension**, if set, is a time column of the same model.
+
+Ratio, derived, cumulative, and conversion metrics are not supported, so a pulled model
+with one of them fails the pull.
+
+Each imported metric becomes a measure on the cube generated from its dbt model:
+
+```yaml
+measures:
+  - name: revenue
+    type: sum
+    sql: "{CUBE}.line_revenue"
+    description: Revenue from order lines
+    meta:
+      dbt:
+        metric_unique_id: metric.jaffle_shop.revenue
+```
+
+- **The name** is the metric's name. An imported measure replaces a default measure with
+  the same name.
+- **The description** is carried over when **Include descriptions** is on.
+- **`meta.dbt.metric_unique_id`** records which dbt metric the measure comes from.
+- **The measure is private** (`public: false`) when the metric is private in dbt or its
+  column sets `meta.cube.public: false`.
+
+With this option on, each sync in the [sync history](#review-sync-history) API
+(`GET /api/v1/deployments/DEPLOYMENT_ID/dbt-sync`) reports how many metrics it imported in
+`stats.importedMetrics`.
 
 ### Cube visibility
 
@@ -867,8 +941,9 @@ has this as a complete CI job.
 
 ## What gets generated
 
-dbt pull converts **models, their columns, and their relationships**. dbt
-**metrics and semantic models are not imported.**
+dbt pull converts **models, their columns, and their relationships**. dbt semantic
+metrics become measures only when you enable
+[Import dbt semantic metrics](#import-dbt-semantic-metrics).
 
 For each dbt model in your project:
 
@@ -898,6 +973,10 @@ For each dbt model in your project:
   | `date`, `datetime`, `timestamp`, `timestamptz`, `time` | `time` |
   | `boolean`, `bool` | `boolean` |
 
+  A column that a dbt semantic model uses as a `time` dimension becomes a `time`
+  dimension too, whether or not metrics are imported. A declared `data_type` or a catalog
+  type still takes precedence.
+
   Vendor spellings and parameters are normalized, so `NUMBER(38,0)`,
   `character varying(256)`, `TIMESTAMP_NTZ(9)`, `INT64`, and `double precision` all map
   as expected.
@@ -907,6 +986,8 @@ For each dbt model in your project:
 - **A `count` measure** is added to every cube.
 - **`total_<column>` sum measures** are added for numeric columns whose names suggest
   an additive metric (names containing `amount`, `price`, `cost`, `total`, or `value`).
+- **Measures from dbt semantic metrics** are added when
+  [Import dbt semantic metrics](#import-dbt-semantic-metrics) is enabled.
 - **Visibility** (`public`) comes from `meta.cube.public` in dbt, then from the
   **Mark pulled cubes as public** option — see [Cube visibility](#cube-visibility).
 - **Primary keys** are detected from dbt `primary_key` constraints, then `unique` +
@@ -1111,8 +1192,9 @@ Each push creates exactly two new files:
 
 - **Supported warehouses:** Snowflake, Amazon Redshift, PostgreSQL, Google
   BigQuery, Databricks, Amazon Athena, and ClickHouse.
-- **Imports models, columns, and relationships only** — not dbt metrics, semantic
-  models, or exposures. Data tests aren't converted into anything either; `unique`,
+- **Imports models, columns, and relationships** — plus simple dbt semantic metrics when
+  [Import dbt semantic metrics](#import-dbt-semantic-metrics) is on. Other metric types,
+  saved queries, and exposures aren't imported. Data tests aren't converted into anything either; `unique`,
   `not_null`, and `relationships` tests are only read as evidence for
   [primary keys](#primary-key-detection) and joins.
 - **Pull is one-directional** — dbt pull never writes back to your dbt repository.
