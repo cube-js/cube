@@ -11,7 +11,7 @@ pub static STARTUPS: Counter = metrics::counter("cs.startup");
 pub static PROCESS_STARTS: Counter = metrics::counter("cs.process.started");
 
 /// Ticks periodically in every live process, tagged like [PROCESS_STARTS]. A counter
-/// rather than a gauge: statsd-exporter keeps serving a dead process's last gauge value.
+/// rather than a gauge: a statsd bridge may keep serving a dead process's last gauge value.
 pub static PROCESS_HEARTBEAT: Counter = metrics::counter("cs.process.heartbeat");
 pub static PROCESS_RSS_BYTES: Gauge = metrics::gauge("cs.process.rss_bytes");
 /// Peak resident set since the process started; catches spikes between samples.

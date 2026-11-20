@@ -3,13 +3,12 @@
 use crate::app_metrics;
 use crate::util::metrics;
 use std::panic::PanicHookInfo;
-use std::sync::{Once, OnceLock};
+use std::sync::Once;
 use std::time::Duration;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// The image build, set by the build pipeline: a release version alone does not tell apart the
-/// builds rolled out between releases.
+/// Identifies builds made between releases, when set at compile time; `unknown` otherwise.
 pub const BUILD_ID: &str = match option_env!("CUBESTORE_BUILD_ID") {
     Some(id) => id,
     None => "unknown",
@@ -17,7 +16,7 @@ pub const BUILD_ID: &str = match option_env!("CUBESTORE_BUILD_ID") {
 
 const SAMPLE_INTERVAL: Duration = Duration::from_secs(15);
 
-/// The same tag names for every process: statsd-exporter can drop samples of a metric whose label
+/// The same tag names for every process: a statsd bridge can drop samples of a metric whose label
 /// names differ from the ones it first saw. `slot` names a pool subprocess, `main` otherwise.
 pub fn identity_tags(role: &str, slot: Option<&str>) -> Vec<String> {
     vec![
@@ -126,9 +125,10 @@ fn parse_memory_status(status: &str) -> Option<MemoryStatus> {
 
 /// OOM kills in this container's memory cgroup so far. Unlike the container restart counter,
 /// they include kills of subprocesses.
+#[cfg(target_os = "linux")]
 pub fn container_oom_kills() -> Option<u64> {
     // Only a file that held the count is remembered, so a transient failure is retried.
-    static SOURCE: OnceLock<&'static str> = OnceLock::new();
+    static SOURCE: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
     if let Some(path) = SOURCE.get() {
         return parse_oom_kills(&std::fs::read_to_string(path).ok()?);
     }
@@ -144,6 +144,12 @@ pub fn container_oom_kills() -> Option<u64> {
     })
 }
 
+#[cfg(not(target_os = "linux"))]
+pub fn container_oom_kills() -> Option<u64> {
+    None
+}
+
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn parse_oom_kills(content: &str) -> Option<u64> {
     content
         .lines()
