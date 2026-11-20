@@ -134,6 +134,15 @@ Publication can't use a connection that
 and sync run without a user for the factory to act for. Give the integration its own Databricks
 service principal instead. Your users' queries keep going through `driver_factory`.
 
+<Warning>
+
+Don't give the data source a service principal with **+ Add data source** or **Edit**. The
+Databricks driver prefers a data source's OAuth client variables over the per-user `token` that
+`driver_factory` returns, so every query on it would run as the service principal. See
+[Data sources served by `driver_factory`](/admin/connect-to-data/multiple-data-sources#data-sources-served-by-driver_factory).
+
+</Warning>
+
 1. In Databricks, create a
    [service principal with an OAuth secret](https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m)
    and grant it the privileges listed in [Before you start](#before-you-start).
