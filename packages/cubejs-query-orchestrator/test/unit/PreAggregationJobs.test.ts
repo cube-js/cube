@@ -497,8 +497,6 @@ describe('pre-aggregation build jobs', () => {
     expect(status).toEqual('done');
   });
 
-  // A partially built external table must not be left behind: it is the newest
-  // version of the partition and would shadow the previous correct table forever.
   describe('without force', () => {
     const buildAndWait = async (requestId: string, preAggregation = PRE_AGGREGATION) => {
       const [{ targetTableName, queryKey }] = await orchestrator.fetchQuery(jobQuery(requestId, { preAggregation }));
@@ -595,6 +593,8 @@ describe('pre-aggregation build jobs', () => {
     });
   });
 
+  // A partially built external table must not be left behind: it is the newest
+  // version of the partition and would shadow the previous correct table forever.
   test('failed external import drops the partially built table', async () => {
     externalMockDriver.importBehavior = 'fail';
 

@@ -237,6 +237,8 @@ type PreAggJobStatusItem = PreAggJobStatusItemNotFound | PreAggJobStatusItemFoun
 
 /**
  * A dry-run post's answer for one partition: no job is queued, so no token.
+ * `table` is the built table only for `done`; otherwise it is a placeholder
+ * that a later build won't use.
  */
 type PreAggJobDryRunItem = Omit<PreAggJobStatusItemFound, 'token'> & {
   status: 'done' | 'outdated' | 'missing_partition';

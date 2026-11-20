@@ -900,7 +900,9 @@ these statuses:
 | `missing_partition` | No version of the partition is built |
 
 The current version is the one the refresh key yields now, so a dry run
-evaluates refresh keys in the data source, like a build does.
+evaluates refresh keys in the data source, like a build does. `table` names the
+built table only for `done`; for other statuses it is a placeholder that a
+later build won't use.
 
 ### Retrieving statuses of jobs
 
