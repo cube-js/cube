@@ -25,6 +25,7 @@ pub mod oidc;
 pub mod onboarding;
 pub mod ossie;
 pub mod policies;
+pub mod query_history;
 pub mod regions;
 pub mod reports;
 pub mod roles;
