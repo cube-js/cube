@@ -338,7 +338,7 @@ export class PreAggregations {
 
   private readonly touchCache: LRUCache<string, true>;
 
-  private refreshActiveMarkedAt: number = 0;
+  protected refreshActiveMarkedAt: number = 0;
 
   public constructor(
     private readonly redisPrefix: string,
