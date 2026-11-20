@@ -512,6 +512,8 @@ describe('pre-aggregation build jobs', () => {
       await delay(200);
       expect(externalMockDriver.tables).toEqual([]);
       expect(externalMockDriver.schema).toBeUndefined();
+      // Nor marks its placeholder table as used
+      expect(await orchestrator.getPreAggregations().tablesUsed()).toEqual([]);
     });
 
     test('a dry run reports the built target version as done', async () => {

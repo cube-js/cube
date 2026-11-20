@@ -746,7 +746,8 @@ export class PreAggregations {
             dataSource: p.dataSource || 'default',
             timezone: p.timezone,
           };
-          if (!usedPreAggregation.isMultiTableUnion) {
+          // A dry run touches nothing, and its unbuilt tables are placeholders
+          if (!usedPreAggregation.isMultiTableUnion && !queryBody.dryRun) {
             await this.addTableUsed(usedPreAggregation.targetTableName);
           }
 
