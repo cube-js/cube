@@ -453,3 +453,33 @@ describe('resolveDateRange', () => {
     expect(resolveDateRange(undefined, 'UTC')).toBeUndefined();
   });
 });
+
+describe('invalid absolute dates', () => {
+  test.each([
+    ['inDateRange', ['2026-13-45', '2026-14-01']],
+    ['notInDateRange', ['2026-01-01', '2026-02-30']],
+    ['inDateRange', ['2026-02-30']],
+    ['beforeDate', ['2026-01-01T25:00:00']],
+    ['afterOrOnDate', ['2026-01-01 10:61']],
+    ['afterDate', ['2026-00-10']],
+  ])('%s with %j is a user error', (operator, values) => {
+    // Why: these match the absolute-date shape and used to reach the planners
+    // unparsed, failing there with an opaque 500.
+    expect(() => normalizeDateFilterValues({ member: 'Orders.createdAt', operator, values }, 'UTC'))
+      .toThrow(expect.objectContaining({ status: 400, message: expect.stringMatching(/Invalid date/) }));
+  });
+
+  test.each([
+    ['inDateRange', ['2024-02-29', '2024-03-01']],
+    ['beforeDate', ['2026-01-01T23:59:59.999']],
+    ['afterDate', ['2026-01-01T10:00:00Z']],
+    ['afterOrOnDate', ['2026-01-01 10:00+02:00']],
+  ])('%s with %j passes through', (operator, values) => {
+    expect(normalizeDateFilterValues({ member: 'Orders.createdAt', operator, values }, 'UTC').values).toEqual(values);
+  });
+
+  test('values of other operators are not dates', () => {
+    expect(normalizeDateFilterValues({ member: 'Orders.code', operator: 'equals', values: ['2026-13-45'] }, 'UTC').values)
+      .toEqual(['2026-13-45']);
+  });
+});
