@@ -269,7 +269,7 @@ Saving the filter fits it to the new type:
 - It keeps its operator if the new type [offers it](#operators-by-dimension-type). Otherwise, it switches to the new type's default operator: for example, `contains` on a String dimension becomes `is` on a Number one.
 - Its **Default value** is cleared.
 
-A [field switcher](#choosing-what-it-switches) with an alternative that became Time shows a warning too. Saving it removes the field from **Alternatives**, and if that field was the [default option](#field-switcher-default-option), the switcher opens on the member it replaces again.
+A [field switcher](#choosing-what-it-switches) with an alternative that became Time shows a warning too. Saving it removes the field from **Alternatives**, and if that field was the [default option](#field-switcher-default-option), the switcher opens on the member it replaces, as it does with no default option.
 
 Until you save each flagged control, the builder doesn't publish the dashboard or send it for [review][ref-reviews], and says which controls to save. A dashboard published through the API or by the [agent][ref-dashboard-agent], or copied along with its workbook, keeps such a control as it was saved, with the field's previous expression and type, so it runs as before the change.
 
