@@ -180,6 +180,17 @@ type PreAggsSelector = {
   cubes?: string[],
   preAggregations?: string[],
   dateRange?: [string, string], // We expect only single date Range for rebuilding
+  /**
+   * `true` (the default) rebuilds every selected partition. `false` builds only
+   * the partitions whose current version is not the one their refresh keys call
+   * for; a job for an up-to-date partition reports `done` without a build.
+   */
+  force?: boolean,
+  /**
+   * Builds nothing: the post answers with each partition's version status,
+   * `done`, `outdated` or `missing_partition`, instead of job tokens.
+   */
+  dryRun?: boolean,
 };
 
 /**
@@ -224,6 +235,13 @@ type PreAggJobStatusItemFound = {
 
 type PreAggJobStatusItem = PreAggJobStatusItemNotFound | PreAggJobStatusItemFound;
 
+/**
+ * A dry-run post's answer for one partition: no job is queued, so no token.
+ */
+type PreAggJobDryRunItem = Omit<PreAggJobStatusItemFound, 'token'> & {
+  status: 'done' | 'outdated' | 'missing_partition';
+};
+
 type PreAggJobStatusObject = {
   [token: string]: Omit<PreAggJobStatusItem, 'token'>
 };
@@ -252,6 +270,7 @@ export type {
   PreAggsSelector,
   PreAggJob,
   PreAggJobStatusItem,
+  PreAggJobDryRunItem,
   PreAggJobStatusObject,
   PreAggJobStatusResponse,
 };

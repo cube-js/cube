@@ -155,18 +155,33 @@ const PRE_AGGREGATION: Partial<PreAggregationDescription> = {
   timezone: 'UTC',
 };
 
-const jobQuery = (requestId: string) => ({
+const jobQuery = (
+  requestId: string,
+  { preAggregation = PRE_AGGREGATION, force = true, dryRun = false }: {
+    preAggregation?: Partial<PreAggregationDescription>,
+    force?: boolean,
+    dryRun?: boolean,
+  } = {},
+) => ({
   // The jobs API posts a build query without `query`
   values: [] as string[],
   cacheKeyQueries: { queries: [] as QueryWithParams[] },
-  preAggregations: [PRE_AGGREGATION as PreAggregationDescription],
+  preAggregations: [preAggregation as PreAggregationDescription],
   continueWait: true,
   renewQuery: true,
   requestId,
   isJob: true,
-  forceBuildPreAggregations: true,
+  forceBuildPreAggregations: force && !dryRun,
+  dryRun,
   external: true,
 });
+
+// The same pre-aggregation after its refresh key moved: the key query returns
+// another value, so the content version changes while the structure does not.
+const PRE_AGGREGATION_KEY_MOVED: Partial<PreAggregationDescription> = {
+  ...PRE_AGGREGATION,
+  invalidateKeyQueries: [['SELECT \'next refresh key\'', [], { renewalThreshold: 21600 }]],
+};
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -458,6 +473,76 @@ describe('pre-aggregation build jobs', () => {
 
   // A partially built external table must not be left behind: it is the newest
   // version of the partition and would shadow the previous correct table forever.
+  describe('without force', () => {
+    const buildAndWait = async (requestId: string, preAggregation = PRE_AGGREGATION) => {
+      const [{ targetTableName, queryKey }] = await orchestrator.fetchQuery(jobQuery(requestId, { preAggregation }));
+      expect(await pollUntilSettled(requestId, targetTableName, queryKey)).toEqual('done');
+      return targetTableName;
+    };
+
+    test('a dry run reports a partition that was never built and builds nothing', async () => {
+      const [job] = await orchestrator.fetchQuery(jobQuery('dry run, nothing built', { dryRun: true }));
+
+      expect(job.versionStatus).toEqual('missing_partition');
+      expect(job.targetTableName).toMatch(/^stb_pre_aggregations\.orders_month_/);
+      await delay(200);
+      expect(externalMockDriver.tables).toEqual([]);
+      expect(externalMockDriver.schema).toBeUndefined();
+    });
+
+    test('a dry run reports the built target version as done', async () => {
+      const built = await buildAndWait('build before dry run');
+
+      const [job] = await orchestrator.fetchQuery(jobQuery('dry run, built', { dryRun: true }));
+
+      expect(job.versionStatus).toEqual('done');
+      expect(job.targetTableName).toEqual(built);
+    });
+
+    test('a dry run reports a partition as outdated once its refresh key moves', async () => {
+      const built = await buildAndWait('build before key moves');
+
+      const [job] = await orchestrator.fetchQuery(
+        jobQuery('dry run, key moved', { preAggregation: PRE_AGGREGATION_KEY_MOVED, dryRun: true })
+      );
+
+      expect(job.versionStatus).toEqual('outdated');
+      expect(job.targetTableName).not.toEqual(built);
+      await delay(200);
+      expect(externalMockDriver.tables).toEqual([built]);
+    });
+
+    test('a job for an up-to-date partition reports it without a rebuild', async () => {
+      const built = await buildAndWait('build before unforced job');
+
+      const [{ targetTableName, queryKey }] = await orchestrator.fetchQuery(
+        jobQuery('unforced job, up to date', { force: false })
+      );
+
+      expect(targetTableName).toEqual(built);
+      expect(await pollUntilSettled('unforced job, up to date', targetTableName, queryKey)).toEqual('done');
+      await delay(200);
+      expect(externalMockDriver.tables).toEqual([built]);
+    });
+
+    test('a job for an outdated partition builds its target version', async () => {
+      const built = await buildAndWait('build before key moves for unforced job');
+
+      const [{ targetTableName, queryKey }] = await orchestrator.fetchQuery(
+        jobQuery('unforced job, key moved', { preAggregation: PRE_AGGREGATION_KEY_MOVED, force: false })
+      );
+
+      expect(targetTableName).not.toEqual(built);
+      expect(await pollUntilSettled('unforced job, key moved', targetTableName, queryKey)).toEqual('done');
+
+      const [dryRun] = await orchestrator.fetchQuery(
+        jobQuery('dry run after unforced build', { preAggregation: PRE_AGGREGATION_KEY_MOVED, dryRun: true })
+      );
+      expect(dryRun.versionStatus).toEqual('done');
+      expect(dryRun.targetTableName).toEqual(targetTableName);
+    });
+  });
+
   test('failed external import drops the partially built table', async () => {
     externalMockDriver.importBehavior = 'fail';
 

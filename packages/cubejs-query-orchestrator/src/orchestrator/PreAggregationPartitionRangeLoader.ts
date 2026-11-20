@@ -48,6 +48,7 @@ export interface PreAggsPartitionRangeLoaderOpts {
   orphanedTimeout?: number;
   lambdaQuery?: LambdaQuery;
   isJob?: boolean;
+  dryRun?: boolean;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 }
 

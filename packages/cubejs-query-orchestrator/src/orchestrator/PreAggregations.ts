@@ -181,6 +181,8 @@ const PRE_AGG_BUILD_STATUS_PERSIST_TIME = 86400;
  */
 const ABANDONED_BUILD_TIMEOUT_FACTOR = 2;
 
+export type PreAggregationVersionStatus = 'done' | 'outdated' | 'missing_partition';
+
 export type LoadPreAggregationResult = {
   targetTableName: string;
   refreshKeyValues: unknown[];
@@ -194,6 +196,12 @@ export type LoadPreAggregationResult = {
    */
   preAggregationId?: string;
   type?: PreAggregationType;
+  /**
+   * Set by a dry-run build job only: whether the partition already has the
+   * version its current refresh keys call for (`done`), only an older version
+   * of the same structure (`outdated`), or nothing built (`missing_partition`).
+   */
+  versionStatus?: PreAggregationVersionStatus;
   lambdaTable?: InlineTable;
   queryKey?: PreAggregationQueryKey;
   rollupLambdaId?: string;
@@ -715,6 +723,7 @@ export class PreAggregations {
             maxPartitions: this.options.maxPartitions,
             maxSourceRowLimit: this.options.maxSourceRowLimit,
             isJob: queryBody.isJob,
+            dryRun: queryBody.dryRun,
             waitForRenew: queryBody.cacheMode === 'must-revalidate',
             // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
             forceBuild: i === preAggregations.length - 1 ? queryBody.forceBuildPreAggregations : false,

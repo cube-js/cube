@@ -49,6 +49,11 @@ type QueryOptions = {
 
 export type PreAggregationLoaderOptions = {
   isJob?: boolean;
+  /**
+   * A build job that only reports whether the partition has its target version,
+   * without building anything. Takes effect together with `isJob`.
+   */
+  dryRun?: boolean;
   waitForRenew?: boolean;
   forceBuild?: boolean;
   orphanedTimeout?: number;
@@ -102,6 +107,8 @@ export class PreAggregationLoader {
    */
   private readonly isJob: boolean;
 
+  protected readonly dryRun: boolean;
+
   private readonly waitForRenew: boolean;
 
   private readonly forceBuild: boolean;
@@ -134,6 +141,7 @@ export class PreAggregationLoader {
     this.preAggregation = preAggregation;
     this.preAggregationsTablesToTempTables = preAggregationsTablesToTempTables;
     this.isJob = !!options.isJob;
+    this.dryRun = this.isJob && !!options.dryRun;
     this.waitForRenew = options.waitForRenew;
     this.forceBuild = options.forceBuild;
     this.orphanedTimeout = options.orphanedTimeout;
@@ -239,6 +247,11 @@ export class PreAggregationLoader {
     const getVersionEntryByContentVersion = ({ byContent }: VersionEntriesObj) => byContent[`${this.preAggregation.tableName}_${contentVersion}`];
 
     const versionEntryByContentVersion = getVersionEntryByContentVersion(versionEntries);
+
+    if (this.dryRun) {
+      return this.dryRunResult(versionEntries, versionEntryByContentVersion, structureVersion, contentVersion);
+    }
+
     if (versionEntryByContentVersion && !this.forceBuild) {
       const targetTableName = this.targetTableName(versionEntryByContentVersion);
       // No need to block here
@@ -251,7 +264,9 @@ export class PreAggregationLoader {
       };
     }
 
-    if (!this.waitForRenew && !this.forceBuild) {
+    // A job is asked for the version its refresh keys call for: never answer it
+    // with an older version of the same structure.
+    if (!this.waitForRenew && !this.forceBuild && !this.isJob) {
       const versionEntryByStructureVersion = versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (versionEntryByStructureVersion) {
         const targetTableName = this.targetTableName(versionEntryByStructureVersion);
@@ -305,8 +320,10 @@ export class PreAggregationLoader {
       };
     };
 
-    if (this.forceBuild) {
-      this.logger('Force build pre-aggregation', {
+    // A job builds its target version whether forced or not: without `forceBuild`
+    // it only gets here when that version is not built yet.
+    if (this.forceBuild || this.isJob) {
+      this.logger(this.forceBuild ? 'Force build pre-aggregation' : 'Build pre-aggregation for a job', {
         preAggregation: this.preAggregation,
         requestId: this.requestId,
         metadata: this.metadata,
@@ -381,6 +398,45 @@ export class PreAggregationLoader {
       refreshKeyValues: [],
       lastUpdatedAt: versionEntry.last_updated_at,
       buildRangeEnd: versionEntry.build_range_end,
+    };
+  }
+
+  /**
+   * A dry-run job's answer: the partition's target version, the one its current
+   * refresh keys call for, and whether it is built. Nothing is built or touched.
+   */
+  protected dryRunResult(
+    versionEntries: VersionEntriesObj,
+    versionEntryByContentVersion: VersionEntry | undefined,
+    structureVersion: string,
+    contentVersion: string,
+  ): LoadPreAggregationResult {
+    if (versionEntryByContentVersion) {
+      return {
+        targetTableName: this.targetTableName(versionEntryByContentVersion),
+        refreshKeyValues: [],
+        lastUpdatedAt: versionEntryByContentVersion.last_updated_at,
+        buildRangeEnd: versionEntryByContentVersion.build_range_end,
+        versionStatus: 'done',
+      };
+    }
+
+    // The table the target version would be built into, dated now
+    const targetVersionEntry: VersionEntry = {
+      table_name: this.preAggregation.tableName,
+      structure_version: structureVersion,
+      content_version: contentVersion,
+      last_updated_at: new Date().getTime(),
+      naming_version: 2,
+    };
+    const builtStructure = versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
+
+    return {
+      targetTableName: this.targetTableName(targetVersionEntry),
+      refreshKeyValues: [],
+      lastUpdatedAt: targetVersionEntry.last_updated_at,
+      buildRangeEnd: this.preAggregation.buildRangeEnd,
+      versionStatus: builtStructure ? 'outdated' : 'missing_partition',
     };
   }
 
