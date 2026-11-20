@@ -8,6 +8,7 @@ import type { NormalizedQuery } from '@cubejs-backend/api-gateway';
 import {
   PreAggregationDescription,
   PreAggregationPartitionRangeLoader,
+  PreAggregationVersionStatus,
   QueuePriority
 } from '@cubejs-backend/query-orchestrator';
 
@@ -85,7 +86,7 @@ type JobedPreAggregation = {
   timezone: string,
   dataSource: string,
   /** Set on a dry run: `done`, `outdated` or `missing_partition`. */
-  versionStatus?: string,
+  versionStatus?: PreAggregationVersionStatus,
 };
 
 type PreAggJob = {

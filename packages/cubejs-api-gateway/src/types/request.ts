@@ -8,6 +8,7 @@
 import type { Request as ExpressRequest } from 'express';
 import type { DataResult } from '@cubejs-backend/native';
 import { CacheMode } from '@cubejs-backend/shared';
+import type { PreAggregationVersionStatus } from '@cubejs-backend/query-orchestrator';
 import { RequestType, ApiType, ResultType } from './strings';
 import { Query } from './query';
 
@@ -241,7 +242,7 @@ type PreAggJobStatusItem = PreAggJobStatusItemNotFound | PreAggJobStatusItemFoun
  * that a later build won't use.
  */
 type PreAggJobDryRunItem = Omit<PreAggJobStatusItemFound, 'token'> & {
-  status: 'done' | 'outdated' | 'missing_partition';
+  status: PreAggregationVersionStatus;
 };
 
 type PreAggJobStatusObject = {
