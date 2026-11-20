@@ -1,6 +1,6 @@
 /* globals describe,test,expect,jest,beforeEach,afterEach */
 
-import { normalizeQuery, normalizeDateFilterValues, resolveDateRange } from '../src/query';
+import { normalizeQuery, normalizeDateFilterValues, resolveDateRange, isValidAbsoluteDateTime } from '../src/query';
 
 // Tests for filter-leaf date-range resolution at the gateway. This mirrors
 // what `timeDimensions.dateRange` has always done: a single relative string
@@ -480,5 +480,58 @@ describe('invalid absolute dates', () => {
   test('values of other operators are not dates', () => {
     expect(normalizeDateFilterValues({ member: 'Orders.code', operator: 'equals', values: ['2026-13-45'] }, 'UTC').values)
       .toEqual(['2026-13-45']);
+  });
+});
+
+describe('isValidAbsoluteDateTime', () => {
+  test.each([
+    // Dates
+    '2026-01-01',
+    '2026-12-31',
+    '2026-04-30',
+    '2024-02-29', // leap year
+    '2000-02-29', // divisible by 400
+    '0001-01-01',
+    '9999-12-31',
+    // Times, with either separator
+    '2026-01-01T00:00',
+    '2026-01-01T23:59',
+    '2026-01-01T23:59:59',
+    '2026-01-01 23:59:59',
+    '2026-01-01T23:59:59.999',
+    '2026-01-01T23:59:59.999999',
+    // Zones
+    '2026-01-01T10:00:00Z',
+    '2026-01-01T10:00:00+02:00',
+    '2026-01-01T10:00:00-0530',
+    '2026-01-01T10:00+02',
+  ])('%s is valid', (value) => {
+    expect(isValidAbsoluteDateTime(value)).toBe(true);
+  });
+
+  test.each([
+    // Months
+    '2026-00-10',
+    '2026-13-10',
+    // Days
+    '2026-01-00',
+    '2026-01-32',
+    '2026-04-31', // 30-day month
+    '2026-02-30',
+    '2023-02-29', // not a leap year
+    '1900-02-29', // divisible by 100, not by 400
+    // Times
+    '2026-01-01T24:00:00',
+    '2026-01-01T25:00',
+    '2026-01-01T10:60',
+    '2026-01-01 10:61',
+    '2026-01-01T10:00:60',
+    '2026-01-01T99:99:99',
+    // Not shaped like a date
+    '',
+    'last 2 weeks',
+    '26-01-01',
+  ])('%s is invalid', (value) => {
+    expect(isValidAbsoluteDateTime(value)).toBe(false);
   });
 });

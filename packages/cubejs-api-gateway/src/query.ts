@@ -330,7 +330,7 @@ const DATE_OPERATORS = [...DATE_RANGE_OPERATORS, 'onTheDate', ...START_DATE_OPER
 
 // Whether a value shaped like an absolute date or timestamp names a real one
 // (AbsoluteDateTimeRegex checks the shape only, so 2024-13-45 or 25:00 match it).
-const isValidAbsoluteDateTime = (value: string): boolean => {
+export const isValidAbsoluteDateTime = (value: string): boolean => {
   const [, date, hours = '00', minutes = '00', seconds = '00'] =
     /^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(value) ?? [];
 
