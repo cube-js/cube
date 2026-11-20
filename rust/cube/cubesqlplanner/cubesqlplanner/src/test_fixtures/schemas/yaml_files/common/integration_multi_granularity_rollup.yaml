@@ -20,6 +20,10 @@ cubes:
             interval: 12 hours
             origin: "2024-07-01"
 
+      - name: cohort_date_alias
+        sql: "{cohort_date}"
+        type: time
+
       - name: cohort_date_shifted
         sql: "{cohort_date} + INTERVAL '12 hours'"
         type: time

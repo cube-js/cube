@@ -33,8 +33,8 @@ pub struct SqlNodesFactory {
     // keys are shifted there.
     joined_cube: Option<CubeId>,
     filter_params_time_shifts: FilterParamsTimeShifts,
-    pre_aggregation_dimensions_references: PreAggregationColumns,
-    pre_aggregation_measures_references: PreAggregationColumns,
+    pre_aggregation_dimensions_references: Rc<PreAggregationColumns>,
+    pre_aggregation_measures_references: Rc<PreAggregationColumns>,
     cube_name_references: HashMap<CubeId, String>,
     use_local_tz_in_date_range: bool,
     original_sql_pre_aggregations: HashMap<CubeId, String>,
@@ -181,7 +181,7 @@ impl SqlNodesFactory {
         !self.pre_aggregation_dimensions_references.is_empty()
     }
 
-    pub fn pre_aggregation_dimensions_references(&self) -> &PreAggregationColumns {
+    pub fn pre_aggregation_dimensions_references(&self) -> &Rc<PreAggregationColumns> {
         &self.pre_aggregation_dimensions_references
     }
 
@@ -190,8 +190,7 @@ impl SqlNodesFactory {
         name: String,
         column: QualifiedColumnName,
     ) {
-        self.pre_aggregation_dimensions_references
-            .insert(name, column);
+        Rc::make_mut(&mut self.pre_aggregation_dimensions_references).insert(name, column);
     }
 
     pub fn add_pre_aggregation_time_dimension_reference(
@@ -200,8 +199,11 @@ impl SqlNodesFactory {
         column: QualifiedColumnName,
         granularity: Option<Granularity>,
     ) {
-        self.pre_aggregation_dimensions_references
-            .insert_grain(name, column, granularity);
+        Rc::make_mut(&mut self.pre_aggregation_dimensions_references).insert_grain(
+            name,
+            column,
+            granularity,
+        );
     }
 
     pub fn set_original_sql_pre_aggregations(&mut self, value: HashMap<CubeId, String>) {
@@ -213,8 +215,7 @@ impl SqlNodesFactory {
         name: String,
         column: QualifiedColumnName,
     ) {
-        self.pre_aggregation_measures_references
-            .insert(name, column);
+        Rc::make_mut(&mut self.pre_aggregation_measures_references).insert(name, column);
     }
 
     pub fn set_cube_name_references(&mut self, value: HashMap<CubeId, String>) {

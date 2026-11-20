@@ -95,11 +95,11 @@ impl PreAggregationColumns {
 /// falling through to `input` for any other member.
 pub struct PreAggregationColumnSqlNode {
     input: Rc<dyn SqlNode>,
-    columns: PreAggregationColumns,
+    columns: Rc<PreAggregationColumns>,
 }
 
 impl PreAggregationColumnSqlNode {
-    pub fn new(input: Rc<dyn SqlNode>, columns: PreAggregationColumns) -> Rc<Self> {
+    pub fn new(input: Rc<dyn SqlNode>, columns: Rc<PreAggregationColumns>) -> Rc<Self> {
         Rc::new(Self { input, columns })
     }
 

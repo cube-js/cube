@@ -417,10 +417,9 @@ impl<'a> DimensionMatcher<'a> {
             for entry in entries.iter() {
                 let td = &entry.symbol;
                 let derives = if let Some((from, to)) = &range {
-                    !is_sql_granularity(td)
-                        && td.granularity_obj().as_ref().is_some_and(|grain| {
-                            grain.bounds_on_grain(from, to, tz).unwrap_or(false)
-                        })
+                    td.granularity_obj()
+                        .as_ref()
+                        .is_some_and(|grain| grain.bounds_on_grain(from, to, tz).unwrap_or(false))
                 } else if is_exact(td) {
                     true
                 } else if is_sql_defined_granularity

@@ -5,7 +5,10 @@ use crate::{
 };
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 use typed_builder::TypedBuilder;
 
 /// A matched pre-aggregation usable as a query source — its table
@@ -176,14 +179,19 @@ impl PreAggregation {
         res
     }
 
-    /// The grain columns of the stored time dimensions, keyed by their base
-    /// member. They are apart from `all_dimensions_refererences` because a
-    /// member may also be stored raw, as a dimension, under the same key.
     /// The grain column of each stored time dimension, with its granularity
-    /// where one is known, in declaration order.
+    /// where one is known, in declaration order, followed by the columns of a
+    /// rollupJoin's keys. A member may also be stored raw under the same name.
     pub fn time_dimensions_references(
         &self,
     ) -> Vec<(String, QualifiedColumnName, Option<Granularity>)> {
+        let join_keys = match self.source().as_ref() {
+            PreAggregationSource::Join(join) => join
+                .key_members()
+                .map(|member| member.symbol.peel_refs().id().clone())
+                .collect(),
+            _ => HashSet::new(),
+        };
         let mut res = Vec::new();
         for dim in self.time_dimensions().iter() {
             let (base_symbol, granularity, granularity_obj) =
@@ -196,6 +204,10 @@ impl PreAggregation {
                 } else {
                     (dim.clone(), None, None)
                 };
+            // The legs store a key in a column of their own, added below.
+            if join_keys.contains(base_symbol.peel_refs().id()) {
+                continue;
+            }
             let suffix = if let Some(granularity) = &granularity {
                 format!("_{}", granularity.clone())
             } else {

@@ -297,3 +297,38 @@ async fn test_rollup_join_date_filter_on_a_truncated_key_needs_bounds_on_its_gra
         assert_eq!(rollup, source, "{operator} {values}; SQL:\n{sql}");
     }
 }
+
+// The legs store the key only plainly, so a date filter on it reads the key's
+// column whatever grain the rollupJoin declares for it.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rollup_join_date_filter_on_a_plainly_stored_key_reads_its_column() {
+    const YAML: &str = "common/rollup_join_time_dimension_key_stored_plainly.yaml";
+    const SEED: &str = "rollup_join_time_dimension_key_tables.sql";
+    let ctx = |pre_aggs: &[&str]| {
+        TestContext::new(MockSchema::from_yaml_file(YAML).only_pre_aggregations(pre_aggs)).unwrap()
+    };
+    for timezone in ["UTC", "America/Los_Angeles", "Asia/Kamchatka"] {
+        for (operator, values) in [
+            ("inDateRange", "['2026-01-01', '2026-03-31']"),
+            ("afterDate", "['2026-01-01']"),
+        ] {
+            let query = format!(
+                "measures:\n  - td_facts.total_amount\ndimensions:\n  - td_dates.quarter_label\n\
+                 filters:\n  - member: td_facts.day\n    operator: {operator}\n    values: {values}\n\
+                 timezone: {timezone}\n"
+            );
+            let served = ctx(&["td_rollup_join", "td_dates_rollup", "td_facts_rollup"]);
+            let (sql, usages) = served.build_sql_with_used_pre_aggregations(&query).unwrap();
+            assert!(
+                usages.iter().any(|u| u.name() == "td_rollup_join"),
+                "expected the rollupJoin to serve the query; SQL:\n{sql}"
+            );
+            let rollup = served.try_execute_pg(&query, SEED).await;
+            let source = ctx(&[]).try_execute_pg(&query, SEED).await;
+            assert_eq!(
+                rollup, source,
+                "{timezone} {operator} {values}; SQL:\n{sql}"
+            );
+        }
+    }
+}

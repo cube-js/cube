@@ -261,6 +261,10 @@ impl Granularity {
     /// Whether both ends of the inclusive range `[from, to]` fall on a bucket
     /// boundary of this granularity in `tz`.
     pub fn bounds_on_grain(&self, from: &str, to: &str, tz: Tz) -> Result<bool, CubeError> {
+        // A `sql` grain's buckets come from a calendar table, not from its interval.
+        if self.calendar_sql.is_some() {
+            return Ok(false);
+        }
         let on_grain = |date: QueryDateTime| -> Result<bool, CubeError> {
             if self.is_predefined_granularity {
                 date.is_start_of(&self.granularity)

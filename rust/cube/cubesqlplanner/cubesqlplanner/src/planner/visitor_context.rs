@@ -1,6 +1,7 @@
 use crate::physical_plan::sql_nodes::PreAggregationColumns;
 use crate::planner::sql_call::SqlCallFilterParamsItem;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Default)]
 pub struct FiltersContext {
@@ -14,5 +15,5 @@ pub struct FiltersContext {
     /// as a bare predicate (e.g. MSSQL `BIT` needs `= 1`).
     pub reading_pre_aggregation: bool,
     /// The rollup columns members resolve to; empty outside a rollup read.
-    pub pre_aggregation_columns: PreAggregationColumns,
+    pub pre_aggregation_columns: Rc<PreAggregationColumns>,
 }

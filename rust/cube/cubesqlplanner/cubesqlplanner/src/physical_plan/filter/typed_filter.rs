@@ -1,7 +1,7 @@
 use super::operators::{FilterOperationSql, FilterSqlContext};
 use super::ToSql;
 use crate::cube_bridge::member_sql::FilterParamsColumn;
-use crate::physical_plan::sql_nodes::SqlNode;
+use crate::physical_plan::sql_nodes::{PreAggregationColumns, SqlNode};
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::filter::typed_filter::{
     resolve_base_symbol, FilterOp, RollingScanBand, TypedFilter,
@@ -9,8 +9,8 @@ use crate::planner::filter::typed_filter::{
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call::SqlCallFilterParamsItem;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::FiltersContext;
 use crate::planner::SqlInterval;
+use crate::planner::{FiltersContext, MemberSymbol};
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -46,10 +46,13 @@ impl ToSql for TypedFilter {
             }
             _ => None,
         };
-        let (visitor, reads_grain) = if !filters_ctx.use_local_tz || !columns.has_grain(&name) {
+        let (visitor, reads_grain) = if !filters_ctx.use_local_tz {
             (visitor.clone(), false)
         } else if self.member_evaluator().as_time_dimension().is_ok() {
-            (visitor.with_time_dimension_read(), true)
+            let reads_grain = reads_a_grain_column(columns, &resolved);
+            (visitor.with_time_dimension_read(), reads_grain)
+        } else if !columns.has_grain(&name) {
+            (visitor.clone(), false)
         } else if let Some(column) = aligned_grain {
             (visitor.with_stored_column(name, column.clone()), true)
         } else if !columns.has_raw(&name) {
@@ -69,6 +72,19 @@ impl ToSql for TypedFilter {
 
         dispatch_to_sql(self.operation(), &ctx)
     }
+}
+
+// A member computed from stored ones reads a grain column through any of them.
+fn reads_a_grain_column(columns: &PreAggregationColumns, member: &Rc<MemberSymbol>) -> bool {
+    let member = member.peel_refs();
+    let name = member.full_name();
+    if columns.contains_key(&name) {
+        return columns.has_grain(&name);
+    }
+    member
+        .get_dependencies()
+        .iter()
+        .any(|dependency| reads_a_grain_column(columns, dependency))
 }
 
 impl TypedFilter {

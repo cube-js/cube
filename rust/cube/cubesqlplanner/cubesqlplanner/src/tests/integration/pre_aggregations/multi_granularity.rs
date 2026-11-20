@@ -911,3 +911,28 @@ async fn date_filter_on_a_grain_the_time_dimension_drops_reads_the_raw_column() 
         }
     }
 }
+
+// A member computed from the stored one reads its columns, so its range takes
+// the timezone of the column it lands on.
+#[tokio::test(flavor = "multi_thread")]
+async fn date_range_on_a_member_computed_from_the_stored_one() {
+    for pre_agg in ["week_and_month", "raw_week_and_month"] {
+        for timezone in ["UTC", "America/Los_Angeles", "Asia/Kamchatka"] {
+            let query = formatdoc! {r#"
+                measures:
+                  - activity.count
+                  - activity.amount
+                time_dimensions:
+                  - dimension: activity.cohort_date_alias
+                    granularity: month
+                    dateRange:
+                      - "2025-01-01"
+                      - "2025-01-31"
+                timezone: "{timezone}"
+            "#};
+            if let Some((rollup, source)) = rollup_vs_source(&query, pre_agg).await {
+                assert_eq!(rollup, source, "{pre_agg} {timezone}");
+            }
+        }
+    }
+}
