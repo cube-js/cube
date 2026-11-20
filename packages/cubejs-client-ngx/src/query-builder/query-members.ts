@@ -8,7 +8,7 @@ import {
   BinaryFilter,
 } from '@cubejs-client/core';
 import { BehaviorSubject } from 'rxjs';
-import equal from 'fast-deep-equal/es6';
+import equal from 'fast-deep-equal/es6/index.js';
 
 import { Query } from './query';
 
