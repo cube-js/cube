@@ -26,6 +26,7 @@ use crate::cluster::worker_services::{
     Callable, Configurator, ServicesServer, ServicesTransport, WorkerProcessing,
 };
 use crate::config::env_parse;
+use crate::telemetry::process::{container_oom_kills, start_process_metrics};
 use crate::util::respawn::respawn;
 use crate::CubeError;
 use datafusion::cube_ext;
@@ -115,6 +116,42 @@ impl<
     pub async fn stop_workers(&self) -> Result<(), CubeError> {
         self.stopped_tx.send(true)?;
         Ok(())
+    }
+}
+
+/// Why a pool subprocess ended in the middle of a request.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ProcessExit {
+    /// The request ran past the pool timeout and the subprocess is killed.
+    Timeout,
+    /// The kernel OOM killer took it: the container's OOM kill count grew meanwhile.
+    OomKill,
+    /// It disappeared for any other reason.
+    Died,
+}
+
+impl ProcessExit {
+    fn lost(oom_kills_before: Option<u64>, oom_kills_after: Option<u64>) -> Self {
+        match (oom_kills_before, oom_kills_after) {
+            (Some(before), Some(after)) if after > before => ProcessExit::OomKill,
+            _ => ProcessExit::Died,
+        }
+    }
+
+    fn reason(&self) -> &'static str {
+        match self {
+            ProcessExit::Timeout => "timeout",
+            ProcessExit::OomKill => "oom_kill",
+            ProcessExit::Died => "died",
+        }
+    }
+
+    fn description(&self) -> &'static str {
+        match self {
+            ProcessExit::Timeout => "was stopped after timing out",
+            ProcessExit::OomKill => "was killed by the OOM killer",
+            ProcessExit::Died => "died",
+        }
     }
 }
 
@@ -250,6 +287,8 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                     }
                 };
 
+                let request_label = P::request_label(&message);
+                let oom_kills_before = container_oom_kills();
                 let process_message_res_timeout = tokio::time::timeout(
                     self.timeout,
                     self.process_message(message, args_tx, res_rx),
@@ -257,13 +296,24 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                 .instrument(span)
                 .with_subscriber(dispatcher)
                 .await;
-                let process_message_res = match process_message_res_timeout {
-                    Ok(r) => r,
-                    Err(e) => Err(CubeError::internal(format!(
-                        "Timed out after waiting for {}",
-                        e
-                    ))),
+                let (process_message_res, exit) = match process_message_res_timeout {
+                    Ok(Ok((Ok(res), a, r))) => (Ok((res, a, r)), None),
+                    Ok(Ok((Err(e), _, _))) => (Err(e), None),
+                    Ok(Err(e)) => (
+                        Err(e),
+                        Some(ProcessExit::lost(oom_kills_before, container_oom_kills())),
+                    ),
+                    Err(e) => (
+                        Err(CubeError::internal(format!(
+                            "Timed out after waiting for {}",
+                            e
+                        ))),
+                        Some(ProcessExit::Timeout),
+                    ),
                 };
+                if let Some(exit) = exit {
+                    self.report_exit(exit, request_label.as_deref());
+                }
                 match process_message_res {
                     Ok((res, a, r)) => {
                         if sender.send(Ok(res)).is_err() {
@@ -297,6 +347,24 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
         }
     }
 
+    fn report_exit(&self, exit: ProcessExit, request_label: Option<&str>) {
+        app_metrics::WORKER_POOL_PROCESS_EXITS.add_with_tags(
+            1,
+            Some(&vec![
+                metrics::format_tag("subprocess_type", &P::process_type()),
+                metrics::format_tag("reason", exit.reason()),
+            ]),
+        );
+        error!(
+            "{} subprocess {} {} while processing {}",
+            P::process_titile(),
+            self.name,
+            exit.description(),
+            request_label.unwrap_or("a request")
+        );
+    }
+
+    /// The outer error means the subprocess is gone; the inner one is its answer to the request.
     #[instrument(level = "trace", skip_all)]
     async fn process_message(
         &self,
@@ -305,7 +373,7 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
         res_rx: IpcReceiver<Result<P::Response, CubeError>>,
     ) -> Result<
         (
-            P::Response,
+            Result<P::Response, CubeError>,
             IpcSender<P::Request>,
             IpcReceiver<Result<P::Response, CubeError>>,
         ),
@@ -314,22 +382,25 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
         args_tx.send(message)?;
         let (res, res_rx) = cube_ext::spawn_blocking(move || (res_rx.recv(), res_rx)).await?;
 
-        if let Err(ipc_err) = res {
-            app_metrics::WORKER_POOL_ERROR.add_with_tags(
-                1,
-                Some(&vec![
-                    metrics::format_tag("subprocess_type", &P::process_type()),
-                    metrics::format_tag("error_type", "receive"),
-                ]),
-            );
-            return Err(CubeError::internal(format!(
-                "Failed to receive response from subprocess {}: {}",
-                P::process_titile(),
-                ipc_err
-            )));
-        }
+        let res = match res {
+            Ok(res) => res,
+            Err(ipc_err) => {
+                app_metrics::WORKER_POOL_ERROR.add_with_tags(
+                    1,
+                    Some(&vec![
+                        metrics::format_tag("subprocess_type", &P::process_type()),
+                        metrics::format_tag("error_type", "receive"),
+                    ]),
+                );
+                return Err(CubeError::internal(format!(
+                    "Failed to receive response from subprocess {}: {}",
+                    P::process_titile(),
+                    ipc_err
+                )));
+            }
+        };
 
-        Ok((res??, args_tx, res_rx))
+        Ok((res, args_tx, res_rx))
     }
 
     async fn spawn_process(
@@ -375,6 +446,7 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                 services_sender: service_request_tx,
                 services_reciever: service_response_rx,
                 timeout: self.timeout.clone(),
+                slot: self.name.clone(),
             },
             &[title],
             &envs,
@@ -399,6 +471,8 @@ pub struct WorkerProcessArgs<C: Configurator, P: WorkerProcessing, S: ServicesTr
     services_sender: IpcSender<S::TransportRequest>,
     services_reciever: IpcReceiver<S::TransportResponse>,
     timeout: Duration,
+    /// The pool slot this subprocess fills, telling apart the pool's processes in metrics.
+    slot: String,
 }
 
 struct TeardownGuard<C: Configurator>(PhantomData<C>);
@@ -421,6 +495,13 @@ where
         a.services_sender,
         a.services_reciever,
         a.timeout,
+    );
+    start_process_metrics(
+        &P::process_type(),
+        vec![metrics::format_tag(
+            "slot",
+            &metrics::sanitize_tag_value(&a.slot),
+        )],
     );
     let mut tokio_builder = Builder::new_multi_thread();
     tokio_builder.enable_all();
@@ -489,8 +570,9 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use tokio::runtime::{Builder, Runtime};
 
-    use crate::cluster::worker_pool::{worker_main, WorkerPool};
+    use crate::cluster::worker_pool::{worker_main, ProcessExit, WorkerPool};
     use crate::config::Config;
+    use crate::util::metrics::test_capture;
     use crate::util::respawn;
     use crate::CubeError;
     use datafusion::cube_ext;
@@ -512,6 +594,7 @@ mod tests {
     pub enum Message {
         Delay(u64),
         Panic,
+        Exit,
     }
 
     #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -562,6 +645,7 @@ mod tests {
                 Message::Panic => {
                     panic!("oops")
                 }
+                Message::Exit => std::process::exit(1),
             }
         }
 
@@ -626,8 +710,17 @@ mod tests {
         });
     }
 
+    fn exits_with_reason(reason: &str) -> usize {
+        let reason_tag = format!("reason:{}", reason);
+        test_capture::samples("cs.worker_pool.process_exits")
+            .iter()
+            .filter(|(_, tags)| tags.contains(&reason_tag))
+            .count()
+    }
+
     #[test]
     fn test_timeout() {
+        test_capture::watch("cs.worker_pool.process_exits");
         let runtime = Builder::new_current_thread().enable_all().build().unwrap();
 
         runtime.block_on(async move {
@@ -655,6 +748,41 @@ mod tests {
             }
             pool.stop_workers().await.unwrap();
         });
+        assert!(exits_with_reason("timeout") >= 1);
+    }
+
+    #[test]
+    fn test_subprocess_exit_is_reported_and_replaced() {
+        test_capture::watch("cs.worker_pool.process_exits");
+        let runtime = Builder::new_current_thread().enable_all().build().unwrap();
+
+        runtime.block_on(async move {
+            let pool = Arc::new(TestPool::new(
+                DefaultServicesServerProcessor::new(),
+                1,
+                Duration::from_millis(5000),
+                Duration::from_secs(60),
+                "test",
+                Vec::new(),
+            ));
+            let pool_to_move = pool.clone();
+            cube_ext::spawn(async move { pool_to_move.wait_processing_loops().await });
+            assert!(pool.process(Message::Exit).await.is_err());
+            assert_eq!(
+                pool.process(Message::Delay(10)).await.unwrap(),
+                Response::Foo(10)
+            );
+            pool.stop_workers().await.unwrap();
+        });
+        assert!(exits_with_reason("died") >= 1);
+    }
+
+    #[test]
+    fn lost_subprocess_is_an_oom_kill_only_if_the_count_grew() {
+        assert_eq!(ProcessExit::lost(Some(2), Some(3)), ProcessExit::OomKill);
+        assert_eq!(ProcessExit::lost(Some(2), Some(2)), ProcessExit::Died);
+        assert_eq!(ProcessExit::lost(None, Some(1)), ProcessExit::Died);
+        assert_eq!(ProcessExit::lost(None, None), ProcessExit::Died);
     }
 
     #[test]

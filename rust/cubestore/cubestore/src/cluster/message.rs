@@ -2,7 +2,7 @@ use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::trace::{MainTrace, WorkerTrace};
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use datafusion::arrow::datatypes::SchemaRef;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
@@ -151,6 +151,7 @@ impl NetworkMessage {
         }
         let ver = socket.read_u32().await?;
         if ver != NETWORK_MESSAGE_VERSION {
+            app_metrics::RPC_DECODE_ERRORS.increment();
             return Err(CubeError::user(format!("Network protocol version mismatch. Expected {} but received {}. It seems multiple versions of Cube Store images running within the same cluster.", NETWORK_MESSAGE_VERSION, ver)));
         }
         let len = socket.read_u64().await?;
@@ -171,8 +172,13 @@ impl NetworkMessage {
 
         let mut buffer = Vec::with_capacity(len as usize);
         socket.take(len).read_to_end(&mut buffer).await?;
-        let r = flexbuffers::Reader::get_root(&buffer)?;
-        Ok(Some(Self::deserialize(r)?))
+        let decoded = flexbuffers::Reader::get_root(&buffer)
+            .map_err(CubeError::from)
+            .and_then(|r| Ok(Self::deserialize(r)?));
+        if decoded.is_err() {
+            app_metrics::RPC_DECODE_ERRORS.increment();
+        }
+        Ok(Some(decoded?))
     }
 }
 
