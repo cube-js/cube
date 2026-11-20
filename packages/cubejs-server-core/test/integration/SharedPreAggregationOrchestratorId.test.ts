@@ -74,11 +74,11 @@ class MockDriver extends BaseDriver {
   public async query<R = unknown>(query: string): Promise<R[]> {
     await pausePromise(20);
 
-    if (query.match(/min\(.*timestamp/)) {
+    if (query.includes('min(') && query.includes('timestamp')) {
       return [{ min: '2020-12-30T00:00:00.000' }] as R[];
     }
 
-    if (query.match(/max\(.*timestamp/)) {
+    if (query.includes('max(') && query.includes('timestamp')) {
       return [{ max: '2020-12-31T01:00:00.000' }] as R[];
     }
 
