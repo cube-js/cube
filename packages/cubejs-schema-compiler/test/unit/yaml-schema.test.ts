@@ -1,4 +1,4 @@
-import { prepareYamlCompiler } from './PrepareCompiler';
+import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { PostgresQuery } from '../../src';
 
 describe('Yaml Schema Testing', () => {
@@ -2436,6 +2436,82 @@ cubes:
       expect(measure.filter.include[0].member).toBe('orders.created_at');
       expect(measure.filter.include[0].operator).toBe('afterDate');
       expect(measure.filter.include[0].values).toEqual(['2024-01-01']);
+    });
+  });
+
+  describe('meta keys', () => {
+    const findView = (compilers: any, name: string) => compilers.metaTransformer.cubes
+      .map((c: any) => c.config)
+      .find((c: any) => c.name === name);
+
+    it('keeps meta keys as written on the cube member, the view and a view include (YAML)', async () => {
+      const compilers = prepareYamlCompiler(`
+      cubes:
+        - name: orders
+          sql_table: orders
+          dimensions:
+            - name: id
+              sql: id
+              type: number
+              primary_key: true
+            - name: status
+              sql: status
+              type: string
+          measures:
+            - name: count
+              type: count
+              meta:
+                ai_context: from the cube member
+                my_other_key: cube
+
+      views:
+        - name: orders_view
+          meta:
+            ai_context: from the view
+            my_other_key: view
+          cubes:
+            - join_path: orders
+              includes:
+                - count
+                - name: status
+                  meta:
+                    ai_context: from the include
+                    my_other_key: include
+      `);
+
+      await compilers.compile();
+
+      const view = findView(compilers, 'orders_view');
+      expect(view.meta).toEqual({ ai_context: 'from the view', my_other_key: 'view' });
+      expect(view.measures.find((m: any) => m.name === 'orders_view.count').meta)
+        .toEqual({ ai_context: 'from the cube member', my_other_key: 'cube' });
+      expect(view.dimensions.find((d: any) => d.name === 'orders_view.status').meta)
+        .toEqual({ ai_context: 'from the include', my_other_key: 'include' });
+    });
+
+    it('keeps meta keys as written on a view include (JS)', async () => {
+      const compilers = prepareJsCompiler(`
+        cube('orders', {
+          sql_table: 'orders',
+          dimensions: {
+            id: { sql: 'id', type: 'number', primary_key: true },
+            status: { sql: 'status', type: 'string' },
+          },
+        });
+
+        view('orders_view', {
+          cubes: [{
+            join_path: orders,
+            includes: [{ name: 'status', meta: { ai_context: 'from the include', my_other_key: 'include' } }],
+          }],
+        });
+      `);
+
+      await compilers.compile();
+
+      const view = findView(compilers, 'orders_view');
+      expect(view.dimensions.find((d: any) => d.name === 'orders_view.status').meta)
+        .toEqual({ ai_context: 'from the include', my_other_key: 'include' });
     });
   });
 });
