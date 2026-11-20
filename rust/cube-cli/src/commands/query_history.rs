@@ -166,6 +166,14 @@ fn print_request(request: &Value) {
             }
         );
         println!("{}", util::printable(&output::field(sql, "sql")));
+        if let Some(params) = sql.get("params").and_then(Value::as_array) {
+            if !params.is_empty() {
+                println!(
+                    "params: {}",
+                    util::printable(&Value::Array(params.clone()).to_string())
+                );
+            }
+        }
     }
 }
 
