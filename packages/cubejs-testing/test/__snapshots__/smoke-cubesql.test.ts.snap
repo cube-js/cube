@@ -58,8 +58,8 @@ Object {
       "timeDimensions": Array [
         Object {
           "dateRange": Array [
-            "2024-01-01T00:00:00.001Z",
-            "2025-12-31T23:59:59.999Z",
+            "2024-01-01T00:00:00.001",
+            "2025-12-31T23:59:59.999",
           ],
           "dimension": "Orders.createdAt",
         },

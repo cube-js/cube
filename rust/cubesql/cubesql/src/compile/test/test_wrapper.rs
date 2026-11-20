@@ -5232,7 +5232,7 @@ async fn test_binary_expr_computed_date_bound_cube_scan_filter() {
         .iter()
         .map(|day| {
             (*day - chrono::Duration::days(28))
-                .format("%Y-%m-%dT00:00:00.000Z")
+                .format("%Y-%m-%dT00:00:00.000")
                 .to_string()
         })
         .collect::<Vec<_>>();
@@ -7869,8 +7869,8 @@ GROUP BY 1, 2
             dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
             granularity: None,
             date_range: Some(json!(vec![
-                "2025-01-01T00:00:00.000Z",
-                "2025-01-31T23:59:59.999Z"
+                "2025-01-01T00:00:00.000",
+                "2025-01-31T23:59:59.999"
             ])),
         }])
     );

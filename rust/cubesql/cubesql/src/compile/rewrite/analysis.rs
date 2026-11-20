@@ -20,6 +20,7 @@ use crate::{
     transport::ext::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
     var_iter, var_list_iter, CubeError,
 };
+use chrono::{DateTime, Offset, TimeZone};
 use datafusion::{
     arrow::{
         array::NullArray,
@@ -37,6 +38,8 @@ use datafusion::{
 use egg::{Analysis, DidMerge, EGraph, Id};
 use hashbrown;
 use std::{cmp::Ordering, fmt::Debug, ops::Index, sync::Arc};
+
+const NANOS_PER_DAY: i64 = 86_400_000_000_000;
 
 pub type MemberNameToExpr = (Option<String>, Member, Expr);
 
@@ -1037,21 +1040,17 @@ impl LogicalPlanAnalysis {
                 .ok()?;
                 if let Expr::ScalarUDF { fun, .. } = &expr {
                     if &fun.name == "eval_now" {
-                        Self::eval_constant_expr(
-                            &egraph,
-                            &Expr::ScalarFunction {
-                                fun: BuiltinScalarFunction::Now,
-                                args: vec![],
-                            },
-                        )
+                        Self::eval_session_now(egraph)
                     } else if &fun.name == "eval_current_date" {
-                        Self::eval_constant_expr(
-                            &egraph,
-                            &Expr::ScalarFunction {
-                                fun: BuiltinScalarFunction::CurrentDate,
-                                args: vec![],
-                            },
-                        )
+                        Self::eval_session_now(egraph).and_then(|now| match now {
+                            ConstantFolding::Scalar(ScalarValue::TimestampNanosecond(
+                                Some(nanos),
+                                _,
+                            )) => Some(ConstantFolding::Scalar(ScalarValue::Date32(Some(
+                                nanos.div_euclid(NANOS_PER_DAY) as i32,
+                            )))),
+                            _ => None,
+                        })
                     } else if &fun.name == "eval_utc_timestamp" {
                         Self::eval_constant_expr(
                             &egraph,
@@ -1188,6 +1187,35 @@ impl LogicalPlanAnalysis {
             ),
             _ => None,
         }
+    }
+
+    /// The current time for a filter on a member, which Cube reads as a local
+    /// time in the session's time zone: that zone's wall time.
+    fn eval_session_now(egraph: &EGraph<LogicalPlanLanguage, Self>) -> Option<ConstantFolding> {
+        let now = Self::eval_constant_expr(
+            egraph,
+            &Expr::ScalarFunction {
+                fun: BuiltinScalarFunction::Now,
+                args: vec![],
+            },
+        )?;
+        let ConstantFolding::Scalar(ScalarValue::TimestampNanosecond(Some(nanos), tz)) = now else {
+            return Some(now);
+        };
+        let offset = egraph
+            .analysis
+            .cube_context
+            .session_state
+            .query_time_zone()
+            .map(|zone| {
+                let utc = DateTime::from_timestamp_nanos(nanos).naive_utc();
+                i64::from(zone.offset_from_utc_datetime(&utc).fix().local_minus_utc())
+            })
+            .unwrap_or(0);
+        Some(ConstantFolding::Scalar(ScalarValue::TimestampNanosecond(
+            Some(nanos + offset * 1_000_000_000),
+            tz,
+        )))
     }
 
     fn eval_constant_expr(

@@ -1034,8 +1034,8 @@ mod tests {
                 dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                 granularity: None,
                 date_range: Some(json!(vec![
-                    "2024-08-01T00:00:00.000Z",
-                    "2024-08-31T23:59:59.999Z"
+                    "2024-08-01T00:00:00.000",
+                    "2024-08-31T23:59:59.999"
                 ])),
             }])
         );
@@ -1182,8 +1182,8 @@ mod tests {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2020-12-25T22:48:48.000Z".to_string(),
-                        "2022-04-01T00:00:00.000Z".to_string()
+                        "2020-12-25T22:48:48.000".to_string(),
+                        "2022-04-01T00:00:00.000".to_string()
                     ]))
                 }]),
                 order: Some(vec![]),
@@ -1220,8 +1220,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("week".to_string()),
                     date_range: Some(json!(vec![
-                        "2021-05-15T00:00:00.000Z".to_string(),
-                        "2022-05-14T23:59:59.999Z".to_string()
+                        "2021-05-15T00:00:00.000".to_string(),
+                        "2022-05-14T23:59:59.999".to_string()
                     ]))
                 }]),
                 order: Some(vec![vec![
@@ -1261,8 +1261,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("week".to_string()),
                     date_range: Some(json!(vec![
-                        "2021-05-15T00:00:00.000Z".to_string(),
-                        "2022-05-14T23:59:59.999Z".to_string()
+                        "2021-05-15T00:00:00.000".to_string(),
+                        "2022-05-14T23:59:59.999".to_string()
                     ]))
                 }]),
                 order: Some(vec![vec![
@@ -1309,8 +1309,8 @@ ORDER BY \"COUNT(count)\" DESC LIMIT 10000"
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("week".to_string()),
                     date_range: Some(json!(vec![
-                        "2021-05-15T00:00:00.000Z".to_string(),
-                        "2022-05-14T23:59:59.999Z".to_string()
+                        "2021-05-15T00:00:00.000".to_string(),
+                        "2022-05-14T23:59:59.999".to_string()
                     ]))
                 }]),
                 order: Some(vec![vec![
@@ -1368,8 +1368,8 @@ ORDER BY \"COUNT(count)\" DESC"
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("week".to_string()),
                     date_range: Some(json!(vec![
-                        "2021-05-15T00:00:00.000Z".to_string(),
-                        "2022-05-14T23:59:59.999Z".to_string()
+                        "2021-05-15T00:00:00.000".to_string(),
+                        "2022-05-14T23:59:59.999".to_string()
                     ]))
                 }]),
                 order: Some(vec![vec![
@@ -1971,8 +1971,8 @@ GROUP BY
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("month".to_string()),
                     date_range: Some(json!(vec![
-                        "2021-12-16T00:00:00.000Z".to_string(),
-                        "2022-06-12T23:59:59.999Z".to_string()
+                        "2021-12-16T00:00:00.000".to_string(),
+                        "2022-06-12T23:59:59.999".to_string()
                     ])),
                 }]),
                 order: Some(vec![]),
@@ -2279,8 +2279,8 @@ limit
                 dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                 granularity: None,
                 date_range: Some(json!(vec![
-                    "2023-07-08T00:00:00.000Z",
-                    "2023-10-07T23:59:59.999Z"
+                    "2023-07-08T00:00:00.000",
+                    "2023-10-07T23:59:59.999"
                 ])),
             }])
         );
@@ -2533,8 +2533,8 @@ limit
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2024-01-01T00:00:00.000Z".to_string(),
-                        "2024-01-01T00:00:00.000Z".to_string()
+                        "2024-01-01T00:00:00.000".to_string(),
+                        "2024-01-01T00:00:00.000".to_string()
                     ])),
                 }]),
                 order: Some(vec![]),
@@ -2993,8 +2993,8 @@ limit
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        "2021-09-06T23:59:59.999Z".to_string()
+                        "2021-08-31T00:00:00.000".to_string(),
+                        "2021-09-06T23:59:59.999".to_string()
                     ])),
                 }])
             ),
@@ -3007,8 +3007,8 @@ limit
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        "2021-09-06T23:59:59.999Z".to_string()
+                        "2021-08-31T00:00:00.000".to_string(),
+                        "2021-09-06T23:59:59.999".to_string()
                     ])),
                 }])
             ),
@@ -3020,8 +3020,8 @@ limit
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        "2021-09-06T23:59:59.999Z".to_string()
+                        "2021-08-31T00:00:00.000".to_string(),
+                        "2021-09-06T23:59:59.999".to_string()
                     ])),
                 }])
             ),
@@ -3034,8 +3034,8 @@ limit
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        "2021-09-06T23:59:59.999Z".to_string()
+                        "2021-08-31T00:00:00.000".to_string(),
+                        "2021-09-06T23:59:59.999".to_string()
                     ])),
                 }])
             ),
@@ -3047,8 +3047,8 @@ limit
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        "2021-09-06T23:59:59.999Z".to_string()
+                        "2021-08-31T00:00:00.000".to_string(),
+                        "2021-09-06T23:59:59.999".to_string()
                     ])),
                 }])
             ),
@@ -3060,8 +3060,8 @@ limit
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        "2021-09-06T23:59:59.999Z".to_string()
+                        "2021-08-31T00:00:00.000".to_string(),
+                        "2021-09-06T23:59:59.999".to_string()
                     ])),
                 }])
             ),
@@ -3073,8 +3073,8 @@ limit
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        "2021-09-06T23:59:59.999Z".to_string()
+                        "2021-08-31T00:00:00.000".to_string(),
+                        "2021-09-06T23:59:59.999".to_string()
                     ])),
                 }])
             ),
@@ -3086,8 +3086,8 @@ limit
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
-                        "2021-08-31T00:00:00.000Z".to_string(),
-                        "2021-09-06T23:59:59.999Z".to_string()
+                        "2021-08-31T00:00:00.000".to_string(),
+                        "2021-09-06T23:59:59.999".to_string()
                     ])),
                 }])
             ),
@@ -3150,14 +3150,14 @@ limit
                     json!(V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                         operator: Some("afterOrOnDate".to_string()),
-                        values: Some(vec!["2021-08-31T00:00:00.000Z".to_string()]),
+                        values: Some(vec!["2021-08-31T00:00:00.000".to_string()]),
                         or: None,
                         and: None,
                     }),
                     json!(V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                         operator: Some("beforeDate".to_string()),
-                        values: Some(vec!["2021-09-07T00:00:00.000Z".to_string()]),
+                        values: Some(vec!["2021-09-07T00:00:00.000".to_string()]),
                         or: None,
                         and: None,
                     })
@@ -3195,7 +3195,7 @@ limit
             Some(vec![V1LoadRequestQueryFilterItem {
                 member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                 operator: Some("beforeOrOnDate".to_string()),
-                values: Some(vec!["2025-01-01T08:00:00.000Z".to_string()]),
+                values: Some(vec!["2025-01-01T08:00:00.000".to_string()]),
                 ..Default::default()
             }])
         );
@@ -6878,8 +6878,8 @@ ORDER BY
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
-                        "2019-01-01T00:00:00.000Z".to_string(),
-                        "2019-12-31T23:59:59.999Z".to_string()
+                        "2019-01-01T00:00:00.000".to_string(),
+                        "2019-12-31T23:59:59.999".to_string()
                     ])),
                 }]),
                 order: Some(vec![vec![
@@ -7236,8 +7236,8 @@ ORDER BY
                     dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2021-06-30T00:00:00.000Z".to_string(),
-                        "2022-06-29T23:59:59.999Z".to_string()
+                        "2021-06-30T00:00:00.000".to_string(),
+                        "2022-06-29T23:59:59.999".to_string()
                     ]))
                 }]),
                 order: Some(vec![vec![
@@ -7558,36 +7558,36 @@ ORDER BY "source"."str0" ASC
             [
                 format!("CAST(({} + (INTERVAL '-30 day')) AS date)", now),
                 format!("CAST({} AS date)", now),
-                "2021-12-02T00:00:00.000Z".to_string(),
-                "2021-12-31T23:59:59.999Z".to_string(),
+                "2021-12-02T00:00:00.000".to_string(),
+                "2021-12-31T23:59:59.999".to_string(),
             ],
             // last 30 weeks
             [
                 format!("(CAST(date_trunc('week', (({} + (INTERVAL '-30 week')) + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
                 format!("(CAST(date_trunc('week', ({} + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
-                "2021-05-30T00:00:00.000Z".to_string(),
-                "2021-12-25T23:59:59.999Z".to_string(),
+                "2021-05-30T00:00:00.000".to_string(),
+                "2021-12-25T23:59:59.999".to_string(),
             ],
             // last 30 quarters
             [
                 format!("date_trunc('quarter', ({} + (INTERVAL '-90 month')))", now),
                 format!("date_trunc('quarter', {})", now),
-                "2014-07-01T00:00:00.000Z".to_string(),
-                "2021-12-31T23:59:59.999Z".to_string(),
+                "2014-07-01T00:00:00.000".to_string(),
+                "2021-12-31T23:59:59.999".to_string(),
             ],
             // this year
             [
                 format!("date_trunc('year', {})", now),
                 format!("date_trunc('year', ({} + (INTERVAL '1 year')))", now),
-                "2022-01-01T00:00:00.000Z".to_string(),
-                "2022-12-31T23:59:59.999Z".to_string(),
+                "2022-01-01T00:00:00.000".to_string(),
+                "2022-12-31T23:59:59.999".to_string(),
             ],
             // next 2 years including current
             [
                 format!("date_trunc('year', {})", now),
                 format!("date_trunc('year', ({} + (INTERVAL '3 year')))", now),
-                "2022-01-01T00:00:00.000Z".to_string(),
-                "2024-12-31T23:59:59.999Z".to_string(),
+                "2022-01-01T00:00:00.000".to_string(),
+                "2024-12-31T23:59:59.999".to_string(),
             ],
         ];
         for [lte, gt, from, to] in cases {
@@ -7645,8 +7645,8 @@ ORDER BY "source"."str0" ASC
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2022-06-13T12:30:00.000Z".to_string(),
-                        "2022-06-29T12:30:00.000Z".to_string()
+                        "2022-06-13T12:30:00.000".to_string(),
+                        "2022-06-29T12:30:00.000".to_string()
                     ]))
                 }]),
                 order: Some(vec![]),
@@ -7661,24 +7661,24 @@ ORDER BY "source"."str0" ASC
                 "(INTERVAL '4 week')".to_string(),
                 format!("CAST(({} + (INTERVAL '-5 day')) AS date)", now),
                 format!("CAST({} AS date)", now),
-                "2021-11-29T00:00:00.000Z".to_string(),
-                "2021-12-04T00:00:00.000Z".to_string(),
+                "2021-11-29T00:00:00.000".to_string(),
+                "2021-12-04T00:00:00.000".to_string(),
             ],
             // prev 5 weeks starting 4 weeks ago
             [
                 "(INTERVAL '4 week')".to_string(),
                 format!("(CAST(date_trunc('week', (({} + (INTERVAL '-5 week')) + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
                 format!("(CAST(date_trunc('week', ({} + (INTERVAL '1 day'))) AS timestamp) + (INTERVAL '-1 day'))", now),
-                "2021-10-24T00:00:00.000Z".to_string(),
-                "2021-11-28T00:00:00.000Z".to_string(),
+                "2021-10-24T00:00:00.000".to_string(),
+                "2021-11-28T00:00:00.000".to_string(),
             ],
             // prev 5 months starting 4 months ago
             [
                 "(INTERVAL '4 month')".to_string(),
                 format!("date_trunc('month', ({} + (INTERVAL '-5 month')))", now),
                 format!("date_trunc('month', {})", now),
-                "2021-04-01T00:00:00.000Z".to_string(),
-                "2021-09-01T00:00:00.000Z".to_string(),
+                "2021-04-01T00:00:00.000".to_string(),
+                "2021-09-01T00:00:00.000".to_string(),
             ],
         ];
 
@@ -8159,7 +8159,7 @@ ORDER BY "source"."str0" ASC
             if bound.starts_with("DATEADD") {
                 assert_eq!(
                     range[1],
-                    json!("2025-01-31T00:00:00.000Z"),
+                    json!("2025-01-31T00:00:00.000"),
                     "folded upper bound"
                 );
             }
@@ -8251,8 +8251,8 @@ ORDER BY "source"."str0" ASC
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("second".to_string()),
                     date_range: Some(json!(vec![
-                        "2022-07-11T18:00:00.000Z".to_string(),
-                        "2022-07-11T19:00:00.000Z".to_string()
+                        "2022-07-11T18:00:00.000".to_string(),
+                        "2022-07-11T19:00:00.000".to_string()
                     ])),
                 }]),
                 order: Some(vec![]),
@@ -9184,8 +9184,8 @@ ORDER BY "source"."str0" ASC
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("equals".to_string()),
                     values: Some(vec![
-                        "2022-06-06T13:30:46.000Z".to_string(),
-                        "2022-06-06T13:30:47.000Z".to_string()
+                        "2022-06-06T13:30:46.000".to_string(),
+                        "2022-06-06T13:30:47.000".to_string()
                     ]),
                     or: None,
                     and: None,
@@ -9244,8 +9244,8 @@ ORDER BY "source"."str0" ASC
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
-                        format!("{}-01-01T00:00:00.000Z", current_year - 5),
-                        format!("{}-12-31T23:59:59.999Z", current_year - 1),
+                        format!("{}-01-01T00:00:00.000", current_year - 5),
+                        format!("{}-12-31T23:59:59.999", current_year - 1),
                     ])),
                 }]),
                 order: Some(vec![vec![
@@ -9266,44 +9266,28 @@ ORDER BY "source"."str0" ASC
         let granularities = vec![
             (
                 "second",
-                "2022-08-27T19:43:09.000Z",
-                "2022-08-27T19:43:09.999Z",
+                "2022-08-27T19:43:09.000",
+                "2022-08-27T19:43:09.999",
             ),
             (
                 "minute",
-                "2022-08-27T19:43:00.000Z",
-                "2022-08-27T19:43:59.999Z",
+                "2022-08-27T19:43:00.000",
+                "2022-08-27T19:43:59.999",
             ),
-            (
-                "hour",
-                "2022-08-27T19:00:00.000Z",
-                "2022-08-27T19:59:59.999Z",
-            ),
-            (
-                "day",
-                "2022-08-27T00:00:00.000Z",
-                "2022-08-27T23:59:59.999Z",
-            ),
-            (
-                "week",
-                "2022-08-22T00:00:00.000Z",
-                "2022-08-28T23:59:59.999Z",
-            ),
+            ("hour", "2022-08-27T19:00:00.000", "2022-08-27T19:59:59.999"),
+            ("day", "2022-08-27T00:00:00.000", "2022-08-27T23:59:59.999"),
+            ("week", "2022-08-22T00:00:00.000", "2022-08-28T23:59:59.999"),
             (
                 "month",
-                "2022-08-01T00:00:00.000Z",
-                "2022-08-31T23:59:59.999Z",
+                "2022-08-01T00:00:00.000",
+                "2022-08-31T23:59:59.999",
             ),
             (
                 "quarter",
-                "2022-07-01T00:00:00.000Z",
-                "2022-09-30T23:59:59.999Z",
+                "2022-07-01T00:00:00.000",
+                "2022-09-30T23:59:59.999",
             ),
-            (
-                "year",
-                "2022-01-01T00:00:00.000Z",
-                "2022-12-31T23:59:59.999Z",
-            ),
+            ("year", "2022-01-01T00:00:00.000", "2022-12-31T23:59:59.999"),
         ];
 
         for (granularity, date_min, date_max) in granularities {
@@ -10132,8 +10116,8 @@ ORDER BY "source"."str0" ASC
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
-                        "2020-01-01T00:00:00.000Z".to_string(),
-                        format!("{}T23:59:59.999Z", end_date),
+                        "2020-01-01T00:00:00.000".to_string(),
+                        format!("{}T23:59:59.999", end_date),
                     ]))
                 }]),
                 order: Some(vec![vec![
@@ -10188,8 +10172,8 @@ ORDER BY "source"."str0" ASC
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
-                        "2020-01-01T00:00:00.000Z".to_string(),
-                        format!("{}T23:59:59.999Z", end_date),
+                        "2020-01-01T00:00:00.000".to_string(),
+                        format!("{}T23:59:59.999", end_date),
                     ]))
                 }]),
                 order: Some(vec![vec![
@@ -13282,44 +13266,44 @@ ORDER BY "source"."str0" ASC
                 ">=",
                 "2020-03-25",
                 "afterOrOnDate",
-                "2020-04-01T00:00:00.000Z",
+                "2020-04-01T00:00:00.000",
             ),
             (
                 ">=",
                 "2020-04-01",
                 "afterOrOnDate",
-                "2020-04-01T00:00:00.000Z",
+                "2020-04-01T00:00:00.000",
             ),
             (
                 ">=",
                 "2020-04-10",
                 "afterOrOnDate",
-                "2020-05-01T00:00:00.000Z",
+                "2020-05-01T00:00:00.000",
             ),
-            ("<=", "2020-03-25", "beforeDate", "2020-04-01T00:00:00.000Z"),
-            ("<=", "2020-04-01", "beforeDate", "2020-05-01T00:00:00.000Z"),
-            ("<=", "2020-04-10", "beforeDate", "2020-05-01T00:00:00.000Z"),
+            ("<=", "2020-03-25", "beforeDate", "2020-04-01T00:00:00.000"),
+            ("<=", "2020-04-01", "beforeDate", "2020-05-01T00:00:00.000"),
+            ("<=", "2020-04-10", "beforeDate", "2020-05-01T00:00:00.000"),
             (
                 ">",
                 "2020-03-25",
                 "afterOrOnDate",
-                "2020-04-01T00:00:00.000Z",
+                "2020-04-01T00:00:00.000",
             ),
             (
                 ">",
                 "2020-04-01",
                 "afterOrOnDate",
-                "2020-05-01T00:00:00.000Z",
+                "2020-05-01T00:00:00.000",
             ),
             (
                 ">",
                 "2020-04-10",
                 "afterOrOnDate",
-                "2020-05-01T00:00:00.000Z",
+                "2020-05-01T00:00:00.000",
             ),
-            ("<", "2020-03-25", "beforeDate", "2020-04-01T00:00:00.000Z"),
-            ("<", "2020-04-01", "beforeDate", "2020-04-01T00:00:00.000Z"),
-            ("<", "2020-04-10", "beforeDate", "2020-05-01T00:00:00.000Z"),
+            ("<", "2020-03-25", "beforeDate", "2020-04-01T00:00:00.000"),
+            ("<", "2020-04-01", "beforeDate", "2020-04-01T00:00:00.000"),
+            ("<", "2020-04-10", "beforeDate", "2020-05-01T00:00:00.000"),
         ];
 
         for (operator, literal_date, filter_operator, filter_value) in test_data {
@@ -13689,8 +13673,8 @@ ORDER BY "source"."str0" ASC
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2022-11-14T00:00:00.000Z".to_string(),
-                        "2022-11-20T23:59:59.999Z".to_string(),
+                        "2022-11-14T00:00:00.000".to_string(),
+                        "2022-11-20T23:59:59.999".to_string(),
                     ]))
                 }]),
                 order: Some(vec![]),
@@ -13729,12 +13713,12 @@ ORDER BY "source"."str0" ASC
                         json!({
                             "member": "KibanaSampleDataEcommerce.order_date",
                             "operator": "beforeDate",
-                            "values": ["2022-11-14T00:00:00.000Z"],
+                            "values": ["2022-11-14T00:00:00.000"],
                         }),
                         json!({
                             "member": "KibanaSampleDataEcommerce.order_date",
                             "operator": "afterOrOnDate",
-                            "values": ["2022-11-21T00:00:00.000Z"],
+                            "values": ["2022-11-21T00:00:00.000"],
                         }),
                     ]),
                     ..Default::default()
@@ -14890,7 +14874,7 @@ ORDER BY "source"."str0" ASC
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("afterOrOnDate".to_string()),
-                    values: Some(vec!["2020-01-02T00:00:00.000Z".to_string()]),
+                    values: Some(vec!["2020-01-02T00:00:00.000".to_string()]),
                     or: None,
                     and: None,
                 }]),
@@ -14988,14 +14972,14 @@ ORDER BY "source"."str0" ASC
                         json!(V1LoadRequestQueryFilterItem {
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("beforeDate".to_string()),
-                            values: Some(vec!["2019-01-01T00:00:00.000Z".to_string()]),
+                            values: Some(vec!["2019-01-01T00:00:00.000".to_string()]),
                             or: None,
                             and: None,
                         }),
                         json!(V1LoadRequestQueryFilterItem {
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("afterOrOnDate".to_string()),
-                            values: Some(vec!["2019-01-02T00:00:00.000Z".to_string()]),
+                            values: Some(vec!["2019-01-02T00:00:00.000".to_string()]),
                             or: None,
                             and: None,
                         }),
@@ -16515,8 +16499,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
                     granularity: Some("month".to_string()),
                     date_range: Some(json!(vec![
-                        "2025-01-01T00:00:00.000Z".to_string(),
-                        "2025-01-31T23:59:59.999Z".to_string()
+                        "2025-01-01T00:00:00.000".to_string(),
+                        "2025-01-31T23:59:59.999".to_string()
                     ])),
                 }]),
                 order: Some(vec![]),
@@ -16569,8 +16553,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2019-01-01T00:00:00.000Z".to_string(),
-                                "2019-12-31T23:59:59.999Z".to_string(),
+                                "2019-01-01T00:00:00.000".to_string(),
+                                "2019-12-31T23:59:59.999".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -16579,8 +16563,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2021-01-01T00:00:00.000Z".to_string(),
-                                "2021-12-31T23:59:59.999Z".to_string(),
+                                "2021-01-01T00:00:00.000".to_string(),
+                                "2021-12-31T23:59:59.999".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -16631,8 +16615,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("year".to_string()),
                     date_range: Some(json!(vec![
-                        "2019-01-01T00:00:00.000Z".to_string(),
-                        "2023-12-31T23:59:59.999Z".to_string()
+                        "2019-01-01T00:00:00.000".to_string(),
+                        "2023-12-31T23:59:59.999".to_string()
                     ])),
                 }]),
                 order: Some(vec![]),
@@ -16690,8 +16674,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2019-01-01T00:00:00.000Z".to_string(),
-                                "2019-03-31T23:59:59.999Z".to_string(),
+                                "2019-01-01T00:00:00.000".to_string(),
+                                "2019-03-31T23:59:59.999".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -16700,8 +16684,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2020-01-01T00:00:00.000Z".to_string(),
-                                "2020-03-31T23:59:59.999Z".to_string(),
+                                "2020-01-01T00:00:00.000".to_string(),
+                                "2020-03-31T23:59:59.999".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -16710,8 +16694,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2021-01-01T00:00:00.000Z".to_string(),
-                                "2021-03-31T23:59:59.999Z".to_string(),
+                                "2021-01-01T00:00:00.000".to_string(),
+                                "2021-03-31T23:59:59.999".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -16720,8 +16704,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2022-01-01T00:00:00.000Z".to_string(),
-                                "2022-03-31T23:59:59.999Z".to_string(),
+                                "2022-01-01T00:00:00.000".to_string(),
+                                "2022-03-31T23:59:59.999".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -16730,8 +16714,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2023-01-01T00:00:00.000Z".to_string(),
-                                "2023-03-31T23:59:59.999Z".to_string(),
+                                "2023-01-01T00:00:00.000".to_string(),
+                                "2023-03-31T23:59:59.999".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -16906,8 +16890,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                 granularity: None,
                 date_range: Some(json!(vec![
-                    "2024-01-01T00:00:00.000Z",
-                    "2024-12-31T23:59:59.999Z"
+                    "2024-01-01T00:00:00.000",
+                    "2024-12-31T23:59:59.999"
                 ])),
             }])
         );
@@ -17121,8 +17105,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("month".to_string()),
                     date_range: Some(json!(vec![
-                        "2019-01-01T00:00:00.000Z".to_string(),
-                        "2019-01-31T23:59:59.999Z".to_string()
+                        "2019-01-01T00:00:00.000".to_string(),
+                        "2019-01-31T23:59:59.999".to_string()
                     ]))
                 }]),
                 order: Some(vec![]),
@@ -17205,8 +17189,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("month".to_string()),
                     date_range: Some(json!(vec![
-                        "2019-01-01T00:00:00.000Z".to_string(),
-                        "2019-01-31T23:59:59.999Z".to_string()
+                        "2019-01-01T00:00:00.000".to_string(),
+                        "2019-01-31T23:59:59.999".to_string()
                     ]))
                 }]),
                 order: Some(vec![]),
@@ -17450,8 +17434,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2024-01-01T00:00:00.000Z".to_string(),
-                        "2024-02-29T00:00:00.000Z".to_string()
+                        "2024-01-01T00:00:00.000".to_string(),
+                        "2024-02-29T00:00:00.000".to_string()
                     ]))
                 }]),
                 order: Some(vec![]),
@@ -18047,8 +18031,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                             member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                             operator: Some("inDateRange".to_string()),
                             values: Some(vec![
-                                "2024-01-01T00:00:00.000Z".to_string(),
-                                "2024-12-31T23:59:59.999Z".to_string(),
+                                "2024-01-01T00:00:00.000".to_string(),
+                                "2024-12-31T23:59:59.999".to_string(),
                             ]),
                             or: None,
                             and: None,
@@ -18065,8 +18049,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                                     ),
                                     operator: Some("inDateRange".to_string()),
                                     values: Some(vec![
-                                        "2025-01-01T00:00:00.000Z".to_string(),
-                                        "2025-12-31T23:59:59.999Z".to_string(),
+                                        "2025-01-01T00:00:00.000".to_string(),
+                                        "2025-12-31T23:59:59.999".to_string(),
                                     ]),
                                     or: None,
                                     and: None,
@@ -18077,8 +18061,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                                     ),
                                     operator: Some("inDateRange".to_string()),
                                     values: Some(vec![
-                                        "2025-01-01T00:00:00.000Z".to_string(),
-                                        "2025-01-31T23:59:59.999Z".to_string(),
+                                        "2025-01-01T00:00:00.000".to_string(),
+                                        "2025-01-31T23:59:59.999".to_string(),
                                     ]),
                                     or: None,
                                     and: None,
@@ -18152,7 +18136,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("beforeDate".to_string()),
-                    values: Some(vec!["2025-01-01T00:00:00.000Z".to_string()]),
+                    values: Some(vec!["2025-01-01T00:00:00.000".to_string()]),
                     ..Default::default()
                 }]),
                 ..Default::default()
@@ -18274,8 +18258,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("month".to_string()),
                     date_range: Some(json!(vec![
-                        "2024-01-01T00:00:00.000Z".to_string(),
-                        "2024-12-31T23:59:59.999Z".to_string()
+                        "2024-01-01T00:00:00.000".to_string(),
+                        "2024-12-31T23:59:59.999".to_string()
                     ])),
                 },]),
                 order: Some(vec![vec![
@@ -19022,8 +19006,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2025-01-01T00:00:00.000Z".to_string(),
-                        "2025-04-30T23:59:59.999Z".to_string(),
+                        "2025-01-01T00:00:00.000".to_string(),
+                        "2025-04-30T23:59:59.999".to_string(),
                     ])),
                 }]),
                 order: Some(vec![]),
@@ -19089,8 +19073,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2025-02-18T00:00:00.000Z".to_string(),
-                        "2025-02-18T23:59:59.999Z".to_string(),
+                        "2025-02-18T00:00:00.000".to_string(),
+                        "2025-02-18T23:59:59.999".to_string(),
                     ])),
                 }]),
                 order: Some(vec![]),
@@ -19135,8 +19119,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: None,
                     date_range: Some(json!(vec![
-                        "2025-07-02T00:00:00.000Z".to_string(),
-                        "2025-09-30T23:59:59.999Z".to_string(),
+                        "2025-07-02T00:00:00.000".to_string(),
+                        "2025-09-30T23:59:59.999".to_string(),
                     ])),
                 }]),
                 order: Some(vec![]),
@@ -19376,7 +19360,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("afterOrOnDate".to_string()),
-                    values: Some(vec!["2025-01-01T00:00:00.000Z".to_string()]),
+                    values: Some(vec!["2025-01-01T00:00:00.000".to_string()]),
                     ..Default::default()
                 }]),
                 ..Default::default()
@@ -19757,8 +19741,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
-                        "2025-01-01T00:00:00.000Z".to_string(),
-                        "2025-01-31T23:59:59.999Z".to_string(),
+                        "2025-01-01T00:00:00.000".to_string(),
+                        "2025-01-31T23:59:59.999".to_string(),
                     ])),
                 }]),
                 order: Some(vec![]),

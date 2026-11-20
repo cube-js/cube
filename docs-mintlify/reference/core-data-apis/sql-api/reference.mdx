@@ -218,6 +218,10 @@ SET TIME ZONE 'UTC';
 Use `DEFAULT` to reset the time zone to its default. The `LOCAL` form
 (`SET TIME ZONE LOCAL`) is not supported.
 
+With a session time zone, time dimensions are returned in it, and a filter on
+one is read in it: a timestamp literal is a local time, and `NOW()` and
+`CURRENT_DATE` are the current time and date in that time zone.
+
 ### `CREATE TEMPORARY TABLE`
 
 Synopsis:
