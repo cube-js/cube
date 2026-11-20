@@ -563,7 +563,7 @@ export class PreAggregations {
     this.refreshActiveMarkedAt = Date.now();
   }
 
-  public async getRefreshEndReached(): Promise<number> {
+  public async getRefreshEndReached(): Promise<number | null> {
     const cacheDriver = this.queryCache.getCacheDriver();
     const refreshEndReached: number = await cacheDriver.get(this.refreshEndReachedKey());
 

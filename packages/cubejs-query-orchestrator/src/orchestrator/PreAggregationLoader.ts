@@ -1134,9 +1134,10 @@ export class PreAggregationLoader {
         versionEntries.filter(v => v.last_updated_at > structureVersionCutoff)
       );
 
-      const refreshEndReached = await this.preAggregations.getRefreshEndReached();
+      const refreshEndReached = this.preAggregations.dropPreAggregationsWithoutTouch &&
+        await this.preAggregations.getRefreshEndReached();
       const toSave =
-        this.preAggregations.dropPreAggregationsWithoutTouch && refreshEndReached
+        refreshEndReached
           ? (await this.preAggregations.tablesUsed())
             .concat(await this.preAggregations.tablesTouched())
             .concat([justCreatedTable])
