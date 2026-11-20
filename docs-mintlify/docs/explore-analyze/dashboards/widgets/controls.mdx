@@ -185,9 +185,11 @@ In the dashboard builder, clicking the warning icon opens the filter's settings,
 
 ### The value list
 
-A string filter's value list shows the dimension's values in ascending order, alphabetically for a string. It loads them 100 at a time: the second 100 load as soon as the list opens, and each next 100 load as you scroll toward the end, so you can scroll to any value the dimension holds. When you reach the end before the next values arrive, a *Loading…* row shows below the last value. The values you've selected are listed first.
+A string filter's value list shows the dimension's values in alphabetical order. It loads them 100 at a time: the second 100 load as soon as the list opens, and each next 100 load as you scroll toward the end, so you can scroll to any value the dimension holds. When you reach the end before the next values arrive, a *Loading…* row shows below the last value. The values you've selected are listed first.
 
 Typing in the list searches every value of the dimension, not only the ones loaded so far, and its matches load the same way.
+
+A filter on a [`switch` dimension](#switch-dimensions) is the exception: it lists every value the data model declares at once, in the declared order.
 
 When the next values fail to load, the ones already listed stay, and the bottom of the list reads *Couldn't load more values*. Click **Try again** to load them.
 
