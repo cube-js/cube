@@ -35,6 +35,8 @@ export class Funnels extends AbstractExtension {
       throw new Error('steps are not defined'); // TODO schema check
     }
 
+    const countDistinctType = funnelDefinition.useApprox === true ? 'countDistinctApprox' : 'countDistinct';
+
     return this.cubeFactory({
       sql: () => {
         const eventJoin =
@@ -59,7 +61,7 @@ ${eventJoin.join('\nLEFT JOIN\n')}
         },
         firstStepConversions: {
           sql: () => 'first_step_user_id',
-          type: 'countDistinct',
+          type: countDistinctType,
           shown: false
         },
         conversionsPercent: {
