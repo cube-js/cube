@@ -385,9 +385,11 @@ is blocked with `ownership-conflict` until it [takes them over](#take-over-an-ex
 
 To publish to production the build you tested in staging:
 
-1. Create both publication targets: save `staging` and `production` with `?target=<name>` and
-   `expectedConfigurationVersion: 0`, each with its own catalog or schema. Leave `syncOnDeploy`
-   off for production, so that no deployment publishes there untested.
+1. Create both publication targets: save `staging` and `production` with `?target=<name>`,
+   `expectedConfigurationVersion: 0`, and `enabled: true`, each with its own catalog or schema.
+   Leave `syncOnDeploy` off for production, so that no deployment publishes there untested. Grant
+   the [privileges Cube needs](#before-you-start) on both: **Test access** checks only `default`,
+   so a missing one surfaces only when the first run writes there.
 2. Publish to staging: turn on [Publish after each deployment](#publish-after-each-deployment)
    for it with `syncOnDeploy: true`, or start its runs yourself.
 3. Once a staging run is **Completed**, run your own checks against the staging Metric Views. Cube
@@ -681,13 +683,13 @@ it; otherwise the view ends **Write failed** and the object keeps its definition
 object may not keep its Databricks grants, so check afterward that its consumers can still query
 it.
 
-A take-over runs alone in your Cube account. Starting one returns `409` while a run of another
-data source or publication target is in flight, and starting such a run returns `409` while a
-take-over is in flight. A run that ended `CANCELLED` or `FAILED` in the last 10 minutes counts as
-in flight, because a write it sent may still land. A [deployment's run](#publish-after-each-deployment)
-retries a `409` for about 30 minutes. The [CI recipe](#trigger-publication-from-ci) retries for
-about 5 minutes by default; if CI may start while a take-over runs, raise `MAX_START_ATTEMPTS`,
-for example to 90 (about 15 minutes).
+A take-over runs alone in your Cube account. Starting one returns `409` while a run of another data
+source or publication target is in flight, and starting such a run returns `409` while a take-over
+is in flight. A run that ended `CANCELLED` or `FAILED` in the last 10 minutes counts as in flight,
+because a write it sent may still land. A [deployment's run](#publish-after-each-deployment) retries
+a `409` for about 30 minutes. The [CI recipe](#trigger-publication-from-ci) retries for about 5
+minutes by default; if CI may start while a take-over runs, raise `MAX_START_ATTEMPTS`, for example
+to 90 (about 15 minutes).
 
 A failed take-over holds the run's drops, as a failed creation does (see
 [Removed views](#removed-views)). Cancelling a take-over does not stop a write already sent to
