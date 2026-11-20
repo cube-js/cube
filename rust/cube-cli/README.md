@@ -76,7 +76,7 @@ workflow just verifies the pushed tag matches `lerna.json`.
 The CLI is built and published by the **same release workflow as the rest of
 Cube** (`.github/workflows/publish.yml`, on `v*.*.*` tags). Its `cube-cli`
 job builds a single static binary per platform and attaches them to the same
-GitHub release as the Cube version, via `svenstaro/upload-release-action`:
+GitHub release as the Cube version, via `gh release upload` (retried on failure):
 
 | Platform | Target | Asset |
 |---|---|---|
