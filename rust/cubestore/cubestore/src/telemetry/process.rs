@@ -3,7 +3,7 @@
 use crate::app_metrics;
 use crate::util::metrics;
 use std::panic::PanicHookInfo;
-use std::sync::Once;
+use std::sync::{Once, OnceLock};
 use std::time::Duration;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -17,21 +17,23 @@ pub const BUILD_ID: &str = match option_env!("CUBESTORE_BUILD_ID") {
 
 const SAMPLE_INTERVAL: Duration = Duration::from_secs(15);
 
-pub fn identity_tags(role: &str) -> Vec<String> {
+/// The same tag names for every process: statsd-exporter can drop samples of a metric whose label
+/// names differ from the ones it first saw. `slot` names a pool subprocess, `main` otherwise.
+pub fn identity_tags(role: &str, slot: Option<&str>) -> Vec<String> {
     vec![
         metrics::format_tag("version", VERSION),
         metrics::format_tag("build", &metrics::sanitize_tag_value(BUILD_ID)),
         metrics::format_tag("role", &metrics::sanitize_tag_value(role)),
+        metrics::format_tag("slot", &metrics::sanitize_tag_value(slot.unwrap_or("main"))),
     ]
 }
 
 /// Reports the start of this process, counts its panics and keeps reporting that it is alive.
 /// Call once per process, as soon as it knows its role; later calls are ignored.
-pub fn start_process_metrics(role: &str, extra_tags: Vec<String>) {
+pub fn start_process_metrics(role: &str, slot: Option<&str>) {
     static STARTED: Once = Once::new();
     STARTED.call_once(|| {
-        let mut tags = identity_tags(role);
-        tags.extend(extra_tags);
+        let tags = identity_tags(role, slot);
 
         log::info!(
             "Cube Store process started: role={} version={} build={} pid={}",
@@ -40,7 +42,7 @@ pub fn start_process_metrics(role: &str, extra_tags: Vec<String>) {
             BUILD_ID,
             std::process::id()
         );
-        app_metrics::STARTUPS.add_with_tags(1, Some(&tags));
+        app_metrics::PROCESS_STARTS.add_with_tags(1, Some(&tags));
         install_panic_hook(tags.clone());
 
         // A plain thread, so liveness is reported even while the async runtime is stalled.
@@ -86,13 +88,7 @@ fn panic_summary(info: &PanicHookInfo) -> String {
         .location()
         .map(|l| format!("{}:{}", l.file(), l.line()))
         .unwrap_or_else(|| "unknown location".to_string());
-    let thread = std::thread::current();
-    format!(
-        "Panic in thread '{}' at {}: {}",
-        thread.name().unwrap_or("<unnamed>"),
-        location,
-        payload.replace('\n', " ")
-    )
+    format!("Panic at {}: {}", location, payload.replace('\n', " "))
 }
 
 #[derive(Debug, PartialEq)]
@@ -130,12 +126,22 @@ fn parse_memory_status(status: &str) -> Option<MemoryStatus> {
 /// OOM kills in this container's memory cgroup so far. Unlike the container restart counter,
 /// they include kills of subprocesses.
 pub fn container_oom_kills() -> Option<u64> {
-    [
-        "/sys/fs/cgroup/memory.events",
-        "/sys/fs/cgroup/memory/memory.oom_control",
-    ]
-    .iter()
-    .find_map(|path| parse_oom_kills(&std::fs::read_to_string(path).ok()?))
+    // Looked up once: this is read around every pool request.
+    static SOURCE: OnceLock<Option<&'static str>> = OnceLock::new();
+    let path = SOURCE.get_or_init(|| {
+        [
+            "/sys/fs/cgroup/memory.events",
+            "/sys/fs/cgroup/memory/memory.oom_control",
+        ]
+        .into_iter()
+        .find(|path| {
+            std::fs::read_to_string(path)
+                .ok()
+                .and_then(|content| parse_oom_kills(&content))
+                .is_some()
+        })
+    });
+    parse_oom_kills(&std::fs::read_to_string((*path)?).ok()?)
 }
 
 fn parse_oom_kills(content: &str) -> Option<u64> {
@@ -152,11 +158,11 @@ mod tests {
 
     #[test]
     fn reports_start_heartbeat_and_panics_with_identity() {
-        test_capture::watch("cs.startup");
+        test_capture::watch("cs.process.started");
         test_capture::watch("cs.process.heartbeat");
         test_capture::watch("cs.panics");
 
-        start_process_metrics("test-role", vec![metrics::format_tag("slot", "sel1")]);
+        start_process_metrics("test-role", Some("sel1"));
         let panicked = std::panic::catch_unwind(|| panic!("first line\nsecond line"));
         assert!(panicked.is_err());
 
@@ -167,7 +173,7 @@ mod tests {
             "slot:sel1".to_string(),
         ];
         assert_eq!(
-            test_capture::samples("cs.startup"),
+            test_capture::samples("cs.process.started"),
             vec![(1, expected_tags.clone())]
         );
         // Other tests may panic on purpose while this one runs, so only look for this hook's tags.
@@ -175,7 +181,7 @@ mod tests {
             .iter()
             .any(|(value, tags)| *value == 1 && *tags == expected_tags));
 
-        for _ in 0..100 {
+        for _ in 0..1000 {
             if !test_capture::samples("cs.process.heartbeat").is_empty() {
                 break;
             }

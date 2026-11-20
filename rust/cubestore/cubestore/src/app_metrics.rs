@@ -4,10 +4,13 @@
 use crate::util::metrics;
 use crate::util::metrics::{Counter, Gauge, Histogram};
 
-/// The number of process startups, tagged with the process identity once it is known.
+/// The number of process startups.
 pub static STARTUPS: Counter = metrics::counter("cs.startup");
 
-/// Ticks periodically in every live process, tagged `version`, `build` and `role`. A counter
+/// Process starts tagged `version`, `build`, `role` and `slot`, counted once the role is known.
+pub static PROCESS_STARTS: Counter = metrics::counter("cs.process.started");
+
+/// Ticks periodically in every live process, tagged like [PROCESS_STARTS]. A counter
 /// rather than a gauge: statsd-exporter keeps serving a dead process's last gauge value.
 pub static PROCESS_HEARTBEAT: Counter = metrics::counter("cs.process.heartbeat");
 pub static PROCESS_RSS_BYTES: Gauge = metrics::gauge("cs.process.rss_bytes");

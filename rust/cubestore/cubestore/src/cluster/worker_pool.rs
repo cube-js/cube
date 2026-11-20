@@ -496,13 +496,7 @@ where
         a.services_reciever,
         a.timeout,
     );
-    start_process_metrics(
-        &P::process_type(),
-        vec![metrics::format_tag(
-            "slot",
-            &metrics::sanitize_tag_value(&a.slot),
-        )],
-    );
+    start_process_metrics(&P::process_type(), Some(&a.slot));
     let mut tokio_builder = Builder::new_multi_thread();
     tokio_builder.enable_all();
     tokio_builder.thread_name("cubestore-worker");
