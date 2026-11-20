@@ -1,4 +1,4 @@
-use super::CompiledPreAggregation;
+use super::{CompiledPreAggregation, PreAggregationSource};
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem, FilterOperator};
 use crate::planner::query_tools::QueryTools;
@@ -50,9 +50,11 @@ pub struct DimensionMatcher<'a> {
     readable_time_columns: HashMap<MemberId, Vec<bool>>,
     pre_aggregation_segments: HashMap<MemberId, bool>,
     projects_stored_dimension: bool,
-    // Set for a date filter not matched as an aligned time-dimension read: it
-    // still renders from grain columns, which can't serve its bounds.
-    in_unaligned_date_filter: bool,
+    // Join keys a rollupJoin reads only from its legs' grain columns.
+    truncated_join_keys: HashSet<MemberId>,
+    // Set while matching the members a date-filtered member is computed from:
+    // the filter renders their raw columns against database-timezone bounds.
+    in_date_filter_dependencies: bool,
     result: MatchState,
 }
 
@@ -83,6 +85,10 @@ impl<'a> DimensionMatcher<'a> {
             .iter()
             .map(|s| (s.id().clone(), false))
             .collect();
+        let truncated_join_keys = match pre_aggregation.source.as_ref() {
+            PreAggregationSource::Join(join) => join.truncated_keys(),
+            _ => HashSet::new(),
+        };
         Self {
             query_tools,
             pre_aggregation,
@@ -91,7 +97,8 @@ impl<'a> DimensionMatcher<'a> {
             readable_time_columns: HashMap::new(),
             pre_aggregation_segments,
             projects_stored_dimension: false,
-            in_unaligned_date_filter: false,
+            truncated_join_keys,
+            in_date_filter_dependencies: false,
             result: MatchState::Full,
         }
     }
@@ -296,17 +303,19 @@ impl<'a> DimensionMatcher<'a> {
         dimension: &DimensionSymbol,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
-        let stored_as_grain = self
-            .pre_aggregation_time_dimensions
-            .contains_key(dimension.id());
-        if stored_as_grain && self.in_unaligned_date_filter {
-            Ok(MatchState::NotMatched)
-        } else if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
+        if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
+            if self.in_date_filter_dependencies && self.truncated_join_keys.contains(dimension.id())
+            {
+                return Ok(MatchState::NotMatched);
+            }
             if add_to_matched_dimension {
                 *found = true;
             }
             Ok(MatchState::Full)
-        } else if stored_as_grain {
+        } else if self
+            .pre_aggregation_time_dimensions
+            .contains_key(dimension.id())
+        {
             // A grain column holds the value truncated and in the query
             // timezone, so a raw read needs the member listed as a dimension.
             Ok(MatchState::NotMatched)
@@ -527,19 +536,38 @@ impl<'a> DimensionMatcher<'a> {
         let add_to_matched_dimension = add_to_matched_dimension && filter.is_single_value_equal();
         let symbol = if let Some(time_dimension) = filter.time_dimension_symbol() {
             time_dimension
-        } else if let Some(read) = self.date_filter_as_time_dimension(filter) {
-            // The rollup holds no raw value to stand for a misaligned range.
-            return self.try_match_time_dimension(&read, add_to_matched_dimension, true);
         } else if filter.operation().is_date_bounded() {
-            self.in_unaligned_date_filter = true;
-            let res = self.try_match_symbol(&filter.member_evaluator(), add_to_matched_dimension);
-            self.in_unaligned_date_filter = false;
-            return res;
+            return self.try_match_date_filter(filter, add_to_matched_dimension);
         } else {
             filter.member_evaluator().clone()
         };
         let res = self.try_match_symbol(&symbol, add_to_matched_dimension)?;
         Ok(res)
+    }
+
+    // A date filter reads the raw column of its member, or of the members it
+    // is computed from. A join key stored only truncated has no raw column.
+    fn try_match_date_filter(
+        &mut self,
+        filter: &BaseFilter,
+        add_to_matched_dimension: bool,
+    ) -> Result<MatchState, CubeError> {
+        let member = filter.member_evaluator();
+        let id = member.peel_refs().id().clone();
+        if !self.truncated_join_keys.contains(&id) {
+            self.in_date_filter_dependencies = true;
+            let res = self.try_match_symbol(&member, add_to_matched_dimension);
+            self.in_date_filter_dependencies = false;
+            return res;
+        }
+        if !self.pre_aggregation_time_dimensions.contains_key(&id) {
+            return self.try_match_symbol(&member, add_to_matched_dimension);
+        }
+        match self.date_filter_as_time_dimension(filter) {
+            // The grain column holds no raw value to stand for a misaligned range.
+            Some(read) => self.try_match_time_dimension(&read, add_to_matched_dimension, true),
+            None => Ok(MatchState::NotMatched),
+        }
     }
 
     fn range_on_grain(
@@ -570,9 +598,8 @@ impl<'a> DimensionMatcher<'a> {
         interval.hour != 0 || interval.minute != 0 || interval.second != 0
     }
 
-    // A grain column holds no raw value, but serves a date filter on the raw
-    // member whose bounds fall on its grain, as it would a time dimension's
-    // range. `None` leaves the filter a raw read.
+    // A grain column serves a date filter whose bounds fall on its grain, as
+    // it would a time dimension's range.
     fn date_filter_as_time_dimension(
         &self,
         filter: &BaseFilter,

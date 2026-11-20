@@ -142,11 +142,17 @@ impl PreAggregation {
             res.insert(segment.full_name(), QualifiedColumnName::new(None, alias));
         }
 
+        // A join key is read from the legs' column, which is a grain column
+        // when the key is stored truncated.
         if let PreAggregationSource::Join(join) = self.source().as_ref() {
-            for item in join.items.iter() {
-                for member in item.from_members.iter().chain(item.to_members.iter()) {
+            let truncated = join.truncated_keys();
+            for member in join.key_members() {
+                let key = member.symbol.peel_refs();
+                if truncated.contains(key.id()) {
+                    res.remove(&key.full_name());
+                } else if member.granularity.is_none() {
                     res.insert(
-                        member.symbol.peel_refs().full_name(),
+                        key.full_name(),
                         QualifiedColumnName::new(None, member.column.clone()),
                     );
                 }
@@ -188,6 +194,20 @@ impl PreAggregation {
                 base_symbol.peel_refs().full_name(),
                 QualifiedColumnName::new(None, alias),
             );
+        }
+        // The legs store no rollupJoin column of their own, so time-dimension
+        // reads of a join key go to the key's column as well.
+        if let PreAggregationSource::Join(join) = self.source().as_ref() {
+            let truncated = join.truncated_keys();
+            for member in join.key_members() {
+                let key = member.symbol.peel_refs();
+                if member.granularity.is_none() || truncated.contains(key.id()) {
+                    res.insert(
+                        key.full_name(),
+                        QualifiedColumnName::new(None, member.column.clone()),
+                    );
+                }
+            }
         }
         res
     }

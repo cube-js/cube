@@ -181,6 +181,10 @@ impl SqlNodesFactory {
         !self.pre_aggregation_dimensions_references.is_empty()
     }
 
+    pub fn pre_aggregation_dimensions_references(&self) -> &PreAggregationColumns {
+        &self.pre_aggregation_dimensions_references
+    }
+
     pub fn add_pre_aggregation_dimension_reference(
         &mut self,
         name: String,

@@ -469,3 +469,40 @@ async fn test_stored_dimension_over_unmasked_member_is_served_by_rollup() -> Res
     }
     Ok(())
 }
+
+// The rollup stores `created_at` both raw and truncated to a day; a bound
+// inside a day is checked against the raw column.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_conditional_mask_with_a_date_bound_inside_a_day_is_rendered_over_rollup(
+) -> Result<(), CubeError> {
+    let query = indoc! {"
+        dimensions:
+          - workers.full_name
+          - workers.gender
+        order:
+          - id: workers.full_name
+        maskedMembers:
+          - member: workers.gender
+            filter:
+              member: workers.created_at
+              operator: afterDate
+              values:
+                - '2024-01-02T11:30:00'
+    "};
+    let (sql, usages) = build(query)?;
+
+    assert_served_by_rollup(&sql, &usages);
+    for result in execute(
+        "conditional_mask_with_a_date_bound_inside_a_day_is_rendered_over_rollup",
+        query,
+    )
+    .await?
+    {
+        assert_eq!(
+            column(&result, "workers__gender"),
+            vec!["NULL", "NULL", "F"],
+            "{result}"
+        );
+    }
+    Ok(())
+}

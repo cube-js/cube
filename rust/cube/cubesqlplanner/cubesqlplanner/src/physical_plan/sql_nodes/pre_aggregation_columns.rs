@@ -42,6 +42,14 @@ impl PreAggregationColumns {
             .or_else(|| self.columns.get(name))
     }
 
+    pub fn has_raw(&self, name: &str) -> bool {
+        self.columns.contains_key(name)
+    }
+
+    pub fn has_grain(&self, name: &str) -> bool {
+        self.grain_columns.contains_key(name)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.columns.is_empty() && self.grain_columns.is_empty()
     }

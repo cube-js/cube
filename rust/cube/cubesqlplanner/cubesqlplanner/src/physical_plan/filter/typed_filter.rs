@@ -35,7 +35,15 @@ impl ToSql for TypedFilter {
         }
 
         let resolved = resolve_base_symbol(self.member_evaluator());
-        let visitor = if self.operation().is_date_bounded() {
+        let name = resolved.peel_refs().full_name();
+        let columns = &filters_ctx.pre_aggregation_columns;
+        // A time dimension's range reads its grain column, any other filter the
+        // raw column wherever one is stored. Bounds take that column's timezone:
+        // the query's for a grain column, the database's for a raw one.
+        let reads_grain = filters_ctx.use_local_tz
+            && columns.has_grain(&name)
+            && (self.member_evaluator().as_time_dimension().is_ok() || !columns.has_raw(&name));
+        let visitor = if reads_grain {
             visitor.with_time_dimension_read()
         } else {
             visitor.clone()
@@ -46,7 +54,7 @@ impl ToSql for TypedFilter {
             &member_sql,
             &query_tools,
             templates,
-            !filters_ctx.use_local_tz,
+            !reads_grain,
             self.use_raw_values(),
         );
 

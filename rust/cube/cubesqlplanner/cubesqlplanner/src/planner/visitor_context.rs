@@ -1,3 +1,4 @@
+use crate::physical_plan::sql_nodes::PreAggregationColumns;
 use crate::planner::sql_call::SqlCallFilterParamsItem;
 use std::collections::HashMap;
 
@@ -12,4 +13,6 @@ pub struct FiltersContext {
     /// segment is then a stored boolean column, which some dialects can't use
     /// as a bare predicate (e.g. MSSQL `BIT` needs `= 1`).
     pub reading_pre_aggregation: bool,
+    /// The rollup columns members resolve to; empty outside a rollup read.
+    pub pre_aggregation_columns: PreAggregationColumns,
 }

@@ -164,6 +164,15 @@ cubes:
         time_dimension: cohort_date
         granularity: month
 
+      - name: raw_only
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+
       - name: quarter_only
         type: rollup
         measures:
