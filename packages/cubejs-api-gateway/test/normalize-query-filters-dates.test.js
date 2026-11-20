@@ -463,8 +463,7 @@ describe('invalid absolute dates', () => {
     ['afterOrOnDate', ['2026-01-01 10:61']],
     ['afterDate', ['2026-00-10']],
   ])('%s with %j is a user error', (operator, values) => {
-    // Why: these match the absolute-date shape and used to reach the planners
-    // unparsed, failing there with an opaque 500.
+    // Why: these match the absolute-date shape but name no real date or time.
     expect(() => normalizeDateFilterValues({ member: 'Orders.createdAt', operator, values }, 'UTC'))
       .toThrow(expect.objectContaining({ status: 400, message: expect.stringMatching(/Invalid date/) }));
   });
