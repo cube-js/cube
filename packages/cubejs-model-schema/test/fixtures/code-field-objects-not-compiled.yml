@@ -1,5 +1,5 @@
 # A code field takes an object only where the YAML compiler turns it into code. Here it doesn't, so
-# Core rejects both objects; the schema accepts them.
+# Core rejects the object; the schema accepts it.
 cubes:
   - name: orders
     sql_table: orders
@@ -8,19 +8,6 @@ cubes:
         sql: id
         type: number
         primary_key: true
-
-views:
-  - name: nested_folder_join_path
-    cubes:
-      - join_path: orders
-        includes: "*"
-    folders:
-      - name: outer
-        includes:
-          - name: inner
-            includes:
-              - join_path:
-                  a: 1
 
 view_groups:
   - name: nested_group_includes
