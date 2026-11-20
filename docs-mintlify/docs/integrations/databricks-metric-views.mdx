@@ -385,15 +385,19 @@ is blocked with `ownership-conflict` until it [takes them over](#take-over-an-ex
 
 To publish to production the build you tested in staging:
 
-1. Publish to staging: turn on [Publish after each deployment](#publish-after-each-deployment)
-   for it with `syncOnDeploy: true`, or start its runs yourself. Leave the setting off for
-   production, so that no deployment publishes there untested.
-2. Once a staging run is **Completed**, run your own checks against the staging Metric Views. Cube
+1. Create both publication targets: save `staging` and `production` with `?target=<name>` and
+   `expectedConfigurationVersion: 0`, each with its own catalog or schema. Leave `syncOnDeploy`
+   off for production, so that no deployment publishes there untested.
+2. Publish to staging: turn on [Publish after each deployment](#publish-after-each-deployment)
+   for it with `syncOnDeploy: true`, or start its runs yourself.
+3. Once a staging run is **Completed**, run your own checks against the staging Metric Views. Cube
    doesn't know whether they passed.
-3. Start a production run with production's `configurationVersion` and `promoteFromRunId` set to
+4. Start a production run with production's `configurationVersion` and `promoteFromRunId` set to
    the staging run's `runId`, here `STAGING_RUN_ID`:
 
 ```bash
+set -euo pipefail
+
 integration="$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/databricks-metric-view-integrations/default"
 auth_header="Authorization: Bearer $CUBE_API_TOKEN"
 version=$(curl --fail --silent --show-error -H "$auth_header" \
