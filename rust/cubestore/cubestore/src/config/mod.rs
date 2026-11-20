@@ -1617,14 +1617,6 @@ where
     n
 }
 
-// A quarter of the container limit: the budget is one per process, shared by every job runner in
-// it, next to the frames being imported and everything else the process does.
-fn default_import_index_memory_budget() -> usize {
-    crate::util::memory::cgroup_memory_limit()
-        .map(|limit| (limit / 4) as usize)
-        .unwrap_or(1024 * 1024 * 1024)
-}
-
 /// Like [env_parse_lenient] for human-readable byte sizes such as `512M`.
 pub fn env_parse_size_lenient(name: &str, default: usize) -> usize {
     match env::var(name) {
@@ -2129,7 +2121,7 @@ impl Config {
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
                 import_index_memory_budget: env_parse_size_lenient(
                     "CUBESTORE_IMPORT_INDEX_MEMORY_BUDGET",
-                    default_import_index_memory_budget(),
+                    0,
                 ),
                 wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 1048576 / 2),
                 wal_split_size_threshold_bytes: env_parse_optional_size(
