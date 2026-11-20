@@ -18,16 +18,34 @@ connection form — the same form the deployment wizard uses.
 
 Cube Cloud tests the connection before saving; on success it persists the
 env vars and restarts the development environment, on failure it surfaces
-the driver's error and saves nothing. The first named source also creates
-`CUBEJS_DATASOURCES`, so Cube Cloud first shows the data sources it will
-list and asks you to confirm them (see [Under the hood](#under-the-hood)).
+the driver's error and saves nothing.
+
+The first named source also creates `CUBEJS_DATASOURCES` (see
+[Under the hood](#under-the-hood)). Once it's set, Cube rejects queries to
+any data source it doesn't list, so Cube Cloud first shows the list it will
+save and asks you to confirm it:
+
+- The list holds the data sources configured on this page and the ones your
+  data model uses. A data source whose driver fails to load while Cube Cloud
+  reads the data model is left out.
+- If Cube Cloud can't read which data sources your data model uses, the
+  dialog says so, and the list holds only the ones configured on this page.
+- If a data source is missing, click **Cancel**, which saves nothing. Add
+  `CUBEJS_DATASOURCES` with every data source name in
+  [**Settings → Environment Variables**][ref-config-ref-env], then add the
+  source again: Cube Cloud keeps every name the variable lists. You can
+  also save and add the missing name afterwards, but queries to that data
+  source fail until you do.
 
 ## Editing and deleting
 
-Use the **Edit** action on a row to update credentials, or the **Delete**
-action to remove a named source. The **default** source can be edited but
-not deleted — to remove it, clear the bare `CUBEJS_DB_*` variables from
-[**Settings → Environment Variables**][ref-config-ref-env] by hand.
+Use the **Edit** action on a row to update its connection, or **Delete** to
+remove the source. Deleting a named source removes its `CUBEJS_DS_<NAME>_*`
+variables. Deleting the **default** source clears only its connection
+variables, since other bare `CUBEJS_*` variables apply to the whole
+deployment; cubes without a `data_source` stop working until you set up a
+new default. Either way, Cube Cloud removes the source's name from
+`CUBEJS_DATASOURCES`.
 
 ## Data sources served by `driver_factory` {#data-sources-served-by-driver_factory}
 
@@ -40,8 +58,8 @@ The clickhouse data source is missing in the declared CUBEJS_DATASOURCES.
 ```
 
 Cube Cloud adds the data sources your data model uses when it creates the variable (see
-[Under the hood](#under-the-hood)). If `driver_factory` serves a data source that isn't in the
-list, such as one no cube uses yet, add its name to `CUBEJS_DATASOURCES` in
+[Adding a data source](#adding-a-data-source)). If `driver_factory` serves a data source that
+isn't in the list, such as one no cube uses yet, add its name to `CUBEJS_DATASOURCES` in
 [**Settings → Environment Variables**][ref-config-ref-env]. Names are case-sensitive.
 
 Don't give a data source that `driver_factory` serves a connection of its own with
@@ -116,8 +134,9 @@ uses a `CUBEJS_DS_<NAME>_*` prefix. `CUBEJS_DATASOURCES` lists the data
 sources Cube accepts queries for, and Cube Cloud sets it whenever at least
 one named source exists:
 
-- The first named source you add creates it from the new source and the
-  data sources your data model uses, after you confirm the list.
+- The save that creates it, usually adding the first named source, lists
+  the data sources configured on the page and the ones your data model
+  uses, after you confirm them (see [Adding a data source](#adding-a-data-source)).
 - Later saves keep every name it lists and add new sources. Deleting a
   source removes its name.
 - Deleting the last named source removes the variable, and Cube then
