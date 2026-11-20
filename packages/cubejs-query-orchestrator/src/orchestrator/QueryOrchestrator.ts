@@ -186,7 +186,6 @@ export class QueryOrchestrator {
     }
 
     if (this.preAggregationsQueryCache !== this.queryCache) {
-      // pre-aggregation refresh key queries queue reconcile
       await (await this.preAggregationsQueryCache.getQueue(datasource)).reconcileQueue();
     }
   }

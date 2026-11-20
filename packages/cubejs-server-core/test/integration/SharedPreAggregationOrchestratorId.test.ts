@@ -203,9 +203,14 @@ describe('Shared pre-aggregation orchestrator id', () => {
       expect(tablesOf('for_b').length).toBeGreaterThan(0);
 
       // A rebuild in app B ends with a cleanup of orphaned tables, after the refresh end was reached
-      const [partitionOfB] = tablesOf('for_b').map(t => t.replace(/_[0-9a-z]+_[0-9a-z]+_[0-9a-z]+$/, ''));
+      const tablesOfB = tablesOf('for_b');
+      const [partitionOfB] = tablesOfB.map(t => t.replace(/_[0-9a-z]+_[0-9a-z]+_[0-9a-z]+$/, ''));
+      // Nothing uses or touches it, so it shows the cleanup ran
+      const orphanedTable = 'stb_pre_aggregations.orders_orphaned20201230_aaaaaaaa_bbbbbbbb_cccccc';
+      driver.tables.push(orphanedTable);
+      let rebuilt = false;
 
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 100 && !rebuilt; i++) {
         try {
           await refreshScheduler.buildPreAggregations(context('b'), {
             timezones: ['UTC'],
@@ -213,7 +218,7 @@ describe('Shared pre-aggregation orchestrator id', () => {
             forceBuildPreAggregations: true,
             throwErrors: true,
           });
-          break;
+          rebuilt = true;
         } catch (e) {
           if ((<{ error: string }>e).error !== 'Continue wait') {
             throw e;
@@ -221,6 +226,10 @@ describe('Shared pre-aggregation orchestrator id', () => {
         }
       }
 
+      expect(rebuilt).toBe(true);
+      // The rebuild loaded the partition again
+      expect(tablesOf('for_b')).toHaveLength(tablesOfB.length + 1);
+      expect(driver.tables).not.toContain(orphanedTable);
       expect(orchestratorIds).toEqual(new Set([`APP_a_${testId}`, `APP_b_${testId}`]));
       expect(tablesOf('for_a')).toEqual(tablesOfA);
     } finally {
