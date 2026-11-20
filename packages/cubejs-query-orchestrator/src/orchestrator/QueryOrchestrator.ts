@@ -46,7 +46,8 @@ export interface QueryOrchestratorOptions {
   skipExternalCacheAndQueue?: boolean;
   /**
    * Prefix of every pre-aggregation cache key and queue: builds, touches, versions and
-   * refresh keys. Defaults to the orchestrator's own prefix.
+   * refresh keys. Defaults to the orchestrator's own prefix. When set, even to that prefix,
+   * the orchestrator waits for the others sharing it before it drops untouched tables.
    */
   preAggregationsRedisPrefix?: string;
 }
@@ -150,7 +151,7 @@ export class QueryOrchestrator {
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.preAggregationsOptions,
-        sharedCacheOrchestratorId: this.preAggregationsQueryCache === this.queryCache ? undefined : this.redisPrefix,
+        sharedCacheOrchestratorId: options.preAggregationsRedisPrefix ? this.redisPrefix : undefined,
       }
     );
   }

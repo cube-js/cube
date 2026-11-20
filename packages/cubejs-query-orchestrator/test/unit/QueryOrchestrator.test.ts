@@ -2001,6 +2001,27 @@ describe('QueryOrchestrator', () => {
       expect(await appB.getPreAggregations().getRefreshEndReached()).toBeTruthy();
     });
 
+    test('an app whose orchestrator id is the shared id waits for the others too', async () => {
+      const sharedId = `SHARED_PRE_AGG_${sharedTestCount++}`;
+      const appA = createApp(sharedId, sharedId);
+      const appB = createApp(`APP_B_${sharedTestCount++}`, sharedId);
+      apps.push(appA, appB);
+
+      // App A keeps one cache, as its pre-aggregation prefix is its own
+      expect(appA.getPreAggregationsQueryCache()).toBe(appA.getQueryCache());
+
+      await appB.markRefreshActive();
+      await appA.markRefreshActive();
+      await appA.updateRefreshEndReached();
+
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeFalsy();
+
+      await appB.updateRefreshEndReached();
+
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+      expect(await appB.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+    });
+
     test('cleanup keeps untouched tables until every refreshing app finished its refresh', async () => {
       const [appA, appB] = createApps(true);
       const builder = createApp(`APP_BUILDER_${sharedTestCount++}`);
