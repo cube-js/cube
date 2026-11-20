@@ -2725,13 +2725,14 @@ impl ChunkStore {
             return Err(CubeError::corrupt_data(error_message));
         }
 
-        // Sorting, assigning rows to partitions and copying them out are CPU-bound and allocate a
-        // full copy of the input; on the async runtime they would starve every other task of
-        // this worker, memory limit checks included.
-        let (partition_columns, unassigned_rows) =
+        // Sorting, assigning rows to partitions and copying them out are CPU-bound; on the async
+        // runtime they would starve every other task of this worker, memory limit checks included.
+        let (columns, partition_rows, unassigned_rows) =
             cube_ext::spawn_blocking(move || -> Result<_, ArrowError> {
                 let rows_order = sort_rows(&columns, sort_key_size)?;
-                split_rows_by_partition(&columns, sort_key_size, partitions, rows_order)
+                let (partition_rows, unassigned_rows) =
+                    assign_rows_to_partitions(&columns, sort_key_size, partitions, rows_order);
+                Ok((columns, partition_rows, unassigned_rows))
             })
             .await??;
 
@@ -2752,12 +2753,21 @@ impl ChunkStore {
         // limit is disabled (the common case) skip the node-name/dedup work entirely.
         let disk_check_enabled = !in_memory && self.config.max_disk_space_per_worker() != 0;
         let mut checked_nodes: HashSet<String> = HashSet::new();
-        for (partition, columns) in partition_columns {
+        // One partition's copy at a time: post-processing shrinks it before the next is taken.
+        for (partition, rows) in partition_rows {
             if disk_check_enabled
                 && checked_nodes.insert(node_name_by_partition(self.config.as_ref(), &partition))
             {
                 self.check_node_disk_space(&partition).await?;
             }
+            let input = columns.clone();
+            let columns = cube_ext::spawn_blocking(move || {
+                input
+                    .iter()
+                    .map(|c| datafusion::arrow::compute::take(c.as_ref(), &rows, None))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .await??;
             let columns = self
                 .post_process_columns(index.clone(), table, columns)
                 .await?;
@@ -3065,13 +3075,13 @@ fn sort_rows(columns: &[ArrayRef], sort_key_size: usize) -> Result<Vec<u64>, Arr
     Ok(order)
 }
 
-// Also returns how many rows fit no partition.
-fn split_rows_by_partition(
+// Row indices of each partition that gets rows, in sort order, plus how many rows fit no partition.
+fn assign_rows_to_partitions(
     columns: &[ArrayRef],
     sort_key_size: usize,
     partitions: Vec<IdRow<Partition>>,
     rows_order: Vec<u64>,
-) -> Result<(Vec<(IdRow<Partition>, Vec<ArrayRef>)>, usize), ArrowError> {
+) -> (Vec<(IdRow<Partition>, UInt64Array)>, usize) {
     let mut remaining_rows = rows_order;
     let mut result = Vec::new();
     for partition in partitions {
@@ -3091,17 +3101,11 @@ fn split_rows_by_partition(
                     ) > Ordering::Equal)
         });
         remaining_rows = next;
-        if to_write.is_empty() {
-            continue;
+        if !to_write.is_empty() {
+            result.push((partition, UInt64Array::from(to_write)));
         }
-        let to_write = UInt64Array::from(to_write);
-        let partition_columns = columns
-            .iter()
-            .map(|c| datafusion::arrow::compute::take(c.as_ref(), &to_write, None))
-            .collect::<Result<Vec<_>, _>>()?;
-        result.push((partition, partition_columns));
     }
-    Ok((result, remaining_rows.len()))
+    (result, remaining_rows.len())
 }
 
 fn remap_columns(

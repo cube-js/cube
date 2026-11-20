@@ -2394,9 +2394,9 @@ sized by the batch's data and column count; the rest wait. This bounds the memor
 inserts into tables with many indexes or many columns, at the cost of building fewer
 indexes in parallel. `0` disables the budget.
 
-| Possible Values                     | Default in Development                                | Default in Production                                 |
-| ----------------------------------- | ----------------------------------------------------- | ----------------------------------------------------- |
-| A size in bytes, e.g., `512MB`, `2GB` | A quarter of the container memory limit, else `1GB` | A quarter of the container memory limit, else `1GB` |
+| Possible Values                        | Default in Development                                 | Default in Production                                  |
+| -------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------ |
+| A size in bytes, e.g., `512MiB`, `2GiB` | A quarter of the container memory limit, else `1GiB` | A quarter of the container memory limit, else `1GiB` |
 
 ## `CUBESTORE_JOB_RUNNERS`
 
