@@ -71,12 +71,13 @@ fn install_panic_hook(tags: Vec<String>) {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         app_metrics::PANICS.add_with_tags(1, Some(&tags));
-        log::error!("{}", panic_summary(info));
+        // Not through the logger: the panic may have happened inside it.
+        eprintln!("{}", panic_summary(info));
         previous(info);
     }));
 }
 
-/// One line, so that a log search for the panic also returns where and why it happened.
+// One line, so that a log search for the panic also returns where and why it happened.
 fn panic_summary(info: &PanicHookInfo) -> String {
     let payload = info
         .payload()
@@ -126,22 +127,21 @@ fn parse_memory_status(status: &str) -> Option<MemoryStatus> {
 /// OOM kills in this container's memory cgroup so far. Unlike the container restart counter,
 /// they include kills of subprocesses.
 pub fn container_oom_kills() -> Option<u64> {
-    // Looked up once: this is read around every pool request.
-    static SOURCE: OnceLock<Option<&'static str>> = OnceLock::new();
-    let path = SOURCE.get_or_init(|| {
-        [
-            "/sys/fs/cgroup/memory.events",
-            "/sys/fs/cgroup/memory/memory.oom_control",
-        ]
-        .into_iter()
-        .find(|path| {
-            std::fs::read_to_string(path)
-                .ok()
-                .and_then(|content| parse_oom_kills(&content))
-                .is_some()
-        })
-    });
-    parse_oom_kills(&std::fs::read_to_string((*path)?).ok()?)
+    // Only a file that held the count is remembered, so a transient failure is retried.
+    static SOURCE: OnceLock<&'static str> = OnceLock::new();
+    if let Some(path) = SOURCE.get() {
+        return parse_oom_kills(&std::fs::read_to_string(path).ok()?);
+    }
+    [
+        "/sys/fs/cgroup/memory.events",
+        "/sys/fs/cgroup/memory/memory.oom_control",
+    ]
+    .into_iter()
+    .find_map(|path| {
+        let count = parse_oom_kills(&std::fs::read_to_string(path).ok()?)?;
+        let _ = SOURCE.set(path);
+        Some(count)
+    })
 }
 
 fn parse_oom_kills(content: &str) -> Option<u64> {
@@ -168,7 +168,7 @@ mod tests {
 
         let expected_tags = vec![
             format!("version:{}", VERSION),
-            format!("build:{}", BUILD_ID),
+            format!("build:{}", metrics::sanitize_tag_value(BUILD_ID)),
             "role:test-role".to_string(),
             "slot:sel1".to_string(),
         ];

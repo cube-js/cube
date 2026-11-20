@@ -119,15 +119,17 @@ impl<
     }
 }
 
-/// Why a pool subprocess ended in the middle of a request.
+// Why a pool subprocess ended in the middle of a request.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum ProcessExit {
-    /// The request ran past the pool timeout and the subprocess is killed.
+    // The request ran past the pool timeout; the subprocess is killed.
     Timeout,
-    /// The kernel OOM killer took it: the container's OOM kill count grew meanwhile.
+    // The container's OOM kill count grew during the request. The count is container-wide, so
+    // another process killed meanwhile is attributed here too.
     OomKill,
-    /// It disappeared for any other reason.
     Died,
+    // The channel to a still-running subprocess failed; the subprocess is killed.
+    BrokenChannel,
 }
 
 impl ProcessExit {
@@ -143,6 +145,7 @@ impl ProcessExit {
             ProcessExit::Timeout => "timeout",
             ProcessExit::OomKill => "oom_kill",
             ProcessExit::Died => "died",
+            ProcessExit::BrokenChannel => "broken_channel",
         }
     }
 
@@ -151,8 +154,23 @@ impl ProcessExit {
             ProcessExit::Timeout => "was stopped after timing out",
             ProcessExit::OomKill => "was killed by the OOM killer",
             ProcessExit::Died => "died",
+            ProcessExit::BrokenChannel => "was stopped after its channel failed",
         }
     }
+}
+
+// The channel can break a moment before the process is gone, so give it a short while.
+async fn exited_soon(handle: Option<&mut ProcessHandleGuard>) -> bool {
+    let Some(handle) = handle else {
+        return true;
+    };
+    for _ in 0..10 {
+        if !handle.is_alive() {
+            return true;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    false
 }
 
 struct ProcessHandleGuard {
@@ -299,10 +317,14 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
                 let (process_message_res, exit) = match process_message_res_timeout {
                     Ok(Ok((Ok(res), a, r))) => (Ok((res, a, r)), None),
                     Ok(Ok((Err(e), _, _))) => (Err(e), None),
-                    Ok(Err(e)) => (
-                        Err(e),
-                        Some(ProcessExit::lost(oom_kills_before, container_oom_kills())),
-                    ),
+                    Ok(Err(e)) => {
+                        let exit = if exited_soon(handle_guard.as_mut()).await {
+                            ProcessExit::lost(oom_kills_before, container_oom_kills())
+                        } else {
+                            ProcessExit::BrokenChannel
+                        };
+                        (Err(e), Some(exit))
+                    }
                     Err(e) => (
                         Err(CubeError::internal(format!(
                             "Timed out after waiting for {}",
@@ -364,7 +386,7 @@ impl<C: Configurator, P: WorkerProcessing, S: ServicesTransport> WorkerProcess<C
         );
     }
 
-    /// The outer error means the subprocess is gone; the inner one is its answer to the request.
+    // The outer error means the channel to the subprocess failed; the inner one is its answer.
     #[instrument(level = "trace", skip_all)]
     async fn process_message(
         &self,
@@ -471,7 +493,7 @@ pub struct WorkerProcessArgs<C: Configurator, P: WorkerProcessing, S: ServicesTr
     services_sender: IpcSender<S::TransportRequest>,
     services_reciever: IpcReceiver<S::TransportResponse>,
     timeout: Duration,
-    /// The pool slot this subprocess fills, telling apart the pool's processes in metrics.
+    // Tells apart the pool's processes in metrics.
     slot: String,
 }
 

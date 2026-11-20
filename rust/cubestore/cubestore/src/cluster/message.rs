@@ -172,6 +172,15 @@ impl NetworkMessage {
 
         let mut buffer = Vec::with_capacity(len as usize);
         socket.take(len).read_to_end(&mut buffer).await?;
+        // A peer that goes away mid-message leaves a short buffer: a dropped connection, not a
+        // message this build cannot decode.
+        if (buffer.len() as u64) < len {
+            return Err(CubeError::internal(format!(
+                "Connection closed after {} of {} message bytes",
+                buffer.len(),
+                len
+            )));
+        }
         let decoded = flexbuffers::Reader::get_root(&buffer)
             .map_err(CubeError::from)
             .and_then(|r| Ok(Self::deserialize(r)?));
@@ -184,3 +193,61 @@ impl NetworkMessage {
 
 // Anything larger is considered to be an invalid message.
 const MAX_NETWORK_MSG_LEN: u64 = 20 * 1024 * 1024 * 1024; // 20GiB
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::net::TcpListener;
+
+    async fn receive_bytes(write: impl FnOnce(&mut Vec<u8>)) -> Result<NetworkMessage, CubeError> {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let mut bytes = Vec::new();
+        write(&mut bytes);
+        let writer = tokio::spawn(async move {
+            let mut socket = TcpStream::connect(addr).await.unwrap();
+            socket.write_all(&bytes).await.unwrap();
+        });
+        let (mut socket, _) = listener.accept().await.unwrap();
+        writer.await.unwrap();
+        NetworkMessage::receive(&mut socket).await
+    }
+
+    fn header(bytes: &mut Vec<u8>, version: u32, len: u64) {
+        bytes.extend_from_slice(&MAGIC.to_be_bytes());
+        bytes.extend_from_slice(&version.to_be_bytes());
+        bytes.extend_from_slice(&len.to_be_bytes());
+    }
+
+    #[tokio::test]
+    async fn message_cut_short_is_a_closed_connection_not_a_decode_error() {
+        let err = receive_bytes(|bytes| {
+            header(bytes, NETWORK_MESSAGE_VERSION, 100);
+            bytes.extend_from_slice(&[0; 10]);
+        })
+        .await
+        .unwrap_err();
+        assert!(
+            err.message
+                .contains("Connection closed after 10 of 100 message bytes"),
+            "{}",
+            err.message
+        );
+    }
+
+    #[tokio::test]
+    async fn undecodable_message_is_counted() {
+        use crate::util::metrics::test_capture;
+        test_capture::watch("cs.rpc.decode_errors");
+        let before = test_capture::samples("cs.rpc.decode_errors").len();
+
+        let err = receive_bytes(|bytes| {
+            header(bytes, NETWORK_MESSAGE_VERSION, 4);
+            bytes.extend_from_slice(&[0xff; 4]);
+        })
+        .await;
+
+        assert!(err.is_err());
+        assert!(test_capture::samples("cs.rpc.decode_errors").len() > before);
+    }
+}

@@ -834,8 +834,8 @@ pub enum RWLoopOperation {
 
 const RW_LOOP_STATS_INTERVAL: Duration = Duration::from_secs(10);
 
-/// Loop activity accumulated between reports: loops run far too many operations to send a
-/// metric packet for each.
+// Loops run far too many operations to send a metric packet for each, so activity accumulates
+// here and a separate thread reports it: a loop stuck on one task must still show its backlog.
 #[derive(Debug)]
 struct RWLoopStats {
     read_tags: Vec<String>,
@@ -846,6 +846,10 @@ struct RWLoopStats {
     writes: AtomicU64,
     write_time_us: AtomicU64,
     busy_us: AtomicU64,
+    epoch: Instant,
+    // Microseconds since `epoch` plus one at which the running task's unreported time starts;
+    // zero while the loop is idle.
+    running_since_us: AtomicU64,
 }
 
 impl RWLoopStats {
@@ -868,7 +872,13 @@ impl RWLoopStats {
             writes: AtomicU64::new(0),
             write_time_us: AtomicU64::new(0),
             busy_us: AtomicU64::new(0),
+            epoch: Instant::now(),
+            running_since_us: AtomicU64::new(0),
         }
+    }
+
+    fn now_us(&self) -> u64 {
+        self.epoch.elapsed().as_micros() as u64 + 1
     }
 
     fn record_operation(&self, operation: RWLoopOperation, elapsed: Duration) {
@@ -880,7 +890,38 @@ impl RWLoopStats {
         time_us.fetch_add(elapsed.as_micros() as u64, Ordering::Relaxed);
     }
 
+    fn task_started(&self) {
+        self.running_since_us
+            .store(self.now_us(), Ordering::Relaxed);
+    }
+
+    fn task_finished(&self) {
+        let since = self.running_since_us.swap(0, Ordering::Relaxed);
+        if since != 0 {
+            self.busy_us
+                .fetch_add(self.now_us().saturating_sub(since), Ordering::Relaxed);
+        }
+    }
+
+    // Moves the running task's time so far into `busy_us`; the task itself adds only the rest.
+    fn account_running_task(&self) {
+        let since = self.running_since_us.load(Ordering::Relaxed);
+        if since == 0 {
+            return;
+        }
+        let now = self.now_us();
+        if self
+            .running_since_us
+            .compare_exchange(since, now, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+        {
+            self.busy_us
+                .fetch_add(now.saturating_sub(since), Ordering::Relaxed);
+        }
+    }
+
     fn report(&self, queue_size: usize) {
+        self.account_running_task();
         let report_sum = |metric: &metrics::Counter, value: &AtomicU64, tags: &Vec<String>| {
             let value = value.swap(0, Ordering::Relaxed);
             if value > 0 {
@@ -932,47 +973,51 @@ impl RocksStoreRWLoop {
         let thread_name = format!("{}-{}-rwloop", store_name, name);
         std::thread::Builder::new()
             .name(thread_name)
-            .spawn(move || {
-                let mut last_report = Instant::now();
-                let mut reported_queue_size = 0;
-                loop {
-                    let Some(fun) = rx.blocking_recv() else {
-                        return;
-                    };
-                    let started = Instant::now();
-                    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(fun)) {
-                        Err(panic_payload) => {
-                            let restore_error = CubeError::from_panic_payload(panic_payload);
-                            log::error!(
-                                "Panic during read write loop execution: {}",
-                                restore_error
-                            );
-                        }
-                        Ok(res) => {
-                            if let Err(e) = res {
-                                log::error!("Error during read write loop execution: {}", e);
-                            }
-                        }
+            .spawn(move || loop {
+                let Some(fun) = rx.blocking_recv() else {
+                    return;
+                };
+                loop_stats.task_started();
+                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(fun)) {
+                    Err(panic_payload) => {
+                        let restore_error = CubeError::from_panic_payload(panic_payload);
+                        log::error!("Panic during read write loop execution: {}", restore_error);
                     }
-                    loop_stats
-                        .busy_us
-                        .fetch_add(started.elapsed().as_micros() as u64, Ordering::Relaxed);
-
-                    // A loop that goes idle reports no more, so a backlog must not be the last
-                    // queue size it leaves behind.
-                    let queue_size = rx.len();
-                    let drained = reported_queue_size > 0 && queue_size == 0;
-                    if drained || last_report.elapsed() >= RW_LOOP_STATS_INTERVAL {
-                        loop_stats.report(queue_size);
-                        reported_queue_size = queue_size;
-                        last_report = Instant::now();
+                    Ok(res) => {
+                        if let Err(e) = res {
+                            log::error!("Error during read write loop execution: {}", e);
+                        }
                     }
                 }
+                loop_stats.task_finished();
             })
             .expect(&format!(
                 "Failed to spawn RWLoop thread for store '{}', name '{}'",
                 store_name, name
             ));
+
+        // A weak sender, so the reporter does not keep the loop alive; it stops with the loop.
+        let weak_tx = tx.downgrade();
+        let reporter_stats = stats.clone();
+        let spawned = std::thread::Builder::new()
+            .name(format!("{}-{}-rwloop-stats", store_name, name))
+            .spawn(move || loop {
+                std::thread::sleep(RW_LOOP_STATS_INTERVAL);
+                let Some(tx) = weak_tx.upgrade() else {
+                    return;
+                };
+                let queue_size = tx.max_capacity() - tx.capacity();
+                drop(tx);
+                reporter_stats.report(queue_size);
+            });
+        if let Err(e) = spawned {
+            log::error!(
+                "Failed to spawn RWLoop stats thread for store '{}', name '{}': {}",
+                store_name,
+                name,
+                e
+            );
+        }
 
         // Thread handle is intentionally dropped - thread will exit when tx is dropped
         Self { name, tx, stats }
@@ -2041,5 +2086,32 @@ mod tests {
             of_this_loop("cs.metastore.rw_loop.queue_size"),
             vec![(7, tags(None)), (0, tags(None))]
         );
+    }
+
+    #[test]
+    fn rw_loop_stats_report_time_of_a_task_still_running() {
+        use crate::util::metrics::test_capture;
+        test_capture::watch("cs.metastore.rw_loop.busy.us");
+        let busy_reports = || {
+            test_capture::samples("cs.metastore.rw_loop.busy.us")
+                .into_iter()
+                .filter(|(_, tags)| tags.contains(&"store:running_test".to_string()))
+                .map(|(value, _)| value)
+                .collect::<Vec<_>>()
+        };
+
+        let stats = RWLoopStats::new("running_test", "default");
+        stats.task_started();
+        std::thread::sleep(Duration::from_millis(20));
+        stats.report(1);
+        assert_eq!(busy_reports().len(), 1);
+        assert!(busy_reports()[0] >= 20_000);
+
+        std::thread::sleep(Duration::from_millis(5));
+        stats.task_finished();
+        stats.report(0);
+        let reports = busy_reports();
+        assert_eq!(reports.len(), 2);
+        assert!(reports[1] >= 5_000);
     }
 }
