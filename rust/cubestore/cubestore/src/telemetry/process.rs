@@ -127,21 +127,17 @@ fn parse_memory_status(status: &str) -> Option<MemoryStatus> {
 /// they include kills of subprocesses.
 #[cfg(target_os = "linux")]
 pub fn container_oom_kills() -> Option<u64> {
-    // Only a file that held the count is remembered, so a transient failure is retried.
-    static SOURCE: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
-    if let Some(path) = SOURCE.get() {
-        return parse_oom_kills(&std::fs::read_to_string(path).ok()?);
-    }
-    [
-        "/sys/fs/cgroup/memory.events",
-        "/sys/fs/cgroup/memory/memory.oom_control",
-    ]
-    .into_iter()
-    .find_map(|path| {
-        let count = parse_oom_kills(&std::fs::read_to_string(path).ok()?)?;
-        let _ = SOURCE.set(path);
-        Some(count)
-    })
+    // Cgroup files don't come and go while the process runs, so the probe is done once.
+    static SOURCE: std::sync::OnceLock<Option<&'static str>> = std::sync::OnceLock::new();
+    let path = SOURCE.get_or_init(|| {
+        [
+            "/sys/fs/cgroup/memory.events",
+            "/sys/fs/cgroup/memory/memory.oom_control",
+        ]
+        .into_iter()
+        .find(|path| std::path::Path::new(path).exists())
+    });
+    parse_oom_kills(&std::fs::read_to_string((*path)?).ok()?)
 }
 
 #[cfg(not(target_os = "linux"))]
