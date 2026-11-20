@@ -150,6 +150,7 @@ export class QueryOrchestrator {
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.preAggregationsOptions,
+        orchestratorId: this.preAggregationsQueryCache === this.queryCache ? undefined : this.redisPrefix,
       }
     );
   }

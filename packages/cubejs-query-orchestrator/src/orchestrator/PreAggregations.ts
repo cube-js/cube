@@ -303,6 +303,12 @@ export type PreAggregationsOptions = {
   dropPreAggregationsWithoutTouch?: boolean;
   usedTablePersistTime?: number;
   externalRefresh?: boolean;
+  /**
+   * Keeps the refresh end reached flag per orchestrator when orchestrators share the
+   * pre-aggregation cache, so one finishing its refresh doesn't let another drop tables
+   * its own refresh hasn't touched yet.
+   */
+  orchestratorId?: string;
 };
 
 export class PreAggregations {
@@ -390,7 +396,7 @@ export class PreAggregations {
 
   protected refreshEndReachedKey() {
     // TODO add dataSource?
-    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', '');
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', this.options.orchestratorId || '');
   }
 
   protected preAggBuildStatusRedisKey(tableName: string): string {

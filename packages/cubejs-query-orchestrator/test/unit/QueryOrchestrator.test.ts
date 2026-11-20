@@ -1956,21 +1956,29 @@ describe('QueryOrchestrator', () => {
       apps = [];
     });
 
-    test('every pre-aggregation key is shared', async () => {
+    test('every pre-aggregation key but the refresh end is shared', async () => {
       const [appA, appB] = createApps(true);
       const tableName = 'stb_pre_aggregations.orders_shared_keys';
 
       await appA.getPreAggregations().addTableUsed(tableName);
       await appA.getPreAggregations().updateLastTouch(tableName);
-      await appA.getPreAggregations().updateRefreshEndReached();
       await appA.getPreAggregations().updatePreAggBackoff(tableName, { backoffMultiplier: 2, nextTimestamp: new Date(0) });
       await appA.getPreAggregations().setPreAggregationBuildStatus(tableName, { status: 'building', startedAt: 1 } as never);
 
       expect(await appB.getPreAggregations().tablesUsed()).toContain(tableName);
       expect(await appB.getPreAggregations().tablesTouched()).toContain(tableName);
-      expect(await appB.getPreAggregations().getRefreshEndReached()).toBeTruthy();
       expect(await appB.getPreAggregations().getPreAggBackoff(tableName)).toMatchObject({ backoffMultiplier: 2 });
       expect(await appB.getPreAggregations().getPreAggregationBuildStatus(tableName)).toMatchObject({ status: 'building' });
+    });
+
+    test('the refresh end stays per orchestrator', async () => {
+      const [appA, appB] = createApps(true);
+
+      // App A's finished refresh says nothing about the tables app B's refresh still has to touch
+      await appA.getPreAggregations().updateRefreshEndReached();
+
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+      expect(await appB.getPreAggregations().getRefreshEndReached()).toBeFalsy();
     });
 
     test('pre-aggregation keys stay per orchestrator by default', async () => {
