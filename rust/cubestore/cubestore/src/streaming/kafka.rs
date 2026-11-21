@@ -393,6 +393,10 @@ impl StreamingSource for KafkaStreamingSource {
             Ok(data)
         }
     }
+    fn reports_lag(&self) -> bool {
+        true
+    }
+
     async fn calulate_lag(&self, current_seq: i64) -> Option<i64> {
         self.kafka_client
             .calulate_lag(self.topic.clone(), self.partition as i32, current_seq)

@@ -15,8 +15,10 @@
 //! Note that misconfiguration (invalid port, address, etc) can cause metric updates to be silently
 //! ignored. This is by design to avoid interrupting normal operation.
 use crate::CubeError;
+use std::collections::HashSet;
 use std::net::ToSocketAddrs;
 use std::net::UdpSocket;
+use std::sync::Mutex;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Compatibility {
@@ -113,6 +115,42 @@ impl IntMetric {
         if let Some(s) = sink() {
             s.send(&self.metric, v, tags)
         }
+    }
+}
+
+/// A gauge reported as a full set of tagged series at once. A series missing from a report is
+/// set to zero, so a tag combination that disappears does not keep its last value.
+pub struct GaugeFamily {
+    gauge: &'static Gauge,
+    reported: Mutex<Option<HashSet<Vec<String>>>>,
+}
+
+impl GaugeFamily {
+    pub const fn new(gauge: &'static Gauge) -> Self {
+        Self {
+            gauge,
+            reported: Mutex::new(None),
+        }
+    }
+
+    pub fn report(&self, series: impl IntoIterator<Item = (Vec<String>, i64)>) {
+        for (tags, value) in self.with_vanished_zeroed(series) {
+            self.gauge.report_with_tags(value, Some(&tags));
+        }
+    }
+
+    fn with_vanished_zeroed(
+        &self,
+        series: impl IntoIterator<Item = (Vec<String>, i64)>,
+    ) -> Vec<(Vec<String>, i64)> {
+        let mut reported = self.reported.lock().unwrap();
+        let mut out = series.into_iter().collect::<Vec<_>>();
+        let current = out.iter().map(|(t, _)| t.clone()).collect::<HashSet<_>>();
+        for tags in reported.iter().flatten().filter(|t| !current.contains(*t)) {
+            out.push((tags.clone(), 0));
+        }
+        *reported = Some(current);
+        out
     }
 }
 
@@ -267,5 +305,30 @@ pub mod test_capture {
         if let Some(recorded) = samples.as_mut().and_then(|s| s.get_mut(name)) {
             recorded.push((value, tags.cloned().unwrap_or_default()));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    static TEST_GAUGE: Gauge = gauge("cs.test.gauge_family");
+
+    #[test]
+    fn gauge_family_zeroes_vanished_series_once() {
+        let family = GaugeFamily::new(&TEST_GAUGE);
+        let a = || vec!["k:a".to_string()];
+        let b = || vec!["k:b".to_string()];
+
+        assert_eq!(
+            family.with_vanished_zeroed(vec![(a(), 1), (b(), 2)]),
+            vec![(a(), 1), (b(), 2)]
+        );
+        assert_eq!(
+            family.with_vanished_zeroed(vec![(a(), 3)]),
+            vec![(a(), 3), (b(), 0)]
+        );
+        assert_eq!(family.with_vanished_zeroed(vec![(a(), 4)]), vec![(a(), 4)]);
+        assert_eq!(family.with_vanished_zeroed(vec![]), vec![(a(), 0)]);
     }
 }
