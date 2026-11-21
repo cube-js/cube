@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { ZodError } from 'zod';
-import { isValidRequestId } from '@cubejs-backend/shared';
+import { getEnv, isValidRequestId } from '@cubejs-backend/shared';
 
 import { UserError } from '../user-error';
 import { ExtendedRequestContext, ContextAcceptorFn } from '../interfaces';
@@ -31,13 +31,135 @@ const calcMessageLength = (message: unknown) => Buffer.byteLength(
 
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => Promise<void>;
 
+export type WebSocketCloseConnectionFn = (connectionId: string, code: number, reason: string) => Promise<void> | void;
+
+export type WsAuthContext = {
+  isSubscription: boolean,
+  protocol: 'ws',
+  securityContext?: any,
+  authInfo?: any,
+  signedWithPlaygroundAuthSecret?: boolean,
+  authorization?: string,
+  expiresAt?: number,
+};
+
+type WsAuthenticateResult = { authContext: WsAuthContext } | { rejectMessage: unknown };
+
+// Policy Violation
+const AUTH_CLOSE_CODE = 1008;
+
+type WebSocketCloseErrorOptions = {
+  // Reported to the client the way it would be without the close
+  cause?: unknown,
+  // Sent to the client as is, instead of an error built from the cause
+  reply?: unknown,
+};
+
+/**
+ * Raised while handling a message to drop the connection's context with its subscriptions
+ * and close the socket, after the client has been told why.
+ */
+export class WebSocketCloseError extends Error {
+  // instanceof breaks when two copies of the package are loaded
+  public readonly type = 'WebSocketCloseError';
+
+  public readonly cause?: unknown;
+
+  public readonly reply?: unknown;
+
+  public constructor(
+    public readonly code: number,
+    public readonly reason: string,
+    options: WebSocketCloseErrorOptions = {},
+  ) {
+    super(reason);
+
+    this.cause = options.cause;
+    this.reply = options.reply;
+  }
+}
+
+const isWebSocketCloseError = (e: unknown): e is WebSocketCloseError => (
+  typeof e === 'object' && e !== null && (e as { type?: unknown }).type === 'WebSocketCloseError'
+);
+
 export class SubscriptionServer {
+  protected readonly reauthentications: Map<string, Promise<WsAuthContext | undefined>> = new Map();
+
   public constructor(
     protected readonly apiGateway: ApiGateway,
     protected readonly sendMessage: WebSocketSendMessageFn,
     protected readonly subscriptionStore: LocalSubscriptionStore,
     protected readonly contextAcceptor: ContextAcceptorFn,
+    protected readonly closeConnection?: WebSocketCloseConnectionFn,
   ) {
+  }
+
+  protected authExpiresAt(authContext: WsAuthContext): number {
+    const now = Date.now();
+    const expiresAt = now + getEnv('webSocketsAuthExpireSecs') * 1000;
+
+    // A custom checkAuth may accept a token whose exp is absent or already in the past, only the TTL applies then
+    const exp = authContext.securityContext?.exp;
+    if (typeof exp === 'number' && Number.isFinite(exp) && exp * 1000 > now) {
+      return Math.min(expiresAt, exp * 1000);
+    }
+
+    return expiresAt;
+  }
+
+  protected isAuthContextExpired(authContext: WsAuthContext): boolean {
+    return typeof authContext.expiresAt !== 'number' || Date.now() >= authContext.expiresAt;
+  }
+
+  protected async authenticate(authorization: string | undefined, isSubscription: boolean): Promise<WsAuthenticateResult> {
+    const authContext: WsAuthContext = { isSubscription, protocol: 'ws' };
+    await this.apiGateway.checkAuthFn(authContext, authorization);
+
+    // TODO: ContextAcceptorFn is typed for REST request contexts, the WS auth context has no requestId
+    const acceptanceResult = await this.contextAcceptor(authContext as any);
+    if (!acceptanceResult.accepted) {
+      return { rejectMessage: acceptanceResult.rejectMessage };
+    }
+
+    authContext.authorization = authorization;
+    authContext.expiresAt = this.authExpiresAt(authContext);
+
+    return { authContext };
+  }
+
+  protected reauthenticate(connectionId: string, expired: WsAuthContext, isSubscription: boolean): Promise<WsAuthContext | undefined> {
+    const inFlight = this.reauthentications.get(connectionId);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const promise = (async () => {
+      const result = await this.authenticate(expired.authorization, isSubscription);
+      if ('rejectMessage' in result) {
+        throw new CubejsHandlerError(403, 'Forbidden', 'Not authorized');
+      }
+
+      // An authorization message handled meanwhile wins over the refresh of the token it replaced
+      const current = await this.subscriptionStore.getAuthContext(connectionId);
+      if (current !== expired) {
+        return current;
+      }
+
+      await this.subscriptionStore.setAuthContext(connectionId, result.authContext);
+      return result.authContext;
+    })();
+
+    this.reauthentications.set(connectionId, promise);
+
+    const release = () => {
+      if (this.reauthentications.get(connectionId) === promise) {
+        this.reauthentications.delete(connectionId);
+      }
+    };
+    promise.then(release, release);
+
+    return promise;
   }
 
   protected resultFn(connectionId: string, messageId: string | undefined, requestId: string | undefined, logNetworkUsage: boolean = true) {
@@ -128,7 +250,7 @@ export class SubscriptionServer {
   }
 
   protected async handleMessage(connectionId: string, message: WsMessage, isSubscription: boolean) {
-    let authContext: any = {};
+    let authContext: WsAuthContext | undefined;
     let context: Partial<ExtendedRequestContext> = {};
 
     try {
@@ -140,12 +262,28 @@ export class SubscriptionServer {
         }
 
         await connection.trackAuth(async () => {
-          authContext = { isSubscription, protocol: 'ws' };
-          await this.apiGateway.checkAuthFn(authContext, message.authorization);
+          // A failed re-authentication must not leave the previous identity usable, a fresh socket has none
+          const closeErrorIfAuthorized = async (options: WebSocketCloseErrorOptions) => (
+            await this.subscriptionStore.getAuthContext(connectionId)
+              ? new WebSocketCloseError(AUTH_CLOSE_CODE, 'Authorization failed', options)
+              : undefined
+          );
 
-          const acceptanceResult = await this.contextAcceptor(authContext);
-          if (!acceptanceResult.accepted) {
-            await this.sendMessage(connectionId, acceptanceResult.rejectMessage);
+          let result: WsAuthenticateResult;
+
+          try {
+            result = await this.authenticate(message.authorization, isSubscription);
+          } catch (e) {
+            throw (await closeErrorIfAuthorized({ cause: e })) || e;
+          }
+
+          if ('rejectMessage' in result) {
+            const closeError = await closeErrorIfAuthorized({ reply: result.rejectMessage });
+            if (closeError) {
+              throw closeError;
+            }
+
+            await this.sendMessage(connectionId, result.rejectMessage);
             return;
           }
 
@@ -153,7 +291,7 @@ export class SubscriptionServer {
             return;
           }
 
-          await this.subscriptionStore.setAuthContext(connectionId, authContext);
+          await this.subscriptionStore.setAuthContext(connectionId, result.authContext);
           await this.sendMessage(connectionId, { handshake: true });
         });
 
@@ -170,6 +308,14 @@ export class SubscriptionServer {
       }
 
       authContext = await this.subscriptionStore.getAuthContext(connectionId);
+      if (authContext && this.isAuthContextExpired(authContext)) {
+        try {
+          authContext = await this.reauthenticate(connectionId, authContext, isSubscription);
+        } catch (e) {
+          throw new WebSocketCloseError(AUTH_CLOSE_CODE, 'Authorization expired', { cause: e });
+        }
+      }
+
       if (!authContext) {
         await this.sendMessage(
           connectionId,
@@ -251,17 +397,41 @@ export class SubscriptionServer {
 
       await this.sendMessage(connectionId, { messageProcessedId: message.messageId });
     } catch (e) {
-      const messageId = 'messageId' in message ? message.messageId : undefined;
-      const query = 'params' in message && message.params && 'query' in message.params
-        ? message.params.query
-        : undefined;
+      const closeError = isWebSocketCloseError(e) ? e : undefined;
+      if (closeError) {
+        await this.subscriptionStore.disconnect(connectionId);
+      }
 
-      this.apiGateway.handleError({
-        e,
-        query,
-        res: this.resultFn(connectionId, messageId, context.requestId),
-        context
-      });
+      if (closeError && closeError.reply !== undefined) {
+        await this.sendMessage(connectionId, closeError.reply);
+      } else {
+        const messageId = 'messageId' in message ? message.messageId : undefined;
+        const query = 'params' in message && message.params && 'query' in message.params
+          ? message.params.query
+          : undefined;
+
+        const res = this.resultFn(connectionId, messageId, context.requestId);
+        let sent: Promise<void> | undefined;
+
+        this.apiGateway.handleError({
+          e: closeError ? closeError.cause : e,
+          query,
+          res: (...args) => {
+            sent = res(...args);
+            return sent;
+          },
+          context
+        });
+
+        // The error has to reach the client before the socket is closed
+        if (closeError) {
+          await sent;
+        }
+      }
+
+      if (closeError && this.closeConnection) {
+        await this.closeConnection(connectionId, closeError.code, closeError.reason);
+      }
     }
   }
 
@@ -283,6 +453,7 @@ export class SubscriptionServer {
   }
 
   public async disconnect(connectionId: string) {
+    this.reauthentications.delete(connectionId);
     await this.subscriptionStore.disconnect(connectionId);
   }
 
