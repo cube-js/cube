@@ -235,7 +235,7 @@ impl StreamingService for StreamingServiceImpl {
         let lag_reset = LagGaugesReset::new(vec![format!("location:{}", location)]);
         let res = self.stream_table_impl(table, location, &lag_reset).await;
         if res.is_err() {
-            lag_reset.disarm();
+            lag_reset.mark_failed();
         }
         res
     }
@@ -452,6 +452,7 @@ impl StreamingServiceImpl {
 
 const STREAMING_LAG_REPORT_INTERVAL: Duration = Duration::from_secs(10);
 const NO_SEQ: i64 = i64::MIN;
+const STALE_LAG_AGE_MS: i64 = i64::MAX;
 
 // Lag is reported on its own schedule rather than per received batch, so it keeps updating while
 // the stream is idle and a failing watermark fetch shows up as a growing age instead of a frozen
@@ -484,10 +485,11 @@ fn spawn_lag_reporter(
 }
 
 // Zeroes the lag gauges when a stream stops cleanly on this node (sealed, table dropped, stream
-// moved away). After a failure the last values stay, so a broken stream does not read as no lag.
+// moved away). After a failure the lag stays and its age is pinned to a stale sentinel instead.
 struct LagGaugesReset {
     tags: Vec<String>,
     armed: AtomicBool,
+    failed: AtomicBool,
 }
 
 impl LagGaugesReset {
@@ -495,6 +497,7 @@ impl LagGaugesReset {
         Self {
             tags,
             armed: AtomicBool::new(false),
+            failed: AtomicBool::new(false),
         }
     }
 
@@ -502,14 +505,19 @@ impl LagGaugesReset {
         self.armed.store(true, Ordering::Relaxed);
     }
 
-    fn disarm(&self) {
-        self.armed.store(false, Ordering::Relaxed);
+    fn mark_failed(&self) {
+        self.failed.store(true, Ordering::Relaxed);
     }
 }
 
 impl Drop for LagGaugesReset {
     fn drop(&mut self) {
-        if *self.armed.get_mut() {
+        if !*self.armed.get_mut() {
+            return;
+        }
+        if *self.failed.get_mut() {
+            app_metrics::STREAMING_LAG_AGE_MS.report_with_tags(STALE_LAG_AGE_MS, Some(&self.tags));
+        } else {
             app_metrics::STREAMING_LAG.report_with_tags(0, Some(&self.tags));
             app_metrics::STREAMING_LAG_AGE_MS.report_with_tags(0, Some(&self.tags));
         }
