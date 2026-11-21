@@ -128,14 +128,35 @@ Requires an API key.
 
 ### AWS Bedrock
 
-- Credentials are optional — if left empty, the default AWS credential chain
-  is used (e.g., workload identity)
-- Supports assume-role configuration for cross-account access
-- Supports inference profiles
+Requires a **Region**. Choose one of three ways to authenticate:
+
+- **Access keys** — enter an **Access Key ID** and a **Secret Access Key**.
+- **Assume role** — enter an **Assume Role ARN** for cross-account access,
+  and optionally an **Assume Role External ID**. Access keys, if set, are
+  used to assume the role.
+- **OIDC workload identity** — turn on **Use OIDC workload identity** and
+  enter the **Assume Role ARN** of an IAM role that trusts your Cube tenant.
+  No access keys are stored. See
+  [Bedrock for bring-your-own LLM][ref-oidc-aws-bedrock] for the AWS setup.
+
+Optionally, set an **Inference Profile ID** to call the model through an
+inference profile.
 
 ### GCP Vertex AI
 
-Requires a service account JSON key for authentication.
+Requires a **Region** and a **Project ID**. Choose one of two ways to
+authenticate:
+
+- **Service account key** — upload a service account JSON key.
+- **OIDC workload identity** — turn on **Use OIDC workload identity** and
+  enter the **Workload Identity Pool Audience**, the resource path of a
+  Workload Identity Federation provider that trusts your Cube tenant. Cube
+  then calls Vertex AI with short-lived tokens, and no service account key is
+  stored. Optionally, set an **Impersonated Service Account**; leave it blank
+  to grant Vertex AI access to the federated principal directly. Use this
+  option when your organization policy blocks service account keys.
+
+See [Vertex AI for bring-your-own LLM][ref-oidc-gcp-vertex] for the GCP setup.
 
 ### Databricks
 
@@ -202,3 +223,5 @@ provider. Model availability may vary by region.
 
 [ref-ai-tokens]: /admin/account-billing/ai-tokens
 [ref-usage-analytics]: /admin/monitoring/usage-analytics
+[ref-oidc-aws-bedrock]: /admin/deployment/oidc/aws#bedrock-for-bring-your-own-llm
+[ref-oidc-gcp-vertex]: /admin/deployment/oidc/gcp#vertex-ai-for-bring-your-own-llm

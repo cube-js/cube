@@ -1,12 +1,13 @@
 ---
 title: GCP
 sidebarTitle: GCP
-description: Configure GCP Workload Identity Federation to trust Cube's OIDC issuer and use it for BigQuery and GCS export buckets.
+description: Configure GCP Workload Identity Federation to trust Cube's OIDC issuer and use it for BigQuery, GCS buckets, and Vertex AI.
 ---
 
 This guide walks through configuring GCP to trust Cube's OIDC issuer using
 Workload Identity Federation (WIF) and shows the setup for the most common
-targets — BigQuery and a GCS export bucket.
+targets — BigQuery, a GCS export bucket, and Vertex AI for bring-your-own
+LLM.
 
 If you haven't enabled OIDC for your tenant yet, start with the
 [OIDC overview][ref-oidc-overview].
@@ -401,6 +402,88 @@ federating to the bucket directly — pick one.
   </Step>
 </Steps>
 
+## Vertex AI for bring-your-own LLM
+
+[Bring Your Own Model][ref-byom] lets AI agents call Vertex AI through your
+own GCP project. With OIDC, Cube exchanges a short-lived token for Google
+credentials on every refresh, so you don't create or upload a service
+account key — use this when your organization policy blocks service account
+keys.
+
+AI agents request a tenant-scoped token: its `{deployment_id}` is the literal
+`global`, and its `{component}` is `ai_engineer`. If the token config has no
+subject claim format, this token's `sub` claim is
+`cube:component:ai_engineer:deployment_id:global`, which the
+`--attribute-condition` from [Step 1](#step-1-create-a-workload-identity-pool-and-provider)
+rejects. Set a subject claim format as described below.
+
+<Steps>
+  <Step title="Set the audience and subject claim format">
+    In **Admin → OIDC**, set the GCP token config's **Audience** to the full
+    resource path of the provider you created in
+    [Step 1](#step-1-create-a-workload-identity-pool-and-provider), such as
+    `//iam.googleapis.com/projects/<project-number>/locations/global/workloadIdentityPools/cube-pool/providers/cube`.
+
+    Set its **Subject claim format** to
+    `cube:deployment:{deployment_id}:component:{component}`. The `sub` claim
+    of AI agents then is `cube:deployment:global:component:ai_engineer`. This
+    format also applies to your deployments' tokens, so update their IAM
+    bindings first, as described in [Step 3](#step-3-build-the-iam-bindings).
+  </Step>
+  <Step title="Grant Vertex AI access">
+    **Service account impersonation.** Create a service account, grant it
+    the Vertex AI User role, and let the AI agents' federated principal
+    impersonate it:
+
+    ```bash
+    PROJECT_NUMBER="<project-number>"
+
+    gcloud iam service-accounts create cube-vertex \
+      --display-name="Cube Vertex AI"
+
+    gcloud projects add-iam-policy-binding my-project \
+      --member="serviceAccount:cube-vertex@my-project.iam.gserviceaccount.com" \
+      --role=roles/aiplatform.user
+
+    gcloud iam service-accounts add-iam-policy-binding \
+      cube-vertex@my-project.iam.gserviceaccount.com \
+      --role=roles/iam.workloadIdentityUser \
+      --member="principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/cube-pool/subject/cube:deployment:global:component:ai_engineer"
+    ```
+
+    **[Direct federation](#direct-federation).** Grant the Vertex AI User
+    role to the federated principal, and leave the service account blank in
+    the model settings:
+
+    ```bash
+    PROJECT_NUMBER="<project-number>"
+
+    gcloud projects add-iam-policy-binding my-project \
+      --member="principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/cube-pool/subject/cube:deployment:global:component:ai_engineer" \
+      --role=roles/aiplatform.user
+    ```
+
+    Also enable the Claude models you use in the Vertex AI Model Garden of
+    this project.
+  </Step>
+  <Step title="Add the model in Cube">
+    Under **Admin → Models**, click **Add model** and configure:
+
+    - **Model type** — `LLM`.
+    - **Provider** — `GCP Vertex AI`.
+    - **Model** — the Claude model the agents call.
+    - **Region** and **Project ID** — where Vertex AI runs the model.
+    - **Use OIDC workload identity** — toggle on. The **Service Account
+      Key** field is hidden.
+    - **Workload Identity Pool Audience** — the same provider resource path
+      as the token config's audience.
+    - **Impersonated Service Account (optional)** — the email of the service
+      account from the previous step, such as
+      `cube-vertex@my-project.iam.gserviceaccount.com`. Leave it blank for
+      direct federation.
+  </Step>
+</Steps>
+
 ## Verifying the setup
 
 The fastest way to confirm WIF is wired up correctly is the **Test
@@ -425,6 +508,7 @@ trace which deployment authenticated against which service account at any
 point in time.
 
 [ref-oidc-overview]: /admin/deployment/oidc
+[ref-byom]: /admin/ai/bring-your-own-model
 [ref-sub-editor]: /admin/deployment/oidc#subject-claim-format
 [ref-cube-cloud-region]: /admin/deployment/infrastructure#what-is-a-cube-cloud-region
 [ref-export-bucket]: /admin/connect-to-data#export-bucket
