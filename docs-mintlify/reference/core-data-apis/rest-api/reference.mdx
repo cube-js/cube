@@ -896,7 +896,7 @@ these statuses:
 | Status | Description |
 | --- | --- |
 | `done` | The partition's current version is built. A version whose build is still running or has failed doesn't count |
-| `outdated` | An older version of the partition is built; its refresh key has changed since |
+| `outdated` | An older version of the partition is built, but not the current one: its refresh key has changed, or the current version's build is still running or has failed |
 | `missing_partition` | No version of the partition is built |
 
 The current version is the one the refresh key yields now, so a dry run
