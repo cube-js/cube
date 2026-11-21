@@ -381,7 +381,10 @@ const DROPPED_PROPS = {
   const sch = src.components.schemas;
   const dropProps = (name, props) => {
     const def = sch[name];
-    if (!def?.properties) return;
+    if (!def?.properties) {
+      console.error(`Aborting: DROPPED_PROPS schema ${name} not found (renamed upstream?)`);
+      process.exit(1);
+    }
     for (const p of props) delete def.properties[p];
     if (Array.isArray(def.required)) def.required = def.required.filter((r) => !props.includes(r));
   };
