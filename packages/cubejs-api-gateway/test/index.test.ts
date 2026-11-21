@@ -6,6 +6,7 @@ import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { testLogger } from '@cubejs-backend/shared';
+import { redactSqlLiterals } from '@cubejs-backend/native';
 
 import * as console from 'console';
 import { ApiGateway, ApiGatewayOptions, Query, QueryRequest, Request } from '../src';
@@ -25,7 +26,7 @@ import { PreAggJob } from '../src/types/request';
 // A Proxy rather than a spread: the module's exports are non-enumerable getters.
 jest.mock('@cubejs-backend/native', () => {
   const actual = jest.requireActual('@cubejs-backend/native');
-  const redactSqlLiterals = (sql: string) => sql.replace(/'[^']*'/g, "'redacted'");
+  const redactSqlLiterals = jest.fn((sql: string) => sql.replace(/'[^']*'/g, "'redacted'"));
   return new Proxy(actual, {
     get: (target, prop) => (prop === 'redactSqlLiterals' ? redactSqlLiterals : target[prop]),
   });
@@ -2281,6 +2282,30 @@ describe('API Gateway', () => {
           query: { sql: "SELECT id FROM test WHERE email = 'john@example.com'" },
           redactedQuery: { sql: "SELECT id FROM test WHERE email = 'redacted'" },
         });
+      });
+
+      test('a redaction failure does not replace the statement error', async () => {
+        const { app, apiGateway } = await createApiGateway();
+        const logSpy = jest.spyOn(apiGateway, 'log');
+        apiGateway.getSQLServer().execSql = jest.fn(async () => {
+          throw new Error('boom');
+        });
+        jest.mocked(redactSqlLiterals).mockImplementationOnce(() => {
+          throw new Error('internal error in Neon module');
+        });
+
+        const res = await request(app)
+          .post('/cubejs-api/v1/cubesql')
+          .set('Content-type', 'application/json')
+          .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+          .send({ query: "SELECT id FROM test WHERE email = 'john@example.com'" })
+          .expect(500);
+
+        expect(res.body.error).toMatch(/boom/);
+        const event = logSpy.mock.calls.find(([e]) => e.type === 'Internal Server Error');
+        expect(event).toBeDefined();
+        expect(event![0].redactedQuery).toBeUndefined();
+        expect(jest.mocked(redactSqlLiterals).mock.results.at(-1)?.type).toBe('throw');
       });
     });
 

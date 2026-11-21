@@ -3015,20 +3015,21 @@ class ApiGateway {
 
   /**
    * The redacted twin of a SQL API statement for the log sink, the same one
-   * cubesql attaches to its own events. Nothing when redaction is off or when
-   * the body carried no statement (validation failed on it).
+   * cubesql attaches to its own events. Nothing when redaction is off, when
+   * the body carried no statement (validation failed on it) or when redaction failed.
    */
   private redactedSqlForLog(query: unknown): { sql: string } | undefined {
     if (!getEnv('logRedaction', this.devServer) || typeof query !== 'string') {
       return undefined;
     }
 
-    // Not guarded against the native module failing to load, on purpose: this
-    // endpoint runs the statement through that same module, so a platform
-    // without it cannot serve the endpoint at all, and the error may propagate.
-    // On such a platform this also turns a scope or validation error, raised
-    // before the statement ran, into a 500 with no event logged.
-    return { sql: redactSqlLiterals(query) };
+    // Fails open: a redaction failure must not replace the error being logged.
+    // With no twin, the log sink drops the statement instead of writing it.
+    try {
+      return { sql: redactSqlLiterals(query) };
+    } catch {
+      return undefined;
+    }
   }
 
   protected exposedRequestId(context?: any): string | undefined {
