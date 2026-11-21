@@ -5751,11 +5751,11 @@ __metadata:
   linkType: hard
 
 "@hono/node-server@npm:^1.19.9 || ^2.0.5":
-  version: 2.1.1
-  resolution: "@hono/node-server@npm:2.1.1"
+  version: 2.1.7
+  resolution: "@hono/node-server@npm:2.1.7"
   peerDependencies:
-    hono: ^4
-  checksum: 10c0/7ef810ca647c56d8d9386fd81609e18443b3a5634aa5ecabdf357e7ca724613c535e863c15ded9b7ae89b935a073040fb11e6d59041f3b1c3e153d8ecb699880
+    hono: ^4 || ^5.0.0-0
+  checksum: 10c0/1e54997c3db9925e97e2a37ad829b9c4eb1694749678a37745c394b0cdde3e16b26d448e1435d0dcf4a56a756a9e5fb16ac9f56ce33a60b402dbe5282a0270f7
   languageName: node
   linkType: hard
 
