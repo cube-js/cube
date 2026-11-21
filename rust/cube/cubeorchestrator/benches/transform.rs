@@ -140,6 +140,7 @@ fn build_request(
         query,
         query_type: Some(QueryType::RegularQuery),
         res_type,
+        timestamp_with_offset: false,
     }
 }
 

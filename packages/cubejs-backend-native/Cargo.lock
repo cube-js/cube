@@ -1023,6 +1023,7 @@ dependencies = [
  "anyhow",
  "arrow",
  "chrono",
+ "chrono-tz 0.10.4",
  "cubeshared",
  "hex",
  "indexmap 2.14.0",
