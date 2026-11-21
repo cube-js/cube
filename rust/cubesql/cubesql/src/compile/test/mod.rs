@@ -55,6 +55,8 @@ pub mod test_introspection;
 #[cfg(test)]
 pub mod test_plan_reuse;
 #[cfg(test)]
+pub mod test_postgres_service;
+#[cfg(test)]
 pub mod test_udfs;
 #[cfg(test)]
 pub mod test_user_change;
