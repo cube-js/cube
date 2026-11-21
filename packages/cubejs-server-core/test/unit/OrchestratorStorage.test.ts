@@ -45,8 +45,40 @@ function createRealApi(driverError: Error) {
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
 describe('OrchestratorStorage', () => {
-  test('releases an orchestrator the LRU evicts, and keeps the one still cached', async () => {
+  test('caps at 100 orchestrators by default', () => {
+    const storage = new OrchestratorStorage();
+
+    for (let i = 0; i <= 100; i++) {
+      storage.set(`id-${i}`, createApi().api);
+    }
+
+    expect(storage.has('id-0')).toBe(false);
+    expect(storage.has('id-1')).toBe(true);
+  });
+
+  test('caps at orchestratorCacheSize, preferring it over compilerCacheSize', () => {
+    const storage = new OrchestratorStorage({ orchestratorCacheSize: 2, compilerCacheSize: 1 });
+
+    storage.set('a', createApi().api);
+    storage.set('b', createApi().api);
+    storage.set('c', createApi().api);
+
+    expect(storage.has('a')).toBe(false);
+    expect(storage.has('b')).toBe(true);
+    expect(storage.has('c')).toBe(true);
+  });
+
+  test('still accepts the deprecated compilerCacheSize', () => {
     const storage = new OrchestratorStorage({ compilerCacheSize: 1 });
+
+    storage.set('a', createApi().api);
+    storage.set('b', createApi().api);
+
+    expect(storage.has('a')).toBe(false);
+  });
+
+  test('releases an orchestrator the LRU evicts, and keeps the one still cached', async () => {
+    const storage = new OrchestratorStorage({ orchestratorCacheSize: 1 });
     const evicted = createApi();
     const kept = createApi();
 
@@ -62,7 +94,7 @@ describe('OrchestratorStorage', () => {
   });
 
   test('releases an orchestrator replaced under the same id', async () => {
-    const storage = new OrchestratorStorage({ compilerCacheSize: 10 });
+    const storage = new OrchestratorStorage({ orchestratorCacheSize: 10 });
     const first = createApi();
     const second = createApi();
 
@@ -75,7 +107,7 @@ describe('OrchestratorStorage', () => {
   });
 
   test('setting the same instance again does not release it', async () => {
-    const storage = new OrchestratorStorage({ compilerCacheSize: 10 });
+    const storage = new OrchestratorStorage({ orchestratorCacheSize: 10 });
     const { api, release } = createApi();
 
     storage.set('same-id', api);
@@ -87,7 +119,7 @@ describe('OrchestratorStorage', () => {
   });
 
   test('releaseConnections waits for the releases it schedules', async () => {
-    const storage = new OrchestratorStorage({ compilerCacheSize: 10 });
+    const storage = new OrchestratorStorage({ orchestratorCacheSize: 10 });
     let finishRelease: () => void = () => undefined;
     const { api, release } = createApi(() => new Promise<void>(resolve => {
       finishRelease = () => resolve();
@@ -112,7 +144,7 @@ describe('OrchestratorStorage', () => {
   });
 
   test('releaseConnections resolves and clears even when a release fails', async () => {
-    const storage = new OrchestratorStorage({ compilerCacheSize: 10 });
+    const storage = new OrchestratorStorage({ orchestratorCacheSize: 10 });
     const failing = createApi(async () => { throw new Error('driver is gone'); });
     const ok = createApi();
 
@@ -127,7 +159,7 @@ describe('OrchestratorStorage', () => {
   });
 
   test('a release that fails is logged rather than lost', async () => {
-    const storage = new OrchestratorStorage({ compilerCacheSize: 1 });
+    const storage = new OrchestratorStorage({ orchestratorCacheSize: 1 });
     const { api, logger } = createRealApi(new Error('driver is gone'));
 
     storage.set('failing', api);
@@ -146,7 +178,7 @@ describe('OrchestratorStorage', () => {
   });
 
   test('forgets a release once it has finished', async () => {
-    const storage = new OrchestratorStorage({ compilerCacheSize: 1 });
+    const storage = new OrchestratorStorage({ orchestratorCacheSize: 1 });
 
     storage.set('a', createApi().api);
     storage.set('b', createApi().api);

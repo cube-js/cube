@@ -6,9 +6,15 @@ export class OrchestratorStorage {
 
   protected readonly pendingReleases: Set<Promise<void>> = new Set();
 
-  public constructor(options: { compilerCacheSize?: number, maxCompilerCacheKeepAlive?: number, updateCompilerCacheKeepAlive?: boolean } = { compilerCacheSize: 100 }) {
+  public constructor(options: {
+    orchestratorCacheSize?: number,
+    /** @deprecated Use `orchestratorCacheSize`. */
+    compilerCacheSize?: number,
+    maxCompilerCacheKeepAlive?: number,
+    updateCompilerCacheKeepAlive?: boolean,
+  } = {}) {
     this.storage = new LRUCache<string, OrchestratorApi>({
-      max: options.compilerCacheSize,
+      max: options.orchestratorCacheSize ?? options.compilerCacheSize ?? 100,
       ttl: options.maxCompilerCacheKeepAlive,
       updateAgeOnGet: options.updateCompilerCacheKeepAlive,
       // Any removal reason ('evict' | 'set' | 'delete' | 'expire') means the api is not

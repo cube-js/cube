@@ -422,6 +422,7 @@ export class OptsHandler {
       scheduledRefreshBatchSize: getEnv('scheduledRefreshBatchSize'),
       compilerCacheSize: getEnv('compilerCacheSize'),
       maxCompiledMembers: getEnv('maxCompiledMembers'),
+      orchestratorCacheSize: getEnv('orchestratorCacheSize'),
       preAggregationsSchema,
       schemaPath: getEnv('schemaPath'),
       scheduledRefreshTimer: getEnv('refreshWorkerMode'),
