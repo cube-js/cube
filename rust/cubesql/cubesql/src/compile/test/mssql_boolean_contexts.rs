@@ -219,8 +219,8 @@ pub(crate) fn mssql_boolean_fixture() -> serde_json::Value {
         },
         {
           "expression": "CASE WHEN b THEN c ELSE b END",
-          "scalar": "CAST(CASE WHEN ((((\"fixture\".\"b\" = CAST(1 AS BIT)) AND NOT ((CAST(0 AS BIT) = CAST(1 AS BIT)))) AND (\"fixture\".\"c\" = CAST(1 AS BIT))) OR (NOT ((\"fixture\".\"b\" = CAST(1 AS BIT))) AND (\"fixture\".\"b\" = CAST(1 AS BIT)))) THEN 1 WHEN NOT (((((\"fixture\".\"b\" = CAST(1 AS BIT)) AND NOT ((CAST(0 AS BIT) = CAST(1 AS BIT)))) AND (\"fixture\".\"c\" = CAST(1 AS BIT))) OR (NOT ((\"fixture\".\"b\" = CAST(1 AS BIT))) AND (\"fixture\".\"b\" = CAST(1 AS BIT))))) THEN 0 ELSE NULL END AS BIT)",
-          "predicate": "((((\"fixture\".\"b\" = CAST(1 AS BIT)) AND NOT ((CAST(0 AS BIT) = CAST(1 AS BIT)))) AND (\"fixture\".\"c\" = CAST(1 AS BIT))) OR (NOT ((\"fixture\".\"b\" = CAST(1 AS BIT))) AND (\"fixture\".\"b\" = CAST(1 AS BIT))))",
+          "scalar": "CASE WHEN (\"fixture\".\"b\" = CAST(1 AS BIT)) THEN \"fixture\".\"c\" ELSE \"fixture\".\"b\" END",
+          "predicate": "(CASE WHEN (\"fixture\".\"b\" = CAST(1 AS BIT)) THEN \"fixture\".\"c\" ELSE \"fixture\".\"b\" END = CAST(1 AS BIT))",
           "expected": [
             true,
             false,
