@@ -16072,10 +16072,6 @@ components:
           oneOf:
             - type: string
             - type: 'null'
-        expectedVersionId:
-          oneOf:
-            - type: integer
-            - type: 'null'
         title:
           oneOf:
             - type: string

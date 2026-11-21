@@ -254,10 +254,10 @@ development branches and metadata calls are left out.
 
 | Method and path | Description |
 | --- | --- |
-| [`GET /query-history/requests`][ref-api-list-requests] | List requests, newest first. Filter by time range (`from`, `to`), `status`, `apiType`, `minDurationMs`, or `search`, and page with `first` and `after`. |
+| [`GET /query-history/requests`][ref-api-list-requests] | List requests, newest first. Filter by time range (`from`, `to`), `status`, `apiType`, `minDurationMs`, or `search`, and page with `first` and `after`. With `after`, the cursor keeps the first page's filters and other filters are ignored. |
 | [`GET /query-history/requests/{id}`][ref-api-get-request] | Get one request by the `id` that the list returns, with the SQL it generated and its parameters. |
 
-Both paths are under `/api/v1/deployments/{deploymentId}`. Authenticate with an
+Both paths are under `/api/v1/deployments/{deploymentId}`. [Authenticate][ref-api-auth] with an
 API key or an OAuth token with the `deployment.read` scope. The caller needs the
 `APMRead` [permission][ref-custom-roles] on the deployment, the same as for the
 Query History page.
@@ -286,3 +286,4 @@ period returns `400`, and a request older than it returns `404`.
 [ref-api-list-requests]: /api-reference/query-history/list-query-history-requests
 [ref-api-get-request]: /api-reference/query-history/get-a-query-history-request
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles
+[ref-api-auth]: /api-reference/authentication
