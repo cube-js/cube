@@ -25,7 +25,7 @@ docker buildx bake aarch64-unknown-linux-gnu-python --push
 docker buildx bake x86_64-unknown-linux-musl --push
 
 # dmY
-export CROSS_VERSION=08092026
+export CROSS_VERSION=09112026
 
 # Verify versions
 docker run --platform linux/amd64 --rm -it cubejs/rust-cross:x86_64-unknown-linux-gnu-$CROSS_VERSION cc --version
