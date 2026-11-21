@@ -164,8 +164,9 @@ export class HttpTransport implements ITransport<Response> {
         } catch (e: any) {
           let errorMessage = 'network Error';
 
-          if (e.name === 'AbortError') {
+          if (e.name === 'AbortError' || e.name === 'TimeoutError') {
             if (
+              e.name === 'TimeoutError' ||
               actualSignal?.reason === 'TimeoutError' ||
               actualSignal?.reason?.name === 'TimeoutError'
             ) {
