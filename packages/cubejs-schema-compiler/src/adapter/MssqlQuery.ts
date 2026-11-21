@@ -312,6 +312,9 @@ export class MssqlQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    // One-argument trimming also works on SQL Server versions before 2017.
+    templates.functions.TRIM = '{% if args[1] is defined %}TRIM({{ args[1] }} FROM {{ args[0] }}){% else %}LTRIM(RTRIM({{ args[0] }})){% endif %}';
+    templates.functions.BTRIM = templates.functions.TRIM;
     templates.functions.APPROXDISTINCT = 'APPROX_COUNT_DISTINCT({{ args_concat }})';
     // INT tokens truncate float division. DECIMAL keeps fractional arithmetic and
     // INT's ten whole digits, avoiding ROUND overflow from minimally sized decimals.

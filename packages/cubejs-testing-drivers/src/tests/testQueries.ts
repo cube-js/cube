@@ -2996,6 +2996,34 @@ from
       expect(res.rows).toMatchSnapshot('ungrouped_pre_agg');
     });
 
+    executePg('SQL API: space-trimmed NULL and blank filters', async (connection) => {
+      const contacts = `(
+        SELECT "customerId" AS id,
+          CASE "customerId"
+            WHEN 'AH-10465' THEN NULL
+            WHEN 'AJ-10780' THEN ''
+            WHEN 'AS-10225' THEN '   '
+            ELSE '  a@example.test  '
+          END AS email
+        FROM Customers
+        WHERE "customerId" IN ('AH-10465', 'AJ-10780', 'AS-10225', 'AW-10840')
+      ) AS contacts`;
+      const rowsFor = async (predicate: string) => {
+        const result = await connection.query(`SELECT id, email FROM ${contacts} WHERE ${predicate} LIMIT 10`);
+        const rows: { id: string; email: string | null }[] = result.rows;
+        return rows.sort((a, b) => a.id.localeCompare(b.id));
+      };
+      // Oracle treats zero-length strings as NULL, so equality to '' never
+      // matches an all-spaces value there. Both predicates still run.
+      const nullAndEmpty = [
+        { id: 'AH-10465', email: null },
+        { id: 'AJ-10780', email: type === 'oracle' ? null : '' },
+      ];
+      const blanks = [...nullAndEmpty, { id: 'AS-10225', email: '   ' }];
+      expect(await rowsFor("NULLIF(TRIM(email), '') IS NULL")).toEqual(blanks);
+      expect(await rowsFor("email IS NULL OR TRIM(email) = ''")).toEqual(type === 'oracle' ? nullAndEmpty : blanks);
+    });
+
     executePg('SQL API: post-aggregate percentage of total', async (connection) => {
       const res = await connection.query(`
     select

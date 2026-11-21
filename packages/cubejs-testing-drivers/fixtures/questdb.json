@@ -188,6 +188,12 @@
     "SQL API: Timeshift measure from cube",
 
     "---------------------------------------",
+    "QuestDB: the SQL API TRIM filter fixture pushes bind variables into CASE values.",
+    "The same filters also lose empty and space-only rows with a stored fixture column.",
+    "---------------------------------------",
+    "SQL API: space-trimmed NULL and blank filters",
+
+    "---------------------------------------",
     "QuestDB: rolling-window-backed queries push dateadd/timestamp_floor over a scalar",
     "subquery (SELECT min(date_from) ...), which QuestDB rejects; week granularity here",
     "is only reached through those rolling-window queries. The SQL API date/time",
@@ -290,6 +296,12 @@
     "SQL API: Window function over measure (running total)",
     "SQL API: EXTRACT DOW from column reference in SQL push down",
     "SQL API: powerbi min max ungrouped flag",
+
+    "---------------------------------------",
+    "QuestDB: the SQL API TRIM filter fixture hits a Tesseract parameter index panic.",
+    "The same filters also lose empty and space-only rows with a stored fixture column.",
+    "---------------------------------------",
+    "SQL API: space-trimmed NULL and blank filters",
 
     "---------------------------------------",
     "QuestDB: rolling windows compute the series bound with a scalar subquery",
