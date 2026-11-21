@@ -489,10 +489,6 @@ impl SchedulerImpl {
             error!("Error deleting middle man partitions: {}", e);
         }
 
-        if let Err(e) = self.report_job_metrics().await {
-            error!("Error reporting job metrics: {}", e);
-        }
-
         if let Err(e) = warn_long_fut(
             "Merge replay handles",
             Duration::from_millis(5000),
@@ -899,26 +895,6 @@ impl SchedulerImpl {
         if deleted > 0 {
             crate::app_metrics::JOBS_UNKNOWN_DELETED.add(deleted as i64);
         }
-        Ok(())
-    }
-
-    async fn report_job_metrics(&self) -> Result<(), CubeError> {
-        let mut counts: HashMap<(&'static str, &'static str), i64> = HashMap::new();
-        for job in self.meta_store.all_jobs().await? {
-            let row = job.get_row();
-            *counts
-                .entry((row.job_type().name(), row.status().name()))
-                .or_default() += 1;
-        }
-        app_metrics::JOBS_FAMILY.report(counts.into_iter().map(|((job_type, status), count)| {
-            (
-                vec![
-                    format!("job_type:{}", job_type),
-                    format!("status:{}", status),
-                ],
-                count,
-            )
-        }));
         Ok(())
     }
 

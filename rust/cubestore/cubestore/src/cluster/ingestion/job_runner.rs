@@ -11,7 +11,7 @@ use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
 use crate::telemetry::tracing::{record_error, record_trace_obj};
 use crate::util::aborting_join_handle::AbortingJoinHandle;
-use crate::CubeError;
+use crate::{CubeError, CubeErrorCauseType};
 use core::mem;
 use datafusion::cube_ext;
 use futures_timer::Delay;
@@ -25,12 +25,12 @@ use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
 
-fn report_job_failure(job_type_tag: String, message: &str) {
+fn report_job_failure(job_type_tag: String, message: &str, is_panic: bool) {
     app_metrics::JOBS_FAILED.add_with_tags(
         1,
         Some(&vec![
             job_type_tag,
-            format!("error_class:{}", job_error_class(message)),
+            format!("error_class:{}", job_error_class(message, is_panic)),
         ]),
     );
 }
@@ -176,8 +176,12 @@ impl JobRunner {
             Ok(Ok(Ok(()))) => {
                 app_metrics::JOBS_COMPLETED.add_with_tags(1, Some(&vec![job_type_tag]));
             }
-            Err(e) | Ok(Ok(Err(e))) => report_job_failure(job_type_tag, &e.message),
-            Ok(Err(e)) => report_job_failure(job_type_tag, &e.to_string()),
+            Err(e) | Ok(Ok(Err(e))) => report_job_failure(
+                job_type_tag,
+                &e.message,
+                e.cause == CubeErrorCauseType::Panic,
+            ),
+            Ok(Err(e)) => report_job_failure(job_type_tag, &e.to_string(), e.is_panic()),
         }
         if let Err(e) = res {
             self.meta_store

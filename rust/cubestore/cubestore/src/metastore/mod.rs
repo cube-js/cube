@@ -4401,8 +4401,9 @@ impl MetaStore for RocksMetaStore {
         self.read_operation_out_of_queue("get_orphaned_jobs", move |db_ref| {
             let jobs_table = JobRocksTable::new(db_ref);
             let time = Utc::now();
-            let all_jobs = jobs_table
-                .all_rows()?
+            let all_jobs = jobs_table.all_rows()?;
+            report_job_counts(&all_jobs);
+            let orphaned_jobs = all_jobs
                 .into_iter()
                 .filter(|j| {
                     if let JobStatus::Scheduled(_) = j.get_row().status() {
@@ -4413,7 +4414,7 @@ impl MetaStore for RocksMetaStore {
                     duration1 > duration
                 })
                 .collect::<Vec<_>>();
-            Ok(all_jobs)
+            Ok(orphaned_jobs)
         })
         .await
     }
@@ -5450,6 +5451,25 @@ fn swap_active_partitions_impl(
     }
 
     Ok(())
+}
+
+fn report_job_counts(jobs: &[IdRow<Job>]) {
+    let mut counts: HashMap<(&'static str, &'static str), i64> = HashMap::new();
+    for job in jobs {
+        let row = job.get_row();
+        *counts
+            .entry((row.job_type().name(), row.status().name()))
+            .or_default() += 1;
+    }
+    app_metrics::JOBS_FAMILY.report(counts.into_iter().map(|((job_type, status), count)| {
+        (
+            vec![
+                format!("job_type:{}", job_type),
+                format!("status:{}", status),
+            ],
+            count,
+        )
+    }));
 }
 
 #[cfg(test)]

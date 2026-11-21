@@ -448,6 +448,8 @@ fn spawn_lag_reporter(
         loop {
             let seq = last_seq.load(Ordering::Relaxed);
             if seq != NO_SEQ {
+                // A fetch that never succeeds still shows up as an age growing from the first offset.
+                last_computed.get_or_insert_with(Instant::now);
                 if let Some(lag) = source.calulate_lag(seq).await {
                     app_metrics::STREAMING_LAG.report_with_tags(lag, Some(&tags));
                     last_computed = Some(Instant::now());

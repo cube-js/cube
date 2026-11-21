@@ -105,7 +105,7 @@ impl JobStatus {
 }
 
 /// A bounded label for a job failure message, for metrics.
-pub fn job_error_class(message: &str) -> &'static str {
+pub fn job_error_class(message: &str, is_panic: bool) -> &'static str {
     if message.contains("offset overflow") {
         "offset_overflow"
     } else if message.contains("chunk") && message.contains("is not active") {
@@ -116,7 +116,7 @@ pub fn job_error_class(message: &str) -> &'static str {
         "timeout"
     } else if message.contains("shutting down") {
         "shutdown"
-    } else if message.contains("Panic") {
+    } else if is_panic {
         "panic"
     } else {
         "other"
@@ -317,20 +317,30 @@ mod tests {
 
     #[test]
     fn job_error_classes() {
-        for (message, class) in [
-            ("Panic: offset overflow", "offset_overflow"),
+        for (message, is_panic, class) in [
+            ("Reason: offset overflow", true, "offset_overflow"),
             (
                 "Source chunk 1 is not active when swapping of (1, 2) to (3) chunks",
+                false,
                 "source_chunk_not_active",
             ),
-            ("Current chunk is not active: 5", "source_chunk_not_active"),
-            ("Current partition is not active: 5", "partition_not_active"),
-            ("timed out", "timeout"),
-            ("shutting down", "shutdown"),
-            ("Panic: index out of bounds", "panic"),
-            ("No such file", "other"),
+            (
+                "Current chunk is not active: 5",
+                false,
+                "source_chunk_not_active",
+            ),
+            (
+                "Current partition is not active: 5",
+                false,
+                "partition_not_active",
+            ),
+            ("timed out", false, "timeout"),
+            ("shutting down", false, "shutdown"),
+            ("Reason: index out of bounds", true, "panic"),
+            ("Panic in a message is not a panic", false, "other"),
+            ("No such file", false, "other"),
         ] {
-            assert_eq!(job_error_class(message), class, "{}", message);
+            assert_eq!(job_error_class(message, is_panic), class, "{}", message);
         }
     }
 

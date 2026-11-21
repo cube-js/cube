@@ -106,7 +106,7 @@ per-node count costs one partition lookup per partition that holds active in-mem
 
 | Metric | Type | Tags | Semantics and cadence |
 |--------|------|------|-----------------------|
-| `cs.jobs` | gauge, set | `job_type`, `status` | Jobs in the metastore (what `system.jobs` shows), by status `Scheduled`, `ProcessingBy`, `Completed`, `Timeout`, `Error`, `Orphaned`. Main, every reconcile (30 s) |
+| `cs.jobs` | gauge, set | `job_type`, `status` | Jobs in the metastore (what `system.jobs` shows), by status `Scheduled`, `ProcessingBy`, `Completed`, `Timeout`, `Error`, `Orphaned`. Main, from the orphaned-job scan of every reconcile (30 s) |
 | `cs.jobs.scheduled` | counter | `job_type` | Jobs added; a job already queued for the same row is not added and not counted. Main |
 | `cs.jobs.completed` | counter | `job_type` | Jobs finished successfully. Emitted by the node that ran the job |
 | `cs.jobs.failed` | counter | `job_type`, `error_class` | Jobs that failed or timed out. `error_class`: `offset_overflow`, `source_chunk_not_active`, `partition_not_active`, `timeout`, `shutdown`, `panic`, `other` |
@@ -122,7 +122,7 @@ Tagged `location` (the stream location of the table).
 | `cs.streaming.rows` / `cs.streaming.chunks` | counter | | Rows / chunks ingested |
 | `cs.streaming.lastoffset` | gauge | offset | Last sequence value of the last received batch |
 | `cs.streaming.lag` | gauge | messages | Partition high watermark minus the last consumed offset (Kafka only). Recomputed every 10 s whether or not messages arrive |
-| `cs.streaming.lag.age.ms` | gauge | ms | Time since `cs.streaming.lag` was last computed, reported every 10 s. Stays below ~10 s when healthy; grows while the watermark fetch fails, i.e. while the lag value is stale |
+| `cs.streaming.lag.age.ms` | gauge | ms | Time since `cs.streaming.lag` was last computed (before the first success: since the first consumed offset), reported every 10 s. Stays below ~10 s when healthy; grows while the watermark fetch fails, i.e. while the lag value is stale |
 | `cs.streaming.import_time.ms`, `.partition_time.ms`, `.upload_time.ms`, `.roundtrip_time.ms` | histogram | ms | Per received batch |
 | `cs.streaming.roundtrip_rows` / `.roundtrip_chunks` | histogram | | Per received batch |
 
