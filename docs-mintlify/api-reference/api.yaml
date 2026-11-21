@@ -59,6 +59,7 @@ tags:
   - name: OpenAPI Spec
   - name: Audit Log
   - name: Chat History
+  - name: Data Model History
   - name: Ossie Conversion
   - name: Report Deliveries
 paths:
@@ -2476,11 +2477,17 @@ paths:
           Interchange)](https://github.com/apache/ossie) model, and returns polling URLs
           immediately. An export converts the YAML data model of the deployment's latest successful
           build, or uploaded YAML files, to one Ossie model; an import converts an uploaded Ossie
-          model to Cube data model files. Neither changes the deployment. Only static YAML model
-          files are converted; JavaScript models and Jinja-templated files are skipped. Uploads are
-          limited to 512 files of at most 2 MiB each and 20 MiB in total. Requests and results are
-          kept for at most one day. Requires `SchemaRead` or `SchemaUpdate` access. This is
-          currently in preview — reach out to the Cube support team to activate it for your account.
+          model to Cube data model files. Neither changes the deployment. Only YAML model files are
+          converted; JavaScript models are skipped. For a caller with `SqlRunnerRead`, other than an
+          embedded analytics session, a deployment export renders its Jinja-templated YAML files,
+          `.yml.jinja` ones included, in the deployment's Cube runtime before the conversion starts,
+          and the request returns 409 while a rollout leaves that runtime on another build;
+          otherwise, and for uploads, they are skipped. They render with the deployment's default
+          context, so Jinja that reads the security context or `COMPILE_CONTEXT` exports that one
+          variant. Uploads are limited to 512 files of at most 2 MiB each and 20 MiB in total.
+          Requests and results are kept for at most one day. Requires `SchemaRead` or `SchemaUpdate`
+          access. This is currently in preview — reach out to the Cube support team to activate it
+          for your account.
   /api/v1/deployments/{deploymentId}/ossie-conversions/{conversionId}:
     delete:
       operationId: cancelConversion
@@ -7706,6 +7713,165 @@ paths:
       summary: Commit (and push) the active branch's pending changes
       tags:
         - Data Model
+  /build/api/v1/deployments/{deploymentId}/data-model/branch-diff:
+    get:
+      operationId: getBranchDiff
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: branchName
+          required: true
+          schema:
+            type: string
+          description: The branch whose changes to show.
+        - in: query
+          name: baseBranch
+          required: false
+          schema:
+            type: string
+          description: The branch to compare against.
+        - in: query
+          name: maxDiffBytes
+          required: false
+          schema:
+            type: integer
+          description: >-
+            Cuts the unified diff at this many bytes (default 12000); `diffTruncated` says when. A
+            diff of many files can still be large: narrow it to a commit or a file first.
+        - in: query
+          name: maxFiles
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: >-
+            Lists at most this many changed files (default 50); `totalFiles` says how many there
+            were when the list is cut. `insertions` and `deletions` always cover the whole change.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchDiffResponse'
+          description: ''
+      summary: Show what a data-model branch changed against its base (git diff of branches)
+      tags:
+        - Data Model History
+      x-mint:
+        content: >-
+          The committed changes on `branchName` since it forked from `baseBranch`, which defaults to
+          its parent branch, else the deploy branch.
+  /build/api/v1/deployments/{deploymentId}/data-model/commit-diff:
+    get:
+      operationId: getCommitDiff
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: branchName
+          required: false
+          schema:
+            type: string
+          description: The branch whose history to read; the deploy branch when omitted.
+        - in: query
+          name: fromCommit
+          required: false
+          schema:
+            type: string
+          description: Full or abbreviated SHA of the left side.
+        - in: query
+          name: toCommit
+          required: false
+          schema:
+            type: string
+          description: Full or abbreviated SHA of the right side.
+        - in: query
+          name: maxDiffBytes
+          required: false
+          schema:
+            type: integer
+          description: >-
+            Cuts the unified diff at this many bytes (default 12000); `diffTruncated` says when. A
+            diff of many files can still be large: narrow it to a commit or a file first.
+        - in: query
+          name: maxFiles
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: >-
+            Lists at most this many changed files (default 50); `totalFiles` says how many there
+            were when the list is cut. `insertions` and `deletions` always cover the whole change.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitDiffResponse'
+          description: ''
+      summary: Show what data-model git commits on a branch changed (git diff of commits)
+      tags:
+        - Data Model History
+      x-mint:
+        content: >-
+          `toCommit` alone diffs that commit against its first parent, `fromCommit` and `toCommit`
+          diff the range, and `fromCommit` alone diffs it against the branch tip. Both must be in
+          the branch’s history.
+  /build/api/v1/deployments/{deploymentId}/data-model/commits:
+    get:
+      operationId: listCommits
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: branchName
+          required: false
+          schema:
+            type: string
+          description: The branch whose history to read; the deploy branch when omitted.
+        - in: query
+          name: filePath
+          required: false
+          schema:
+            type: string
+          description: >-
+            Only commits that changed this file, relative to the project root:
+            `model/cubes/orders.yml`, without a `/data-model/` prefix.
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitLogListResponse'
+          description: ''
+      summary: List a branch's data-model git commits (the git log), newest first
+      tags:
+        - Data Model History
+      x-mint:
+        content: '`first` defaults to 20 and is capped at 100.'
   /build/api/v1/deployments/{deploymentId}/data-model/file-hashes:
     get:
       operationId: fileHashes
@@ -8594,6 +8760,73 @@ components:
         - expectedSourceHash
         - idempotencyKey
       type: object
+    BranchDiffFile:
+      properties:
+        binary:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        deletions:
+          oneOf:
+            - type: number
+            - type: 'null'
+        insertions:
+          oneOf:
+            - type: number
+            - type: 'null'
+        path:
+          type: string
+        previousPath:
+          oneOf:
+            - type: string
+            - type: 'null'
+        status:
+          type: string
+      required:
+        - path
+        - status
+      type: object
+    BranchDiffResponse:
+      properties:
+        baseBranch:
+          type: string
+        baseRef:
+          type: string
+        branchName:
+          type: string
+        deletions:
+          type: number
+        diff:
+          type: string
+        diffOmittedReason:
+          oneOf:
+            - type: string
+            - type: 'null'
+        diffTruncated:
+          type: boolean
+        files:
+          items:
+            $ref: '#/components/schemas/BranchDiffFile'
+          type: array
+        insertions:
+          type: number
+        totalFiles:
+          oneOf:
+            - type: number
+            - type: 'null'
+        usedMergeBase:
+          type: boolean
+      required:
+        - branchName
+        - baseBranch
+        - baseRef
+        - usedMergeBase
+        - files
+        - insertions
+        - deletions
+        - diff
+        - diffTruncated
+      type: object
     BranchResponse:
       properties:
         id:
@@ -9219,6 +9452,75 @@ components:
             - type: boolean
             - type: 'null'
       type: object
+    CommitDiffResponse:
+      properties:
+        branchName:
+          type: string
+        deletions:
+          type: number
+        diff:
+          type: string
+        diffOmittedReason:
+          oneOf:
+            - type: string
+            - type: 'null'
+        diffTruncated:
+          type: boolean
+        files:
+          items:
+            $ref: '#/components/schemas/BranchDiffFile'
+          type: array
+        fromCommit:
+          type: string
+        insertions:
+          type: number
+        toCommit:
+          type: string
+        totalFiles:
+          oneOf:
+            - type: number
+            - type: 'null'
+      required:
+        - branchName
+        - fromCommit
+        - toCommit
+        - files
+        - insertions
+        - deletions
+        - diff
+        - diffTruncated
+      type: object
+    CommitLogEntryResponse:
+      properties:
+        authorEmail:
+          type: string
+        authorName:
+          type: string
+        committedAt:
+          type: string
+        sha:
+          type: string
+        subject:
+          type: string
+      required:
+        - sha
+        - authorName
+        - authorEmail
+        - committedAt
+        - subject
+      type: object
+    CommitLogListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/CommitLogEntryResponse'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
     ConnectGitHubRequest:
       properties:
         deployBranchName:
@@ -9499,6 +9801,15 @@ components:
           type: string
         region:
           type: string
+        starterProject:
+          description: >-
+            The project the deployment starts with: `empty` (the default); or `none`, for a
+            deployment the console wizard goes on to set up from its `creationStep` (e.g.
+            `databases`: connect a database, then build the project from the tables chosen). Not
+            used when `creationMethod` is `github`.
+          oneOf:
+            - $ref: '#/components/schemas/CreateDeploymentInputStarterProject'
+            - type: 'null'
         targetPlatform:
           type: string
         template:
@@ -9533,6 +9844,11 @@ components:
       enum:
         - git
         - cli
+      type: string
+    CreateDeploymentInputStarterProject:
+      enum:
+        - empty
+        - none
       type: string
     CreateDeploymentInputTemplate:
       enum:
@@ -10364,10 +10680,6 @@ components:
               additionalProperties:
                 type: string
             - type: 'null'
-        html:
-          oneOf:
-            - type: string
-            - type: 'null'
         manifest:
           oneOf:
             - $ref: '#/components/schemas/DashboardAppManifest'
@@ -10385,10 +10697,6 @@ components:
             - type: object
               additionalProperties:
                 type: string
-            - type: 'null'
-        html:
-          oneOf:
-            - type: string
             - type: 'null'
         manifest:
           oneOf:
@@ -10830,10 +11138,10 @@ components:
         value:
           description: >-
             Filter value. Omit for is_null / is_not_null / is_empty / is_not_empty; provide a
-            2-element [start, end] array for between; a whole number of members of at least 1
-            for top_n / bottom_n, which set a Top N control and rank by the measure it is
-            configured with. An empty array or empty string with no operator renders the filter
-            cleared; with an operator, the filter keeps that operator.
+            2-element [start, end] array for between; a whole number of members of at least 1 for
+            top_n / bottom_n, which set a Top N control and rank by the measure it is configured
+            with. An empty array or empty string with no operator renders the filter cleared; with
+            an operator, the filter keeps that operator.
           oneOf:
             - oneOf:
                 - type: string
@@ -10870,9 +11178,9 @@ components:
         - is_empty
         - is_not_empty
         - between
+        - custom
         - top_n
         - bottom_n
-        - custom
       type: string
     DashboardFilterOperator:
       enum:
@@ -10899,9 +11207,9 @@ components:
         - is_empty
         - is_not_empty
         - between
+        - custom
         - top_n
         - bottom_n
-        - custom
       type: string
     DashboardLayout:
       properties:
