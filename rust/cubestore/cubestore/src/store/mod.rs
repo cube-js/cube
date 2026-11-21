@@ -20,6 +20,7 @@ extern crate bincode;
 
 use bincode::{deserialize_from, serialize_into};
 
+use crate::import::limits::IndexMemoryBudget;
 use crate::metastore::{
     deactivate_table_due_to_corrupt_data, deactivate_table_on_corrupt_data, table::Table, Chunk,
     Column, ColumnType, IdRow, Index, IndexType, MetaStore, Partition, WAL,
@@ -211,6 +212,7 @@ pub struct ChunkStore {
     metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory>,
     memory_chunks: RwLock<HashMap<String, RecordBatch>>,
     chunk_size: usize,
+    index_memory_budget: IndexMemoryBudget,
 }
 
 crate::di_service!(ChunkStore, [ChunkDataStore]);
@@ -393,6 +395,7 @@ impl ChunkStore {
         metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
+        let index_memory_budget = IndexMemoryBudget::new(config.import_index_memory_budget());
         let store = ChunkStore {
             meta_store,
             remote_fs,
@@ -401,6 +404,7 @@ impl ChunkStore {
             metadata_cache_factory,
             memory_chunks: RwLock::new(HashMap::new()),
             chunk_size,
+            index_memory_budget,
         };
 
         Arc::new(store)
@@ -2649,6 +2653,19 @@ mod tests {
     }
 }
 
+// Working memory to build one index's chunks from `columns`: the sorted and post-processed
+// copies of the input, plus a parquet writer that reserves page buffers per column up front.
+// In-memory chunks are kept as record batches and never write parquet.
+fn estimate_index_build_memory(columns: &[ArrayRef], in_memory: bool) -> usize {
+    const PARQUET_WRITER_BYTES_PER_COLUMN: usize = 2 * 1024 * 1024;
+    let copies = 2 * columns_vec_buffer_size(columns);
+    if in_memory {
+        copies
+    } else {
+        copies + columns.len() * PARQUET_WRITER_BYTES_PER_COLUMN
+    }
+}
+
 pub type ChunkUploadJob = JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>;
 
 impl ChunkStore {
@@ -2672,7 +2689,7 @@ impl ChunkStore {
         index: &IdRow<Index>,
         table: &IdRow<Table>,
         preset_partitions: Option<Vec<IdRow<Partition>>>,
-        mut columns: Vec<ArrayRef>,
+        columns: Vec<ArrayRef>,
         in_memory: bool,
     ) -> Result<Vec<JoinHandle<Result<(IdRow<Chunk>, Option<u64>), CubeError>>>, CubeError> {
         let index_id = index.get_id();
@@ -2708,26 +2725,26 @@ impl ChunkStore {
             return Err(CubeError::corrupt_data(error_message));
         }
 
-        let mut remaining_rows: Vec<u64> = (0..columns[0].len() as u64).collect_vec();
-        {
-            let (columns_again, remaining_rows_again) =
-                cube_ext::spawn_blocking(move || -> Result<_, ArrowError> {
-                    let sort_key = &columns[0..sort_key_size];
-                    let converter = RowConverter::new(
-                        (0..sort_key_size)
-                            .map(|i| SortField::new(columns[i].data_type().clone()))
-                            .into_iter()
-                            .collect(),
-                    )?;
-                    let rows = converter.convert_columns(sort_key)?;
-                    remaining_rows
-                        .sort_unstable_by(|a, b| rows.row(*a as usize).cmp(&rows.row(*b as usize)));
-                    Ok((columns, remaining_rows))
-                })
-                .await??;
+        // Sorting, assigning rows to partitions and copying them out are CPU-bound; on the async
+        // runtime they would starve every other task of this worker, memory limit checks included.
+        let (columns, partition_rows, unassigned_rows) =
+            cube_ext::spawn_blocking(move || -> Result<_, ArrowError> {
+                let rows_order = sort_rows(&columns, sort_key_size)?;
+                let (partition_rows, unassigned_rows) =
+                    assign_rows_to_partitions(&columns, sort_key_size, partitions, rows_order);
+                Ok((columns, partition_rows, unassigned_rows))
+            })
+            .await??;
 
-            columns = columns_again;
-            remaining_rows = remaining_rows_again;
+        if unassigned_rows > 0 {
+            let error_message = format!("Error while insert data into index {:?}. {} rows of incoming data can't be assigned to any partitions. Probably paritition metadata is lost", index, unassigned_rows);
+            deactivate_table_due_to_corrupt_data(
+                self.meta_store.clone(),
+                index.get_row().table_id(),
+                error_message.clone(),
+            )
+            .await?;
+            return Err(CubeError::internal(error_message));
         }
 
         let mut futures = Vec::new();
@@ -2736,62 +2753,32 @@ impl ChunkStore {
         // limit is disabled (the common case) skip the node-name/dedup work entirely.
         let disk_check_enabled = !in_memory && self.config.max_disk_space_per_worker() != 0;
         let mut checked_nodes: HashSet<String> = HashSet::new();
-        for partition in partitions.into_iter() {
-            let min = partition.get_row().get_min_val().as_ref();
-            let max = partition.get_row().get_max_val().as_ref();
-            let (to_write, next) = remaining_rows.into_iter().partition::<Vec<_>, _>(|&r| {
-                let r = r as usize;
-                (min.is_none()
-                    || cmp_partition_key(
-                        sort_key_size,
-                        min.unwrap().values().as_slice(),
-                        columns.as_slice(),
-                        r,
-                    ) <= Ordering::Equal)
-                    && (max.is_none()
-                        || cmp_partition_key(
-                            sort_key_size,
-                            max.unwrap().values().as_slice(),
-                            columns.as_slice(),
-                            r,
-                        ) > Ordering::Equal)
-            });
-            if to_write.len() > 0 {
-                if disk_check_enabled
-                    && checked_nodes
-                        .insert(node_name_by_partition(self.config.as_ref(), &partition))
-                {
-                    self.check_node_disk_space(&partition).await?;
-                }
-                let to_write = UInt64Array::from(to_write);
-                let columns = columns
-                    .iter()
-                    .map(|c| datafusion::arrow::compute::take(c.as_ref(), &to_write, None))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let columns = self
-                    .post_process_columns(index.clone(), table, columns)
-                    .await?;
-
-                futures.push(self.add_chunk_columns(
-                    index.clone(),
-                    table,
-                    partition.clone(),
-                    columns,
-                    in_memory,
-                ));
+        // One partition's copy at a time: post-processing shrinks it before the next is taken.
+        for (partition, rows) in partition_rows {
+            if disk_check_enabled
+                && checked_nodes.insert(node_name_by_partition(self.config.as_ref(), &partition))
+            {
+                self.check_node_disk_space(&partition).await?;
             }
-            remaining_rows = next;
-        }
+            let input = columns.clone();
+            let columns = cube_ext::spawn_blocking(move || {
+                input
+                    .iter()
+                    .map(|c| datafusion::arrow::compute::take(c.as_ref(), &rows, None))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .await??;
+            let columns = self
+                .post_process_columns(index.clone(), table, columns)
+                .await?;
 
-        if !remaining_rows.is_empty() {
-            let error_message = format!("Error while insert data into index {:?}. {} rows of incoming data can't be assigned to any partitions. Probably paritition metadata is lost", index, remaining_rows.len());
-            deactivate_table_due_to_corrupt_data(
-                self.meta_store.clone(),
-                index.get_row().table_id(),
-                error_message.clone(),
-            )
-            .await?;
-            return Err(CubeError::internal(error_message));
+            futures.push(self.add_chunk_columns(
+                index.clone(),
+                table,
+                partition,
+                columns,
+                in_memory,
+            ));
         }
 
         let new_chunks = join_all(futures)
@@ -3038,13 +3025,15 @@ impl ChunkStore {
             let preset_partitions = partitions_by_index
                 .as_mut()
                 .map(|all| std::mem::take(&mut all[i]));
-            futures.push(self.partition_rows_for_index(
-                &index,
-                &table,
-                preset_partitions,
-                remapped,
-                in_memory,
-            ));
+            // Bound the fan-out over indexes by memory: each one builds a full sorted copy.
+            let estimated_memory = estimate_index_build_memory(&remapped, in_memory);
+            let budget = self.index_memory_budget.clone();
+            let table = &table;
+            futures.push(async move {
+                let _permit = budget.acquire(estimated_memory).await?;
+                self.partition_rows_for_index(index, table, preset_partitions, remapped, in_memory)
+                    .await
+            });
         }
 
         let new_chunks = join_all(futures)
@@ -3071,6 +3060,52 @@ fn min_max_values_from_data(data: &[ArrayRef], key_size: usize) -> (Option<Row>,
             ))),
         )
     }
+}
+
+fn sort_rows(columns: &[ArrayRef], sort_key_size: usize) -> Result<Vec<u64>, ArrowError> {
+    let converter = RowConverter::new(
+        columns[0..sort_key_size]
+            .iter()
+            .map(|c| SortField::new(c.data_type().clone()))
+            .collect(),
+    )?;
+    let rows = converter.convert_columns(&columns[0..sort_key_size])?;
+    let mut order = (0..columns[0].len() as u64).collect_vec();
+    order.sort_unstable_by(|a, b| rows.row(*a as usize).cmp(&rows.row(*b as usize)));
+    Ok(order)
+}
+
+// Row indices of each partition that gets rows, in sort order, plus how many rows fit no partition.
+fn assign_rows_to_partitions(
+    columns: &[ArrayRef],
+    sort_key_size: usize,
+    partitions: Vec<IdRow<Partition>>,
+    rows_order: Vec<u64>,
+) -> (Vec<(IdRow<Partition>, UInt64Array)>, usize) {
+    let mut remaining_rows = rows_order;
+    let mut result = Vec::new();
+    for partition in partitions {
+        let min = partition.get_row().get_min_val().as_ref();
+        let max = partition.get_row().get_max_val().as_ref();
+        let (to_write, next) = remaining_rows.into_iter().partition::<Vec<_>, _>(|&r| {
+            let r = r as usize;
+            (min.is_none()
+                || cmp_partition_key(sort_key_size, min.unwrap().values().as_slice(), columns, r)
+                    <= Ordering::Equal)
+                && (max.is_none()
+                    || cmp_partition_key(
+                        sort_key_size,
+                        max.unwrap().values().as_slice(),
+                        columns,
+                        r,
+                    ) > Ordering::Equal)
+        });
+        remaining_rows = next;
+        if !to_write.is_empty() {
+            result.push((partition, UInt64Array::from(to_write)));
+        }
+    }
+    (result, remaining_rows.len())
 }
 
 fn remap_columns(
