@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.32](https://github.com/cube-js/cube/compare/v1.8.31...v1.8.32) (2026-11-21)
+
+### Features
+
+- **api-gateway:** Add force and dry-run options to the pre-aggregation jobs API ([#12882](https://github.com/cube-js/cube/issues/12882)) ([67f452a](https://github.com/cube-js/cube/commit/67f452ae60da39b7f68f2eba0aa56e8c2e02ebbf))
+
 ## [1.8.31](https://github.com/cube-js/cube/compare/v1.8.30...v1.8.31) (2026-11-20)
 
 **Note:** Version bump only for package @cubejs-backend/testing
