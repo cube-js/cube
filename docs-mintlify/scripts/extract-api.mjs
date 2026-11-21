@@ -362,10 +362,21 @@ const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
 }
 
 // Fields of flag-gated or preview features stay out of the reference until the
-// feature ships: the demo starter project, custom time granularities, chart
-// download settings, creating a chart from the builder, serving and templates of
-// Apps, workbook SQL parameters, and email switches of the notification inbox.
-// Remove each line once its feature ships.
+// feature ships. Remove each line once its feature ships.
+const DROPPED_PROPS = {
+  AppConfigResponse: [
+    'dashboardAppServingEnabled',
+    'customTimeGranularitiesEnabled',
+    'chartDownloadSettingsEnabled',
+    'createChartFromBuilderEnabled',
+  ],
+  Dashboard: ['useCustomTimeGranularities'],
+  DashboardAppManifest: ['template'],
+  DashboardAppManifestInput: ['template'],
+  DashboardConfig: ['parameters'],
+  Workbook: ['parameters'],
+  UserSettingsInput: ['notificationEmail'],
+};
 {
   const sch = src.components.schemas;
   const dropProps = (name, props) => {
@@ -374,18 +385,7 @@ const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
     for (const p of props) delete def.properties[p];
     if (Array.isArray(def.required)) def.required = def.required.filter((r) => !props.includes(r));
   };
-  dropProps('AppConfigResponse', [
-    'dashboardAppServingEnabled',
-    'customTimeGranularitiesEnabled',
-    'chartDownloadSettingsEnabled',
-    'createChartFromBuilderEnabled',
-  ]);
-  dropProps('Dashboard', ['useCustomTimeGranularities']);
-  dropProps('DashboardAppManifest', ['template']);
-  dropProps('DashboardAppManifestInput', ['template']);
-  dropProps('DashboardConfig', ['parameters']);
-  dropProps('Workbook', ['parameters']);
-  dropProps('UserSettingsInput', ['notificationEmail']);
+  for (const [name, props] of Object.entries(DROPPED_PROPS)) dropProps(name, props);
   for (const name of ['WorkbookParameter', 'WorkbookParameterType', 'DashboardParameter', 'DashboardParameterType', 'NotificationEmailUserSettingsInput']) {
     delete sch[name];
   }
@@ -666,6 +666,9 @@ if (/subjectType|SubjectType|user_email|\{user_|\.@\+/.test(JSON.stringify({ pat
     /WorkbookParameter|DashboardParameter|notificationEmail|NotificationEmailUserSettingsInput/,
   ].filter((re) => re.test(json));
   if (schemas.CreateDeploymentInputStarterProject?.enum?.includes('demo')) leaked.push('CreateDeploymentInputStarterProject: demo');
+  for (const [name, props] of Object.entries(DROPPED_PROPS)) {
+    for (const p of props) if (schemas[name]?.properties?.[p]) leaked.push(`${name}.${p}`);
+  }
   if (leaked.length) {
     console.error('Aborting: flag-gated fields survived stripping (did the upstream spec change?):\n  ' + leaked.join('\n  '));
     process.exit(1);
