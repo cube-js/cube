@@ -118,16 +118,23 @@ impl GaugeFamily {
     }
 
     pub fn report(&self, series: impl IntoIterator<Item = (Vec<String>, i64)>) {
-        let mut reported = self.reported.lock().unwrap();
-        let mut current = HashSet::new();
-        for (tags, value) in series {
+        for (tags, value) in self.with_vanished_zeroed(series) {
             self.gauge.report_with_tags(value, Some(&tags));
-            current.insert(tags);
         }
+    }
+
+    fn with_vanished_zeroed(
+        &self,
+        series: impl IntoIterator<Item = (Vec<String>, i64)>,
+    ) -> Vec<(Vec<String>, i64)> {
+        let mut reported = self.reported.lock().unwrap();
+        let mut out = series.into_iter().collect::<Vec<_>>();
+        let current = out.iter().map(|(t, _)| t.clone()).collect::<HashSet<_>>();
         for tags in reported.iter().flatten().filter(|t| !current.contains(*t)) {
-            self.gauge.report_with_tags(0, Some(tags));
+            out.push((tags.clone(), 0));
         }
         *reported = Some(current);
+        out
     }
 }
 
@@ -248,3 +255,28 @@ mod global_sink {
 }
 
 use global_sink::sink;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    static TEST_GAUGE: Gauge = gauge("cs.test.gauge_family");
+
+    #[test]
+    fn gauge_family_zeroes_vanished_series_once() {
+        let family = GaugeFamily::new(&TEST_GAUGE);
+        let a = || vec!["k:a".to_string()];
+        let b = || vec!["k:b".to_string()];
+
+        assert_eq!(
+            family.with_vanished_zeroed(vec![(a(), 1), (b(), 2)]),
+            vec![(a(), 1), (b(), 2)]
+        );
+        assert_eq!(
+            family.with_vanished_zeroed(vec![(a(), 3)]),
+            vec![(a(), 3), (b(), 0)]
+        );
+        assert_eq!(family.with_vanished_zeroed(vec![(a(), 4)]), vec![(a(), 4)]);
+        assert_eq!(family.with_vanished_zeroed(vec![]), vec![(a(), 0)]);
+    }
+}

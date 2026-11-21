@@ -37,7 +37,7 @@ use reqwest::{Response, Url};
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Write};
 use std::pin::Pin;
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tracing::Instrument;
@@ -232,6 +232,32 @@ impl StreamingServiceImpl {
 #[async_trait]
 impl StreamingService for StreamingServiceImpl {
     async fn stream_table(&self, table: IdRow<Table>, location: &str) -> Result<(), CubeError> {
+        let lag_reset = LagGaugesReset::new(vec![format!("location:{}", location)]);
+        let res = self.stream_table_impl(table, location, &lag_reset).await;
+        if res.is_err() {
+            lag_reset.disarm();
+        }
+        res
+    }
+
+    async fn validate_table_location(
+        &self,
+        table: IdRow<Table>,
+        location: &str,
+    ) -> Result<(), CubeError> {
+        let source = self.source_by(&table, location, None).await?;
+        source.validate_table_location()?;
+        Ok(())
+    }
+}
+
+impl StreamingServiceImpl {
+    async fn stream_table_impl(
+        &self,
+        table: IdRow<Table>,
+        location: &str,
+        lag_reset: &LagGaugesReset,
+    ) -> Result<(), CubeError> {
         if table.get_row().sealed() {
             return Ok(());
         }
@@ -276,6 +302,7 @@ impl StreamingService for StreamingServiceImpl {
         let tags = vec![format!("location:{}", location)];
         let last_seq = Arc::new(AtomicI64::new(initial_seq_value.unwrap_or(NO_SEQ)));
         let _lag_reporter = source.reports_lag().then(|| {
+            lag_reset.arm();
             spawn_lag_reporter(
                 source.clone(),
                 last_seq.clone(),
@@ -421,16 +448,6 @@ impl StreamingService for StreamingServiceImpl {
 
         Ok(())
     }
-
-    async fn validate_table_location(
-        &self,
-        table: IdRow<Table>,
-        location: &str,
-    ) -> Result<(), CubeError> {
-        let source = self.source_by(&table, location, None).await?;
-        source.validate_table_location()?;
-        Ok(())
-    }
 }
 
 const STREAMING_LAG_REPORT_INTERVAL: Duration = Duration::from_secs(10);
@@ -446,7 +463,6 @@ fn spawn_lag_reporter(
     interval: Duration,
 ) -> AbortingJoinHandle<()> {
     AbortingJoinHandle::new(cube_ext::spawn(async move {
-        let _reset = LagGaugesReset(tags.clone());
         let mut last_computed: Option<Instant> = None;
         loop {
             let seq = last_seq.load(Ordering::Relaxed);
@@ -467,14 +483,36 @@ fn spawn_lag_reporter(
     }))
 }
 
-// Zeroes the lag gauges when a stream stops on this node, so the exporter does not keep its last
-// lag as current after the table is dropped or the stream moves away.
-struct LagGaugesReset(Vec<String>);
+// Zeroes the lag gauges when a stream stops cleanly on this node (sealed, table dropped, stream
+// moved away). After a failure the last values stay, so a broken stream does not read as no lag.
+struct LagGaugesReset {
+    tags: Vec<String>,
+    armed: AtomicBool,
+}
+
+impl LagGaugesReset {
+    fn new(tags: Vec<String>) -> Self {
+        Self {
+            tags,
+            armed: AtomicBool::new(false),
+        }
+    }
+
+    fn arm(&self) {
+        self.armed.store(true, Ordering::Relaxed);
+    }
+
+    fn disarm(&self) {
+        self.armed.store(false, Ordering::Relaxed);
+    }
+}
 
 impl Drop for LagGaugesReset {
     fn drop(&mut self) {
-        app_metrics::STREAMING_LAG.report_with_tags(0, Some(&self.0));
-        app_metrics::STREAMING_LAG_AGE_MS.report_with_tags(0, Some(&self.0));
+        if *self.armed.get_mut() {
+            app_metrics::STREAMING_LAG.report_with_tags(0, Some(&self.tags));
+            app_metrics::STREAMING_LAG_AGE_MS.report_with_tags(0, Some(&self.tags));
+        }
     }
 }
 

@@ -69,8 +69,8 @@ A held chunk is released when the scheduler on the main processes its deletion e
 dropped when the scheduler's event channel overflows (`cs.scheduler.events_dropped`), and those
 chunks used to stay in worker memory for the life of the process, which made
 `cs.workers.in_memory_chunks` far exceed the metastore's count. The reconcile pass releases them;
-`orphans_freed` shows how many deletions were lost. `held − active − inactive` is at most what the
-next pass will release.
+`orphans_freed` is the exact count of lost deletions. `held − active − inactive` is only an upper
+bound: it also counts chunks added since the last pass and chunks not activated yet.
 
 ## Metastore chunk truth (main)
 
