@@ -651,7 +651,7 @@ export class DevServer {
   }
 
   protected getIdentifier(apiSecret: string): string {
-    return crypto.createHash('md5')
+    return crypto.createHash('sha256')
       .update(apiSecret)
       .digest('hex')
       .replace(/[^\d]/g, '')

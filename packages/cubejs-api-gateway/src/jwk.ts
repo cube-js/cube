@@ -91,7 +91,7 @@ export const createJWKsFetcher = (jwtOptions: JWTOptions, options: JWKsFetcherOp
       result,
     };
   }, {
-    extractKey: (url) => crypto.createHash('md5').update(url).digest('hex'),
+    extractKey: (url) => crypto.createHash('sha256').update(url).digest('hex'),
     extractCacheLifetime: ({ lifeTime }) => {
       if (lifeTime) {
         return lifeTime;

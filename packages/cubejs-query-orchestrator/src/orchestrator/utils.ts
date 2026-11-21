@@ -20,13 +20,13 @@ export function getCacheHash(queryKey: QueryKey | CacheKey, processUid?: string)
 
   if (typeof queryKey === 'object' && 'persistent' in queryKey && queryKey.persistent) {
     return `${crypto
-      .createHash('md5')
+      .createHash('sha256')
       .update(JSON.stringify(queryKey))
       .digest('hex')
     }@${processUid}` as QueryKeyHash;
   } else {
     return crypto
-      .createHash('md5')
+      .createHash('sha256')
       .update(JSON.stringify(queryKey))
       .digest('hex') as QueryKeyHash;
   }
