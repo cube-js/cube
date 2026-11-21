@@ -137,7 +137,8 @@ impl ParquetTableStore {
                 table,
                 WriterProperties::builder()
                     .set_max_row_group_size(self.row_group_size)
-                    .set_writer_version(WriterVersion::PARQUET_2_0),
+                    .set_writer_version(WriterVersion::PARQUET_2_0)
+                    .set_compression(datafusion::parquet::basic::Compression::ZSTD),
             )
             .await
             .map_err(CubeError::from)
