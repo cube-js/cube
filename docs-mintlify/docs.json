@@ -1220,6 +1220,15 @@
                 ]
               },
               {
+                "group": "Data Model History",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /build/api/v1/deployments/{deploymentId}/data-model/branch-diff",
+                  "GET /build/api/v1/deployments/{deploymentId}/data-model/commit-diff",
+                  "GET /build/api/v1/deployments/{deploymentId}/data-model/commits"
+                ]
+              },
+              {
                 "group": "Ossie Conversion",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [

@@ -7,6 +7,13 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-11-21" description="v0.28.0" tags={["Added"]}>
+  ### Added
+
+  - `starterProject` on `POST /build/api/v1/deployments` (`CreateDeploymentInput`) chooses the project the deployment starts with. `empty` (the default) is the empty starter project. `none` scaffolds no project, so the console wizard sets up the deployment from its `creationStep`, for example `databases`. The field is ignored when `creationMethod` is `github`. New schema: `CreateDeploymentInputStarterProject`.
+  - Data model git history: `GET /build/api/v1/deployments/{deploymentId}/data-model/commits` lists a branch's commits, newest first (`branchName`, optional `filePath`, `first` up to 100 with a default of 20, and an `after` cursor); `GET …/data-model/commit-diff` diffs one commit against its parent or a range (`fromCommit`, `toCommit`); and `GET …/data-model/branch-diff` diffs a branch's committed changes against `baseBranch`, its parent branch or the deploy branch by default. Both diffs list at most `maxFiles` changed files (default 50, with `totalFiles` when the list is cut) and cut the patch at `maxDiffBytes` (default 12000, with `diffTruncated`). New schemas: `CommitLogListResponse`, `CommitLogEntryResponse`, `CommitDiffResponse`, `BranchDiffResponse`, `BranchDiffFile`.
+</Update>
+
 <Update label="2026-11-17" description="v0.27.0" tags={["Added","Changed"]}>
   ### Added
 
