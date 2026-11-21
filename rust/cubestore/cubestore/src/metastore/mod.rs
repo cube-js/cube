@@ -19,8 +19,10 @@ pub use rocks_fs::*;
 pub use rocks_store::*;
 pub use rocks_table::*;
 
+use crate::app_metrics;
 use crate::cluster::node_name_by_partition;
 use crate::metastore::partition::partition_file_name;
+use crate::util::metrics;
 use async_trait::async_trait;
 use cuberockstore::rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
 use log::info;
@@ -2542,8 +2544,15 @@ impl MetaStore for RocksMetaStore {
     async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError> {
         self.write_operation("table_ready", move |db_ref, batch_pipe| {
             let rocks_table = TableRocksTable::new(db_ref.clone());
-            let entry =
-                rocks_table.update_with_fn(id, |r| r.update_is_ready(is_ready), batch_pipe)?;
+            let mut was_ready = false;
+            let entry = rocks_table.update_with_fn(
+                id,
+                |r| {
+                    was_ready = r.is_ready();
+                    r.update_is_ready(is_ready)
+                },
+                batch_pipe,
+            )?;
 
             if is_ready {
                 let schema = SchemaRocksTable::new(db_ref)
@@ -2554,8 +2563,20 @@ impl MetaStore for RocksMetaStore {
                     metastore.cached_tables.upsert_table_by_id(id, table_path);
                 });
             } else {
+                // Decided on the write loop, so concurrent deactivations of a table count once.
+                let deactivated_source = was_ready.then(|| {
+                    if entry.get_row().is_streaming() {
+                        "stream"
+                    } else {
+                        "batch"
+                    }
+                });
                 batch_pipe.set_post_commit_callback(move |metastore| {
                     metastore.cached_tables.remove_by_table_id_or_reset(id);
+                    if let Some(source) = deactivated_source {
+                        app_metrics::TABLES_DEACTIVATED
+                            .add_with_tags(1, Some(&vec![metrics::format_tag("source", source)]));
+                    }
                 });
             }
 
@@ -6067,6 +6088,70 @@ mod tests {
         assert_eq!(ids(&batch[1]), ids(&single2));
         assert!(batch[2].is_empty());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn table_deactivation_is_counted_by_source() -> Result<(), CubeError> {
+        use crate::util::metrics::test_capture;
+        init_test_logger().await;
+        test_capture::watch("cs.tables.deactivated");
+
+        let (_remote_fs, meta_store) =
+            RocksMetaStore::prepare_test_metastore("table_deactivation_is_counted_by_source");
+        meta_store.create_schema("foo".to_string(), false).await?;
+        let create = |name: &str, location: &str| {
+            meta_store.create_table(
+                "foo".to_string(),
+                name.to_string(),
+                vec![Column::new("col1".to_string(), ColumnType::Int, 0)],
+                Some(vec![location.to_string()]),
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+        };
+        let stream_table = create("streamed", "stream://source/topic").await?;
+        let batch_table = create("imported", "temp://imported.csv").await?;
+
+        for table in [&stream_table, &batch_table] {
+            deactivate_table_due_to_corrupt_data(
+                meta_store.clone(),
+                table.get_id(),
+                "corrupt".to_string(),
+            )
+            .await?;
+            assert!(!meta_store
+                .get_table_by_id(table.get_id())
+                .await?
+                .get_row()
+                .is_ready());
+        }
+
+        let samples = test_capture::samples("cs.tables.deactivated");
+        assert!(samples.contains(&(1, vec!["source:stream".to_string()])));
+        assert!(samples.contains(&(1, vec!["source:batch".to_string()])));
+
+        deactivate_table_due_to_corrupt_data(
+            meta_store.clone(),
+            batch_table.get_id(),
+            "corrupt again".to_string(),
+        )
+        .await?;
+        assert_eq!(test_capture::samples("cs.tables.deactivated"), samples);
+
+        RocksMetaStore::cleanup_test_metastore("table_deactivation_is_counted_by_source");
         Ok(())
     }
 
