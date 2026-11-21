@@ -15,8 +15,10 @@
 //! Note that misconfiguration (invalid port, address, etc) can cause metric updates to be silently
 //! ignored. This is by design to avoid interrupting normal operation.
 use crate::CubeError;
+use std::collections::HashSet;
 use std::net::ToSocketAddrs;
 use std::net::UdpSocket;
+use std::sync::Mutex;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Compatibility {
@@ -97,6 +99,35 @@ impl IntMetric {
         if let Some(s) = sink() {
             s.send(&self.metric, v, tags)
         }
+    }
+}
+
+/// A gauge reported as a full set of tagged series at once. A series missing from a report is
+/// set to zero, so a tag combination that disappears does not keep its last value.
+pub struct GaugeFamily {
+    gauge: &'static Gauge,
+    reported: Mutex<Option<HashSet<Vec<String>>>>,
+}
+
+impl GaugeFamily {
+    pub const fn new(gauge: &'static Gauge) -> Self {
+        Self {
+            gauge,
+            reported: Mutex::new(None),
+        }
+    }
+
+    pub fn report(&self, series: impl IntoIterator<Item = (Vec<String>, i64)>) {
+        let mut reported = self.reported.lock().unwrap();
+        let mut current = HashSet::new();
+        for (tags, value) in series {
+            self.gauge.report_with_tags(value, Some(&tags));
+            current.insert(tags);
+        }
+        for tags in reported.iter().flatten().filter(|t| !current.contains(*t)) {
+            self.gauge.report_with_tags(0, Some(tags));
+        }
+        *reported = Some(current);
     }
 }
 

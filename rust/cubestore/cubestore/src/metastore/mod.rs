@@ -1,3 +1,4 @@
+mod chunk_metrics;
 pub mod chunks;
 pub mod index;
 pub mod job;
@@ -19,9 +20,11 @@ pub use rocks_fs::*;
 pub use rocks_store::*;
 pub use rocks_table::*;
 
+use crate::app_metrics;
 use crate::cluster::node_name_by_partition;
 use crate::metastore::partition::partition_file_name;
 use async_trait::async_trait;
+use chunk_metrics::ChunkStats;
 use cuberockstore::rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -96,7 +99,7 @@ use crate::remotefs::LocalDirRemoteFs;
 use cubedatasketches::HLLDataSketch;
 use deepsize::DeepSizeOf;
 use snapshot_info::SnapshotInfo;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 use table::Table;
 use table::{TableRocksIndex, TableRocksTable};
 use tokio::sync::broadcast::Sender;
@@ -1546,7 +1549,10 @@ impl RocksMetaStore {
                         .config
                         .compaction_in_memory_chunks_schedule_period_secs(),
                 );
-                if allow_stale || time.elapsed()? < cache_duration {
+                let age = time.elapsed()?;
+                if allow_stale || age < cache_duration {
+                    app_metrics::IN_MEMORY_COMPACTION_DISCOVERY_AGE_MS
+                        .report(age.as_millis() as i64);
                     Some(by_node.clone())
                 } else {
                     None
@@ -1599,6 +1605,7 @@ impl RocksMetaStore {
         }
 
         let config = self.store.config.clone();
+        let scan_started = Instant::now();
         let by_node = self
             .read_operation_out_of_queue("in_memory_compaction_partition_ids", move |db_ref| {
                 let chunks_table = ChunkRocksTable::new(db_ref.clone());
@@ -1628,6 +1635,11 @@ impl RocksMetaStore {
             })
             .await?;
 
+        app_metrics::IN_MEMORY_COMPACTION_DISCOVERY_MS
+            .report(scan_started.elapsed().as_millis() as i64);
+        app_metrics::IN_MEMORY_COMPACTION_PENDING_PARTITIONS
+            .report(by_node.values().map(|ids| ids.len() as i64).sum());
+        app_metrics::IN_MEMORY_COMPACTION_DISCOVERY_AGE_MS.report(0);
         *self.in_memory_compaction_cache.write().await = Some((by_node.clone(), SystemTime::now()));
         Ok(by_node.get(&node).cloned().unwrap_or_default())
     }
@@ -4172,19 +4184,34 @@ impl MetaStore for RocksMetaStore {
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
+    // The scheduler's periodic chunk sweep is the only regular full chunk scan on every
+    // deployment, so it also reports the metastore chunk gauges.
     async fn all_inactive_chunks(&self) -> Result<Vec<IdRow<Chunk>>, CubeError> {
-        self.read_operation_out_of_queue("all_inactive_chunks", move |db_ref| {
-            let table = ChunkRocksTable::new(db_ref);
-            let mut res = Vec::new();
-            for c in table.scan_all_rows()? {
-                let c = c?;
-                if !c.get_row().active() && c.get_row().uploaded() {
-                    res.push(c);
+        let config = self.store.config.clone();
+        let (res, stats, node_by_partition) = self
+            .read_operation_out_of_queue("all_inactive_chunks", move |db_ref| {
+                let table = ChunkRocksTable::new(db_ref.clone());
+                let mut res = Vec::new();
+                let mut stats = ChunkStats::default();
+                for c in table.scan_all_rows()? {
+                    let c = c?;
+                    stats.observe(&c);
+                    if !c.get_row().active() && c.get_row().uploaded() {
+                        res.push(c);
+                    }
                 }
-            }
-            Ok(res)
-        })
-        .await
+                let partitions = PartitionRocksTable::new(db_ref);
+                let mut node_by_partition = HashMap::new();
+                for id in stats.active_in_memory_by_partition.keys() {
+                    if let Some(p) = partitions.get_row(*id)? {
+                        node_by_partition.insert(*id, node_name_by_partition(config.as_ref(), &p));
+                    }
+                }
+                Ok((res, stats, node_by_partition))
+            })
+            .await?;
+        stats.report(&node_by_partition);
+        Ok(res)
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
@@ -4305,28 +4332,39 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip_all)]
     async fn add_job(&self, job: Job) -> Result<Option<IdRow<Job>>, CubeError> {
-        self.write_operation("add_job", move |db_ref, batch_pipe| {
-            // Unknown is a read-time fallback for variants written by a newer binary;
-            // this binary must never create one (the cleanup sweep would delete it).
-            debug_assert!(
-                !matches!(job.job_type(), JobType::Unknown),
-                "refusing to add a job with an unknown type"
+        let result = self
+            .write_operation("add_job", move |db_ref, batch_pipe| {
+                // Unknown is a read-time fallback for variants written by a newer binary;
+                // this binary must never create one (the cleanup sweep would delete it).
+                debug_assert!(
+                    !matches!(job.job_type(), JobType::Unknown),
+                    "refusing to add a job with an unknown type"
+                );
+                let table = JobRocksTable::new(db_ref.clone());
+
+                let result = table.get_row_ids_by_index(
+                    &JobIndexKey::RowReference(job.row_reference().clone(), job.job_type().clone()),
+                    &JobRocksIndex::RowReference,
+                )?;
+                if result.len() > 0 {
+                    return Ok(None);
+                }
+
+                let id_row = table.insert(job, batch_pipe)?;
+
+                Ok(Some(id_row))
+            })
+            .await;
+        if let Ok(Some(job)) = &result {
+            app_metrics::JOBS_SCHEDULED.add_with_tags(
+                1,
+                Some(&vec![format!(
+                    "job_type:{}",
+                    job.get_row().job_type().name()
+                )]),
             );
-            let table = JobRocksTable::new(db_ref.clone());
-
-            let result = table.get_row_ids_by_index(
-                &JobIndexKey::RowReference(job.row_reference().clone(), job.job_type().clone()),
-                &JobRocksIndex::RowReference,
-            )?;
-            if result.len() > 0 {
-                return Ok(None);
-            }
-
-            let id_row = table.insert(job, batch_pipe)?;
-
-            Ok(Some(id_row))
-        })
-        .await
+        }
+        result
     }
 
     #[tracing::instrument(level = "trace", skip_all)]

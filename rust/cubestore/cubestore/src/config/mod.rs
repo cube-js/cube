@@ -72,6 +72,9 @@ use tokio::time::{timeout_at, Duration, Instant};
 
 const LOST_IN_MEMORY_CHUNKS_CLEANUP_ATTEMPTS: usize = 40;
 const LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY: Duration = Duration::from_secs(15);
+// Also the refresh period of the in-memory chunk gauges, so a restarted process overwrites the
+// value its previous incarnation left in the metrics exporter.
+const IN_MEMORY_CHUNKS_RECONCILE_INTERVAL: Duration = Duration::from_secs(60);
 
 #[derive(Clone)]
 pub struct CubeServices {
@@ -222,6 +225,29 @@ impl CubeServices {
                     tokio::select! {
                         _ = stop_token.cancelled() => return,
                         _ = tokio::time::sleep(LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY) => {}
+                    }
+                }
+            });
+        }
+
+        if self
+            .injector
+            .has_service_typed::<dyn ChunkDataStore>()
+            .await
+        {
+            let chunk_store = self
+                .injector
+                .get_service_typed::<dyn ChunkDataStore>()
+                .await;
+            let stop_token = self.cluster.stop_token();
+            cube_ext::spawn(async move {
+                loop {
+                    if let Err(e) = chunk_store.reconcile_memory_chunks().await {
+                        log::error!("Error reconciling in-memory chunks: {}", e);
+                    }
+                    tokio::select! {
+                        _ = stop_token.cancelled() => return,
+                        _ = tokio::time::sleep(IN_MEMORY_CHUNKS_RECONCILE_INTERVAL) => {}
                     }
                 }
             });

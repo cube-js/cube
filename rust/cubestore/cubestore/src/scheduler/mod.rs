@@ -1,3 +1,4 @@
+use crate::app_metrics;
 use crate::cluster::{pick_import_worker, pick_worker_by_ids, Cluster};
 use crate::config::{ConfigObj, RepartitionStrategy};
 use crate::metastore::chunks::chunk_file_name;
@@ -68,6 +69,34 @@ const GC_DELETE_CHUNKS_BATCH: usize = 1000;
 const CHUNK_SWEEP_INTERVAL: Duration = Duration::from_secs(30);
 // Lagging can last for a while, so it wakes the sweep no more often than this.
 const CHUNK_SWEEP_MIN_INTERVAL: Duration = Duration::from_secs(5);
+
+const EVENTS_PENDING_REPORT_INTERVAL: Duration = Duration::from_secs(1);
+
+// Reports the event channel backlog at most once per interval, and at once when it drains, so
+// an idle channel never keeps a stale non-zero value.
+struct EventsPendingReporter {
+    last_report: Instant,
+    last_value: usize,
+}
+
+impl EventsPendingReporter {
+    fn new() -> Self {
+        app_metrics::SCHEDULER_EVENTS_PENDING.report(0);
+        Self {
+            last_report: Instant::now(),
+            last_value: 0,
+        }
+    }
+
+    fn observe(&mut self, pending: usize) {
+        let drained = pending == 0 && self.last_value != 0;
+        if drained || self.last_report.elapsed() >= EVENTS_PENDING_REPORT_INTERVAL {
+            app_metrics::SCHEDULER_EVENTS_PENDING.report(pending as i64);
+            self.last_report = Instant::now();
+            self.last_value = pending;
+        }
+    }
+}
 
 struct LastNodeActionTimes {
     in_memory_compaction: SystemTime,
@@ -237,22 +266,29 @@ impl SchedulerImpl {
             GCTask::DeleteChunks(chunk_ids) => {
                 match self.meta_store.get_chunks_out_of_queue(chunk_ids).await {
                     Ok(chunks) => {
-                        let ids = chunks
+                        let inactive = chunks
                             .iter()
-                            .filter_map(|c| {
-                                if c.get_row().active() {
-                                    None
-                                } else {
-                                    Some(c.get_id())
-                                }
-                            })
+                            .filter(|c| !c.get_row().active())
                             .collect::<Vec<_>>();
+                        let in_memory = inactive.iter().filter(|c| c.get_row().in_memory()).count();
+                        let persistent = inactive.len() - in_memory;
+                        let ids = inactive.iter().map(|c| c.get_id()).collect::<Vec<_>>();
 
                         if let Err(e) = self.meta_store.delete_chunks_without_checks(ids).await {
                             log::error!(
                                 "Could not delete chunks. Get error {} when deleting chunks",
                                 e
                             );
+                        } else {
+                            app_metrics::GC_CHUNK_DELETE_BATCHES.increment();
+                            for (in_memory, count) in [(true, in_memory), (false, persistent)] {
+                                if count > 0 {
+                                    app_metrics::GC_CHUNKS_DELETED.add_with_tags(
+                                        count as i64,
+                                        Some(&vec![format!("in_memory:{}", in_memory)]),
+                                    );
+                                }
+                            }
                         }
                     }
                     Err(e) => {
@@ -305,8 +341,10 @@ impl SchedulerImpl {
     }
 
     async fn run_meta_event_processor(self: Arc<Self>) {
+        let mut pending_reporter = EventsPendingReporter::new();
         loop {
             let mut event_receiver = self.event_receiver.lock().await;
+            pending_reporter.observe(event_receiver.len());
             let event = tokio::select! {
                 _ = self.cancel_token.cancelled() => {
                     return;
@@ -314,6 +352,7 @@ impl SchedulerImpl {
                 event = event_receiver.recv() => {
                     match event {
                         Err(broadcast::error::RecvError::Lagged(messages)) => {
+                            app_metrics::SCHEDULER_EVENTS_DROPPED.add(messages as i64);
                             error!("Scheduler is lagging on meta store event processing for {} messages", messages);
                             // notify_one keeps a permit, so a sweep already running is
                             // followed by another one that sees the dropped events' effects.
@@ -448,6 +487,10 @@ impl SchedulerImpl {
         .await
         {
             error!("Error deleting middle man partitions: {}", e);
+        }
+
+        if let Err(e) = self.report_job_metrics().await {
+            error!("Error reporting job metrics: {}", e);
         }
 
         if let Err(e) = warn_long_fut(
@@ -856,6 +899,26 @@ impl SchedulerImpl {
         if deleted > 0 {
             crate::app_metrics::JOBS_UNKNOWN_DELETED.add(deleted as i64);
         }
+        Ok(())
+    }
+
+    async fn report_job_metrics(&self) -> Result<(), CubeError> {
+        let mut counts: HashMap<(&'static str, &'static str), i64> = HashMap::new();
+        for job in self.meta_store.all_jobs().await? {
+            let row = job.get_row();
+            *counts
+                .entry((row.job_type().name(), row.status().name()))
+                .or_default() += 1;
+        }
+        app_metrics::JOBS_FAMILY.report(counts.into_iter().map(|((job_type, status), count)| {
+            (
+                vec![
+                    format!("job_type:{}", job_type),
+                    format!("status:{}", status),
+                ],
+                count,
+            )
+        }));
         Ok(())
     }
 

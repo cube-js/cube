@@ -1,8 +1,9 @@
+use crate::app_metrics;
 use crate::cluster::ingestion::job_processor::{JobProcessResult, JobProcessor};
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::config::ConfigObj;
 use crate::import::ImportService;
-use crate::metastore::job::{Job, JobRunnerPool, JobStatus, JobType};
+use crate::metastore::job::{job_error_class, Job, JobRunnerPool, JobStatus, JobType};
 use crate::metastore::table::Table;
 use crate::metastore::{IdRow, MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
@@ -23,6 +24,16 @@ use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
+
+fn report_job_failure(job_type_tag: String, message: &str) {
+    app_metrics::JOBS_FAILED.add_with_tags(
+        1,
+        Some(&vec![
+            job_type_tag,
+            format!("error_class:{}", job_error_class(message)),
+        ]),
+    );
+}
 
 fn record_job_result(job_span: &Span, job_result: &JobProcessResult) {
     job_span.record(
@@ -159,6 +170,14 @@ impl JobRunner {
             }
             Ok(Err(e)) => record_error(&Span::current(), &CubeError::internal(e.to_string())),
             Ok(Ok(Ok(()))) => {}
+        }
+        let job_type_tag = format!("job_type:{}", job.get_row().job_type().name());
+        match &res {
+            Ok(Ok(Ok(()))) => {
+                app_metrics::JOBS_COMPLETED.add_with_tags(1, Some(&vec![job_type_tag]));
+            }
+            Err(e) | Ok(Ok(Err(e))) => report_job_failure(job_type_tag, &e.message),
+            Ok(Err(e)) => report_job_failure(job_type_tag, &e.to_string()),
         }
         if let Err(e) = res {
             self.meta_store

@@ -90,6 +90,39 @@ pub enum JobStatus {
     Orphaned,
 }
 
+impl JobStatus {
+    /// The variant without its payload, which can be a node address or an error message.
+    pub fn name(&self) -> &'static str {
+        match self {
+            JobStatus::Scheduled(_) => "Scheduled",
+            JobStatus::ProcessingBy(_) => "ProcessingBy",
+            JobStatus::Completed => "Completed",
+            JobStatus::Timeout => "Timeout",
+            JobStatus::Error(_) => "Error",
+            JobStatus::Orphaned => "Orphaned",
+        }
+    }
+}
+
+/// A bounded label for a job failure message, for metrics.
+pub fn job_error_class(message: &str) -> &'static str {
+    if message.contains("offset overflow") {
+        "offset_overflow"
+    } else if message.contains("chunk") && message.contains("is not active") {
+        "source_chunk_not_active"
+    } else if message.contains("partition is not active") {
+        "partition_not_active"
+    } else if message.contains("timed out") {
+        "timeout"
+    } else if message.contains("shutting down") {
+        "shutdown"
+    } else if message.contains("Panic") {
+        "panic"
+    } else {
+        "other"
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Hash)]
 pub struct Job {
     row_reference: RowKey,
@@ -281,6 +314,25 @@ impl RocksSecondaryIndex<Job, JobIndexKey> for JobRocksIndex {
 mod tests {
     use super::*;
     use serde::Serialize;
+
+    #[test]
+    fn job_error_classes() {
+        for (message, class) in [
+            ("Panic: offset overflow", "offset_overflow"),
+            (
+                "Source chunk 1 is not active when swapping of (1, 2) to (3) chunks",
+                "source_chunk_not_active",
+            ),
+            ("Current chunk is not active: 5", "source_chunk_not_active"),
+            ("Current partition is not active: 5", "partition_not_active"),
+            ("timed out", "timeout"),
+            ("shutting down", "shutdown"),
+            ("Panic: index out of bounds", "panic"),
+            ("No such file", "other"),
+        ] {
+            assert_eq!(job_error_class(message), class, "{}", message);
+        }
+    }
 
     fn job(job_type: JobType) -> Job {
         Job::new(

@@ -2,7 +2,7 @@
 //! The convention is to prefix all metrics with `cs.` (short for CubeStore).
 
 use crate::util::metrics;
-use crate::util::metrics::{Counter, Gauge, Histogram};
+use crate::util::metrics::{Counter, Gauge, GaugeFamily, Histogram};
 
 /// The number of process startups.
 pub static STARTUPS: Counter = metrics::counter("cs.startup");
@@ -94,9 +94,18 @@ pub static QUEUE_QUERY_TIME_MS: Histogram = metrics::histogram("cs.sql.query.que
 pub static STREAMING_ROWS_READ: Counter = metrics::counter("cs.streaming.rows");
 pub static STREAMING_CHUNKS_READ: Counter = metrics::counter("cs.streaming.chunks");
 pub static STREAMING_LASTOFFSET: Gauge = metrics::gauge("cs.streaming.lastoffset");
+/// In-memory chunks held by this process, whatever their state in the metastore.
 pub static IN_MEMORY_CHUNKS_COUNT: Gauge = metrics::gauge("cs.workers.in_memory_chunks");
 pub static IN_MEMORY_CHUNKS_ROWS: Gauge = metrics::gauge("cs.workers.in_memory_chunks.rows");
 pub static IN_MEMORY_CHUNKS_MEMORY: Gauge = metrics::gauge("cs.workers.in_memory_chunks.memory");
+/// Held in-memory chunks the metastore lists as active.
+pub static IN_MEMORY_CHUNKS_ACTIVE: Gauge = metrics::gauge("cs.workers.in_memory_chunks.active");
+/// Held in-memory chunks the metastore lists as deactivated, i.e. waiting for GC.
+pub static IN_MEMORY_CHUNKS_INACTIVE: Gauge =
+    metrics::gauge("cs.workers.in_memory_chunks.inactive");
+/// Held in-memory chunks whose metastore row was already deleted, released by the reconcile pass.
+pub static IN_MEMORY_CHUNKS_ORPHANS_FREED: Counter =
+    metrics::counter("cs.workers.in_memory_chunks.orphans_freed");
 pub static STREAMING_IMPORT_TIME: Histogram = metrics::histogram("cs.streaming.import_time.ms");
 pub static STREAMING_PARTITION_TIME: Histogram =
     metrics::histogram("cs.streaming.partition_time.ms");
@@ -106,7 +115,46 @@ pub static STREAMING_ROUNDTRIP_TIME: Histogram =
 pub static STREAMING_ROUNDTRIP_ROWS: Histogram = metrics::histogram("cs.streaming.roundtrip_rows");
 pub static STREAMING_ROUNDTRIP_CHUNKS: Histogram =
     metrics::histogram("cs.streaming.roundtrip_chunks");
+/// High watermark minus the last consumed offset, refreshed periodically with or without traffic.
 pub static STREAMING_LAG: Gauge = metrics::gauge("cs.streaming.lag");
+/// Time since [STREAMING_LAG] was last computed; grows while the watermark fetch fails.
+pub static STREAMING_LAG_AGE_MS: Gauge = metrics::gauge("cs.streaming.lag.age.ms");
+
+/// Chunks in the metastore, tagged `in_memory` and `active`.
+pub static METASTORE_CHUNKS: Gauge = metrics::gauge("cs.metastore.chunks");
+pub static METASTORE_CHUNKS_FAMILY: GaugeFamily = GaugeFamily::new(&METASTORE_CHUNKS);
+pub static METASTORE_CHUNKS_ROWS: Gauge = metrics::gauge("cs.metastore.chunks.rows");
+pub static METASTORE_CHUNKS_ROWS_FAMILY: GaugeFamily = GaugeFamily::new(&METASTORE_CHUNKS_ROWS);
+/// Active in-memory chunks per owning node, tagged `node`; compare with
+/// [IN_MEMORY_CHUNKS_ACTIVE] of that node.
+pub static METASTORE_IN_MEMORY_CHUNKS_BY_NODE: Gauge =
+    metrics::gauge("cs.metastore.chunks.in_memory_active_by_node");
+pub static METASTORE_IN_MEMORY_CHUNKS_BY_NODE_FAMILY: GaugeFamily =
+    GaugeFamily::new(&METASTORE_IN_MEMORY_CHUNKS_BY_NODE);
+pub static METASTORE_OLDEST_ACTIVE_IN_MEMORY_CHUNK_AGE_SECS: Gauge =
+    metrics::gauge("cs.metastore.chunks.in_memory.oldest_active_age.secs");
+/// Time since the oldest deactivated chunk was deactivated, tagged `in_memory`: the GC backlog.
+pub static METASTORE_OLDEST_INACTIVE_CHUNK_AGE_SECS: Gauge =
+    metrics::gauge("cs.metastore.chunks.oldest_inactive_age.secs");
+pub static METASTORE_OLDEST_INACTIVE_CHUNK_AGE_SECS_FAMILY: GaugeFamily =
+    GaugeFamily::new(&METASTORE_OLDEST_INACTIVE_CHUNK_AGE_SECS);
+
+pub static IN_MEMORY_COMPACTION_DISCOVERY_MS: Histogram =
+    metrics::histogram("cs.metastore.in_memory_compaction.discovery.ms");
+pub static IN_MEMORY_COMPACTION_DISCOVERY_AGE_MS: Gauge =
+    metrics::gauge("cs.metastore.in_memory_compaction.discovery.age.ms");
+/// Partitions holding active in-memory chunks, as of the last discovery scan.
+pub static IN_MEMORY_COMPACTION_PENDING_PARTITIONS: Gauge =
+    metrics::gauge("cs.metastore.in_memory_compaction.pending_partitions");
+
+/// Chunk rows deleted by GC, tagged `in_memory`.
+pub static GC_CHUNKS_DELETED: Counter = metrics::counter("cs.gc.chunks_deleted");
+pub static GC_CHUNK_DELETE_BATCHES: Counter = metrics::counter("cs.gc.chunk_delete_batches");
+
+/// Metastore events the scheduler lost because its channel overflowed. Lost chunk deletions
+/// are only recovered by the workers' in-memory chunk reconcile.
+pub static SCHEDULER_EVENTS_DROPPED: Counter = metrics::counter("cs.scheduler.events_dropped");
+pub static SCHEDULER_EVENTS_PENDING: Gauge = metrics::gauge("cs.scheduler.events_pending");
 
 pub static METASTORE_QUEUE: Gauge = metrics::gauge("cs.metastore.queue_size");
 pub static METASTORE_READ_OPERATION: Histogram =
@@ -152,6 +200,15 @@ pub static JOBS_REPARTITION_CHUNK_COMPLETED: Counter =
     metrics::counter("cs.jobs.repartition_chunk.completed");
 pub static JOBS_REPARTITION_CHUNK_FAILURES: Counter =
     metrics::counter("cs.jobs.repartition_chunk.failures");
+/// Jobs in the metastore, tagged `job_type` and `status` (what `system.jobs` shows).
+pub static JOBS: Gauge = metrics::gauge("cs.jobs");
+pub static JOBS_FAMILY: GaugeFamily = GaugeFamily::new(&JOBS);
+/// Jobs added to the metastore, tagged `job_type`. A job already queued for the same row is
+/// not added again and not counted.
+pub static JOBS_SCHEDULED: Counter = metrics::counter("cs.jobs.scheduled");
+pub static JOBS_COMPLETED: Counter = metrics::counter("cs.jobs.completed");
+/// Tagged `job_type` and `error_class`.
+pub static JOBS_FAILED: Counter = metrics::counter("cs.jobs.failed");
 /// Jobs removed by the cleanup sweep because their type is unknown to this
 /// binary. Non-zero means a newer binary wrote a job type this one cannot run
 /// (version skew across `latest`/`release` channels).
