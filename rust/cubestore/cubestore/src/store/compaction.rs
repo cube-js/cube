@@ -1406,8 +1406,8 @@ async fn write_to_files_impl(
             }
         };
     let err = redistribute(records, store.row_group_size(), move |b| {
-        // Log arrays over 512 MB: such wide values shrink row groups (redistribute caps a group
-        // at i32::MAX value bytes).
+        // Log arrays over 512 MB. Such wide values only shorten the batches handed here
+        // (redistribute caps them at i32::MAX value bytes); parquet row groups keep their size.
 
         // First figure out what to log.  (Normally we don't allocate or log anything.)
         let mut loggable_overlongs = Vec::new();
