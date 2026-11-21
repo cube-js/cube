@@ -1,5 +1,15 @@
 import { validateOptions } from '../../src/core/optionsValidate';
 
+describe('validateOptions compilerConcurrency', () => {
+  test.each([undefined, 1, 2, 100])('accepts %s', (compilerConcurrency) => {
+    expect(() => validateOptions({ compilerConcurrency })).not.toThrow();
+  });
+
+  test.each([0, -1, 1.5, NaN, Infinity, -Infinity, '2', null, 9007199254740992])('rejects %s', (compilerConcurrency) => {
+    expect(() => validateOptions({ compilerConcurrency })).toThrow(/compilerConcurrency/);
+  });
+});
+
 describe('validateOptions scheduledRefreshTimeZones', () => {
   test('accepts valid IANA timezones', () => {
     expect(() => validateOptions({ scheduledRefreshTimeZones: ['UTC', 'America/New_York'] })).not.toThrow();

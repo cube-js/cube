@@ -23,6 +23,7 @@ impl CubeConfigPy {
             "base_path",
             "cache_and_queue_driver",
             "compiler_cache_size",
+            "compiler_concurrency",
             "dev_server",
             "graceful_shutdown",
             "http",
