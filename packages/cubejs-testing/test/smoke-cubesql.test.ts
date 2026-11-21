@@ -543,6 +543,34 @@ describe('SQL API', () => {
       expect(res.rows).toMatchSnapshot('current_timestamp_push_down');
     });
 
+    // https://github.com/cube-js/cube/issues/11553
+    // Tableau's Postgres connector buckets weeks starting on Sunday as
+    // `DATE_TRUNC('day', d) + (-EXTRACT(DOW FROM d) * INTERVAL '1 DAY')`.
+    // The `tableau-week` rewrite maps it to Cube's `week` granularity,
+    // which starts on Monday, so every bucket is shifted by a day and Sunday
+    // rows land in the wrong week.
+    test('tableau week starting on Sunday', async () => {
+      const res = await connection.query(`
+        SELECT
+          CAST((DATE_TRUNC('day', CAST("Orders"."createdAt" AS DATE)) + (-EXTRACT(DOW FROM "Orders"."createdAt") * INTERVAL '1 DAY')) AS DATE) AS "twk:createdAt:ok",
+          COUNT(*) AS "cnt"
+        FROM "public"."Orders" "Orders"
+        GROUP BY 1
+      `);
+      // Fixture rows are 2024-01-01 (Mon) .. 2024-01-05 (Fri): the Sunday that
+      // starts their week is 2023-12-31, not Monday 2024-01-01.
+      // node-pg parses DATE values as local midnight, so format with local getters.
+      const formatDate = (d: Date) => [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, '0'),
+        String(d.getDate()).padStart(2, '0'),
+      ].join('-');
+      expect(res.rows.map((r) => ({
+        week: formatDate(r['twk:createdAt:ok']),
+        cnt: Number(r.cnt),
+      }))).toEqual([{ week: '2023-12-31', cnt: 5 }]);
+    });
+
     test('no limit for non matching count push down', async () => {
       const res = await connection.query(`
       select
