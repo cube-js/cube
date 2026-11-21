@@ -19,6 +19,14 @@ cube(`OrdersPA`, {
         every: `1 hour`,
       }
     },
+    // Built only by the jobs API smoke test, so it starts out unbuilt
+    byIdForJobs: {
+      measures: [CUBE.count],
+      dimensions: [CUBE.id],
+      refreshKey: {
+        every: `1 hour`,
+      }
+    },
   },
 
   measures: {
