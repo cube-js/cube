@@ -191,14 +191,23 @@ mod tests {
         ))
     }
 
-    async fn collect_groups(batches: Vec<RecordBatch>, buf: BatchBuffer) -> Vec<(Vec<i64>, usize)> {
+    /// Keeps only the first `cut_once` rows of the first group and hands the rest back.
+    async fn collect_groups(
+        batches: Vec<RecordBatch>,
+        buf: BatchBuffer,
+        mut cut_once: Option<usize>,
+    ) -> Vec<(Vec<i64>, usize)> {
         let mut groups = Vec::new();
         redistribute_impl(stream(batches), buf, |b| {
+            let (b, rest) = match cut_once.take() {
+                Some(n) => (b.slice(0, n), Some(b.slice(n, b.num_rows() - n))),
+                None => (b, None),
+            };
             let ids = b
                 .column(0)
                 .as_primitive::<datafusion::arrow::datatypes::Int64Type>();
             groups.push((ids.values().to_vec(), column_value_bytes(&b)[1]));
-            async { Ok(None) }
+            async { Ok(rest) }
         })
         .await
         .unwrap();
@@ -218,10 +227,15 @@ mod tests {
             .collect()
     }
 
-    async fn group_sizes(rows_per_group: usize, max_column_value_bytes: usize) -> Vec<usize> {
+    async fn group_sizes(
+        rows_per_group: usize,
+        max_column_value_bytes: usize,
+        cut_once: Option<usize>,
+    ) -> Vec<usize> {
         let groups = collect_groups(
             small_batches(),
             BatchBuffer::new(rows_per_group, max_column_value_bytes),
+            cut_once,
         )
         .await;
         let all_ids = groups
@@ -237,9 +251,17 @@ mod tests {
 
     #[tokio::test]
     async fn groups_are_cut_by_rows_and_value_bytes() {
-        assert_eq!(group_sizes(8, 120).await, vec![8, 8, 4]);
-        assert_eq!(group_sizes(8, 60).await, vec![5, 5, 5, 5]);
-        assert_eq!(group_sizes(8, 5).await, vec![5, 5, 5, 5]);
+        assert_eq!(group_sizes(8, 120, None).await, vec![8, 8, 4]);
+        assert_eq!(group_sizes(8, 60, None).await, vec![5, 5, 5, 5]);
+        assert_eq!(group_sizes(8, 5, None).await, vec![5, 5, 5, 5]);
+        // Fewer rows than a group: the whole stream is drained at its end.
+        assert_eq!(group_sizes(100, 60, None).await, vec![5, 5, 5, 5]);
+    }
+
+    #[tokio::test]
+    async fn rows_handed_back_by_process_are_taken_again() {
+        assert_eq!(group_sizes(8, 120, Some(3)).await, vec![3, 8, 8, 1]);
+        assert_eq!(group_sizes(100, 60, Some(2)).await, vec![2, 3, 5, 5, 5]);
     }
 
     /// Concatenating these two batches would need Utf8 offsets past i32::MAX ("offset overflow").

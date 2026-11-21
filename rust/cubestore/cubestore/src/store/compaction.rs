@@ -1406,9 +1406,8 @@ async fn write_to_files_impl(
             }
         };
     let err = redistribute(records, store.row_group_size(), move |b| {
-        // See if we get an array using more than 512 MB and log it.  This means a default batch
-        // size of 8192 might, or our row group size of 16384 really might, get i32 offset overflow
-        // when used in an Arrow array with a Utf8 column.
+        // Log arrays over 512 MB: such wide values shrink row groups (redistribute caps a group
+        // at i32::MAX value bytes) and can overflow upstream batches.
 
         // First figure out what to log.  (Normally we don't allocate or log anything.)
         let mut loggable_overlongs = Vec::new();
