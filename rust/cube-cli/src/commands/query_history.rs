@@ -80,8 +80,11 @@ enum Cmd {
         #[arg(long)]
         first: Option<u64>,
         /// Cursor for the next page (from a previous pageInfo.endCursor); it keeps the
-        /// first page's filters, so the other filter flags are ignored with it
-        #[arg(long)]
+        /// first page's filters, so it does not take the other filter flags
+        #[arg(
+            long,
+            conflicts_with_all = ["from", "to", "status", "api_type", "min_duration_ms", "search"]
+        )]
         after: Option<String>,
     },
     /// Show one request with the SQL it generated
@@ -167,6 +170,27 @@ fn check_request_id(request: &str) -> Result<()> {
     Ok(())
 }
 
+/// One generated query's heading; a value APM has not recorded yet (a query still running) is left
+/// out rather than printed empty.
+fn sql_heading(sql: &Value) -> String {
+    let mut parts = Vec::new();
+    let executor = output::field(sql, "executor");
+    if !executor.is_empty() {
+        parts.push(format!("[{executor}]"));
+    }
+    for (label, path) in [("", "durationMs"), ("queued ", "queueDurationMs")] {
+        let ms = output::field(sql, path);
+        if !ms.is_empty() {
+            parts.push(format!("{label}{ms} ms"));
+        }
+    }
+    let error = output::field(sql, "error");
+    if !error.is_empty() {
+        parts.push(format!("error: {}", util::one_cell(&error)));
+    }
+    parts.join(", ")
+}
+
 fn print_request(request: &Value) {
     let line = |label: &str, path: &str| {
         let value = output::field(request, path);
@@ -191,16 +215,7 @@ fn print_request(request: &Value) {
         .unwrap_or_default();
     println!("\nSQL queries: {}", sql_queries.len());
     for sql in &sql_queries {
-        println!(
-            "\n[{}] {} ms, queued {} ms{}",
-            output::field(sql, "executor"),
-            output::field(sql, "durationMs"),
-            output::field(sql, "queueDurationMs"),
-            match output::field(sql, "error") {
-                error if error.is_empty() => String::new(),
-                error => format!(", error: {}", util::one_cell(&error)),
-            }
-        );
+        println!("\n{}", sql_heading(sql));
         println!("{}", util::printable(&output::field(sql, "sql")));
         if let Some(params) = sql.get("params").and_then(Value::as_array) {
             if !params.is_empty() {
@@ -248,8 +263,6 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             } else {
                 let (headers, rows) = list_table(&res);
                 output::table(&headers, rows);
-            }
-            if !ctx.json {
                 if let Some(cursor) = next_cursor(&res) {
                     eprintln!("Next page: --after {}", util::shell_quote(cursor));
                 }
@@ -302,6 +315,32 @@ mod tests {
         assert_eq!(next_cursor(&page(true, "abc")), Some("abc"));
         assert_eq!(next_cursor(&page(false, "abc")), None);
         assert_eq!(next_cursor(&page(true, "")), None);
+    }
+
+    #[test]
+    fn after_refuses_other_filters_but_takes_first() {
+        use clap::Parser;
+
+        #[derive(Parser)]
+        struct Cli {
+            #[command(subcommand)]
+            cmd: Cmd,
+        }
+
+        let parse = |args: &[&str]| Cli::try_parse_from([&["cube", "list", "7"], args].concat());
+        assert!(parse(&["--after", "c", "--status", "error"]).is_err());
+        assert!(parse(&["--after", "c", "--api-type", "sql"]).is_err());
+        assert!(parse(&["--after", "c", "--first", "5"]).is_ok());
+    }
+
+    #[test]
+    fn sql_heading_leaves_out_what_is_not_recorded_yet() {
+        let full = serde_json::json!({
+            "executor": "dataSource", "durationMs": 19, "queueDurationMs": 11, "error": null
+        });
+        assert_eq!(sql_heading(&full), "[dataSource], 19 ms, queued 11 ms");
+        let running = serde_json::json!({ "executor": null, "durationMs": null, "error": "boom" });
+        assert_eq!(sql_heading(&running), "error: boom");
     }
 
     #[test]
