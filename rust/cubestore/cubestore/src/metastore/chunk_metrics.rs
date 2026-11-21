@@ -39,7 +39,8 @@ impl ChunkStats {
                     *c.created_at(),
                 );
             }
-        } else {
+        } else if c.uploaded() {
+            // Never-activated chunks are not uploaded yet and are not GC backlog.
             // A chunk deactivated by an older binary has no deactivation time.
             let deactivated_at = c.deactivated_at().or(*c.created_at());
             min_time(&mut self.oldest_deactivated_at[in_memory], deactivated_at);
@@ -167,6 +168,11 @@ mod tests {
         assert!(stats.oldest_active_in_memory_created_at.is_some());
         assert!(stats.oldest_deactivated_at[0].is_some());
         assert!(stats.oldest_deactivated_at[1].is_some());
+
+        let mut pending_only = ChunkStats::default();
+        pending_only.observe(&IdRow::new(7, Chunk::new(10, 1, None, None, true)));
+        assert_eq!(pending_only.counts[1][0], ChunkCount { chunks: 1, rows: 1 });
+        assert!(pending_only.oldest_deactivated_at[1].is_none());
     }
 
     #[test]

@@ -275,12 +275,14 @@ impl StreamingService for StreamingServiceImpl {
         let mut round_trip_started: Option<SystemTime> = None;
         let tags = vec![format!("location:{}", location)];
         let last_seq = Arc::new(AtomicI64::new(initial_seq_value.unwrap_or(NO_SEQ)));
-        let _lag_reporter = spawn_lag_reporter(
-            source.clone(),
-            last_seq.clone(),
-            tags.clone(),
-            STREAMING_LAG_REPORT_INTERVAL,
-        );
+        let _lag_reporter = source.reports_lag().then(|| {
+            spawn_lag_reporter(
+                source.clone(),
+                last_seq.clone(),
+                tags.clone(),
+                STREAMING_LAG_REPORT_INTERVAL,
+            )
+        });
 
         while !sealed {
             let new_rows = match tokio::time::timeout(
@@ -479,6 +481,11 @@ pub trait StreamingSource: Send + Sync {
 
     async fn apply_post_processing(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
         Ok(data)
+    }
+
+    /// Whether [StreamingSource::calulate_lag] can return a value; otherwise no lag is reported.
+    fn reports_lag(&self) -> bool {
+        false
     }
 
     async fn calulate_lag(&self, _current_seq: i64) -> Option<i64> {
@@ -1020,6 +1027,10 @@ mod tests {
             0
         }
 
+        fn reports_lag(&self) -> bool {
+            true
+        }
+
         async fn calulate_lag(&self, current_seq: i64) -> Option<i64> {
             self.lag_calls.lock().unwrap().push(current_seq);
             Some(0)
@@ -1045,7 +1056,10 @@ mod tests {
         assert!(lag_calls.lock().unwrap().is_empty(), "nothing consumed yet");
 
         last_seq.store(41, Ordering::Relaxed);
-        tokio::time::sleep(interval * 3).await;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while lag_calls.lock().unwrap().len() < 3 && Instant::now() < deadline {
+            tokio::time::sleep(interval).await;
+        }
         let calls = lag_calls.lock().unwrap().clone();
         assert!(calls.len() >= 3, "polled {} times", calls.len());
         assert!(calls.iter().all(|s| *s == 41));

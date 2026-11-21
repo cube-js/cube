@@ -926,7 +926,9 @@ impl ChunkDataStore for ChunkStore {
         for name in held {
             match rows.get(&name) {
                 Some(c) if c.get_row().active() => active += 1,
-                Some(_) => inactive += 1,
+                // Not uploaded means not activated yet, e.g. a compaction output before its swap.
+                Some(c) if c.get_row().uploaded() => inactive += 1,
+                Some(_) => {}
                 None => orphans.push(name),
             }
         }
