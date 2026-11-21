@@ -1,0 +1,322 @@
+---
+title: "`@cubejs-client/svelte`"
+description: "@cubejs-client/svelte provides headless Svelte 5 components and stores for Cube integration."
+---
+
+<Note>
+
+`@cubejs-client/svelte` requires [Svelte 5](https://svelte.dev/docs/svelte/overview).
+
+</Note>
+
+## CubeProvider
+
+`<CubeProvider />` makes a [`CubeApi`](/reference/javascript-sdk/reference/cubejs-client-core#cubeapi)
+instance available to child components and stores through Svelte context.
+
+### Props
+
+| Name | Type | Description |
+| --- | --- | --- |
+| cubeApi | [`CubeApi`](/reference/javascript-sdk/reference/cubejs-client-core#cubeapi) | `CubeApi` instance to use |
+| options? | `CubeProviderOptions` | Provider-level options. Currently supports `castNumerics` |
+
+### Example
+
+```svelte
+<script lang="ts">
+  import cube from '@cubejs-client/core';
+  import { CubeProvider } from '@cubejs-client/svelte';
+
+  const cubeApi = cube('YOUR-CUBE-API-TOKEN', {
+    apiUrl: 'http://localhost:4000/cubejs-api/v1',
+  });
+</script>
+
+<CubeProvider {cubeApi} options={{ castNumerics: true }}>
+  <!-- child components -->
+</CubeProvider>
+```
+
+## QueryRenderer
+
+`<QueryRenderer />` executes a query and passes the result to a snippet. The
+component is headless and renders nothing itself.
+
+Provide exactly one of `query` or `queries`.
+
+### Props
+
+| Name | Type | Description |
+| --- | --- | --- |
+| cubeApi? | [`CubeApi`](/reference/javascript-sdk/reference/cubejs-client-core#cubeapi) | `CubeApi` instance to use. Taken from context when omitted |
+| query? | Query &#124; Query[] | Analytic query. See [Query Format](/reference/core-data-apis/rest-api/query-format) |
+| queries? | object | Named map of queries. Use instead of `query` for multi-query rendering |
+| loadSql? | `"only"` &#124; boolean | Request generated SQL. See [REST (JSON) API `/v1/sql`](/reference/core-data-apis/rest-api/reference#base_path/v1/sql). Defaults to `false` |
+| skip? | boolean | Skip query execution when `true`. Defaults to `false` |
+| subscribe? | boolean | Use continuous fetch behavior. See [Real-Time Data Fetch](/recipes/core-data-api/real-time-data-fetch). Defaults to `false` |
+| resetResultSetOnChange? | boolean | Reset `resultSet` to `null` when the query changes. Defaults to `true` |
+| castNumerics? | boolean | Convert numeric members to JavaScript `Number`. See [`load` options](/reference/javascript-sdk/reference/cubejs-client-core#loadmethodoptions) |
+| cache? | [`CacheMode`](/reference/javascript-sdk/reference/cubejs-client-core#cachemode) | Server-side cache policy for query execution |
+| baseRequestId? | string | Base request ID forwarded to Cube |
+
+### Snippet props
+
+The `children` snippet receives:
+
+| Name | Type | Description |
+| --- | --- | --- |
+| resultSet | [`ResultSet`](/reference/javascript-sdk/reference/cubejs-client-core#resultset) &#124; `Record<string, ResultSet>` &#124; null | Query result |
+| error | Error &#124; null | Error from the latest request |
+| isLoading | boolean | Whether a request is in flight |
+| loadingState | `{ isLoading: boolean }` | Loading state wrapper |
+| progress | ProgressResponse &#124; null | Long-running query progress |
+| sqlQuery | [`SqlQuery`](/reference/javascript-sdk/reference/cubejs-client-core#sqlquery) &#124; [`SqlQuery[]`](/reference/javascript-sdk/reference/cubejs-client-core#sqlquery) &#124; null | Generated SQL when `loadSql` is enabled |
+| refetch | `() => Promise<void>` | Re-run the current query |
+
+### Example
+
+```svelte
+<script lang="ts">
+  import cube from '@cubejs-client/core';
+  import { CubeProvider, QueryRenderer } from '@cubejs-client/svelte';
+
+  const cubeApi = cube('YOUR-CUBE-API-TOKEN', {
+    apiUrl: 'http://localhost:4000/cubejs-api/v1',
+  });
+
+  const query = {
+    measures: ['order_items.count'],
+    timeDimensions: [
+      {
+        dimension: 'order_items.created_at',
+        granularity: 'month',
+      },
+    ],
+  };
+</script>
+
+<CubeProvider {cubeApi}>
+  <QueryRenderer {query}>
+    {#snippet children({ resultSet, error, isLoading })}
+      {#if error}
+        <p>{error.message}</p>
+      {:else if resultSet}
+        <pre>{JSON.stringify(resultSet.tablePivot(), null, 2)}</pre>
+      {:else if isLoading}
+        <p>Loading…</p>
+      {/if}
+    {/snippet}
+  </QueryRenderer>
+</CubeProvider>
+```
+
+## QueryRendererWithTotals
+
+`<QueryRendererWithTotals />` is a convenience wrapper around
+[`QueryRenderer`](#queryrenderer) that fetches both the main query and a totals
+query in one render pass.
+
+### Props
+
+Accepts the same props as [`QueryRenderer`](#queryrenderer) for a single
+`query`, except `queries`, `loadSql`, and `subscribe` are not supported.
+
+The snippet receives `resultSet` as a record with `main` and `totals` keys.
+
+## QueryBuilder
+
+`<QueryBuilder />` builds interactive analytics query builders. It abstracts
+state management and API calls to Cube Backend and renders through a snippet.
+
+### Props
+
+| Name | Type | Description |
+| --- | --- | --- |
+| cubeApi? | [`CubeApi`](/reference/javascript-sdk/reference/cubejs-client-core#cubeapi) | `CubeApi` instance to use |
+| defaultQuery? | Query | Initial query members. Defaults to `{}` |
+| defaultChartType? | [ChartType](#charttype) | Initial chart type. Defaults to `line` |
+| initialVizState? | [VizState](#vizstate) | Initial visualization state |
+| disableHeuristics? | boolean | Disable default heuristics. Defaults to `false` |
+| stateChangeHeuristics? | function | Override default heuristics before state is applied |
+| onVizStateChanged? | function | Called when visualization state changes |
+| executeQuery? | boolean | Execute the current query. Defaults to `true` |
+| subscribe? | boolean | Use continuous fetch behavior. Defaults to `false` |
+| resetResultSetOnChange? | boolean | Reset `resultSet` when the query changes. Defaults to `false` |
+| castNumerics? | boolean | Convert numeric members to JavaScript `Number` |
+| cache? | [`CacheMode`](/reference/javascript-sdk/reference/cubejs-client-core#cachemode) | Server-side cache policy |
+| baseRequestId? | string | Base request ID forwarded to Cube |
+| schemaVersion? | number &#124; string | Schema version used to detect metadata changes |
+| onSchemaChange? | function | Called when Cube metadata changes |
+
+### Snippet props
+
+The `children` snippet receives query-builder state and actions, including:
+
+- `measures`, `dimensions`, `segments`, `timeDimensions`, `filters`
+- `availableMeasures`, `availableDimensions`, `availableTimeDimensions`,
+  `availableSegments`
+- `updateMeasures`, `updateDimensions`, `updateSegments`,
+  `updateTimeDimensions`, `updateFilters`
+- `chartType`, `updateChartType`
+- `query`, `resultSet`, `isLoading`, `error`
+- `setLimit`, `setOffset`, `refetch`, and other builder actions
+
+See [`createQueryBuilder`](#createquerybuilder) for the full state and action
+surface.
+
+### Example
+
+```svelte
+<script lang="ts">
+  import cube from '@cubejs-client/core';
+  import { CubeProvider, QueryBuilder } from '@cubejs-client/svelte';
+
+  const cubeApi = cube('YOUR-CUBE-API-TOKEN', {
+    apiUrl: 'http://localhost:4000/cubejs-api/v1',
+  });
+</script>
+
+<CubeProvider {cubeApi}>
+  <QueryBuilder defaultChartType="line">
+    {#snippet children({
+      availableMeasures,
+      measures,
+      updateMeasures,
+      resultSet,
+      isLoading,
+    })}
+      <select
+        multiple
+        onchange={(event) => {
+          const selected = Array.from(
+            (event.currentTarget as HTMLSelectElement).selectedOptions
+          ).map((option) => option.value);
+          updateMeasures.set(
+            selected
+              .map((name) => availableMeasures.find((member) => member.name === name))
+              .filter(Boolean)
+          );
+        }}
+      >
+        {#each availableMeasures as measure (measure.name)}
+          <option value={measure.name} selected={measures.some((item) => item.name === measure.name)}>
+            {measure.title}
+          </option>
+        {/each}
+      </select>
+
+      {#if isLoading}
+        <p>Loading…</p>
+      {:else if resultSet}
+        <pre>{JSON.stringify(resultSet.tablePivot(), null, 2)}</pre>
+      {/if}
+    {/snippet}
+  </QueryBuilder>
+</CubeProvider>
+```
+
+## createCubeQuery
+
+`createCubeQuery(query, options?)` returns a readable store for executing a Cube
+query outside components.
+
+### Parameters
+
+| Name | Type | Description |
+| --- | --- | --- |
+| query | Query &#124; Query[] &#124; readable store | Query or reactive query source |
+| options? | `CubeQueryOptions` | Execution options |
+
+`CubeQueryOptions` supports `cubeApi`, `skip`, `subscribe`,
+`resetResultSetOnChange`, `castNumerics`, `cache`, and `baseRequestId`.
+
+### Store API
+
+| Name | Type | Description |
+| --- | --- | --- |
+| subscribe | function | Subscribe to query state |
+| refetch | function | Re-run the query |
+| start | function | Begin automatic execution |
+| stop | function | Stop automatic execution |
+| destroy | function | Tear down subscriptions and in-flight requests |
+
+### Example
+
+```svelte
+<script lang="ts">
+  import { onDestroy } from 'svelte';
+  import cube from '@cubejs-client/core';
+  import { createCubeQuery } from '@cubejs-client/svelte';
+
+  const cubeApi = cube('YOUR-CUBE-API-TOKEN', {
+    apiUrl: 'http://localhost:4000/cubejs-api/v1',
+  });
+
+  const queryStore = createCubeQuery(
+    { measures: ['order_items.count'] },
+    { cubeApi }
+  );
+
+  queryStore.start();
+
+  onDestroy(() => {
+    void queryStore.destroy();
+  });
+</script>
+
+{#if $queryStore.error}
+  <p>{$queryStore.error.message}</p>
+{:else if $queryStore.resultSet}
+  <pre>{JSON.stringify($queryStore.resultSet.tablePivot(), null, 2)}</pre>
+{:else if $queryStore.isLoading}
+  <p>Loading…</p>
+{/if}
+```
+
+## createQueryRenderer
+
+`createQueryRenderer(input, options?)` exposes the same behavior as
+[`QueryRenderer`](#queryrenderer) as a store/controller.
+
+Use it when you want full control over rendering while keeping request
+lifecycle, cancellation, and SSR-safe startup behavior.
+
+## createQueryBuilder
+
+`createQueryBuilder(options?)` exposes the same behavior as
+[`QueryBuilder`](#querybuilder) as a store/controller with an `actions` object.
+
+## Meta and SQL helpers
+
+These helpers wrap common [`CubeApi`](/reference/javascript-sdk/reference/cubejs-client-core#cubeapi)
+calls as SSR-safe stores:
+
+| Function | Purpose |
+| --- | --- |
+| `createCubeMeta(options?)` | Fetch Cube metadata |
+| `createDryRun(query, options?)` | Validate a query with a dry run |
+| `createLazyDryRun(query, options?)` | Dry run on demand |
+| `createCubeSql(query, options?)` | Fetch generated SQL for a query |
+
+## Context helpers
+
+| Function | Description |
+| --- | --- |
+| `getCubeContext()` | Read the current `CubeProvider` context |
+| `tryGetCubeContext()` | Read context when present, otherwise return `null` |
+| `setCubeContext(value)` | Set context manually in advanced setups |
+
+## Types
+
+### ChartType
+
+> **ChartType**: `"line" | "bar" | "table" | "area" | "number" | "pie"`
+
+### VizState
+
+| Name | Type |
+| --- | --- |
+| query | [`Query`](/reference/javascript-sdk/reference/cubejs-client-core#query-2) |
+| chartType? | [ChartType](#charttype) |
+| pivotConfig? | [`PivotConfig`](/reference/javascript-sdk/reference/cubejs-client-core#pivotconfig) |
