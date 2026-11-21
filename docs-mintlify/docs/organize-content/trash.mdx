@@ -1,0 +1,93 @@
+---
+title: Trash
+description: Move workbooks and dashboards to the Trash, restore them, or delete them permanently.
+---
+
+When you delete a workbook or a dashboard, it goes to the **Trash**. You can
+restore it from there with its reports, versions, sharing, scheduled
+deliveries, and data alerts. Nothing in the Trash is deleted automatically.
+
+Folders and explorations don't go to the Trash. Deleting them is permanent.
+
+## Moving items to the Trash
+
+Select **Move to Trash** in one of these places:
+
+- The row actions menu (**⋯**) on the **Workspace** page.
+- The bulk action bar, after you select several rows on the **Workspace** page.
+- The workbook menu, while the workbook is open.
+- The options menu (**⋯**) of a published dashboard.
+
+Cube asks you to confirm, then shows a message with **Undo**.
+
+An item in the Trash is hidden from the workspace, search, Home, and agents.
+The scheduled deliveries and [data alerts][ref-data-alerts] of its dashboard
+stop, and they resume when you restore it.
+
+You need **Full access** to the workbook to move it or its dashboard to the
+Trash. See [Share content][ref-sharing].
+
+### Workbooks and dashboards
+
+Moving a workbook to the Trash moves its published dashboard with it.
+
+Moving a dashboard to the Trash moves only the dashboard. The workbook stays
+in the workspace with its reports. If you publish the workbook again, the
+dashboard leaves the Trash. It keeps its link, versions, sharing, schedules,
+and alerts.
+
+### Folders
+
+Deleting a folder deletes the folder permanently. The workbooks inside it go
+to the Trash. Other content inside it, such as explorations and subfolders, is
+deleted permanently. See [Deleting folders][ref-folders-delete].
+
+## Restoring and deleting permanently
+
+Click **Trash** in the **Workspace** page toolbar to open the Trash. It lists
+the items you can access, with their **Name**, **Owner**, **Deleted** date,
+and **Deleted by**. Use the search box to find an item by name.
+
+Each row offers two actions. You can also select several rows and apply them
+in bulk:
+
+- **Restore** returns the item to the workspace.
+- **Delete permanently…** deletes the item. This can't be undone.
+
+Both actions require **Full access** to the workbook. Only the creator of a
+dashboard can delete the dashboard permanently on its own.
+
+## Opening an item in the Trash
+
+A link to a workbook or a dashboard in the Trash still opens it, read-only. A
+banner says that the item is in the Trash, who moved it there, and when. If you
+have **Full access**, click **Restore** in the banner to restore it.
+
+An [embedded dashboard][ref-embed-dashboards] in the Trash shows that it's not
+available.
+
+## Creator Mode
+
+In [Creator Mode][ref-creator-mode], embed users delete workbooks permanently.
+Creator Mode has no Trash.
+
+## API
+
+The [REST API][ref-api] moves workbooks to the Trash by default:
+
+- `DELETE /api/v1/deployments/{deploymentId}/workbooks/{workbookId}` — pass the
+  `permanent=true` query parameter to delete the workbook, its reports, and its
+  dashboard permanently.
+- [`POST /api/v1/deployments/{deploymentId}/workspace/bulk-delete`][ref-bulk-delete]
+  — pass `"permanent": true` in the request body to delete workbooks
+  permanently. Reports and folders are always deleted permanently.
+
+Requests from an embed session always delete permanently.
+
+[ref-sharing]: /docs/organize-content/sharing#workbooks-and-dashboards
+[ref-folders-delete]: /docs/organize-content/folders#deleting-folders
+[ref-data-alerts]: /docs/explore-analyze/data-alerts
+[ref-embed-dashboards]: /embedding/iframe/dashboards
+[ref-creator-mode]: /embedding/iframe/creator-mode
+[ref-api]: /api-reference/introduction
+[ref-bulk-delete]: /api-reference/workspace/delete-workspace-items-in-bulk
