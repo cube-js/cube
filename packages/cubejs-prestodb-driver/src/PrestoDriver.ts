@@ -20,9 +20,10 @@ import {
   formatAnsi,
   extractRequestUUID,
   isValidRequestId,
+  CancelablePromise,
 } from '@cubejs-backend/shared';
 
-import { Transform, TransformCallback } from 'stream';
+import { finished, Transform, TransformCallback } from 'stream';
 import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 
 import {
@@ -220,20 +221,24 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     await this.queryPromised('SELECT 1', false);
   }
 
-  public query(query: string, values: unknown[], options?: QueryOptions): Promise<any[]> {
-    return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values), false, options?.requestId);
+  public query(query: string, values: unknown[], options?: QueryOptions): CancelablePromise<any[]> {
+    return <CancelablePromise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values), false, options?.requestId);
   }
 
   protected prepareQueryWithParams(query: string, values: unknown[]) {
     return formatAnsi(query, values || []);
   }
 
-  public queryPromised(query: string, streaming: boolean, requestId?: string): Promise<any[] | StreamTableData> {
+  public queryPromised(query: string, streaming: boolean, requestId?: string): CancelablePromise<any[] | StreamTableData> {
     const traceToken = requestId && extractRequestUUID(requestId);
     const headers = traceToken && isValidRequestId(traceToken)
       ? { ...this.config.headers, [this.traceTokenHeader]: traceToken }
       : this.config.headers;
     const toError = (error: any) => new Error(error.error ? `${error.message}\n${error.error}` : error.message);
+    let cancelled = false;
+    const cancel = () => cancelled;
+    let promise: Promise<any[] | StreamTableData>;
+
     if (streaming) {
       const rowStream = new Transform({
         writableObjectMode: true,
@@ -243,21 +248,38 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
           callback(null, obj);
         }
       });
+      let columnsDelivered = false;
 
-      return new Promise((resolve, reject) => {
+      // finished() also listens for 'error', which pipe() does not add to its source
+      finished(rowStream, (err) => {
+        if (err) {
+          cancelled = true;
+        }
+      });
+
+      promise = new Promise((resolve, reject) => {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
           timezone: this.config.timezone,
           headers,
+          cancel,
           session: this.config.queryTimeout ? `query_max_run_time=${this.config.queryTimeout}s` : undefined,
           columns: (error: any, columns: TableStructure) => {
+            columnsDelivered = true;
             resolve({
               rowStream,
-              types: columns
+              types: columns,
+              release: async () => {
+                rowStream.destroy();
+              },
             });
           },
           data: (error: any, data: any[], columns: TableStructure) => {
+            if (rowStream.destroyed) {
+              return;
+            }
+
             const normalData = this.normalizeResultOverColumns(data, columns);
 
             for (const obj of normalData) {
@@ -265,15 +287,21 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
             }
           },
           success: () => {
-            rowStream.end();
+            if (!rowStream.destroyed) {
+              rowStream.end();
+            }
           },
           error: (error: any) => {
-            reject(toError(error));
+            const err = toError(error);
+            if (columnsDelivered && !rowStream.destroyed) {
+              rowStream.destroy(err);
+            }
+            reject(err);
           }
         });
       });
     } else {
-      return new Promise((resolve, reject) => {
+      promise = new Promise((resolve, reject) => {
         let fullData: any[] = [];
 
         this.client.execute({
@@ -281,6 +309,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
           schema: this.config.schema || 'default',
           timezone: this.config.timezone,
           headers,
+          cancel,
           data: (error: any, data: any[], columns: TableStructure) => {
             const normalData = this.normalizeResultOverColumns(data, columns);
             fullData = concat(normalData, fullData);
@@ -294,6 +323,12 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         });
       });
     }
+
+    return Object.assign(promise, {
+      cancel: async () => {
+        cancelled = true;
+      },
+    });
   }
 
   public downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
@@ -361,10 +396,10 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return map(arrayToObject, data || []);
   }
 
-  public stream(query: string, values: unknown[], options: StreamOptions): Promise<StreamTableData> {
+  public stream(query: string, values: unknown[], options: StreamOptions): CancelablePromise<StreamTableData> {
     const queryWithParams = this.prepareQueryWithParams(query, values);
 
-    return <Promise<StreamTableData>> this.queryPromised(queryWithParams, true, options?.requestId);
+    return <CancelablePromise<StreamTableData>> this.queryPromised(queryWithParams, true, options?.requestId);
   }
 
   public capabilities(): DriverCapabilities {
@@ -476,6 +511,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
 
   public async queryColumnTypes(sql: string, params: unknown[], options?: QueryOptions): Promise<{ name: string; type: string; }[]> {
     const response = await this.stream(`${sql} LIMIT 0`, params || [], { highWaterMark: 1, requestId: options?.requestId });
+    (<Transform> response.rowStream).destroy();
     const result = [];
 
     for (const column of response.types || []) {
