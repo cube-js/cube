@@ -152,6 +152,7 @@ pub trait QueryEngine {
                 CompilationError::planning(message).with_meta(meta)
             })?;
 
+        let ordered = Self::orders_rows(&plan);
         let mut optimized_plan = plan;
         // ctx.optimize(&plan).map_err(|err| {
         //    CompilationError::Internal(format!("Planning optimization error: {}", err))
@@ -333,6 +334,7 @@ pub trait QueryEngine {
                 Arc::new(state.get_load_request_meta("sql")),
                 state,
                 rewrite_plan,
+                ordered,
             )
             .await?
         };
@@ -343,11 +345,28 @@ pub trait QueryEngine {
         Ok((QueryPlan::DataFusionSelect(rewrite_plan, ctx), metadata))
     }
 
+    /// Whether the query orders its rows on its top level. An `ORDER BY` of a derived table
+    /// sorts its aliased projection and doesn't count: SQL doesn't keep it for the select on top
+    fn orders_rows(plan: &LogicalPlan) -> bool {
+        match plan {
+            LogicalPlan::Sort(sort) => !matches!(
+                sort.input.as_ref(),
+                LogicalPlan::Projection(projection) if projection.alias.is_some()
+            ),
+            LogicalPlan::Projection(projection) if projection.alias.is_none() => {
+                Self::orders_rows(&projection.input)
+            }
+            LogicalPlan::Limit(limit) => Self::orders_rows(&limit.input),
+            _ => false,
+        }
+    }
+
     fn evaluate_wrapped_sql(
         transport_service: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
         state: Arc<SessionState>,
         plan: LogicalPlan,
+        ordered: bool,
     ) -> Pin<Box<dyn Future<Output = CompilationResult<LogicalPlan>> + Send>> {
         Box::pin(async move {
             if let LogicalPlan::Extension(Extension { node }) = &plan {
@@ -362,12 +381,19 @@ pub trait QueryEngine {
                                     transport_service.clone(),
                                     load_request_meta.clone(),
                                     state.clone(),
+                                    ordered,
                                 )
                                 .await?,
                         ),
                     }));
                 }
             }
+            // Rows of a wrapper below these nodes reach the client in the order they have
+            let ordered = ordered
+                && matches!(
+                    plan,
+                    LogicalPlan::Projection(_) | LogicalPlan::Filter(_) | LogicalPlan::Limit(_)
+                );
             let mut children = Vec::new();
             for input in plan.inputs() {
                 children.push(
@@ -376,6 +402,7 @@ pub trait QueryEngine {
                         load_request_meta.clone(),
                         state.clone(),
                         input.clone(),
+                        ordered,
                     )
                     .await?,
                 );
