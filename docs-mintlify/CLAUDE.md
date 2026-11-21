@@ -134,6 +134,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
             - Tabs container
     - **Dashboard**
       - Cross-filtering
+      - Drill-through
       - Full screen
       - Schedules ("Refreshes, deliveries and alerts"; "schedule" where the kind is unknown)
         - Refresh (notifies nobody; not the dashboard's auto-refresh)
