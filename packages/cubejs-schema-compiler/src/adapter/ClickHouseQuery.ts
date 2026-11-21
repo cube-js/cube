@@ -340,6 +340,7 @@ export class ClickHouseQuery extends BaseQuery {
     templates.expressions.wrap_boolean_dimension = 'toBool({{ expr }})';
     templates.expressions.wrap_segment_select = 'toBool({{ expr }})';
     templates.types.timestamp = 'DATETIME';
+    templates.types.string = 'String';
     delete templates.types.time;
     // ClickHouse intervals have a distinct type for each granularity
     delete templates.types.interval;
