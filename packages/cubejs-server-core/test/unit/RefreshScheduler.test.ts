@@ -1027,6 +1027,61 @@ describe('Refresh Scheduler', () => {
   });
 
   describe('Manual pre-aggregations rebuild via postBuildJobs', () => {
+    test('A dry run reports statuses and builds nothing', async () => {
+      process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+      process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+
+      const {
+        refreshScheduler, mockDriver, serverCore
+      } = setupScheduler({ repository: repositoryWithPreAggregations });
+
+      const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+      const options = {
+        metadata: undefined as unknown,
+        preAggregations: [{ id: 'Foo.first' }],
+        timezones: ['UTC'],
+        throwErrors: false,
+        preAggregationLoadConcurrency: 1,
+      };
+      const retryContinueWait = async <T>(fn: () => Promise<T>): Promise<T> => {
+        for (;;) {
+          try {
+            return await fn();
+          } catch (err: any) {
+            if (err.error !== 'Continue wait') {
+              throw err;
+            }
+          }
+        }
+      };
+      const waitForQueue = async () => {
+        const orchestrator = await serverCore.getOrchestratorApi(ctx);
+        const lock = createPromiseLock();
+        const interval = setInterval(async () => {
+          if ((await orchestrator.getPreAggregationQueueStates()).length === 0) {
+            lock.resolve();
+          }
+        }, 500);
+        await lock.promise;
+        clearInterval(interval);
+      };
+
+      const before = await retryContinueWait(() => refreshScheduler.getBuildJobsStatus(ctx, options));
+      expect(before.length).toEqual(5);
+      expect(before.map(({ status }) => status)).toEqual(Array(5).fill('missing_partition'));
+      await waitForQueue();
+      expect(mockDriver.createdTables).toEqual([]);
+
+      await retryContinueWait(() => refreshScheduler.postBuildJobs(ctx, options));
+      await waitForQueue();
+      const createdTables = mockDriver.createdTables.length;
+      expect(createdTables).toEqual(5);
+
+      const after = await retryContinueWait(() => refreshScheduler.getBuildJobsStatus(ctx, options));
+      expect(after.map(({ status }) => status)).toEqual(Array(5).fill('done'));
+      expect(mockDriver.createdTables.length).toEqual(createdTables);
+    });
+
     test('All pre-aggregations', async () => {
       process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
       process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';

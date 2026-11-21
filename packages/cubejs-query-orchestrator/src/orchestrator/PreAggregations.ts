@@ -181,6 +181,8 @@ const PRE_AGG_BUILD_STATUS_PERSIST_TIME = 86400;
  */
 const ABANDONED_BUILD_TIMEOUT_FACTOR = 2;
 
+export type PreAggregationVersionStatus = 'done' | 'outdated' | 'missing_partition';
+
 export type LoadPreAggregationResult = {
   targetTableName: string;
   refreshKeyValues: unknown[];
@@ -194,6 +196,12 @@ export type LoadPreAggregationResult = {
    */
   preAggregationId?: string;
   type?: PreAggregationType;
+  /**
+   * Set by a dry-run build job only: whether the partition already has the
+   * version its current refresh keys call for (`done`), only an older version
+   * of the same structure (`outdated`), or nothing built (`missing_partition`).
+   */
+  versionStatus?: PreAggregationVersionStatus;
   lambdaTable?: InlineTable;
   queryKey?: PreAggregationQueryKey;
   rollupLambdaId?: string;
@@ -434,7 +442,7 @@ export class PreAggregations {
    * that is still marked as running long past that timeout is one whose process
    * is gone and will never report an outcome.
    */
-  private async isBuildAbandoned(dataSource: string, buildStatus: PreAggregationBuildStatus): Promise<boolean> {
+  protected async isBuildAbandoned(dataSource: string, buildStatus: PreAggregationBuildStatus): Promise<boolean> {
     if (!buildStatus.startedAt) {
       return false;
     }
@@ -443,6 +451,19 @@ export class PreAggregations {
     const limit = (executionTimeout || getEnv('dbQueryTimeout')) * 1000 * ABANDONED_BUILD_TIMEOUT_FACTOR;
 
     return new Date().getTime() - buildStatus.startedAt > limit;
+  }
+
+  /**
+   * The table's last build failed or was abandoned, so the table may hold
+   * partial data. A build that is still running doesn't count.
+   */
+  public async isBuildFailed(dataSource: string, tableName: string): Promise<boolean> {
+    const buildStatus = await this.getPreAggregationBuildStatus(tableName);
+    if (buildStatus?.status === 'failure') {
+      return true;
+    }
+
+    return buildStatus?.status === 'building' && this.isBuildAbandoned(dataSource, buildStatus);
   }
 
   public async addTableUsed(tableName: string): Promise<void> {
@@ -715,6 +736,9 @@ export class PreAggregations {
             maxPartitions: this.options.maxPartitions,
             maxSourceRowLimit: this.options.maxSourceRowLimit,
             isJob: queryBody.isJob,
+            dryRun: queryBody.dryRun,
+            // Dependencies (rollupJoin, rollupLambda) come first, the job's target last
+            buildsJobTarget: i === preAggregations.length - 1,
             waitForRenew: queryBody.cacheMode === 'must-revalidate',
             // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
             forceBuild: i === preAggregations.length - 1 ? queryBody.forceBuildPreAggregations : false,
@@ -735,7 +759,8 @@ export class PreAggregations {
             dataSource: p.dataSource || 'default',
             timezone: p.timezone,
           };
-          if (!usedPreAggregation.isMultiTableUnion) {
+          // A dry run touches nothing, and its unbuilt tables are placeholders
+          if (!usedPreAggregation.isMultiTableUnion && !queryBody.dryRun) {
             await this.addTableUsed(usedPreAggregation.targetTableName);
           }
 

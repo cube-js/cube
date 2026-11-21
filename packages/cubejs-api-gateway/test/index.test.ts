@@ -2151,6 +2151,112 @@ describe('API Gateway', () => {
         expect(compiledWith).not.toContainEqual(expect.objectContaining({ tenant: 'caller' }));
       });
     });
+
+    describe('force and dryRun', () => {
+      const prepare = async () => {
+        const job = <PreAggJob>{
+          request: 'request-id',
+          context: { securityContext: { tenant: 'a' } },
+          preagg: 'Usage.usages',
+          table: 'usage_usages',
+          target: 'usage_usages_20210430',
+          structure: 'structure',
+          content: 'content',
+          updated: 1,
+          key: [],
+          status: 'outdated',
+          timezone: 'UTC',
+          dataSource: 'default',
+        };
+        const refreshScheduler = {
+          postBuildJobs: jest.fn(async () => ['token']),
+          getBuildJobsStatus: jest.fn(async () => [job]),
+        };
+        const apiGateway = new ApiGateway(
+          API_SECRET,
+          <any>(async () => ({ preAggregations: async () => preAggregationsResultFactory() })),
+          async () => new AdapterApiMock(),
+          testLogger,
+          {
+            standalone: true,
+            dataSourceStorage: new DataSourceStorageMock(),
+            basePath: '/test',
+            refreshScheduler: () => refreshScheduler,
+            contextToApiScopes: () => Promise.resolve(<ApiScopesTuple>['jobs']),
+          }
+        );
+        const app = express();
+        app.use(express.json());
+        apiGateway.initApp(app);
+
+        const token = generateAuthToken({ tenant: 'caller' }, {}, API_SECRET);
+        const post = (selector: Record<string, unknown>) => request(app).post('/test/v1/pre-aggregations/jobs')
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            action: 'post',
+            selector: { contexts: [{ securityContext: { tenant: 'a' } }], timezones: ['UTC'], ...selector },
+          });
+
+        return { post, refreshScheduler };
+      };
+
+      test('forces builds by default', async () => {
+        const { post, refreshScheduler } = await prepare();
+
+        const res = await post({});
+
+        expect(res.status).toEqual(200);
+        expect(res.body).toEqual(['token']);
+        expect(refreshScheduler.postBuildJobs).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ forceBuildPreAggregations: true }),
+          expect.anything(),
+        );
+      });
+
+      test('passes force: false to the scheduler', async () => {
+        const { post, refreshScheduler } = await prepare();
+
+        const res = await post({ force: false });
+
+        expect(res.status).toEqual(200);
+        expect(refreshScheduler.postBuildJobs).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ forceBuildPreAggregations: false }),
+          expect.anything(),
+        );
+      });
+
+      test('a dry run answers with partition statuses and posts no job', async () => {
+        const { post, refreshScheduler } = await prepare();
+
+        const res = await post({ dryRun: true });
+
+        expect(res.status).toEqual(200);
+        expect(refreshScheduler.postBuildJobs).not.toHaveBeenCalled();
+        expect(res.body).toEqual([{
+          table: 'usage_usages_20210430',
+          status: 'outdated',
+          selector: {
+            cubes: ['Usage'],
+            preAggregations: ['Usage.usages'],
+            contexts: [{ securityContext: { tenant: 'a' } }],
+            timezones: ['UTC'],
+            dataSources: ['default'],
+          },
+        }]);
+      });
+
+      test('rejects a non-boolean dryRun', async () => {
+        const { post } = await prepare();
+
+        const res = await post({ dryRun: 'yes' });
+
+        expect(res.status).toEqual(400);
+        expect(res.body.error).toContain('dryRun');
+      });
+    });
   });
 
   describe('healtchecks', () => {

@@ -56,6 +56,7 @@ import {
   PreAggsSelector,
   PreAggJob,
   PreAggJobStatusItem,
+  PreAggJobDryRunItem,
   PreAggJobStatusResponse,
   SqlApiRequest,
   MetaResponseResultFn,
@@ -1172,6 +1173,9 @@ class ApiGateway {
    *     "preAggregations": ["Events.TemporaryData"]
    *   }
    * }
+   * // `"force": false` in the selector builds only partitions without their
+   * // target version; `"dryRun": true` builds nothing and answers with each
+   * // partition's status (`done`, `outdated` or `missing_partition`).
    * // or
    * {
    *   "action": "get",
@@ -1255,8 +1259,8 @@ class ApiGateway {
     req: Request,
     context: RequestContext,
     selector: PreAggsSelector,
-  ): Promise<string[]> {
-    let jobs: string[] = [];
+  ): Promise<string[] | PreAggJobDryRunItem[]> {
+    let jobs: (string | PreAggJobDryRunItem)[] = [];
 
     // There might be a few contexts but dateRange if present is still the same
     // so let's normalize it only once.
@@ -1287,7 +1291,7 @@ class ApiGateway {
       jobs = jobs.concat(_jobs);
     });
 
-    return jobs;
+    return <string[] | PreAggJobDryRunItem[]>jobs;
   }
 
   /**
@@ -1303,13 +1307,14 @@ class ApiGateway {
   }
 
   /**
-   * Add pre-aggregations build job. Returns added jobs ids.
+   * Add pre-aggregations build job. Returns added jobs ids, or on a dry run
+   * each partition's version status.
    */
   private async postPreAggregationsBuildJobs(
     context: RequestContext,
     selector: PreAggsSelector,
     jobContext: PreAggJob['context'],
-  ): Promise<string[]> {
+  ): Promise<string[] | PreAggJobDryRunItem[]> {
     const compiler = await this.getCompilerApi(context);
     const { timezones, dateRange } = selector;
     const preaggs = await compiler.preAggregations({
@@ -1320,25 +1325,40 @@ class ApiGateway {
     if (preaggs.length === 0) {
       return [];
     } else {
-      const jobs: string[] = await this
-        .refreshScheduler()
-        .postBuildJobs(
-          context,
-          {
-            metadata: undefined,
-            timezones,
-            dateRange,
-            preAggregations: preaggs.map(p => ({
-              id: p.id,
-              cacheOnly: false,
-              partitions: undefined, // string[]
-            })),
-            forceBuildPreAggregations: false,
-            throwErrors: false,
+      const queryingOptions = {
+        metadata: undefined,
+        timezones,
+        dateRange,
+        preAggregations: preaggs.map(p => ({
+          id: p.id,
+          cacheOnly: false,
+          partitions: undefined, // string[]
+        })),
+        forceBuildPreAggregations: selector.force ?? true,
+        throwErrors: false,
+      };
+
+      if (selector.dryRun) {
+        const jobs = await this
+          .refreshScheduler()
+          .getBuildJobsStatus(context, queryingOptions, jobContext);
+
+        return jobs.map((job) => ({
+          table: job.target,
+          status: <PreAggJobDryRunItem['status']>job.status,
+          selector: {
+            cubes: [job.preagg.split('.')[0]],
+            preAggregations: [job.preagg],
+            contexts: [job.context],
+            timezones: [job.timezone],
+            dataSources: [job.dataSource],
           },
-          jobContext,
-        );
-      return jobs;
+        }));
+      }
+
+      return this
+        .refreshScheduler()
+        .postBuildJobs(context, queryingOptions, jobContext);
     }
   }
 
