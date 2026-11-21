@@ -118,6 +118,42 @@ fn list_query(
     query
 }
 
+const LIST_COLUMNS: [(&str, &str); 7] = [
+    ("ID", "id"),
+    ("TIME", "timestamp"),
+    ("STATUS", "status"),
+    ("API", "apiType"),
+    ("MS", "durationMs"),
+    ("CACHE", "cacheType"),
+    ("QUERY", "query"),
+];
+
+/// A query is whatever an API caller sent: one bounded, printable line per cell keeps a multi-line
+/// SQL query, a huge REST query or an escape sequence from breaking the table or the terminal.
+fn list_table(res: &Value) -> (Vec<&'static str>, Vec<Vec<String>>) {
+    let headers = LIST_COLUMNS.iter().map(|(header, _)| *header).collect();
+    let rows = output::items(res)
+        .iter()
+        .map(|item| {
+            LIST_COLUMNS
+                .iter()
+                .map(|(_, path)| util::one_cell(&output::field(item, path)))
+                .collect()
+        })
+        .collect();
+    (headers, rows)
+}
+
+/// The cursor of the page after this one, or None on the last page.
+fn next_cursor(res: &Value) -> Option<&str> {
+    if res.pointer("/pageInfo/hasNextPage") != Some(&Value::Bool(true)) {
+        return None;
+    }
+    res.pointer("/pageInfo/endCursor")
+        .and_then(Value::as_str)
+        .filter(|cursor| !cursor.is_empty())
+}
+
 /// The id goes into the path unencoded, so anything but its own alphabet is refused here
 /// rather than letting a `/` or `?` address a different route.
 fn check_request_id(request: &str) -> Result<()> {
@@ -207,21 +243,14 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
                     &query,
                 )
                 .await?;
-            output::print_list(
-                ctx.json,
-                &res,
-                &[
-                    ("ID", "id"),
-                    ("TIME", "timestamp"),
-                    ("STATUS", "status"),
-                    ("API", "apiType"),
-                    ("MS", "durationMs"),
-                    ("CACHE", "cacheType"),
-                    ("QUERY", "query"),
-                ],
-            );
+            if ctx.json {
+                output::print_json(&res);
+            } else {
+                let (headers, rows) = list_table(&res);
+                output::table(&headers, rows);
+            }
             if !ctx.json {
-                if let Some(cursor) = res.pointer("/pageInfo/endCursor").and_then(Value::as_str) {
+                if let Some(cursor) = next_cursor(&res) {
                     eprintln!("Next page: --after {}", util::shell_quote(cursor));
                 }
             }
@@ -250,6 +279,30 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn list_cells_are_one_bounded_printable_line() {
+        let res = serde_json::json!({
+            "items": [{
+                "id": "1-a",
+                "query": format!("SELECT 1\nFROM t\u{1b}[2J{}", "x".repeat(500)),
+            }]
+        });
+        let (headers, rows) = list_table(&res);
+        assert_eq!(headers.len(), rows[0].len());
+        let query = rows[0].last().unwrap();
+        assert!(!query.contains('\n') && !query.contains('\u{1b}'));
+        assert!(query.starts_with("SELECT 1 FROM t"));
+        assert!(query.chars().count() <= util::CELL_LIMIT + 1);
+    }
+
+    #[test]
+    fn next_page_hint_only_when_a_next_page_exists() {
+        let page = |has_next: bool, cursor: &str| serde_json::json!({ "pageInfo": { "hasNextPage": has_next, "endCursor": cursor } });
+        assert_eq!(next_cursor(&page(true, "abc")), Some("abc"));
+        assert_eq!(next_cursor(&page(false, "abc")), None);
+        assert_eq!(next_cursor(&page(true, "")), None);
+    }
 
     #[test]
     fn request_id_keeps_to_its_alphabet() {
