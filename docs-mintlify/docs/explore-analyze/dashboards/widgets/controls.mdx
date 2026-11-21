@@ -62,6 +62,16 @@ No tab offers a list of values: each field takes one, and a `between` filter's t
 
 `top` and `bottom` keep the N members of the dimension with the highest or lowest value of a measure, such as the 10 cities with the most orders, on every chart the filter reaches. They work like the [Top N filter][ref-top-n-filter] in a workbook: every other filter applies before the ranking, ties are broken by the member's value, and a member with a null measure value never takes a slot. They are offered on string and number dimensions of the semantic view, not on [calculated dimensions](#calculated-dimensions), and only when the view has a measure.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/a7BMtuhSTAw"
+  title="Top N in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 In the filter's edit sidebar, **Viewers can rank by** lists the measures of the view the filter may rank by. At least one must stay checked. The filter itself has two settings: **Number of values** and, when more than one measure is allowed, **Ranked by**. It reads like "10 by Count". With a single allowed measure, viewers set only the number.
 
 A [parent control](#parent)'s **Set to** can set a filter to `top` or `bottom`, with a number and a measure. When a filter ranks by a measure that is no longer in the semantic view, it says so; pick another measure in the filter.
