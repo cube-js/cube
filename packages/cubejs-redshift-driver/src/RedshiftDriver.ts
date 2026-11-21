@@ -55,6 +55,10 @@ const IGNORED_SCHEMAS = ['pg_catalog', 'pg_internal', 'information_schema', 'mys
  * Redshift driver class.
  */
 export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> {
+  public override dbType(): string {
+    return 'redshift';
+  }
+
   private readonly credentials: RedshiftCredentialsProvider;
 
   /**

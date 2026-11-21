@@ -151,6 +151,10 @@ const DatabricksToGenericType: Record<string, string> = {
  * Databricks driver class.
  */
 export class DatabricksDriver extends JDBCDriver {
+  public override dbType(): string {
+    return 'databricks-jdbc';
+  }
+
   /**
    * Show warning message flag.
    */

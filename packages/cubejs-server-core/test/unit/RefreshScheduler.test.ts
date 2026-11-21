@@ -397,6 +397,10 @@ cube('Foo', {
 };
 
 class MockDriver extends BaseDriver {
+  public dbType() {
+    return 'postgres';
+  }
+
   public tables: any[] = [];
 
   public createdTables: any[] = [];

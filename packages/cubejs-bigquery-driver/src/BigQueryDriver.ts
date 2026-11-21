@@ -69,6 +69,10 @@ const BigQueryToGenericType: Record<string, string> = {
  * BigQuery driver.
  */
 export class BigQueryDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'bigquery';
+  }
+
   /**
    * Returns default concurrency value.
    */

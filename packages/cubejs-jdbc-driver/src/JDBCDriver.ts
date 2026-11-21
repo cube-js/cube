@@ -85,6 +85,10 @@ type RowBatchIter = {
 };
 
 export class JDBCDriver extends BaseDriver {
+  public dbType(): string {
+    return 'jdbc';
+  }
+
   protected readonly config: JDBCDriverConfiguration;
 
   protected pool: Pool<any>;

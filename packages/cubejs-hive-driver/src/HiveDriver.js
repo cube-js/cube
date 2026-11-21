@@ -49,6 +49,10 @@ IDLFactory.extractConfig = (config) => {
 const TSaslTransport = require('./TSaslTransport');
 
 class HiveDriver extends BaseDriver {
+  dbType() {
+    return 'hive';
+  }
+
   static getDefaultConcurrency() {
     return 2;
   }
