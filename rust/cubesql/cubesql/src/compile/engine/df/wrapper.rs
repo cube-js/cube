@@ -17,21 +17,25 @@ use crate::{
     sql::{AuthContextRef, SessionState},
     transport::{
         AliasedColumn, DataSource, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlResponse,
-        SqlTemplates, TransportLoadRequestQuery, TransportService, V1CubeMetaExt,
-        CUBE_STORE_DATA_SOURCE,
+        SqlTemplates, TransportLoadRequestQuery, TransportService, V1CubeMetaDimensionExt,
+        V1CubeMetaExt, CUBE_STORE_DATA_SOURCE,
     },
     CubeError,
 };
 use chrono::{Days, NaiveDate, SecondsFormat, TimeZone, Utc};
-use cubeclient::models::{V1LoadRequestQuery, V1LoadRequestQueryJoinSubquery};
+use cubeclient::models::{
+    V1LoadRequestQuery, V1LoadRequestQueryJoinSubquery, V1LoadRequestQueryTimeDimension,
+};
 use datafusion::logical_plan::{ExprVisitable, ExpressionVisitor, Recursion};
+use datafusion::optimizer::utils::expr_to_columns;
 use datafusion::{
+    arrow::datatypes::DataType as ArrowDataType,
     error::{DataFusionError, Result},
     logical_expr::{ReturnTypeFunction, ScalarFunctionImplementation},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFField, DFSchema, DFSchemaRef, Expr, ExprRewritable,
-        ExprRewriter, ExprSchemable, GroupingSet, JoinType, LogicalPlan, Operator,
-        UserDefinedLogicalNode,
+        plan::Extension, replace_col, replace_col_to_expr, Column, DFField, DFSchema, DFSchemaRef,
+        Expr, ExprRewritable, ExprRewriter, ExprSchemable, GroupingSet, JoinType, LogicalPlan,
+        Operator, UserDefinedLogicalNode,
     },
     physical_plan::{
         aggregates::AggregateFunction,
@@ -425,6 +429,18 @@ impl CubeScanWrapperNode {
     }
 }
 
+/// The members a filter of a scan stands on, those of its `and` and `or` groups included
+fn filter_members(filter: &serde_json::Value, members: &mut Vec<String>) {
+    if let Some(member) = filter["member"].as_str() {
+        members.push(member.to_string());
+    }
+    for group in ["and", "or"] {
+        for filter in filter[group].as_array().into_iter().flatten() {
+            filter_members(filter, members);
+        }
+    }
+}
+
 /// `expr` without the aliases wrapped around it
 fn unalias(mut expr: &Expr) -> &Expr {
     while let Expr::Alias(inner, _) = expr {
@@ -455,6 +471,9 @@ enum ColumnReferenceState {
 #[derive(Debug)]
 pub struct ColumnRemapping {
     column_remapping: HashMap<Column, Column>,
+    /// Targets holding a timestamp where the schema has a date, like a CAST AS DATE key
+    /// Cube takes as a time dimension, which plans on top read through a cast
+    date_targets: HashSet<Column>,
 }
 
 impl ColumnRemapping {
@@ -482,7 +501,24 @@ impl ColumnRemapping {
     /// Replace every column expression in `expr` according to this remapping. Column expressions
     /// not present in `self` will stay the same.
     pub fn remap(&self, expr: &Expr) -> result::Result<Expr, CubeError> {
-        replace_col(expr.clone(), &self.column_remapping.iter().collect())
+        let targets = self
+            .column_remapping
+            .iter()
+            .map(|(from, to)| {
+                let to_expr = Expr::Column(to.clone());
+                let to_expr = if self.date_targets.contains(to) {
+                    Expr::Cast {
+                        expr: Box::new(to_expr),
+                        data_type: ArrowDataType::Date32,
+                    }
+                } else {
+                    to_expr
+                };
+                (from, to_expr)
+            })
+            .collect::<Vec<_>>();
+        let replace_map = targets.iter().map(|(from, to)| (*from, to)).collect();
+        replace_col_to_expr(expr.clone(), &replace_map)
             .map_err(|_| CubeError::internal(format!("Can't rename columns for expr: {expr:?}",)))
     }
 
@@ -507,6 +543,7 @@ impl ColumnRemapping {
         // We will need this to remove conflicting unqualified mappings when merging.
         let mut conflicting_columns = HashMap::new();
         let old_column_remapping = take(&mut self.column_remapping);
+        self.date_targets.extend(other.date_targets);
 
         for (from, to) in old_column_remapping
             .into_iter()
@@ -553,6 +590,7 @@ struct Remapper {
     from_alias: Option<String>,
     can_rename_columns: bool,
     remapping: HashMap<Column, Column>,
+    date_targets: HashSet<Column>,
     used_targets: HashSet<String>,
     used_columns: HashMap<String, ColumnReferenceState>,
     /// `{from_alias}.{name}` keys filled by a column of another relation, which a later
@@ -572,6 +610,7 @@ impl Remapper {
             can_rename_columns,
 
             remapping: HashMap::new(),
+            date_targets: HashSet::new(),
             used_targets: HashSet::new(),
             used_columns: HashMap::new(),
             vacancy_fills: HashSet::new(),
@@ -740,10 +779,19 @@ impl Remapper {
         Ok(alias)
     }
 
+    /// Plans on top will read the column of `alias` through a cast to a date
+    pub fn read_as_date(&mut self, alias: &str) {
+        self.date_targets.insert(Column {
+            name: alias.to_string(),
+            relation: self.from_alias.clone(),
+        });
+    }
+
     pub fn into_remapping(self) -> Option<ColumnRemapping> {
         if self.remapping.len() > 0 {
             Some(ColumnRemapping {
                 column_remapping: self.remapping,
+                date_targets: self.date_targets,
             })
         } else {
             None
@@ -759,9 +807,11 @@ struct PushToCubeQuery<'a> {
     sql: SqlQuery,
     remapper: Remapper,
     request: TransportLoadRequestQuery,
+    /// Aliases the select reads time dimensions of the request by
+    member_to_alias: HashMap<String, String>,
     pre_aggregations: Vec<serde_json::Value>,
-    /// Over a pre-aggregation, the members the select reads, `None` when no rollup can
-    /// serve it. The scan's own filters are checked apart, when the scan is planned
+    /// Over a pre-aggregation, the members the select reads and its scan filters by, `None`
+    /// when no rollup can serve it
     pre_aggregation_members: Option<HashSet<String>>,
 }
 
@@ -4440,6 +4490,7 @@ impl WrappedSelectNode {
             sql,
             remapper,
             request,
+            member_to_alias,
             mut pre_aggregations,
             ..
         } = self
@@ -4463,8 +4514,7 @@ impl WrappedSelectNode {
                 request.clone(),
                 scan.auth_context.clone(),
                 meta_with_user,
-                // TODO use aliases or push everything through names?
-                None,
+                (!member_to_alias.is_empty()).then_some(member_to_alias),
                 Some(sql.values.clone()),
             )
             .await?;
@@ -4767,6 +4817,13 @@ impl WrappedSelectNode {
         // Drop mut, turn to ref
         let column_remapping = column_remapping.as_ref();
 
+        // Rolling windows and time shifts read the time dimensions and date ranges of the
+        // query only, so DATE_TRUNC keys go to Cube as time dimensions, like the CubeScan path
+        // sends them. The date bounds are on the scan already, as its filters and date ranges
+        let time_dimension_keys = self
+            .time_dimension_keys(push_to_cube_context, &subqueries_names)
+            .unwrap_or_default();
+
         let (generator, columns, mut sql, mut next_remapper) = self
             .generate_columns(
                 meta,
@@ -4797,6 +4854,62 @@ impl WrappedSelectNode {
             ungrouped_scan_node,
             ..
         } = push_to_cube_context;
+
+        // A rolling window is computed over the time dimension and date range of the query, so
+        // a filter of the scan or a condition left in a segment on its time dimension, or one
+        // next to a key reading a time dimension otherwise, would make it wrong: refuse instead
+        let is_time = |member: &String| {
+            meta.find_dimension_with_name(member)
+                .is_some_and(|dimension| dimension.is_time())
+        };
+        let time_key_members = time_dimension_keys
+            .iter()
+            .flatten()
+            .map(|(member, _)| member)
+            .collect::<HashSet<_>>();
+        let unconverted_time_key = group_by.iter().enumerate().any(|(index, (_, members))| {
+            !matches!(time_dimension_keys.get(index), Some(Some(_))) && members.iter().any(is_time)
+        });
+        let mut scan_filter_members = vec![];
+        for filter in ungrouped_scan_node.request.filters.iter().flatten() {
+            filter_members(&serde_json::json!(filter), &mut scan_filter_members);
+        }
+        let filters_time_dimension = filter
+            .iter()
+            .flat_map(|(_, members)| members)
+            .chain(&scan_filter_members)
+            .any(|member| {
+                is_time(member) && (unconverted_time_key || time_key_members.contains(member))
+            });
+        // The window takes one date range, of the time dimension its key truncates
+        let scan_date_ranges = ungrouped_scan_node
+            .request
+            .time_dimensions
+            .iter()
+            .flatten()
+            .filter(|time_dimension| time_dimension.date_range.is_some())
+            .map(|time_dimension| &time_dimension.dimension)
+            .collect::<Vec<_>>();
+        let date_range_besides_key = if unconverted_time_key {
+            !scan_date_ranges.is_empty()
+        } else {
+            time_key_members
+                .iter()
+                .any(|member| scan_date_ranges.iter().filter(|m| *m == member).count() > 1)
+        };
+        // Subtotals of a grouping set roll up the windows of the keys they leave out
+        let grouping_sets_time_key = unconverted_time_key
+            && self
+                .group_expr
+                .iter()
+                .any(|expr| matches!(expr, Expr::GroupingSet(_)));
+        if (filters_time_dimension || date_range_besides_key || grouping_sets_time_key)
+            && self.reads_rolling_window(push_to_cube_context, &subqueries_names)
+        {
+            return Err(CubeError::user(
+                "Rolling window measures can only be grouped by DATE_TRUNC of a time dimension, filtered by it through comparisons combined with AND at the top level of WHERE".to_string(),
+            ));
+        }
         let mut prepared_join_subqueries = vec![];
         for JoinSubquery {
             alias: subq_alias,
@@ -4889,8 +5002,50 @@ impl WrappedSelectNode {
                 .chain(window.iter())
                 .chain(filter.iter())
                 .flat_map(|(_, used_members)| used_members.iter().cloned())
+                .chain(scan_filter_members.iter().cloned())
+                .chain(scan_date_ranges.iter().map(|member| member.to_string()))
                 .collect::<HashSet<_>>()
         });
+
+        let mut time_dimensions = load_request.time_dimensions.clone().unwrap_or_default();
+        let mut dimensions = vec![];
+        // Cube outputs a time dimension under the alias the select reads its key by
+        let mut member_to_alias = HashMap::new();
+        let mut time_dimension_names = HashMap::new();
+        for (index, ((column, used_members), grouping_set)) in
+            group_by.iter().zip(group_descs.iter()).enumerate()
+        {
+            let Some(Some((member, granularity))) = time_dimension_keys.get(index) else {
+                dimensions.push(Self::dimension_member_def(
+                    column,
+                    used_members,
+                    &ungrouped_scan_node.used_cubes,
+                    grouping_set,
+                )?);
+                continue;
+            };
+            member_to_alias.insert(format!("{member}.{granularity}"), column.alias.clone());
+            // Cube outputs a time dimension as a timestamp, even for a CAST AS DATE key
+            if let Expr::Cast {
+                data_type: ArrowDataType::Date32,
+                ..
+            } = unalias(&self.group_expr[index])
+            {
+                next_remapper.read_as_date(&column.alias);
+            }
+            time_dimension_names.insert(column.alias.clone(), member.clone());
+            match time_dimensions
+                .iter_mut()
+                .find(|td| &td.dimension == member)
+            {
+                Some(time_dimension) => time_dimension.granularity = Some(granularity.clone()),
+                None => time_dimensions.push(V1LoadRequestQueryTimeDimension {
+                    dimension: member.clone(),
+                    granularity: Some(granularity.clone()),
+                    date_range: None,
+                }),
+            }
+        }
 
         let timezone = state
             .query_timezone
@@ -4920,17 +5075,9 @@ impl WrappedSelectNode {
                     .collect::<Result<_>>()?,
             ),
             dimensions: Some(
-                group_by
-                    .iter()
-                    .zip(group_descs.iter())
-                    .map(|((m, used_members), t)| {
-                        Self::dimension_member_def(
-                            m,
-                            used_members,
-                            &ungrouped_scan_node.used_cubes,
-                            t,
-                        )
-                    })
+                dimensions
+                    .into_iter()
+                    .map(Ok)
                     .chain(dimensions_only_projection.iter().map(|(m, used_members)| {
                         Self::ungrouped_member_def(m, used_members, &ungrouped_scan_node.used_cubes)
                     }))
@@ -4984,7 +5131,11 @@ impl WrappedSelectNode {
                                         ))
                                     })?;
                                 Ok(vec![
-                                    aliased_column.alias,
+                                    // Cube orders by a time dimension by its name
+                                    time_dimension_names
+                                        .get(&aliased_column.alias)
+                                        .cloned()
+                                        .unwrap_or(aliased_column.alias),
                                     if *asc { "asc".to_string() } else { "desc".to_string() },
                                 ])
                             }
@@ -5020,7 +5171,9 @@ impl WrappedSelectNode {
             // It's incorrect to just throw them away
             filters: ungrouped_scan_node.request.filters.clone(),
 
-            time_dimensions: load_request.time_dimensions.clone(),
+            time_dimensions: (load_request.time_dimensions.is_some()
+                || !time_dimensions.is_empty())
+            .then_some(time_dimensions),
             subquery_joins: (!prepared_join_subqueries.is_empty())
                 .then_some(prepared_join_subqueries),
 
@@ -5037,8 +5190,158 @@ impl WrappedSelectNode {
             sql,
             remapper: next_remapper,
             request: load_request,
+            member_to_alias,
             pre_aggregations,
             pre_aggregation_members,
+        })
+    }
+
+    /// For every group key, the time dimension and granularity it truncates when Cube can take
+    /// it as a time dimension of the query. `None` when another key reads a time dimension
+    /// too: the date range would then bound what that key groups by as well
+    fn time_dimension_keys(
+        &self,
+        context: &PushToCubeContext<'_>,
+        subqueries: &HashSet<String>,
+    ) -> Option<Vec<Option<(String, String)>>> {
+        // Every key of a grouping set can be rolled up, a time dimension can't
+        let grouping_sets = self
+            .group_expr
+            .iter()
+            .any(|expr| matches!(expr, Expr::GroupingSet(_)));
+        if !matches!(self.select_type, WrappedSelectType::Aggregate) || grouping_sets {
+            return None;
+        }
+        let mut keys = vec![];
+        for expr in &self.group_expr {
+            let key = match unalias(expr) {
+                // A date is the day it truncates to, or its own granularity when coarser
+                Expr::Cast {
+                    expr,
+                    data_type: ArrowDataType::Date32,
+                } => match unalias(expr) {
+                    Expr::Column(column) => Self::scan_time_dimension(column, context, subqueries)
+                        .map(|member| (member, "day".to_string())),
+                    Expr::ScalarFunction {
+                        fun: BuiltinScalarFunction::DateTrunc,
+                        args,
+                    } => match args.as_slice() {
+                        [Expr::Literal(ScalarValue::Utf8(Some(granularity))), Expr::Column(column)]
+                            if ["day", "week", "month", "quarter", "year"]
+                                .contains(&granularity.to_ascii_lowercase().as_str()) =>
+                        {
+                            Self::scan_time_dimension(column, context, subqueries)
+                                .map(|member| (member, granularity.to_ascii_lowercase()))
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                }
+                .filter(|(member, _)| {
+                    Self::scan_date_range(member, context)
+                        .is_none_or(|time_dimension| time_dimension.granularity.is_none())
+                }),
+                Expr::ScalarFunction {
+                    fun: BuiltinScalarFunction::DateTrunc,
+                    args,
+                } => match args.as_slice() {
+                    [Expr::Literal(ScalarValue::Utf8(Some(granularity))), Expr::Column(column)] => {
+                        let granularity = granularity.to_ascii_lowercase();
+                        granularity_str_to_int_order(&granularity, Some(false))
+                            .and_then(|_| Self::scan_time_dimension(column, context, subqueries))
+                            .filter(|member| {
+                                Self::scan_date_range(member, context).is_none_or(
+                                    |time_dimension| time_dimension.granularity.is_none(),
+                                )
+                            })
+                            .map(|member| (member, granularity))
+                    }
+                    _ => None,
+                },
+                _ => None,
+            };
+            // Cube orders and aliases a time dimension by its name, so it takes one granularity
+            let key = key.filter(|(member, _)| {
+                !keys
+                    .iter()
+                    .flatten()
+                    .any(|(m, _): &(String, String)| m == member)
+            });
+            if key.is_none() {
+                let members = collect_used_members(expr, context, subqueries).ok()?;
+                let reads_time_dimension = members.iter().any(|member| {
+                    context
+                        .meta
+                        .find_dimension_with_name(member)
+                        .is_some_and(|dimension| dimension.is_time())
+                });
+                if reads_time_dimension {
+                    return None;
+                }
+            }
+            keys.push(key);
+        }
+        Some(keys)
+    }
+
+    /// The time dimension of the scan a column reads
+    fn scan_time_dimension(
+        column: &Column,
+        context: &PushToCubeContext<'_>,
+        subqueries: &HashSet<String>,
+    ) -> Option<String> {
+        if subqueries.contains(&column.flat_name())
+            || column
+                .relation
+                .as_ref()
+                .is_some_and(|relation| context.known_join_subqueries.contains(relation))
+        {
+            return None;
+        }
+        let Ok(MemberField::Member(member)) =
+            Self::find_member_in_ungrouped_scan(context.ungrouped_scan_node, column)
+        else {
+            return None;
+        };
+        // A column at a granularity is not the time dimension itself
+        let time_dimension = member.field_name == member.member
+            && context
+                .meta
+                .find_dimension_with_name(&member.member)
+                .is_some_and(|dimension| dimension.is_time());
+        time_dimension.then(|| member.member.clone())
+    }
+
+    /// The time dimension the scan has of its own for a member, from filters it consumed
+    fn scan_date_range<'c>(
+        member: &str,
+        context: &'c PushToCubeContext<'_>,
+    ) -> Option<&'c V1LoadRequestQueryTimeDimension> {
+        let time_dimensions = context.ungrouped_scan_node.request.time_dimensions.iter();
+        time_dimensions
+            .flatten()
+            .find(|time_dimension| time_dimension.dimension == member)
+    }
+
+    /// Whether an aggregate reads a rolling window measure
+    fn reads_rolling_window(
+        &self,
+        context: &PushToCubeContext<'_>,
+        subqueries: &HashSet<String>,
+    ) -> bool {
+        let mut columns = HashSet::new();
+        for expr in &self.aggr_expr {
+            let _ = expr_to_columns(expr, &mut columns);
+        }
+        columns.iter().any(|column| {
+            !subqueries.contains(&column.flat_name())
+                && matches!(
+                    Self::find_member_in_ungrouped_scan(context.ungrouped_scan_node, column),
+                    Ok(MemberField::Member(member)) if context
+                        .meta
+                        .find_measure_with_name(&member.member)
+                        .is_some_and(|measure| measure.cumulative == Some(true))
+                )
         })
     }
 
