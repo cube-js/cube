@@ -446,6 +446,7 @@ fn spawn_lag_reporter(
     interval: Duration,
 ) -> AbortingJoinHandle<()> {
     AbortingJoinHandle::new(cube_ext::spawn(async move {
+        let _reset = LagGaugesReset(tags.clone());
         let mut last_computed: Option<Instant> = None;
         loop {
             let seq = last_seq.load(Ordering::Relaxed);
@@ -464,6 +465,17 @@ fn spawn_lag_reporter(
             tokio::time::sleep(interval).await;
         }
     }))
+}
+
+// Zeroes the lag gauges when a stream stops on this node, so the exporter does not keep its last
+// lag as current after the table is dropped or the stream moves away.
+struct LagGaugesReset(Vec<String>);
+
+impl Drop for LagGaugesReset {
+    fn drop(&mut self) {
+        app_metrics::STREAMING_LAG.report_with_tags(0, Some(&self.0));
+        app_metrics::STREAMING_LAG_AGE_MS.report_with_tags(0, Some(&self.0));
+    }
 }
 
 #[async_trait]
