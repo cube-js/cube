@@ -3,15 +3,17 @@ title: Using Cube with dbt
 description: Layer Cube cubes and views on dbt-built warehouse models, aligning documentation patterns with dimensions, measures, joins, and downstream APIs.
 ---
 
-<Info>
+<Warning>
 
-This recipe covers dynamic data models built with the Python `cube_dbt` package. To
-generate static cube files with Cube's dbt pull — including uploading your CI
-job's exact manifest with `cube dbt sync --manifest` — see the [dbt
-integration](/docs/integrations/dbt#trigger-from-your-cicd-pipeline) and the
-ready-made pipelines in [dbt pull with the Cube CLI](/recipes/data-modeling/dbt-cli).
+This recipe uses the Python `cube_dbt` package, which is
+[deprecated](/reference/data-modeling/cube_dbt). On Premium and above plans,
+use [dbt pull](/docs/integrations/dbt) to generate cubes from dbt models.
+To use the exact manifest produced by your CI job, upload it with
+`cube dbt sync --manifest`. See [dbt pull with the Cube CLI](/recipes/data-modeling/dbt-cli)
+for pipeline examples. On Cube Core or a plan without dbt pull, keep an
+existing `cube_dbt` setup or define cubes directly over the dbt-built tables and views.
 
-</Info>
+</Warning>
 
 [dbt][link-dbt-docs] is a popular data integration tool used by many Cube
 users to transform the data in the data warehouse before bringing it to the
@@ -62,8 +64,8 @@ cube(`orders`, {
 
 </CodeGroup>
 
-Cube provides a convenient `cube_dbt` package to simplify [data model
-integration][self-integration].
+The [data model integration][self-integration] section describes how existing
+`cube_dbt` setups load and use dbt metadata.
 
 ## Data transformation
 
@@ -104,11 +106,9 @@ models are updated via the [Orchestration API][ref-orchestration-api].
 
 ## Data model integration
 
-[`cube_dbt` package][ref-cube-dbt] simplifies defining the data model on
-top of dbt models. It provides convenient tools for loading the metadata
-of a dbt project, inspecting dbt models, and rendering them as cubes with
-dimensions. It's designed to work with [dynamic data models][dynamic-models]
-built with YAML, Jinja, and Python.
+The deprecated [`cube_dbt` package][ref-cube-dbt] loads dbt metadata, inspects dbt
+models, and renders them as cubes with dimensions. Existing integrations use
+[dynamic data models][dynamic-models] built with YAML, Jinja, and Python.
 
 Usually, the integration would include the following steps:
 
