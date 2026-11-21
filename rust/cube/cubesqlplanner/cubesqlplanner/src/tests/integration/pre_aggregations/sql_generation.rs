@@ -1624,6 +1624,46 @@ async fn test_rollup_lambda_cross_cube_union_aliases() -> Result<(), CubeError> 
     Ok(())
 }
 
+// `impressions.lambda` UNIONs the `history` and `recent` rollups, and both
+// store the `production` segment. The outer query filters on the segment's
+// column, so every branch of the union has to project it.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rollup_lambda_union_projects_segments() -> Result<(), CubeError> {
+    let schema = MockSchema::from_yaml_file("common/pre_agg_lambda_segments.yaml");
+    let ctx = TestContext::new(schema)?;
+
+    let query_yaml = indoc! {"
+        measures:
+          - impressions.count
+        dimensions:
+          - impressions.app_id
+        segments:
+          - impressions.production
+        time_dimensions:
+          - dimension: impressions.created_at
+            granularity: day
+        pre_aggregation_id: impressions.lambda
+    "};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query_yaml)?;
+
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "lambda");
+
+    let union_start = sql.find("FROM (").expect(&sql) + "FROM (".len();
+    let union_end = sql.find(") AS \"impressions__lambda\"").expect(&sql);
+    let branches: Vec<&str> = sql[union_start..union_end].split("UNION ALL").collect();
+    assert_eq!(branches.len(), 2, "{sql}");
+    for branch in branches {
+        assert!(
+            branch.contains("\"impressions__production\" \"impressions__production\""),
+            "every union branch must project the segment column. SQL:\n{sql}"
+        );
+    }
+
+    Ok(())
+}
+
 // `joined_rollup` is a rollup on the fact cube `visitor_checkins` that includes
 // a cross-cube dimension from the many_to_one joined `visitors` cube, plus a
 // `time_dimension`. An ungrouped query with no measures and no time dimension
