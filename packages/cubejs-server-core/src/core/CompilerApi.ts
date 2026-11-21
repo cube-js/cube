@@ -101,6 +101,8 @@ export interface DataSourceInfo {
   driverCapabilities?: DriverCapabilities;
 }
 
+type FilterNumber = { negative: boolean, int: string, frac: string };
+
 export class CompilerApi {
   protected readonly repository: SchemaFileRepository;
 
@@ -936,11 +938,25 @@ export class CompilerApi {
     // also lets a conditionally-masked aggregate measure render its real value
     // (instead of being fully masked) when the query is already scoped to the
     // filter's rows.
-    for (const member of Array.from(maskedMembersSet)) {
-      const maskFilter = memberMaskFiltersMap[member];
-      if (maskFilter && this.queryFiltersImplyFilter(query.filters || [], maskFilter)) {
-        maskedMembersSet.delete(member);
-        delete memberMaskFiltersMap[member];
+    const targetPath = (member: string) => cubeEvaluator.resolveMemberPath(member)?.targetPath || member;
+    const isNumberDimension = (member: string) => {
+      const path = targetPath(member);
+      return cubeEvaluator.isDimension(path) && cubeEvaluator.dimensionByPath(path).type === 'number';
+    };
+    // A time-shifted measure moves the time filters with it, so the query also reads
+    // rows its own filters exclude and the filters prove nothing about those.
+    const readsShiftedRows = memberNames.some((member) => {
+      const path = targetPath(member);
+      return cubeEvaluator.isMeasure(path) && !!cubeEvaluator.measureByPath(path).timeShift?.length;
+    });
+
+    if (!readsShiftedRows) {
+      for (const member of Array.from(maskedMembersSet)) {
+        const maskFilter = memberMaskFiltersMap[member];
+        if (maskFilter && this.queryFiltersImplyFilter(query.filters || [], maskFilter, isNumberDimension)) {
+          maskedMembersSet.delete(member);
+          delete memberMaskFiltersMap[member];
+        }
       }
     }
 
@@ -1002,76 +1018,137 @@ export class CompilerApi {
   }
 
   /**
+   * Filter values as strings, or null when they can't be compared by their text:
+   * `null` renders as IS NULL while the string 'null' is an ordinary value, so
+   * stringifying both would make two different conditions look identical.
+   */
+  protected comparableFilterValues(leaf: any): string[] | null {
+    const values = leaf.values ?? [];
+    const isScalar = (value: unknown) => typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+
+    return Array.isArray(values) && values.every(isScalar) ? values.map(String) : null;
+  }
+
+  /**
+   * Splits a numeric bound into its digits, or null for hex, exponents and blanks, which
+   * the database reads differently. The digits stay text: a number can be any length.
+   */
+  protected parseFilterNumber(value: string): FilterNumber | null {
+    const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(value);
+    if (!match) {
+      return null;
+    }
+    const int = match[2].replace(/^0+/, '');
+    const frac = (match[3] || '').replace(/0+$/, '');
+
+    return { negative: match[1] === '-' && int + frac !== '', int, frac };
+  }
+
+  protected compareFilterNumbers(a: FilterNumber, b: FilterNumber): number {
+    if (a.negative !== b.negative) {
+      return a.negative ? -1 : 1;
+    }
+    const sign = a.negative ? -1 : 1;
+    if (a.int.length !== b.int.length) {
+      return a.int.length < b.int.length ? -sign : sign;
+    }
+    const width = Math.max(a.frac.length, b.frac.length);
+    const left = a.int + a.frac.padEnd(width, '0');
+    const right = b.int + b.frac.padEnd(width, '0');
+    if (left === right) {
+      return 0;
+    }
+    return left < right ? -sign : sign;
+  }
+
+  /**
    * Returns true when a query leaf condition is at least as restrictive as a
    * target leaf condition on the same member (i.e. the rows allowed by the query
    * condition are guaranteed to be a subset of the rows allowed by the target).
    * Intentionally conservative: when implication can't be proven soundly, returns
    * false so masking is preserved.
    */
-  protected leafFilterImplies(queryLeaf: any, targetLeaf: any): boolean {
-    if (this.filterMemberName(queryLeaf) !== this.filterMemberName(targetLeaf)) {
+  protected leafFilterImplies(
+    queryLeaf: any,
+    targetLeaf: any,
+    isNumberDimension: (member: string) => boolean,
+  ): boolean {
+    const member = this.filterMemberName(queryLeaf);
+    if (!member || member !== this.filterMemberName(targetLeaf)) {
       return false;
     }
     const qOp = queryLeaf.operator;
     const tOp = targetLeaf.operator;
-    const qVals = (queryLeaf.values || []).map((v: any) => String(v));
-    const tVals = (targetLeaf.values || []).map((v: any) => String(v));
+    const qVals = this.comparableFilterValues(queryLeaf);
+    const tVals = this.comparableFilterValues(targetLeaf);
+    if (!qVals || !tVals) {
+      return false;
+    }
 
-    // Identical condition.
-    if (
-      qOp === tOp &&
-      qVals.length === tVals.length &&
-      qVals.every((v: string) => tVals.includes(v)) &&
-      tVals.every((v: string) => qVals.includes(v))
-    ) {
+    // Identical condition. Only equals/notEquals treat values as a set; for range
+    // operators such as inDateRange/notInDateRange each position is a distinct
+    // bound, so reversed endpoints describe different rows.
+    const sameValues = qOp === 'equals' || qOp === 'notEquals'
+      ? qVals.every(v => tVals.includes(v)) && tVals.every(v => qVals.includes(v))
+      : qVals.every((v, i) => v === tVals[i]);
+    if (qOp === tOp && qVals.length === tVals.length && sameValues) {
       return true;
     }
 
     // equals/in: the query value set must be a subset of the target value set
     // (querying fewer values is more restrictive).
     if (qOp === 'equals' && tOp === 'equals') {
-      return qVals.length > 0 && qVals.every((v: string) => tVals.includes(v));
+      return qVals.length > 0 && qVals.every(v => tVals.includes(v));
     }
 
-    // Numeric range bounds in the same direction.
-    if (qVals.length === 1 && tVals.length === 1) {
-      const q = Number(qVals[0]);
-      const t = Number(tVals[0]);
-      if (!Number.isNaN(q) && !Number.isNaN(t)) {
-        // Lower bounds: x > / >= value.
-        if ((qOp === 'gt' || qOp === 'gte') && (tOp === 'gt' || tOp === 'gte')) {
-          // target `x > t`: a `gt q` query needs q >= t, a `gte q` query needs q > t.
-          // target `x >= t`: q >= t for both query operators.
-          if (tOp === 'gt') {
-            return qOp === 'gt' ? q >= t : q > t;
-          }
-          return q >= t;
-        }
-        // Upper bounds: x < / <= value.
-        if ((qOp === 'lt' || qOp === 'lte') && (tOp === 'lt' || tOp === 'lte')) {
-          if (tOp === 'lt') {
-            return qOp === 'lt' ? q <= t : q < t;
-          }
-          return q <= t;
-        }
-      }
+    // Numeric range bounds in the same direction. The database orders the bounds of
+    // any other member type as text, where '1000' sorts below '20'.
+    const lowerBounds = (qOp === 'gt' || qOp === 'gte') && (tOp === 'gt' || tOp === 'gte');
+    const upperBounds = (qOp === 'lt' || qOp === 'lte') && (tOp === 'lt' || tOp === 'lte');
+    const sameDirection = lowerBounds || upperBounds;
+    const singleValues = qVals.length === 1 && tVals.length === 1;
+    if (!sameDirection || !singleValues || !isNumberDimension(member)) {
+      return false;
     }
+    const q = this.parseFilterNumber(qVals[0]);
+    const t = this.parseFilterNumber(tVals[0]);
+    if (q === null || t === null) {
+      return false;
+    }
+    const order = this.compareFilterNumbers(q, t);
+    // A float column rounds both bounds. Rounding keeps their order but can make two
+    // different bounds equal, so a strict order is only trusted up to 15 digits.
+    const distinct = q.int.length + q.frac.length <= 15 && t.int.length + t.frac.length <= 15;
 
-    return false;
+    // An inclusive query bound only fits inside an exclusive policy bound when it is
+    // strictly tighter (`x >= q` implies `x > t` only for q > t). Every other pair
+    // also holds for equal bounds.
+    if (lowerBounds) {
+      const needsStrictlyTighter = qOp === 'gte' && tOp === 'gt';
+      return needsStrictlyTighter ? distinct && order > 0 : order >= 0;
+    }
+    const needsStrictlyTighter = qOp === 'lte' && tOp === 'lt';
+    return needsStrictlyTighter ? distinct && order < 0 : order <= 0;
   }
 
-  protected filterConditionImplied(guaranteedLeaves: any[], condition: any): boolean {
+  protected filterConditionImplied(
+    guaranteedLeaves: any[],
+    condition: any,
+    isNumberDimension: (member: string) => boolean,
+  ): boolean {
     if (!condition) {
       return false;
     }
     if (condition.and) {
-      return condition.and.every((c: any) => this.filterConditionImplied(guaranteedLeaves, c));
+      // An empty group proves nothing; `every` on it would unmask unconditionally.
+      return condition.and.length > 0 &&
+        condition.and.every((c: any) => this.filterConditionImplied(guaranteedLeaves, c, isNumberDimension));
     }
     if (condition.or) {
-      return condition.or.some((c: any) => this.filterConditionImplied(guaranteedLeaves, c));
+      return condition.or.some((c: any) => this.filterConditionImplied(guaranteedLeaves, c, isNumberDimension));
     }
     if (this.filterMemberName(condition) && condition.operator) {
-      return guaranteedLeaves.some(leaf => this.leafFilterImplies(leaf, condition));
+      return guaranteedLeaves.some(leaf => this.leafFilterImplies(leaf, condition, isNumberDimension));
     }
     return false;
   }
@@ -1081,12 +1158,16 @@ export class CompilerApi {
    * subset of the rows allowed by `maskFilter` — i.e. the query is already at
    * least as restrictive as the (row-security) mask filter.
    */
-  protected queryFiltersImplyFilter(queryFilters: any[], maskFilter: any): boolean {
+  protected queryFiltersImplyFilter(
+    queryFilters: any[],
+    maskFilter: any,
+    isNumberDimension: (member: string) => boolean,
+  ): boolean {
     const guaranteedLeaves = this.collectGuaranteedFilterLeaves(queryFilters);
     if (guaranteedLeaves.length === 0) {
       return false;
     }
-    return this.filterConditionImplied(guaranteedLeaves, maskFilter);
+    return this.filterConditionImplied(guaranteedLeaves, maskFilter, isNumberDimension);
   }
 
   protected removeEmptyFilters(filter: any): any {

@@ -13,6 +13,22 @@ class CompilerApiTestable extends CompilerApi {
   public getQueryFactoryProperty(): QueryFactory | any {
     return this.queryFactory;
   }
+
+  public leafFilterImplies(
+    queryLeaf: any,
+    targetLeaf: any,
+    isNumberDimension: (member: string) => boolean = () => true,
+  ): boolean {
+    return super.leafFilterImplies(queryLeaf, targetLeaf, isNumberDimension);
+  }
+
+  public queryFiltersImplyFilter(
+    queryFilters: any[],
+    maskFilter: any,
+    isNumberDimension: (member: string) => boolean = () => true,
+  ): boolean {
+    return super.queryFiltersImplyFilter(queryFilters, maskFilter, isNumberDimension);
+  }
 }
 
 describe('CompilerApi', () => {
@@ -1034,6 +1050,149 @@ cubes:
   });
 });
 
+describe('CompilerApi leafFilterImplies', () => {
+  const repository: SchemaFileRepository = {
+    localPath: () => '/mock/path',
+    dataSchemaFiles: () => Promise.resolve([]),
+  };
+  const compilerApi = new CompilerApiTestable(repository, async () => 'postgres', {
+    logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+  });
+
+  afterAll(() => compilerApi.dispose());
+
+  const leaf = (operator: string, values: (string | number)[]) => ({ member: 'statements.booked', operator, values });
+
+  test('a range filter with reversed endpoints does not imply the policy range', () => {
+    for (const operator of ['inDateRange', 'notInDateRange']) {
+      expect(compilerApi.leafFilterImplies(
+        leaf(operator, ['2025-03-31', '2025-02-01']),
+        leaf(operator, ['2025-02-01', '2025-03-31']),
+      )).toBe(false);
+      expect(compilerApi.leafFilterImplies(
+        leaf(operator, ['2025-02-01', '2025-03-31']),
+        leaf(operator, ['2025-02-01', '2025-03-31']),
+      )).toBe(true);
+    }
+  });
+
+  test('date conditions only match the policy byte for byte', () => {
+    const policy = leaf('inDateRange', ['2025-02-01', '2025-03-31']);
+    const notImplied: [string, any[]][] = [
+      // Narrower or equivalent ranges are not proven, so the mask stays.
+      ['inDateRange', ['2025-02-10', '2025-02-20']],
+      ['inDateRange', ['2025-02-01T00:00:00.000', '2025-03-31T23:59:59.999']],
+      ['inDateRange', ['2025-02-01T00:00:00.000Z', '2025-03-31T23:59:59.999Z']],
+      ['inDateRange', ['2025-02-01', '2025-03-31', '2025-04-01']],
+      ['inDateRange', ['2025-02-01']],
+      ['notInDateRange', ['2025-02-01', '2025-03-31']],
+      ['onTheDate', ['2025-02-01', '2025-03-31']],
+      ['equals', ['2025-02-01', '2025-03-31']],
+    ];
+
+    for (const [operator, values] of notImplied) {
+      expect(compilerApi.leafFilterImplies(leaf(operator, values), policy)).toBe(false);
+    }
+
+    expect(compilerApi.leafFilterImplies(leaf('afterDate', ['2025-03-01']), leaf('afterDate', ['2025-02-01']))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('beforeDate', ['2025-02-01']), leaf('beforeOrOnDate', ['2025-02-01']))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['2025-03-01']), leaf('gt', ['2025-02-01']))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('afterDate', ['2025-02-01']), leaf('afterDate', ['2025-02-01']))).toBe(true);
+  });
+
+  test('null is not the string "null"', () => {
+    expect(compilerApi.leafFilterImplies(leaf('equals', ['null']), leaf('equals', [null] as any))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('equals', ['null']), leaf('equals', ['a', null] as any))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('notEquals', ['a', 'null']), leaf('notEquals', ['a', null] as any))).toBe(false);
+    expect(compilerApi.leafFilterImplies(
+      leaf('inDateRange', ['null', 'null']),
+      leaf('inDateRange', [null, null] as any),
+    )).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('equals', ['undefined']), leaf('equals', [undefined] as any))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('equals', [['a', 'b']] as any), leaf('equals', ['a,b']))).toBe(false);
+  });
+
+  test('values that are not an array never imply', () => {
+    expect(compilerApi.leafFilterImplies(
+      leaf('inDateRange', ['2025-02-01', '2025-03-31']),
+      { member: 'statements.booked', operator: 'inDateRange', values: 'last month' },
+    )).toBe(false);
+  });
+
+  test('numeric bounds only compare plain decimals', () => {
+    const loose = ['0x100', '0b1111111', '0o777', '', ' ', 'Infinity', '1e3', ' 200', '+200'];
+
+    for (const value of loose) {
+      expect(compilerApi.leafFilterImplies(leaf('gt', [value]), leaf('gt', ['100']))).toBe(false);
+    }
+    expect(compilerApi.leafFilterImplies(
+      leaf('gt', ['9007199254740992']),
+      leaf('gt', ['9007199254740993']),
+    )).toBe(false);
+
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['200']), leaf('gt', ['100']))).toBe(true);
+    expect(compilerApi.leafFilterImplies(leaf('gte', ['100.5']), leaf('gt', ['100']))).toBe(true);
+    expect(compilerApi.leafFilterImplies(leaf('lte', ['-3']), leaf('lt', ['-2.5']))).toBe(true);
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['50']), leaf('gt', ['100']))).toBe(false);
+  });
+
+  test('numeric bounds compare as numbers of any length', () => {
+    const implies = (qOp: string, q: string, tOp: string, t: string) => compilerApi.leafFilterImplies(leaf(qOp, [q]), leaf(tOp, [t]));
+
+    // Number() reads both of these as 9007199254740992.
+    expect(implies('gt', '9007199254740993', 'gt', '9007199254740992')).toBe(true);
+    expect(implies('lt', '9007199254740992', 'lt', '9007199254740993')).toBe(true);
+    expect(implies('lt', '9007199254740993', 'lt', '9007199254740992')).toBe(false);
+    expect(implies('gte', '12345678901234567890.123456789013', 'gte', '12345678901234567890.123456789012')).toBe(true);
+    expect(implies('gte', '12345678901234567890.123456789011', 'gte', '12345678901234567890.123456789012')).toBe(false);
+    expect(implies('lte', '-12345678901234567890.5', 'lte', '-12345678901234567890.4')).toBe(true);
+    expect(implies('gt', '-12345678901234567890.5', 'gt', '-12345678901234567890.4')).toBe(false);
+
+    expect(implies('gt', '100', 'gt', '99.999')).toBe(true);
+    expect(implies('gt', '0100.50', 'gte', '100.5')).toBe(true);
+    expect(implies('gt', '9', 'gt', '10')).toBe(false);
+    expect(implies('gt', '-0', 'gt', '0.0')).toBe(true);
+    expect(implies('lt', '-9', 'lt', '-10')).toBe(false);
+    expect(implies('lt', '-10', 'lt', '-9')).toBe(true);
+    expect(implies('gt', '-1', 'gt', '1')).toBe(false);
+  });
+
+  test('a strict order between long bounds is not trusted', () => {
+    // A double column rounds both bounds to 9007199254740992.
+    expect(compilerApi.leafFilterImplies(
+      leaf('gte', ['9007199254740993']),
+      leaf('gt', ['9007199254740992']),
+    )).toBe(false);
+    expect(compilerApi.leafFilterImplies(
+      leaf('lte', ['9007199254740992']),
+      leaf('lt', ['9007199254740993']),
+    )).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('gte', ['100']), leaf('gt', ['100']))).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('lte', ['100']), leaf('lt', ['100']))).toBe(false);
+  });
+
+  test('numeric bounds only compare on number dimensions', () => {
+    // As text '1000' passes `gt '100'` and fails `gt '20'`.
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['100']), leaf('gt', ['20']), () => false)).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('lte', ['-3']), leaf('lt', ['-2.5']), () => false)).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['20']), leaf('gt', ['20']), () => false)).toBe(true);
+  });
+
+  test('an empty policy group does not unmask', () => {
+    const queryFilters = [leaf('equals', ['a'])];
+    expect(compilerApi.queryFiltersImplyFilter(queryFilters, { and: [] })).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter(queryFilters, { or: [] })).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter(queryFilters, {})).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter([{ or: queryFilters }], leaf('equals', ['a']))).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter([{ and: queryFilters }], leaf('equals', ['a']))).toBe(true);
+  });
+
+  test('set operators still match regardless of value order', () => {
+    expect(compilerApi.leafFilterImplies(leaf('equals', ['b', 'a']), leaf('equals', ['a', 'b']))).toBe(true);
+    expect(compilerApi.leafFilterImplies(leaf('notEquals', ['b', 'a']), leaf('notEquals', ['a', 'b']))).toBe(true);
+  });
+});
+
 describe('CompilerApi externalPreAggregationMembers', () => {
   // cubesql plans a scan over a Cube Store rollup only when the scan's members fit one
   // of these sets, so each external rollup has to show up with every member it holds,
@@ -1140,5 +1299,109 @@ views:
     } finally {
       compilerApi.dispose();
     }
+  });
+});
+
+describe('CompilerApi conditional mask lifting', () => {
+  const model = `
+cubes:
+  - name: orders
+    sql_table: orders
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: created_at
+        sql: created_at
+        type: time
+      - name: code
+        sql: code
+        type: string
+      - name: amount
+        sql: amount
+        type: number
+    measures:
+      - name: total
+        sql: amount
+        type: sum
+      - name: total_prev_month
+        multi_stage: true
+        sql: "{total}"
+        type: number
+        time_shift:
+          - time_dimension: created_at
+            interval: 1 month
+            type: prior
+      - name: total_prev_month_doubled
+        multi_stage: true
+        sql: "{total_prev_month} * 2"
+        type: number
+    access_policy:
+      - group: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+      - group: dates
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: created_at
+              operator: inDateRange
+              values: ["2025-02-01", "2025-03-31"]
+      - group: codes
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: code
+              operator: gt
+              values: ["20"]
+      - group: amounts
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: amount
+              operator: gt
+              values: ["20"]
+`;
+  const repository: SchemaFileRepository = {
+    localPath: () => '/mock/path',
+    dataSchemaFiles: () => Promise.resolve([{ fileName: 'model.yml', content: model }]),
+  };
+  const compilerApi = new CompilerApi(repository, async () => 'postgres', {
+    logger: () => {}, // eslint-disable-line @typescript-eslint/no-empty-function
+    contextToGroups: async (context: any) => context.securityContext.groups,
+  });
+
+  afterAll(() => compilerApi.dispose());
+
+  const maskedMembers = async (group: string, measure: string, filter: any) => {
+    const query: any = { timezone: 'UTC', measures: [`orders.${measure}`], filters: [filter] };
+    const context: any = { securityContext: { groups: [group] }, requestId: 'test' };
+    const result = await compilerApi.applyRowLevelSecurity(query, query, context);
+    return ((result.query as any).maskedMembers || []).map((m: any) => m.member);
+  };
+
+  const policyRange = { member: 'orders.created_at', operator: 'inDateRange', values: ['2025-02-01', '2025-03-31'] };
+
+  test('the policy filter unmasks a measure that reads the filtered rows', async () => {
+    expect(await maskedMembers('dates', 'total', policyRange)).toEqual([]);
+  });
+
+  test('a time-shifted measure stays masked, also behind another measure', async () => {
+    expect(await maskedMembers('dates', 'total_prev_month', policyRange)).toContain('orders.total_prev_month');
+    expect(await maskedMembers('dates', 'total_prev_month_doubled', policyRange))
+      .toContain('orders.total_prev_month_doubled');
+  });
+
+  test('a narrower bound unmasks on a number dimension only', async () => {
+    const narrower = (member: string) => ({ member: `orders.${member}`, operator: 'gt', values: ['100'] });
+
+    expect(await maskedMembers('amounts', 'total', narrower('amount'))).toEqual([]);
+    expect(await maskedMembers('codes', 'total', narrower('code'))).toContain('orders.total');
   });
 });

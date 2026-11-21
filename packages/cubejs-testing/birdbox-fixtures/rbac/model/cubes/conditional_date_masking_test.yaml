@@ -1,0 +1,65 @@
+cubes:
+  - name: conditional_date_masking_test
+    sql_table: public.line_items
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+      - name: price
+        sql: price
+        type: number
+        mask: -1
+
+    measures:
+      - name: count
+        type: count
+
+      - name: total_price
+        sql: price
+        type: sum
+
+      # Reads rows one month before the ones the query filter selects
+      - name: total_price_prev_month
+        multi_stage: true
+        sql: "{total_price}"
+        type: number
+        time_shift:
+          - time_dimension: created_at
+            interval: 1 month
+            type: prior
+
+    access_policy:
+      - group: "*"
+        member_level:
+          includes: []
+        member_masking:
+          includes: "*"
+
+      - group: "conditional_date_mask_group"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: created_at
+              operator: inDateRange
+              values:
+                - "2018-02-01"
+                - "2018-03-31"
+
+      - group: "conditional_not_in_date_mask_group"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: created_at
+              operator: notInDateRange
+              values:
+                - "2018-02-01"
+                - "2018-03-31"
