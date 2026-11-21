@@ -61,6 +61,7 @@ tags:
   - name: Chat History
   - name: Data Model History
   - name: Ossie Conversion
+  - name: Query History
   - name: Report Deliveries
 paths:
   /api/v1/api-keys:
@@ -8352,6 +8353,136 @@ paths:
       summary: Pull the latest for a branch from its remote and rebuild if changed
       tags:
         - Data Model
+  /api/v1/deployments/{deploymentId}/query-history/requests:
+    get:
+      operationId: listQueryHistoryRequests
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: from
+          schema:
+            description: >-
+              Only requests at or after this ISO 8601 date or date-time, UTC unless it names a zone.
+              Defaults to 24 hours before `to`. A window that starts earlier than the deployment’s
+              Query History retention answers `400`.
+            oneOf:
+              - pattern: ^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$
+                type: string
+              - type: 'null'
+        - in: query
+          name: to
+          schema:
+            description: >-
+              Only requests at or before this ISO 8601 date-time, UTC unless it names a zone. A date
+              alone (`2026-10-01`) includes that whole day. Defaults to now.
+            oneOf:
+              - pattern: ^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$
+                type: string
+              - type: 'null'
+        - in: query
+          name: status
+          schema:
+            description: >-
+              `success`, `error`, `running` (no response yet), or `noResponse` (no response, and
+              silent for five minutes).
+            oneOf:
+              - $ref: '#/components/schemas/QueryHistoryRequestsQueryStatus'
+              - type: 'null'
+        - in: query
+          name: apiType
+          schema:
+            description: The API the request came in on. Repeat the parameter to match any of several.
+            oneOf:
+              - items:
+                  type: string
+                  enum:
+                    - rest
+                    - graphql
+                    - sql
+                    - ws
+                type: array
+                maxItems: 4
+              - type: 'null'
+        - in: query
+          name: minDurationMs
+          schema:
+            description: Only requests that took at least this many milliseconds.
+            oneOf:
+              - minimum: 0
+                type: integer
+              - type: 'null'
+        - in: query
+          name: search
+          schema:
+            description: A substring of the query, the security context, the request id or the span id.
+            oneOf:
+              - maxLength: 1000
+                type: string
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryHistoryRequestListResponse'
+          description: ''
+      summary: List Query History requests
+      tags:
+        - Query History
+      x-mint:
+        content: >-
+          API requests to the deployment, newest first. Covers the deployment's production API
+          requests that queried data (REST, GraphQL, SQL and WebSocket), as the Query History page
+          in Cube Cloud shows them; requests to development branches and metadata calls are left
+          out. How far back it reaches is the deployment's Query History retention. Filters combine
+          with AND. A page holds up to 200 requests (100 by default). An `endCursor` keeps its first
+          page's filters: with `after`, the other filters are ignored. Open a request with `GET
+          …/query-history/requests/{id}` to see the SQL it generated.
+  /api/v1/deployments/{deploymentId}/query-history/requests/{id}:
+    get:
+      operationId: getQueryHistoryRequest
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: 'The `id` a listed request carries: `<epochMs>-<spanId>`.'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryHistoryRequestDetail'
+          description: ''
+      summary: Get a Query History request
+      tags:
+        - Query History
+      x-mint:
+        content: >-
+          One API request with the SQL it generated, to the data source and to Cube Store, and how
+          long each query waited and ran. Covers the deployment's production API requests that
+          queried data (REST, GraphQL, SQL and WebSocket), as the Query History page in Cube Cloud
+          shows them; requests to development branches and metadata calls are left out. How far back
+          it reaches is the deployment's Query History retention.
 components:
   securitySchemes:
     bearerAuth:
@@ -15992,6 +16123,244 @@ components:
         - stderr
         - inputRowCount
       type: object
+    QueryHistoryRequest:
+      properties:
+        apiType:
+          description: '`rest`, `graphql`, `sql` or `ws`.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        cacheType:
+          description: >-
+            Where the answer came from: `cube` (a pre-aggregation in Cube Store), `cube-suboptimal`
+            (Cube Store with a suboptimal plan), `base` (the data source), `internal` (Cube’s
+            in-memory cache) or `none`.
+          type: string
+        durationMs:
+          description: Time to the API response.
+          oneOf:
+            - type: number
+            - type: 'null'
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          description: >-
+            Pass to `GET …/query-history/requests/{id}`. It is the id in the request’s Query History
+            link in Cube Cloud, not `requestId`.
+          type: string
+        isPlayground:
+          type: boolean
+        isSubscription:
+          type: boolean
+        preAggregations:
+          description: The pre-aggregations the request used, as APM recorded them.
+          oneOf:
+            - type: string
+            - type: 'null'
+        query:
+          description: 'The query as the API received it: REST query JSON, or the SQL text.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        requestId:
+          description: The request id the client sent or Cube assigned.
+          type: string
+        responseBytes:
+          oneOf:
+            - type: number
+            - type: 'null'
+        securityContext:
+          description: The security context JSON.
+          oneOf:
+            - type: string
+            - type: 'null'
+        spanId:
+          type: string
+        status:
+          $ref: '#/components/schemas/QueryHistoryRequestStatus'
+          description: >-
+            `success`, `error`, `running` (no response yet), or `noResponse` (no response, and
+            silent for five minutes).
+        timestamp:
+          description: When the request arrived, ISO 8601 UTC.
+          type: string
+        usedPreAggregations:
+          type: boolean
+      required:
+        - id
+        - requestId
+        - spanId
+        - timestamp
+        - status
+        - cacheType
+        - usedPreAggregations
+        - isPlayground
+        - isSubscription
+      type: object
+    QueryHistoryRequestDetail:
+      properties:
+        apiType:
+          description: '`rest`, `graphql`, `sql` or `ws`.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        cacheType:
+          description: >-
+            Where the answer came from: `cube` (a pre-aggregation in Cube Store), `cube-suboptimal`
+            (Cube Store with a suboptimal plan), `base` (the data source), `internal` (Cube’s
+            in-memory cache) or `none`.
+          type: string
+        durationMs:
+          description: Time to the API response.
+          oneOf:
+            - type: number
+            - type: 'null'
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          description: >-
+            Pass to `GET …/query-history/requests/{id}`. It is the id in the request’s Query History
+            link in Cube Cloud, not `requestId`.
+          type: string
+        isPlayground:
+          type: boolean
+        isSubscription:
+          type: boolean
+        preAggregations:
+          description: The pre-aggregations the request used, as APM recorded them.
+          oneOf:
+            - type: string
+            - type: 'null'
+        query:
+          description: 'The query as the API received it: REST query JSON, or the SQL text.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        requestId:
+          description: The request id the client sent or Cube assigned.
+          type: string
+        responseBytes:
+          oneOf:
+            - type: number
+            - type: 'null'
+        securityContext:
+          description: The security context JSON.
+          oneOf:
+            - type: string
+            - type: 'null'
+        spanId:
+          type: string
+        sqlQueries:
+          description: >-
+            The SQL the request generated, oldest first: up to 100 queries, each to the data source
+            or Cube Store.
+          items:
+            $ref: '#/components/schemas/QueryHistorySqlQuery'
+          type: array
+        status:
+          $ref: '#/components/schemas/QueryHistoryRequestDetailStatus'
+          description: >-
+            `success`, `error`, `running` (no response yet), or `noResponse` (no response, and
+            silent for five minutes).
+        timestamp:
+          description: When the request arrived, ISO 8601 UTC.
+          type: string
+        usedPreAggregations:
+          type: boolean
+      required:
+        - sqlQueries
+        - id
+        - requestId
+        - spanId
+        - timestamp
+        - status
+        - cacheType
+        - usedPreAggregations
+        - isPlayground
+        - isSubscription
+      type: object
+    QueryHistoryRequestDetailStatus:
+      enum:
+        - success
+        - error
+        - running
+        - noResponse
+      type: string
+    QueryHistoryRequestListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/QueryHistoryRequest'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    QueryHistoryRequestStatus:
+      enum:
+        - success
+        - error
+        - running
+        - noResponse
+      type: string
+    QueryHistoryRequestsQueryStatus:
+      enum:
+        - success
+        - error
+        - running
+        - noResponse
+      type: string
+    QueryHistorySqlQuery:
+      properties:
+        durationMs:
+          oneOf:
+            - type: number
+            - type: 'null'
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+        executionDurationMs:
+          description: Time the data source spent executing.
+          oneOf:
+            - type: number
+            - type: 'null'
+        executor:
+          $ref: '#/components/schemas/QueryHistorySqlQueryExecutor'
+        params:
+          description: The values bound to the SQL’s placeholders, in order.
+          items: {}
+          type: array
+        queueDurationMs:
+          description: Time spent waiting in the query queue.
+          oneOf:
+            - type: number
+            - type: 'null'
+        spanId:
+          type: string
+        sql:
+          oneOf:
+            - type: string
+            - type: 'null'
+        timestamp:
+          type: string
+      required:
+        - spanId
+        - timestamp
+        - params
+        - executor
+      type: object
+    QueryHistorySqlQueryExecutor:
+      enum:
+        - dataSource
+        - cubeStore
+      type: string
     RefreshReportInput:
       properties:
         anchorCell:

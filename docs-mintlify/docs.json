@@ -1241,6 +1241,14 @@
                 ]
               },
               {
+                "group": "Query History",
+                "openapi": "/api-reference/api.yaml",
+                "pages": [
+                  "GET /api/v1/deployments/{deploymentId}/query-history/requests",
+                  "GET /api/v1/deployments/{deploymentId}/query-history/requests/{id}"
+                ]
+              },
+              {
                 "group": "Report Deliveries",
                 "openapi": "/api-reference/api.yaml",
                 "pages": [
