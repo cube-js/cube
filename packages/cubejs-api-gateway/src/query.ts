@@ -197,6 +197,8 @@ const memberPath = (path: Joi.StringSchema) => Joi.alternatives().conditional(
   }
 );
 
+const MAX_U32 = 4294967295;
+
 const querySchema = Joi.object().keys({
   measures: Joi.array().items(memberPath(id)),
   dimensions: Joi.array().items(memberPath(dimensionWithTime)),
@@ -216,8 +218,11 @@ const querySchema = Joi.object().keys({
   ),
   segments: Joi.array().items(memberPath(id)),
   timezone: timezoneSchema,
-  limit: Joi.number().integer().strict().min(0),
-  offset: Joi.number().integer().strict().min(0),
+  // The result transform reads both as u32 (rust/cube/cubeorchestrator/src/transport.rs).
+  limit: Joi.number().integer().strict().min(0)
+    .max(MAX_U32),
+  offset: Joi.number().integer().strict().min(0)
+    .max(MAX_U32),
   total: Joi.boolean(),
   cacheMode: cacheModeSchema,
   cache: cacheModeSchema,
@@ -321,6 +326,21 @@ const END_DATE_OPERATORS = ['beforeOrOnDate', 'afterDate'];
 // may carry a UTC designator or offset (e.g. from the SQL API push-down).
 const AbsoluteDateTimeRegex = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}(:?\d{2})?)?)?$/;
 
+const DATE_OPERATORS = [...DATE_RANGE_OPERATORS, 'onTheDate', ...START_DATE_OPERATORS, ...END_DATE_OPERATORS];
+
+// Whether a value shaped like an absolute date or timestamp names a real one
+// (AbsoluteDateTimeRegex checks the shape only, so 2024-13-45 or 25:00 match it).
+export const isValidAbsoluteDateTime = (value: string): boolean => {
+  const [, date, hours = '00', minutes = '00', seconds = '00'] =
+    /^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(value) ?? [];
+
+  return !!date &&
+    moment.utc(date, 'YYYY-MM-DD', true).isValid() &&
+    Number(hours) < 24 &&
+    Number(minutes) < 60 &&
+    Number(seconds) < 60;
+};
+
 // Resolve a dateRange input — a relative string ("last 2 weeks"), a single
 // absolute date, or a 2-element array — to a normalized [startISO, endISO]
 // pair.
@@ -353,6 +373,17 @@ export function resolveDateRange(input: unknown, timezone: string): unknown {
 export const normalizeDateFilterValues = <T extends { operator?: string, values?: unknown[] }>(filter: T, timezone: string): T => {
   if (!filter || !filter.operator || !Array.isArray(filter.values)) {
     return filter;
+  }
+
+  if (DATE_OPERATORS.includes(filter.operator)) {
+    const invalid = filter.values.find(
+      (v) => typeof v === 'string' && AbsoluteDateTimeRegex.test(v) && !isValidAbsoluteDateTime(v)
+    );
+    if (invalid !== undefined) {
+      throw new UserError(
+        `Invalid date \`${invalid}\` for operator \`${filter.operator}\`: expected a calendar date (YYYY-MM-DD) or a timestamp with a valid time.`
+      );
+    }
   }
 
   // Fail fast at the gateway if a range operator is given a multi-element
@@ -532,7 +563,7 @@ const normalizeQuery = (
       typeof query.limit === 'number' &&
       query.limit > getEnv('dbQueryLimit')
     ) {
-      throw new Error('The query limit has been exceeded.');
+      throw new UserError(`The query limit has been exceeded: the limit is at most ${getEnv('dbQueryLimit')}.`);
     }
     newLimit = typeof query.limit === 'number'
       ? query.limit
