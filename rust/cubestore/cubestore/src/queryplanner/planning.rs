@@ -788,17 +788,31 @@ fn sort_to_column_names(
     }
 }
 
-/// Column names of the group-by keys, or `None` if any key is not a plain column (then we can't
-/// relate the grouping to the index sort key).
-fn group_expr_to_column_names(group_expr: &Vec<Expr>, input: &LogicalPlan) -> Option<Vec<String>> {
+/// Group-by keys of an aggregate, positionally matching its group columns.
+#[derive(Debug, Clone)]
+struct GroupKeys {
+    /// A plain column key is named as in the index (aliases resolved); an expression key by the
+    /// output column the aggregate gives it, which is what an ORDER BY above refers to.
+    names: Vec<String>,
+    /// Only plain columns can be related to the index sort key.
+    all_columns: bool,
+}
+
+/// `None` for grouping sets, whose output columns don't map one-to-one onto `group_expr`.
+fn group_expr_to_keys(group_expr: &Vec<Expr>, input: &LogicalPlan) -> Option<GroupKeys> {
     let mut names = Vec::with_capacity(group_expr.len());
+    let mut all_columns = true;
     for expr in group_expr {
         match expr {
             Expr::Column(c) => names.push(get_original_name(&c.name, input)),
-            _ => return None,
+            Expr::GroupingSet(_) => return None,
+            _ => {
+                all_columns = false;
+                names.push(expr.schema_name().to_string());
+            }
         }
     }
-    Some(names)
+    Some(GroupKeys { names, all_columns })
 }
 
 fn single_value_filter_columns<'a>(expr: &'a Expr, columns: &mut Vec<&'a common::Column>) -> bool {
@@ -862,9 +876,9 @@ struct ChooseIndexContext {
     /// (or default) NULL placement so the worker top-k cut matches the router select.
     sort_nulls_first: Vec<bool>,
     single_value_filtered_cols: HashSet<String>,
-    /// Group-by key column names of the nearest aggregate above the scan, when all of them are
-    /// plain columns. Lets a `GROUP BY ... LIMIT` without `ORDER BY` push the limit to workers.
-    group_by: Option<Vec<String>>,
+    /// Group-by keys of the nearest aggregate above the scan. Lets a `GROUP BY ... LIMIT` push the
+    /// limit to workers, through the index or a bounded worker sort.
+    group_by: Option<GroupKeys>,
     /// An `ORDER BY` we couldn't reduce to a column prefix (mixed asc/desc, or a non-column expr).
     /// It still constrains the output order, so a group-by limit pushdown must not bypass it.
     unusable_sort: bool,
@@ -911,13 +925,13 @@ impl ChooseIndexContext {
             ..self.clone()
         }
     }
-    /// Enter an aggregate: record its group-by keys (`None` when they are not all plain columns, so
-    /// an outer aggregate's keys are never inherited in their place), fold any filter seen above it
+    /// Enter an aggregate: record its group-by keys (always replacing the outer ones, so an outer
+    /// aggregate's keys are never inherited in their place), fold any filter seen above it
     /// into [group_by_has_having], and reset [filter_above] so a `WHERE` below counts only towards a
     /// deeper aggregate. Claims the limit for this aggregate.
-    fn enter_aggregate(&self, names: Option<Vec<String>>) -> Self {
+    fn enter_aggregate(&self, keys: Option<GroupKeys>) -> Self {
         Self {
-            group_by: names,
+            group_by: keys,
             group_by_has_having: self.filter_above,
             filter_above: false,
             limit_claimed: true,
@@ -1069,7 +1083,7 @@ impl PlanRewriter for ChooseIndex<'_> {
                 } else {
                     context.clone()
                 };
-                Some(context.enter_aggregate(group_expr_to_column_names(group_expr, input)))
+                Some(context.enter_aggregate(group_expr_to_keys(group_expr, input)))
             }
             // Row-preserving: the limit still describes the relation below. `TableScan` is here
             // because `enter_node`'s result is also what [Self::rewrite] sees for this very node,
@@ -1234,7 +1248,11 @@ impl ChooseIndex<'_> {
             return None;
         }
         let limit = ctx.limit?;
-        let group_by = ctx.group_by.as_ref().filter(|g| !g.is_empty())?;
+        let group_by = ctx
+            .group_by
+            .as_ref()
+            .map(|g| &g.names)
+            .filter(|g| !g.is_empty())?;
 
         // Every ORDER BY column must be a group-by column; map it to its group-key position. A bare
         // LIMIT (no ORDER BY) leaves the prefix empty, so the total order is the full group key in
@@ -1322,9 +1340,13 @@ impl ChooseIndex<'_> {
             // key emits complete groups in sort order, so the per-partition limit may descend to
             // the workers' sorted partial aggregate (see add_limit_to_workers). Skipped when an
             // ORDER BY is present but unusable (it still constrains the output order).
-            None if !ctx.unusable_sort => match ctx.group_by.as_ref().filter(|g| !g.is_empty()) {
+            None if !ctx.unusable_sort => match ctx
+                .group_by
+                .as_ref()
+                .filter(|g| g.all_columns && !g.names.is_empty())
+            {
                 Some(group_by) => group_by_is_index_sort_prefix(
-                    group_by,
+                    &group_by.names,
                     index_sort_on,
                     &ctx.single_value_filtered_cols,
                 ),
@@ -3126,6 +3148,76 @@ pub mod tests {
             .collect()
     }
 
+    /// Expression group keys take the bounded worker sort just like plain columns: ORDER BY entries
+    /// are matched to group keys by the aggregate's output column, not by an index column.
+    #[tokio::test]
+    pub async fn test_worker_sort_expression_group_keys() {
+        let indices = default_indices();
+        // The pushdown part of each ClusterSend line; the chosen index is not what these cases
+        // are about.
+        async fn worker_sort_of(sql: &str, indices: &TestIndices) -> Vec<String> {
+            limit_pushdown_of(sql, indices)
+                .await
+                .into_iter()
+                .map(|l| l.split("]], ").nth(1).unwrap_or("").to_string())
+                .collect()
+        }
+
+        assert_eq!(
+            worker_sort_of(
+                "SELECT order_customer, order_product + 1, sum(order_amount) FROM s.Orders \
+                 GROUP BY 1, 2 ORDER BY 2 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["worker_sort: [1 asc nulls last, 0 asc nulls first], worker_fetch: 10"]
+        );
+
+        // ORDER BY through a projection alias of the expression key.
+        assert_eq!(
+            worker_sort_of(
+                "SELECT order_customer, order_product + 1 p, sum(order_amount) FROM s.Orders \
+                 GROUP BY 1, 2 ORDER BY p DESC LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["worker_sort: [1 desc nulls first, 0 asc nulls first], worker_fetch: 10"]
+        );
+
+        // A bare LIMIT orders by the full group key, expression included.
+        assert_eq!(
+            worker_sort_of(
+                "SELECT order_product + 1, sum(order_amount) FROM s.Orders GROUP BY 1 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec!["worker_sort: [0 asc nulls first], worker_fetch: 10"]
+        );
+
+        // ORDER BY a measure, an expression over a group key, or mixed directions: no pushdown.
+        for sql in [
+            "SELECT order_product + 1, sum(order_amount) FROM s.Orders GROUP BY 1 ORDER BY 2 LIMIT 10",
+            "SELECT order_product, sum(order_amount) FROM s.Orders \
+             GROUP BY 1 ORDER BY order_product + 1 LIMIT 10",
+            "SELECT order_customer, order_product + 1, sum(order_amount) FROM s.Orders \
+             GROUP BY 1, 2 ORDER BY 1, 2 DESC LIMIT 10",
+        ] {
+            let pushdown = worker_sort_of(sql, &indices).await;
+            assert!(pushdown.iter().all(|l| l.is_empty()), "{}: {:?}", sql, pushdown);
+        }
+
+        // HAVING still blocks it.
+        assert_eq!(
+            worker_sort_of(
+                "SELECT order_product + 1, sum(order_amount) FROM s.Orders \
+                 GROUP BY 1 HAVING sum(order_amount) > 5 ORDER BY 1 LIMIT 10",
+                &indices
+            )
+            .await,
+            vec![""]
+        );
+    }
+
     /// A `LIMIT` bounds the rows of the relation it sits on. The worker pushdown lands on the
     /// aggregate nearest the scan, so it is sound only while that aggregate is the one the limit
     /// counts the rows of. These are the shapes where it is and is not.
@@ -3196,9 +3288,9 @@ pub mod tests {
             vec!["ClusterSend, indices: [[2]]"]
         );
 
-        // Same with an expression in the inner group key. `group_expr_to_column_names` fails on it,
-        // and the outer aggregate's keys must not be inherited in its place -- the descriptor would
-        // then index the inner aggregate's key by the outer one's positions.
+        // Same with an expression in the inner group key. The outer aggregate's keys must not be
+        // inherited in place of the inner one's -- the descriptor would then index the inner
+        // aggregate's key by the outer one's positions.
         assert_eq!(
             limit_pushdown_of(
                 "SELECT k, sum(v) FROM \
