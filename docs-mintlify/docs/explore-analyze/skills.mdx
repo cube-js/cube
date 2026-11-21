@@ -1,6 +1,6 @@
 ---
 title: Agent skills
-description: Run saved agent workflows using skill buttons, the slash menu, or automatic matching.
+description: Run saved agent workflows using skill buttons, the slash menu, the + menu, or automatic matching.
 ---
 
 Skills are reusable, named workflows the agent can run on demand wherever you work with
@@ -25,7 +25,7 @@ which connects Claude and other MCP clients directly to Cube.
 
 ## Running a skill
 
-There are three ways to run a skill from the chat input.
+There are four ways to run a skill from the chat input.
 
 <Steps>
   <Step title="Skill buttons">
@@ -39,6 +39,10 @@ There are three ways to run a skill from the chat input.
     keyboard-navigable. When skills are available, the input placeholder reads
     **"Type / for skills."**
   </Step>
+  <Step title="The + menu">
+    Click **+** at the bottom left of the chat input and open **Skills** to see the same
+    list as the slash menu. Pick a skill to insert it where your cursor is.
+  </Step>
   <Step title="Automatic matching">
     You don't always have to pick a skill explicitly. If a free-text request matches a
     skill's description, the agent recognizes the intent and runs the matching skill on
@@ -49,7 +53,7 @@ There are three ways to run a skill from the chat input.
 
 ## Adding context before you run
 
-Picking a skill — whether from a button or the `/` menu — does **not** send the message
+Picking a skill — whether from a button, the `/` menu or the **+** menu — does **not** send the message
 immediately. Instead, it inserts a styled `/skill-name` token into the chat input and
 keeps your cursor there.
 
