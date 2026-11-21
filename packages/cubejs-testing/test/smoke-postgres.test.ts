@@ -32,6 +32,7 @@ describe('postgres pa', () => {
         CUBEJS_DB_PASS: 'test',
         CUBEJS_ROLLUP_ONLY: 'true',
         CUBEJS_REFRESH_WORKER: 'false',
+        CUBEJS_DEFAULT_API_SCOPES: 'graphql,meta,data,sql,jobs',
       },
       {
         schemaDir: 'smoke/schema',
@@ -175,5 +176,65 @@ describe('postgres pa', () => {
       }),
     })).json();
     expect(preview.preview).toBeDefined();
+  });
+  test('jobs API dry run reports partition statuses without building', async () => {
+    const selector = {
+      contexts: [{ securityContext: {} }],
+      timezones: ['UTC'],
+      preAggregations: ['OrdersPA.byIdForJobs'],
+    };
+    const jobs = async (body: Record<string, unknown>): Promise<any> => {
+      for (;;) {
+        const response = await fetch(`${birdbox.configuration.apiUrl}/pre-aggregations/jobs`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: DEFAULT_API_TOKEN },
+          body: JSON.stringify(body),
+        });
+        const result = await response.json();
+
+        if (result?.error !== 'Continue wait') {
+          expect(response.status).toEqual(200);
+          return result;
+        }
+      }
+    };
+    const dryRun = () => jobs({ action: 'post', selector: { ...selector, dryRun: true } });
+    const buildUnforced = async () => {
+      const tokens: string[] = await jobs({ action: 'post', selector: { ...selector, force: false } });
+      expect(tokens).toHaveLength(1);
+
+      for (;;) {
+        const [job] = await jobs({ action: 'get', tokens });
+        if (job.status === 'done') {
+          return job.table;
+        }
+        expect(['scheduled', 'processing', 'missing_partition']).toContain(job.status);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    };
+
+    const [before] = await dryRun();
+    expect(before).toEqual({
+      table: expect.stringContaining('orders_p_a_by_id_for_jobs'),
+      status: 'missing_partition',
+      selector: {
+        cubes: ['OrdersPA'],
+        preAggregations: ['OrdersPA.byIdForJobs'],
+        contexts: [{ securityContext: {} }],
+        timezones: ['UTC'],
+        dataSources: ['default'],
+      },
+    });
+    // Polling a dry run builds nothing
+    expect((await dryRun()).map(({ status }: { status: string }) => status)).toEqual(['missing_partition']);
+
+    const built = await buildUnforced();
+
+    const [after] = await dryRun();
+    expect(after.status).toEqual('done');
+    expect(after.table).toEqual(built);
+
+    // An unforced job for an up-to-date partition reports it without a rebuild
+    expect(await buildUnforced()).toEqual(built);
   });
 });
