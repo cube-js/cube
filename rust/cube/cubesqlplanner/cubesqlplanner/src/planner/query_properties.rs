@@ -74,7 +74,7 @@ pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
 ///
 /// Two equality flavours: [`PartialEq`] compares all semantic fields;
 /// [`eq_as_state`](Self::eq_as_state) compares only members, filters,
-/// segments and time-shifts.
+/// segments, time-shifts and the ungrouped flag.
 #[derive(Clone, TypedBuilder)]
 #[builder(build_method(into = Result<Rc<QueryProperties>, CubeError>))]
 pub struct QueryProperties {
@@ -871,8 +871,8 @@ impl QueryProperties {
     }
 
     /// Equality over members (chain-resolved), the three filter slots,
-    /// segments and time-shifts. Excludes ordering, limits, planner flags
-    /// and join hints; for those fields use the full [`PartialEq`].
+    /// segments, time-shifts and the ungrouped flag. Excludes ordering, limits,
+    /// other planner flags and join hints; for those fields use the full [`PartialEq`].
     ///
     /// Filters are compared with [`tree_ops::eq_with_member`] rather than with
     /// `FilterItem`'s own equality, which looks at a filter's operator and
@@ -890,6 +890,7 @@ impl QueryProperties {
             && Self::filters_equivalent(&self.measures_filters, &other.measures_filters)
             && Self::filters_equivalent(&self.segments, &other.segments)
             && self.time_shifts == other.time_shifts
+            && self.ungrouped == other.ungrouped
     }
 
     fn filters_equivalent(a: &[FilterItem], b: &[FilterItem]) -> bool {

@@ -154,7 +154,13 @@ impl<'a> InodeStagePlanner<'a> {
         // window function does the `exclude` collapse at outer level.
         let filtered_state = {
             let mut filtered_state = match directive_filter.as_ref().map(|f| &f.mode) {
-                Some(MultiStageFilterMode::Fixed) => self.planner.root_state().as_ref().clone(),
+                Some(MultiStageFilterMode::Fixed) => {
+                    // Whether the rows come grouped is up to the consuming stage,
+                    // not the query.
+                    let mut root = self.planner.root_state().as_ref().clone();
+                    root.set_ungrouped(state.ungrouped());
+                    root
+                }
                 Some(MultiStageFilterMode::Relative) | None => state.as_ref().clone(),
             };
 

@@ -1,6 +1,7 @@
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
+use itertools::Itertools;
 
 fn create_context() -> TestContext {
     let schema = MockSchema::from_yaml_file("common/integration_multi_stage.yaml");
@@ -107,6 +108,85 @@ async fn test_ungrouped_reduce_by_aggregate_with_dimension() {
         let grouped = ctx.try_execute_pg(&grouped_query, SEED).await.unwrap();
         assert_eq!(result, grouped);
         insta::assert_snapshot!(result);
+    }
+}
+
+// A `mode: fixed` input restarts from the query's state, yet it still feeds an
+// aggregate stage that needs its values grouped.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_aggregate_over_fixed_filter_input() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.unique_customers_fixed_group_by_status
+        dimensions:
+          - orders.category
+        ungrouped: true
+        order:
+          - id: orders.category
+    "#};
+    let grouped_query = query.replace("ungrouped: true\n", "");
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        let grouped = ctx.try_execute_pg(&grouped_query, SEED).await.unwrap();
+        assert_eq!(result, grouped);
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The same leaf is read grouped by an aggregate stage and row by row by a
+// calculated one; each must get its own stage.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_grouped_and_raw_inputs_of_one_leaf() {
+    let ctx = create_context();
+
+    let query = |measures: &str| {
+        format!(
+            indoc! {r#"
+                measures: [{}]
+                dimensions:
+                  - orders.status
+                ungrouped: true
+            "#},
+            measures
+        )
+    };
+    let both = query("orders.max_total_amount_reduce_category, orders.category_share");
+    let max_alone = query("orders.max_total_amount_reduce_category");
+    let share_alone = query("orders.category_share");
+
+    ctx.build_sql(&both).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(&both, SEED).await {
+        let max_alone = ctx.try_execute_pg(&max_alone, SEED).await.unwrap();
+        let share_alone = ctx.try_execute_pg(&share_alone, SEED).await.unwrap();
+        let rows = |table: &str| {
+            table
+                .lines()
+                .skip(2)
+                .map(|line| line.split('|').map(|c| c.trim().to_string()).collect_vec())
+                .collect_vec()
+        };
+        // Next to a row-level measure the answer has a row per order, so the
+        // aggregate is compared per status rather than row by row.
+        let max_by_status = rows(&max_alone)
+            .into_iter()
+            .map(|r| (r[0].clone(), r[1].clone()))
+            .collect::<std::collections::HashMap<_, _>>();
+        let both_rows = rows(&result);
+        for row in both_rows.iter() {
+            assert_eq!(Some(&row[1]), max_by_status.get(&row[0]), "{result}");
+        }
+        let shares = |rows: Vec<Vec<String>>, idx: usize| {
+            rows.into_iter()
+                .map(|r| r[idx].clone())
+                .sorted()
+                .collect_vec()
+        };
+        assert_eq!(shares(both_rows, 2), shares(rows(&share_alone), 1));
     }
 }
 
