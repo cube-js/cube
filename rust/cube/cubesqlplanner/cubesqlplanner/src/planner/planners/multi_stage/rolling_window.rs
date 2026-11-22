@@ -342,7 +342,7 @@ impl<'a> RollingWindowStagePlanner<'a> {
                     alias,
                     &member,
                     &state,
-                    self.query_properties.ungrouped(),
+                    state.ungrouped(),
                     &rolling_window_descr,
                     &input[0],
                     &input[1],

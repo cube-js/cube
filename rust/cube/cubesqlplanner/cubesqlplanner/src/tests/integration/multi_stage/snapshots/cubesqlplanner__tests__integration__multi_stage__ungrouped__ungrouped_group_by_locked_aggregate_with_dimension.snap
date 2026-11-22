@@ -4,6 +4,6 @@ expression: result
 ---
 orders__category | orders__unique_customers_group_by_status
 -----------------+-----------------------------------------
-books            | 30                                      
-clothing         | 30                                      
-electronics      | 30
+books            | 3                                       
+clothing         | 3                                       
+electronics      | 3

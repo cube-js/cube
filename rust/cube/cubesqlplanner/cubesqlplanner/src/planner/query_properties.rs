@@ -399,6 +399,10 @@ impl QueryProperties {
         self.time_dimensions = time_dimensions;
     }
 
+    pub fn set_ungrouped(&mut self, ungrouped: bool) {
+        self.ungrouped = ungrouped;
+    }
+
     /// Append `dimensions` to the existing list, deduplicating by
     /// reference-chain-resolved full name. A dimension the grain already
     /// carries as a time dimension is dropped rather than appended: a time

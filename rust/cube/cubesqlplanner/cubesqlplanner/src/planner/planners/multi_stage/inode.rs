@@ -99,14 +99,12 @@ impl MultiStageInodeMember {
 pub(super) struct InodeStagePlanner<'a> {
     planner: &'a MultiStageQueryPlanner,
     query_tools: Rc<State>,
-    query_properties: Rc<QueryProperties>,
 }
 
 impl<'a> InodeStagePlanner<'a> {
     pub(super) fn new(planner: &'a MultiStageQueryPlanner) -> Self {
         Self {
             query_tools: planner.query_tools().clone(),
-            query_properties: planner.query_properties().clone(),
             planner,
         }
     }
@@ -123,7 +121,7 @@ impl<'a> InodeStagePlanner<'a> {
     ) -> Result<StageRef, CubeError> {
         let member_id = member.id().clone();
         let (mut multi_stage_member, is_ungrupped) =
-            self.create_multi_stage_inode_member(member.clone(), registry)?;
+            self.create_multi_stage_inode_member(member.clone(), &state, registry)?;
 
         let mut dimensions_to_add = multi_stage_member
             .grain()
@@ -215,6 +213,9 @@ impl<'a> InodeStagePlanner<'a> {
                 let time_dims = grain.partition(new_state.time_dimensions());
                 new_state.set_dimensions(dims);
                 new_state.set_time_dimensions(time_dims);
+                // This stage aggregates its inputs with plain aggregate functions,
+                // which need values computed at the input grain, not raw rows.
+                new_state.set_ungrouped(false);
             }
             if !dimensions_to_add.is_empty() {
                 new_state.add_dimensions(dimensions_to_add.clone());
@@ -307,6 +308,7 @@ impl<'a> InodeStagePlanner<'a> {
     fn create_multi_stage_inode_member(
         &self,
         base_member: Rc<MemberSymbol>,
+        state: &QueryProperties,
         registry: &mut StageRegistry,
     ) -> Result<(MultiStageInodeMember, bool), CubeError> {
         let inode = if let Ok(measure) = base_member.as_measure() {
@@ -323,7 +325,7 @@ impl<'a> InodeStagePlanner<'a> {
 
             let is_ungrupped = match &member_type {
                 MultiStageInodeMemberType::Rank | MultiStageInodeMemberType::Calculate => true,
-                _ => self.query_properties.ungrouped(),
+                _ => state.ungrouped(),
             };
 
             let grain = measure

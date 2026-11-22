@@ -57,8 +57,9 @@ async fn test_ungrouped_with_dimension() {
     }
 }
 
-// A sum over count_distinct cannot take the window path, so its stage
-// projects a plain sum() next to the query dimensions and must stay grouped.
+// A sum over count_distinct cannot take the window path: its stage sums the
+// inputs' per-group distinct counts, so an ungrouped query must report what
+// the grouped one does over the same distinct key rows.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ungrouped_group_by_locked_aggregate_with_dimension() {
     let ctx = create_context();
@@ -72,14 +73,13 @@ async fn test_ungrouped_group_by_locked_aggregate_with_dimension() {
         order:
           - id: orders.category
     "#};
+    let grouped_query = query.replace("ungrouped: true\n", "");
 
-    let sql = ctx.build_sql(query).unwrap();
-    assert!(
-        sql.contains("GROUP BY"),
-        "aggregate stage is not grouped: {sql}"
-    );
+    ctx.build_sql(query).unwrap();
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        let grouped = ctx.try_execute_pg(&grouped_query, SEED).await.unwrap();
+        assert_eq!(result, grouped);
         insta::assert_snapshot!(result);
     }
 }
@@ -99,14 +99,13 @@ async fn test_ungrouped_reduce_by_aggregate_with_dimension() {
           - id: orders.status
           - id: orders.category
     "#};
+    let grouped_query = query.replace("ungrouped: true\n", "");
 
-    let sql = ctx.build_sql(query).unwrap();
-    assert!(
-        sql.contains("GROUP BY"),
-        "aggregate stage is not grouped: {sql}"
-    );
+    ctx.build_sql(query).unwrap();
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        let grouped = ctx.try_execute_pg(&grouped_query, SEED).await.unwrap();
+        assert_eq!(result, grouped);
         insta::assert_snapshot!(result);
     }
 }

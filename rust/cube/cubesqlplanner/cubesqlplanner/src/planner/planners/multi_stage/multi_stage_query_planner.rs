@@ -71,6 +71,7 @@ impl MultiStageQueryPlanner {
             .dimensions_filters(request.dimensions_filters().clone())
             .time_dimensions_filters(request.time_dimensions_filters().clone())
             .segments(request.segments().clone())
+            .ungrouped(request.ungrouped())
             .build()
     }
 
