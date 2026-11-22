@@ -173,8 +173,9 @@ impl PreAggregationOptimizer {
             .is_some_and(|context| context.measure_for_ungrouped)
     }
 
-    // A non-additive measure's row value is its input, e.g. the user id under
-    // a distinct count, which no stored aggregate holds.
+    // Under a rolling-window base a non-additive measure's row value is its
+    // input, e.g. the user id under a distinct count, which no stored aggregate
+    // holds. Other ungrouped leaves are refused too, conservatively.
     fn has_non_additive_measure(leaf: &Query) -> bool {
         leaf.schema().measures.iter().any(|measure| {
             measure

@@ -89,8 +89,8 @@ async fn test_ungrouped_time_shift() {
     }
 }
 
-// Each row of a time-shifted count carries the count's row value, 1, as
-// the plain count does; the primary key the count is built on must not leak.
+// Each row of a time-shifted count or distinct count carries its row value,
+// 1, as the plain measures do; the column they are built on must not leak.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ungrouped_time_shift_over_count() {
     let ctx = create_context();
@@ -99,6 +99,7 @@ async fn test_ungrouped_time_shift_over_count() {
         measures:
           - orders.count
           - orders.count_prev_month
+          - orders.unique_customers_prev_month
         dimensions:
           - orders.id
         time_dimensions:
@@ -116,32 +117,28 @@ async fn test_ungrouped_time_shift_over_count() {
     ctx.build_sql(query).unwrap();
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
-        let mut lines = result.lines();
-        let shifted_column = lines
-            .next()
-            .unwrap()
-            .split('|')
-            .position(|name| name.trim() == "orders__count_prev_month")
-            .unwrap();
-        let shifted_values = lines
-            .skip(1)
-            .map(|row| {
-                row.split('|')
-                    .nth(shifted_column)
-                    .unwrap()
-                    .trim()
-                    .to_string()
-            })
-            .collect::<Vec<_>>();
-        assert_eq!(
-            shifted_values.iter().filter(|v| *v == "1").count(),
-            10,
-            "{result}"
-        );
-        assert!(
-            shifted_values.iter().all(|v| v == "1" || v == "NULL"),
-            "{result}"
-        );
+        for column in [
+            "orders__count_prev_month",
+            "orders__unique_customers_prev_month",
+        ] {
+            let values = column_values(&result, column);
+            assert_eq!(values.iter().filter(|v| *v == "1").count(), 10, "{result}");
+            assert!(values.iter().all(|v| v == "1" || v == "NULL"), "{result}");
+        }
         insta::assert_snapshot!(result);
     }
+}
+
+fn column_values(result: &str, column: &str) -> Vec<String> {
+    let mut lines = result.lines();
+    let index = lines
+        .next()
+        .unwrap()
+        .split('|')
+        .position(|name| name.trim() == column)
+        .unwrap();
+    lines
+        .skip(1)
+        .map(|row| row.split('|').nth(index).unwrap().trim().to_string())
+        .collect()
 }
