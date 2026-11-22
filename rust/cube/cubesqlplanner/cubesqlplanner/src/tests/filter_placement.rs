@@ -130,35 +130,6 @@ fn a_filter_on_an_unselected_multi_stage_dimension_is_recorded_as_unrenderable()
     );
 }
 
-#[test]
-fn an_or_group_mixing_multi_stage_and_other_members_is_recorded_as_unrenderable() {
-    let placement = placement(
-        indoc! {r#"
-            dimensions:
-              - activity.tier_ms_dim
-            filters:
-              - or:
-                  - member: activity.tier_ms_dim
-                    operator: equals
-                    values:
-                      - low
-                  - member: activity.player
-                    operator: equals
-                    values:
-                      - p2
-        "#},
-        false,
-        &["activity.tier_ms_dim"],
-    );
-
-    assert!(placement.own().measures_filter.is_empty());
-    let reason = placement.unrenderable_reason().unwrap();
-    assert!(
-        reason.contains("can't mix multi-stage dimensions with other members"),
-        "{reason}"
-    );
-}
-
 fn query_with_placement() -> Rc<Query> {
     let properties = context().create_query_properties(QUERY).unwrap();
     let filter = LogicalFilter {

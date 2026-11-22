@@ -15,7 +15,8 @@ use crate::logical_plan::LogicalSubqueryJoinItem;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::filter::tree_ops;
 use crate::planner::filter::{
-    map_filter_items, BaseFilter, Filter, FilterGroup, FilterItem, FilterOperator,
+    map_filter_items, BaseFilter, Filter, FilterGroup, FilterGroupOperator, FilterItem,
+    FilterOperator,
 };
 use crate::planner::join_hints::JoinHints;
 use crate::planner::planners::multi_stage::TimeShiftState;
@@ -604,11 +605,20 @@ impl QueryProperties {
         for item in filters.iter() {
             match item {
                 FilterItem::Group(group) => {
-                    let new_group = FilterItem::Group(Rc::new(FilterGroup::new(
-                        group.operator.clone(),
-                        Self::extract_filters_exclude_member(member_name, &group.items),
-                    )));
-                    result.push(new_group);
+                    // Dropping a branch of an OR would narrow the rows; dropping the
+                    // whole group only widens them, and the outer select re-applies it.
+                    if group.operator == FilterGroupOperator::Or
+                        && Self::has_filters_for_member_impl(member_name, &group.items)
+                    {
+                        continue;
+                    }
+                    let items = Self::extract_filters_exclude_member(member_name, &group.items);
+                    if !items.is_empty() {
+                        result.push(FilterItem::Group(Rc::new(FilterGroup::new(
+                            group.operator.clone(),
+                            items,
+                        ))));
+                    }
                 }
                 FilterItem::Item(itm) => {
                     if &itm.member_id() != member_name {

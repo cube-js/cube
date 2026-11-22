@@ -210,33 +210,6 @@ async fn test_multi_stage_dim_and_group_with_unselected_dimension() {
 }
 
 #[test]
-fn test_multi_stage_dim_or_group_with_unselected_dimension_is_rejected() {
-    let ctx = create_context();
-    let err = ctx
-        .build_sql(indoc! {r#"
-        dimensions:
-          - activity.tier_ms_dim
-        filters:
-          - or:
-              - member: activity.tier_ms_dim
-                operator: equals
-                values:
-                  - low
-              - member: activity.player
-                operator: equals
-                values:
-                  - p2
-    "#})
-        .unwrap_err();
-    assert!(
-        err.message
-            .contains("can't mix multi-stage dimensions with other members"),
-        "{}",
-        err.message
-    );
-}
-
-#[test]
 fn test_filter_on_unselected_multi_stage_dim_is_rejected() {
     let ctx = create_context();
     let err = ctx
@@ -296,6 +269,164 @@ async fn test_multi_stage_time_dim_over_subquery_dim_with_granularity() {
             granularity: month
         order:
           - id: activity.played_at
+    "#},
+    )
+    .await;
+}
+
+// The leaf computes the tier over all rows (410, high); the OR then keeps p2's rows.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_dim_mixed_or_group_with_measure() {
+    assert_query(
+        "multi_stage_dim_mixed_or_group_with_measure",
+        indoc! {r#"
+        measures:
+          - activity.theo_win
+        dimensions:
+          - activity.tier_ms_dim
+        filters:
+          - or:
+              - member: activity.tier_ms_dim
+                operator: equals
+                values:
+                  - low
+              - member: activity.player
+                operator: equals
+                values:
+                  - p2
+    "#},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_dim_mixed_or_group_without_measure() {
+    assert_query(
+        "multi_stage_dim_mixed_or_group_without_measure",
+        indoc! {r#"
+        dimensions:
+          - activity.tier_ms_dim
+        filters:
+          - or:
+              - member: activity.tier_ms_dim
+                operator: equals
+                values:
+                  - low
+              - member: activity.player
+                operator: equals
+                values:
+                  - p2
+    "#},
+    )
+    .await;
+}
+
+// Per player the tier is p1 high, p2 low; the OR keeps both players.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_dim_mixed_or_group_grouped_by_player() {
+    assert_query(
+        "multi_stage_dim_mixed_or_group_grouped_by_player",
+        indoc! {r#"
+        dimensions:
+          - activity.player
+          - activity.tier_ms_dim
+        filters:
+          - or:
+              - member: activity.tier_ms_dim
+                operator: equals
+                values:
+                  - high
+              - member: activity.player
+                operator: equals
+                values:
+                  - p2
+        order:
+          - id: activity.player
+    "#},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_dim_or_group_on_itself_only() {
+    assert_query(
+        "multi_stage_dim_or_group_on_itself_only",
+        indoc! {r#"
+        dimensions:
+          - activity.tier_ms_dim
+        filters:
+          - or:
+              - member: activity.tier_ms_dim
+                operator: equals
+                values:
+                  - low
+              - member: activity.tier_ms_dim
+                operator: equals
+                values:
+                  - none
+          - member: activity.player
+            operator: equals
+            values:
+              - p2
+    "#},
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_or_group_over_two_multi_stage_dims() {
+    assert_query(
+        "or_group_over_two_multi_stage_dims",
+        indoc! {r#"
+        dimensions:
+          - activity.tier_ms_dim
+          - activity.tier_subquery_dim
+        filters:
+          - or:
+              - member: activity.tier_ms_dim
+                operator: equals
+                values:
+                  - low
+              - member: activity.tier_subquery_dim
+                operator: equals
+                values:
+                  - none
+          - member: activity.player
+            operator: equals
+            values:
+              - p2
+    "#},
+    )
+    .await;
+}
+
+// The OR is nested in an AND: the leaf keeps the date range and drops only the OR.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_dim_mixed_or_group_nested_in_and() {
+    assert_query(
+        "multi_stage_dim_mixed_or_group_nested_in_and",
+        indoc! {r#"
+        measures:
+          - activity.theo_win
+        dimensions:
+          - activity.tier_ms_dim
+        filters:
+          - and:
+              - or:
+                  - member: activity.tier_ms_dim
+                    operator: equals
+                    values:
+                      - high
+                  - member: activity.player
+                    operator: equals
+                    values:
+                      - p2
+              - member: activity.played_at
+                operator: inDateRange
+                values:
+                  - "2024-01-01"
+                  - "2024-01-31"
+        timezone: UTC
     "#},
     )
     .await;
