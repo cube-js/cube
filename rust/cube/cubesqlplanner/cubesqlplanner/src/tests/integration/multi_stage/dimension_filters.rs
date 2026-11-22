@@ -456,3 +456,84 @@ async fn test_multi_stage_measure_in_mixed_or_measure_filter() {
     )
     .await;
 }
+
+// With the tier condition taken as true the leaf keeps `January OR p2` (210, low);
+// the full filter then keeps p1's January row and both p2 rows.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_dim_and_nested_in_mixed_or_group() {
+    assert_query(
+        "multi_stage_dim_and_nested_in_mixed_or_group",
+        indoc! {r#"
+        measures:
+          - activity.theo_win
+        dimensions:
+          - activity.tier_ms_dim
+        filters:
+          - or:
+              - and:
+                  - member: activity.tier_ms_dim
+                    operator: equals
+                    values:
+                      - low
+                  - member: activity.played_at
+                    operator: inDateRange
+                    values:
+                      - "2024-01-01"
+                      - "2024-01-31"
+              - member: activity.player
+                operator: equals
+                values:
+                  - p2
+        timezone: UTC
+    "#},
+    )
+    .await;
+}
+
+// The select reads the source table next to the multi-stage dimension subquery,
+// so that subquery can't be served by a rollup kept in CubeStore.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_dim_mixed_or_group_skips_external_rollup() {
+    let path = format!(
+        "{}/src/test_fixtures/schemas/yaml_files/common/integration_multi_stage_dimension_filter.yaml",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let rollup = "
+      pre_aggregations:
+          - name: by_player
+            type: rollup
+            measures:
+                - theo_win
+            dimensions:
+                - player
+            external: true
+";
+    let yaml = std::fs::read_to_string(path).unwrap() + rollup;
+    let ctx = TestContext::new(MockSchema::from_yaml(&yaml).unwrap()).unwrap();
+    let query = indoc! {r#"
+        dimensions:
+          - activity.tier_ms_dim
+        filters:
+          - or:
+              - member: activity.tier_ms_dim
+                operator: equals
+                values:
+                  - low
+              - member: activity.player
+                operator: equals
+                values:
+                  - p2
+    "#};
+    let (_, usages) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert!(
+        usages.iter().all(|u| !u.pre_aggregation.external()),
+        "external rollup used under a select reading the source table"
+    );
+
+    if let Some(result) = ctx.try_execute(query, SEED).await {
+        insta::assert_snapshot!(
+            "multi_stage_dim_mixed_or_group_skips_external_rollup",
+            result
+        );
+    }
+}

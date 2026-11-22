@@ -597,38 +597,47 @@ impl QueryProperties {
         self.measures_filters.extend(items);
     }
 
+    // The member's own conditions are taken as true, which only widens the rows.
     fn extract_filters_exclude_member(
         member_name: &MemberId,
         filters: &[FilterItem],
     ) -> Vec<FilterItem> {
-        let mut result = Vec::new();
-        for item in filters.iter() {
-            match item {
-                FilterItem::Group(group) => {
-                    // Dropping a branch of an OR would narrow the rows; dropping the
-                    // whole group only widens them, and the outer select re-applies it.
-                    if group.operator == FilterGroupOperator::Or
-                        && Self::has_filters_for_member_impl(member_name, &group.items)
-                    {
-                        continue;
-                    }
-                    let items = Self::extract_filters_exclude_member(member_name, &group.items);
-                    if !items.is_empty() {
-                        result.push(FilterItem::Group(Rc::new(FilterGroup::new(
-                            group.operator.clone(),
-                            items,
-                        ))));
-                    }
-                }
-                FilterItem::Item(itm) => {
-                    if &itm.member_id() != member_name {
-                        result.push(FilterItem::Item(itm.clone()));
+        filters
+            .iter()
+            .filter_map(|item| Self::exclude_member_from_filter(member_name, item))
+            .collect()
+    }
+
+    // None when `item` is always true once the member's conditions are.
+    fn exclude_member_from_filter(member_name: &MemberId, item: &FilterItem) -> Option<FilterItem> {
+        match item {
+            FilterItem::Group(group) => {
+                let mut items = Vec::new();
+                for child in group.items.iter() {
+                    match Self::exclude_member_from_filter(member_name, child) {
+                        Some(child) => items.push(child),
+                        None if group.operator == FilterGroupOperator::Or => return None,
+                        None => {}
                     }
                 }
-                FilterItem::Segment(_) => {}
+                if items.is_empty() {
+                    None
+                } else {
+                    Some(FilterItem::Group(Rc::new(FilterGroup::new(
+                        group.operator.clone(),
+                        items,
+                    ))))
+                }
             }
+            FilterItem::Item(itm) => {
+                if &itm.member_id() == member_name {
+                    None
+                } else {
+                    Some(item.clone())
+                }
+            }
+            FilterItem::Segment(_) => None,
         }
-        result
     }
 
     pub fn has_filters_for_member(&self, member_name: &MemberId) -> bool {

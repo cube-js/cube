@@ -332,6 +332,9 @@ impl PreAggregationOptimizer {
         root: &Rc<RootQuery>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
     ) -> Result<Option<Rc<RootQuery>>, CubeError> {
+        if Self::reads_source_tables(root.query()) {
+            return self.match_subqueries_of_type(root, compiled_pre_aggregations, false);
+        }
         match self.match_subqueries(root, compiled_pre_aggregations)? {
             SubqueryMatch::Matched(rewritten) => return Ok(Some(rewritten)),
             SubqueryMatch::UnmatchedSubquery => return Ok(None),
@@ -342,32 +345,54 @@ impl PreAggregationOptimizer {
         // a set one query can read, against an alternative of reading the fact
         // table. CubeStore goes first as the default and faster store.
         for external in [true, false] {
-            let is_in_pass = |pa: &CompiledPreAggregation| pa.external.unwrap_or(false) == external;
-            let left_out_branches: HashSet<_> = compiled_pre_aggregations
-                .iter()
-                .filter(|pa| !is_in_pass(pa))
-                .flat_map(|pa| Self::lambda_branches(pa))
-                .collect();
-            let candidates: Vec<_> = compiled_pre_aggregations
-                .iter()
-                .filter(|pa| {
-                    is_in_pass(pa) && !left_out_branches.contains(&(&pa.cube_name, &pa.name))
-                })
-                .cloned()
-                .collect();
-            let outcome = self.match_subqueries(root, &candidates)?;
-            // These candidates share one external type, and that is the same
-            // value a usage built from them reports, so the pass cannot split.
-            debug_assert!(
-                !matches!(outcome, SubqueryMatch::ExternalTypesSplit),
-                "a pass over one external type reported a split"
-            );
-            if let SubqueryMatch::Matched(rewritten) = outcome {
+            if let Some(rewritten) =
+                self.match_subqueries_of_type(root, compiled_pre_aggregations, external)?
+            {
                 return Ok(Some(rewritten));
             }
         }
 
         Ok(None)
+    }
+
+    fn match_subqueries_of_type(
+        &mut self,
+        root: &Rc<RootQuery>,
+        compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
+        external: bool,
+    ) -> Result<Option<Rc<RootQuery>>, CubeError> {
+        let is_in_pass = |pa: &CompiledPreAggregation| pa.external.unwrap_or(false) == external;
+        let left_out_branches: HashSet<_> = compiled_pre_aggregations
+            .iter()
+            .filter(|pa| !is_in_pass(pa))
+            .flat_map(|pa| Self::lambda_branches(pa))
+            .collect();
+        let candidates: Vec<_> = compiled_pre_aggregations
+            .iter()
+            .filter(|pa| is_in_pass(pa) && !left_out_branches.contains(&(&pa.cube_name, &pa.name)))
+            .cloned()
+            .collect();
+        let outcome = self.match_subqueries(root, &candidates)?;
+        // These candidates share one external type, and that is the same
+        // value a usage built from them reports, so the pass cannot split.
+        debug_assert!(
+            !matches!(outcome, SubqueryMatch::ExternalTypesSplit),
+            "a pass over one external type reported a split"
+        );
+        Ok(match outcome {
+            SubqueryMatch::Matched(rewritten) => Some(rewritten),
+            _ => None,
+        })
+    }
+
+    // A select that reads source tables runs on the source database, where
+    // rollups kept in CubeStore can't be read.
+    fn reads_source_tables(query: &Query) -> bool {
+        let from = query.from();
+        from.root()
+            .into_iter()
+            .chain(from.joins().iter().map(|join| join.relation()))
+            .any(|relation| matches!(relation, Relation::Cube { .. } | Relation::RawSql { .. }))
     }
 
     fn match_subqueries(
