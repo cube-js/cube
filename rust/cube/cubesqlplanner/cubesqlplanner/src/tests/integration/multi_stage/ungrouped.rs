@@ -88,3 +88,60 @@ async fn test_ungrouped_time_shift() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Each row of a time-shifted count carries the count's row value, 1, as
+// the plain count does; the primary key the count is built on must not leak.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_time_shift_over_count() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.count
+          - orders.count_prev_month
+        dimensions:
+          - orders.id
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-02-01"
+              - "2024-03-31"
+        order:
+          - id: orders.id
+          - id: orders.created_at
+        ungrouped: true
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        let mut lines = result.lines();
+        let shifted_column = lines
+            .next()
+            .unwrap()
+            .split('|')
+            .position(|name| name.trim() == "orders__count_prev_month")
+            .unwrap();
+        let shifted_values = lines
+            .skip(1)
+            .map(|row| {
+                row.split('|')
+                    .nth(shifted_column)
+                    .unwrap()
+                    .trim()
+                    .to_string()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            shifted_values.iter().filter(|v| *v == "1").count(),
+            10,
+            "{result}"
+        );
+        assert!(
+            shifted_values.iter().all(|v| v == "1" || v == "NULL"),
+            "{result}"
+        );
+        insta::assert_snapshot!(result);
+    }
+}

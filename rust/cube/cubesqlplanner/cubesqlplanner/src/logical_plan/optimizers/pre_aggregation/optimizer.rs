@@ -165,8 +165,8 @@ impl PreAggregationOptimizer {
         std::mem::take(&mut self.usages)
     }
 
-    // A leaf rendering row-level values feeds an aggregate over them, e.g. a
-    // non-additive rolling window, so only a rollup keeping those rows serves it.
+    // A leaf of an ungrouped stage emits one value per source row, so only a
+    // rollup keeping those rows serves it.
     fn reads_row_values(leaf: &Query) -> bool {
         leaf.evaluation_context()
             .as_ref()
