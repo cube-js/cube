@@ -129,6 +129,39 @@ async fn test_ungrouped_time_shift_over_count() {
     }
 }
 
+// A rolling sum over a count reads the count through a multi-stage leaf too;
+// its rows must sum the count's row values, not primary keys.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_rolling_sum_over_count() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.count_rolling_sum
+        dimensions:
+          - orders.id
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.id
+          - id: orders.created_at
+        ungrouped: true
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        let values = column_values(&result, "orders__count_rolling_sum");
+        assert!(!values.is_empty(), "{result}");
+        assert!(values.iter().all(|v| v == "1"), "{result}");
+        insta::assert_snapshot!(result);
+    }
+}
+
 fn column_values(result: &str, column: &str) -> Vec<String> {
     let mut lines = result.lines();
     let index = lines
