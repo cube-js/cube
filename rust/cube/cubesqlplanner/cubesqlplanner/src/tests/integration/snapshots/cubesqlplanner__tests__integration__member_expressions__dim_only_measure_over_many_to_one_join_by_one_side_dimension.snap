@@ -1,0 +1,10 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/member_expressions.rs
+expression: result
+---
+customers__city | amount_by_customer_id
+----------------+----------------------
+Boston          | 2500.00              
+New York        | 1200.00              
+San Francisco   | 700.00               
+NULL            | 195.00
