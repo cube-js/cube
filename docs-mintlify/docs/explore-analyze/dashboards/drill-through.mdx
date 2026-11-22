@@ -5,6 +5,16 @@ description: Let viewers click a chart's data on a published dashboard to open a
 
 A drill-through links a chart to another dashboard in the same deployment. A viewer of the published dashboard clicks a bar, a point, a table cell or a map marker, chooses **Open in** and the target dashboard's title, and the target opens filtered by the values they clicked. Use it to build overview → detail flows from any chart, without defining [links on a dimension][ref-dimension-links] in the data model.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube.com/embed/k9xbl60WZwc"
+  title="Creating drill-throughs in Cube dashboards"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 ## Adding a drill-through
 
 In the dashboard builder, open the chart's **⋮** menu and choose **Add drill-through**. A chart inside a stack, a grid or a tab gets the same item. The dialog lists every dashboard in the deployment that you can see, except the one you are editing, from A to Z by name. A chart never drills through to its own dashboard: [cross-filtering][ref-cross-filtering] already filters that dashboard by a clicked point, and adding such a drill-through through the Workbook Agent or the API is refused with that reason. A dashboard with a [slug][ref-slug] is shown as its slug in brackets followed by its name, such as `[order-details] · Order details`, and a dashboard without one by its name alone. Type in the search field to narrow the list by name or slug. Above the list, a note says what a target needs for this chart: "A target dashboard needs a slug and filters enabled for" followed by the titles of the chart's dimensions.
