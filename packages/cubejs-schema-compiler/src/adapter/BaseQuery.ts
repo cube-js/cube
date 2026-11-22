@@ -3634,6 +3634,9 @@ export class BaseQuery {
         if (!this.useNativeSqlPlanner && symbol.case?.when?.some((item: { context?: unknown }) => item.context)) {
           throw new UserError(`Measure '${cubeName}.${name}' uses QUERY_CONTEXT conditions, which require the Tesseract SQL planner`);
         }
+        if (!this.useNativeSqlPlanner && symbol.type === 'numberAgg') {
+          throw new UserError(`Measure '${cubeName}.${name}' uses the number_agg type, which requires the Tesseract SQL planner`);
+        }
         let parentMeasure;
         if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
           this.safeEvaluateSymbolContext().leafMeasures) {
