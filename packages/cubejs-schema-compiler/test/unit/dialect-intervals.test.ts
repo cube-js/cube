@@ -122,6 +122,8 @@ describe('interval rendering across dialects', () => {
       // A negative offset, e.g. a custom granularity starting a day early, moves the other way
       ['subtractInterval', '-1 day', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'1 day\')'],
       ['addInterval', '-1 week', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-7 day\')'],
+      ['subtractInterval', '1 month -1 day', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-1 month\', \'1 day\')'],
+      ['subtractInterval', '0 week', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x)'],
       ['addInterval', '1 year 2 quarter 1 week 6 hour',
         'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'1 year\', \'6 month\', \'7 day\', \'6 hour\')'],
     ])('%s %s', (method, interval, sql) => {

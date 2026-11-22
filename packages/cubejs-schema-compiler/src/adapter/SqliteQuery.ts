@@ -77,6 +77,9 @@ export class SqliteQuery extends BaseQuery {
     }
 
     const signed = Object.entries(parsed).map(([unit, value]) => `${value * sign} ${unit}`).join(' ');
+    if (!signed) {
+      return this.timeStampCast(date);
+    }
     const modifiers = splitSqlInterval(signed).map(part => `'${part}'`).join(', ');
 
     return `strftime('%Y-%m-%dT%H:%M:%f', ${date}, ${modifiers})`;
