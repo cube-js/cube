@@ -7,6 +7,12 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-11-22" description="v0.29.0" tags={["Added"]}>
+  ### Added
+
+  - Query History: `GET /api/v1/deployments/{deploymentId}/query-history/requests` (`QueryHistoryPublicController.listQueryHistoryRequests`) lists the deployment's API requests, newest first, filtered by `from`, `to`, `status`, `apiType`, `minDurationMs` and `search`, with up to 200 requests a page (`first`, 100 by default) and an `after` cursor that keeps its first page's filters. `GET …/query-history/requests/{id}` (`getQueryHistoryRequest`) returns one request with the SQL it generated, for the data source and for Cube Store, with its bound `params` and how long each query waited and ran. New schemas: `QueryHistoryRequest`, `QueryHistoryRequestDetail`, `QueryHistoryRequestDetailStatus`, `QueryHistoryRequestListResponse`, `QueryHistoryRequestStatus`, `QueryHistoryRequestsQueryStatus`, `QueryHistorySqlQuery`, `QueryHistorySqlQueryExecutor`.
+</Update>
+
 <Update label="2026-11-21" description="v0.28.0" tags={["Added","Removed"]}>
   ### Added
 

@@ -1158,6 +1158,7 @@
                   "DELETE /api/v1/embed/dashboard/{publicId}/comments/{commentId}",
                   "POST /api/v1/embed/dashboard/{publicId}/comments/{commentId}/resolve",
                   "POST /api/v1/embed/dashboard/{publicId}/python-run",
+                  "GET /api/v1/embed/deployments/{deploymentId}/dashboards/by-slug/{slug}",
                   "POST /api/v1/embed/generate-session",
                   "POST /api/v1/embed/session/revoke",
                   "POST /api/v1/embed/session/token"
