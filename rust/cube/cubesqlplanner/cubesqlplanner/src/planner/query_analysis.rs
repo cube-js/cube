@@ -202,6 +202,16 @@ impl QueryAnalysis {
                 member
             )));
         }
+        // Over this subquery alone the plain branches of such a group would be
+        // dropped silently; `QueryPlanner` plans these queries over base rows.
+        if self
+            .dimension_filter_items()
+            .any(|item| has_mixed_or_group(item, &multi_stage_members))
+        {
+            return Err(CubeError::internal(
+                "An OR group mixing multi-stage dimensions with other members must be planned over base rows".to_string(),
+            ));
+        }
         let targets = multi_stage_members.iter().collect_vec();
         let on_targets = |items: &[FilterItem]| {
             items
