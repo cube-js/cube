@@ -239,8 +239,8 @@ This lets new connections reach API instances added by
 [autoscaling][ref-autoscaling]. The lifetime may change, so don't rely on the
 exact value.
 
-A connection is closed only while it is idle: a running query and an open
-transaction always finish first. The client then gets the standard Postgres
+A connection is never closed while a query is running or a transaction is open;
+it is closed only once it is idle. The client then gets the standard Postgres
 `FATAL` error with the `57P01` (`admin_shutdown`) code, the same one a Postgres
 server sends when it shuts down.
 
