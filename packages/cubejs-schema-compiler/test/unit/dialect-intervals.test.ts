@@ -96,6 +96,39 @@ describe('interval rendering across dialects', () => {
     });
   });
 
+  // SQLite answers a modifier with a unit it does not know with NULL, not an error.
+  describe('SqliteQuery modifiers', () => {
+    const SQLITE_MODIFIER_UNITS = ['year', 'month', 'day', 'hour', 'minute', 'second'];
+
+    it.each([...SINGLE_SHAPES, ...COMPOUND_SHAPES, '2 week', '1 quarter', '1 year 1 quarter 2 week 1 day'])(
+      'renders %s with units SQLite knows',
+      interval => {
+        const q = query(dialect('SqliteQuery'));
+
+        for (const rendered of [q.subtractInterval('x', interval), q.addInterval('x', interval)]) {
+          const units = [...rendered.matchAll(/'[-+]?\d+ (\w+)'/g)].map(m => m[1]);
+          expect({ rendered, units: units.filter(u => !SQLITE_MODIFIER_UNITS.includes(u)) })
+            .toEqual({ rendered, units: [] });
+        }
+      }
+    );
+
+    it.each([
+      ['subtractInterval', '2 week', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-14 day\')'],
+      ['subtractInterval', '2 week 1 day', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-15 day\')'],
+      ['subtractInterval', '1 quarter', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-3 month\')'],
+      ['subtractInterval', '1 quarter 1 month', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-4 month\')'],
+      ['addInterval', '1 week', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'7 day\')'],
+      // A negative offset, e.g. a custom granularity starting a day early, moves the other way
+      ['subtractInterval', '-1 day', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'1 day\')'],
+      ['addInterval', '-1 week', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-7 day\')'],
+      ['addInterval', '1 year 2 quarter 1 week 6 hour',
+        'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'1 year\', \'6 month\', \'7 day\', \'6 hour\')'],
+    ])('%s %s', (method, interval, sql) => {
+      expect(query(dialect('SqliteQuery'))[method]('x', interval)).toEqual(sql);
+    });
+  });
+
   // Trino and Athena take their interval handling from Presto, so the fix has to reach them too.
   it.each(['TrinoQuery', 'AthenaQuery'])('%s inherits the Presto spelling', name => {
     expect(query(dialect(name)).subtractInterval('x', '3 month 14 day'))
