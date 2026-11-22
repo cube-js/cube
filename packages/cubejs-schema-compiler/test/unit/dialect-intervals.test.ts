@@ -86,6 +86,12 @@ describe('interval rendering across dialects', () => {
       // Snowflake separates the components with commas
       '3 month 14 day': 'x - interval \'3 month, 14 day\'',
     }],
+    ['OracleQuery', {
+      '3 month 14 day': 'ADD_MONTHS(x, -3) - NUMTODSINTERVAL(14, \'DAY\')',
+      // NUMTODSINTERVAL has no week unit, so a week is spelled as seven days
+      '1 week': 'x - NUMTODSINTERVAL(7, \'DAY\')',
+      '2 week 1 day 6 hour': 'x - NUMTODSINTERVAL(15, \'DAY\') - NUMTODSINTERVAL(6, \'HOUR\')',
+    }],
     ['SqliteQuery', {
       '3 month': 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-3 month\')',
       // A strftime modifier carries one unit, so each becomes its own argument
@@ -150,6 +156,13 @@ describe('interval rendering across dialects', () => {
     ['OracleQuery', '-3 month', 'ADD_MONTHS(x, 3)'],
   ])('%s subtracts %s by adding its magnitude', (name, interval, sql) => {
     expect(query(dialect(name)).subtractInterval('x', interval)).toEqual(sql);
+  });
+
+  it.each([
+    ['1 week', 'x + NUMTODSINTERVAL(7, \'DAY\')'],
+    ['1 week 1 day', 'x + NUMTODSINTERVAL(8, \'DAY\')'],
+  ])('OracleQuery adds %s', (interval, sql) => {
+    expect(query(dialect('OracleQuery')).addInterval('x', interval)).toEqual(sql);
   });
 
   // Trino and Athena take their interval handling from Presto, so the fix has to reach them too.

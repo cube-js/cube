@@ -135,8 +135,9 @@ export class OracleQuery extends BaseQuery {
     }
 
     // Handle day/hour/minute/second using NUMTODSINTERVAL
-    if (intervalParsed.day) {
-      res = `${res} + NUMTODSINTERVAL(${intervalParsed.day}, 'DAY')`;
+    const totalDays = this.intervalDays(intervalParsed);
+    if (totalDays) {
+      res = `${res} + NUMTODSINTERVAL(${totalDays}, 'DAY')`;
     }
     if (intervalParsed.hour) {
       res = `${res} + NUMTODSINTERVAL(${intervalParsed.hour}, 'HOUR')`;
@@ -176,8 +177,9 @@ export class OracleQuery extends BaseQuery {
     }
 
     // Handle day/hour/minute/second using NUMTODSINTERVAL with subtraction
-    if (intervalParsed.day) {
-      res = `${res} - NUMTODSINTERVAL(${intervalParsed.day}, 'DAY')`;
+    const totalDays = this.intervalDays(intervalParsed);
+    if (totalDays) {
+      res = `${res} - NUMTODSINTERVAL(${totalDays}, 'DAY')`;
     }
     if (intervalParsed.hour) {
       res = `${res} - NUMTODSINTERVAL(${intervalParsed.hour}, 'HOUR')`;
@@ -190,6 +192,11 @@ export class OracleQuery extends BaseQuery {
     }
 
     return res;
+  }
+
+  // NUMTODSINTERVAL has no week unit
+  protected intervalDays(interval: ReturnType<typeof parseSqlInterval>): number {
+    return (interval.week || 0) * 7 + (interval.day || 0);
   }
 
   public dateBin(interval: string, source: string, origin: string): string {
