@@ -228,6 +228,11 @@ const EXCLUDE_OPERATIONS = new Set([
   'GET /api/v1/deployments/{deploymentId}/automation-runs',
   'GET /api/v1/deployments/{deploymentId}/automation-runs/{runUuid}',
   'GET /api/v1/deployments/{deploymentId}/automation-templates',
+  'GET /api/v1/deployments/{deploymentId}/automation-triggers',
+  'POST /api/v1/deployments/{deploymentId}/automations/{automationUuid}/runs',
+  // Automation settings: flag-gated with the rest of automations (assertAutomationsEnabled).
+  'GET /api/v1/automation-settings',
+  'PUT /api/v1/automation-settings',
 ]);
 
 // Cube-staff-only operations (provisioning real cloud infrastructure — Regions,
