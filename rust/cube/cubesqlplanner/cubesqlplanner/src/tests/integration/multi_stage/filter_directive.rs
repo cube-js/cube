@@ -1,5 +1,5 @@
 use crate::test_fixtures::cube_bridge::MockSchema;
-use crate::test_fixtures::test_utils::TestContext;
+use crate::test_fixtures::test_utils::{table_rows, TestContext};
 use indoc::indoc;
 
 fn create_context() -> TestContext {
@@ -587,5 +587,176 @@ async fn test_group_by_partially_kept_keeps_query_row_set() {
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
+    }
+}
+
+fn rows(expected: &[[&str; 3]]) -> Vec<Vec<String>> {
+    expected
+        .iter()
+        .map(|row| row.iter().map(|cell| cell.to_string()).collect())
+        .collect()
+}
+
+// An excluded member's condition counts as true, so an OR group holding it is
+// true as a whole: the stage spans every status, not just books.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_exclude_member_inside_or_group_drops_whole_group() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_exclude_status
+        dimensions:
+          - orders.category
+        filters:
+          - or:
+              - dimension: orders.status
+                operator: equals
+                values:
+                  - completed
+              - dimension: orders.category
+                operator: equals
+                values:
+                  - books
+        order:
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_eq!(
+            table_rows(&result),
+            rows(&[
+                ["books", "880.00", "880.00"],
+                ["clothing", "300.00", "720.00"],
+                ["electronics", "500.00", "650.00"],
+            ])
+        );
+    }
+}
+
+// The dropped branch of an OR group counts as true, so keeping only `status`
+// leaves no restriction from that group: each status gets its full total.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_keep_only_member_inside_or_group_drops_whole_group() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_keep_only_status
+        dimensions:
+          - orders.status
+        filters:
+          - or:
+              - dimension: orders.status
+                operator: equals
+                values:
+                  - completed
+              - dimension: orders.category
+                operator: equals
+                values:
+                  - books
+        order:
+          - id: orders.status
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_eq!(
+            table_rows(&result),
+            rows(&[
+                ["cancelled", "100.00", "200.00"],
+                ["completed", "1400.00", "1400.00"],
+                ["pending", "180.00", "650.00"],
+            ])
+        );
+    }
+}
+
+// Only the AND around the excluded member becomes looser: the OR keeps its
+// other branch, so the stage still restricts to books or clothing.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_exclude_member_inside_and_under_or_keeps_other_branch() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_exclude_status
+        dimensions:
+          - orders.category
+        filters:
+          - or:
+              - and:
+                  - dimension: orders.status
+                    operator: equals
+                    values:
+                      - completed
+                  - dimension: orders.category
+                    operator: equals
+                    values:
+                      - books
+              - dimension: orders.category
+                operator: equals
+                values:
+                  - clothing
+        order:
+          - id: orders.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_eq!(
+            table_rows(&result),
+            rows(&[
+                ["books", "600.00", "880.00"],
+                ["clothing", "720.00", "720.00"],
+            ])
+        );
+    }
+}
+
+// Through a view the OR group names view members; they still match the
+// excluded base member by reference, so the group is dropped as on the cube.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_exclude_member_inside_or_group_drops_whole_group() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders_ms_view.total_amount
+          - orders_ms_view.amount_exclude_status
+        dimensions:
+          - orders_ms_view.category
+        filters:
+          - or:
+              - dimension: orders_ms_view.status
+                operator: equals
+                values:
+                  - completed
+              - dimension: orders_ms_view.category
+                operator: equals
+                values:
+                  - books
+        order:
+          - id: orders_ms_view.category
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_eq!(
+            table_rows(&result),
+            rows(&[
+                ["books", "880.00", "880.00"],
+                ["clothing", "300.00", "720.00"],
+                ["electronics", "500.00", "650.00"],
+            ])
+        );
     }
 }

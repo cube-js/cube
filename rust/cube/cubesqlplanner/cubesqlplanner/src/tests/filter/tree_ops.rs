@@ -89,7 +89,28 @@ fn exclude_members_handles_multiple_names() {
 }
 
 #[test]
-fn exclude_members_descends_into_groups_and_preserves_structure() {
+fn exclude_members_descends_into_and_group_and_preserves_structure() {
+    let ctx = ctx();
+    let inner_a = make_dim_filter(&ctx, "visitors.visitor_id", "1");
+    let inner_b = make_dim_filter(&ctx, "visitors.source", "google");
+    let group = FilterItem::Group(Rc::new(FilterGroup::new(
+        FilterGroupOperator::And,
+        vec![FilterItem::Item(inner_a), FilterItem::Item(inner_b)],
+    )));
+
+    let result = tree_ops::exclude_members(&[member_id("visitors.visitor_id")], &[group]);
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        FilterItem::Group(g) => {
+            assert!(matches!(g.operator, FilterGroupOperator::And));
+            assert_eq!(item_member_names(&g.items), vec!["visitors.source"]);
+        }
+        _ => panic!("expected group preserved"),
+    }
+}
+
+#[test]
+fn exclude_members_drops_or_group_holding_excluded_member() {
     let ctx = ctx();
     let inner_a = make_dim_filter(&ctx, "visitors.visitor_id", "1");
     let inner_b = make_dim_filter(&ctx, "visitors.source", "google");
@@ -99,14 +120,7 @@ fn exclude_members_descends_into_groups_and_preserves_structure() {
     )));
 
     let result = tree_ops::exclude_members(&[member_id("visitors.visitor_id")], &[group]);
-    assert_eq!(result.len(), 1);
-    match &result[0] {
-        FilterItem::Group(g) => {
-            assert!(matches!(g.operator, FilterGroupOperator::Or));
-            assert_eq!(item_member_names(&g.items), vec!["visitors.source"]);
-        }
-        _ => panic!("expected group preserved"),
-    }
+    assert!(result.is_empty());
 }
 
 #[test]
@@ -196,7 +210,29 @@ fn keep_only_members_drops_groups_with_no_surviving_items() {
 }
 
 #[test]
-fn keep_only_members_preserves_partially_matching_group() {
+fn keep_only_members_preserves_partially_matching_and_group() {
+    let ctx = ctx();
+    let visitor_id = make_dim_filter(&ctx, "visitors.visitor_id", "1");
+    let source = make_dim_filter(&ctx, "visitors.source", "google");
+
+    let group = FilterItem::Group(Rc::new(FilterGroup::new(
+        FilterGroupOperator::And,
+        vec![FilterItem::Item(visitor_id), FilterItem::Item(source)],
+    )));
+
+    let result = tree_ops::keep_only_members(&[member_id("visitors.source")], &[group]);
+    assert_eq!(result.len(), 1);
+    match &result[0] {
+        FilterItem::Group(g) => {
+            assert!(matches!(g.operator, FilterGroupOperator::And));
+            assert_eq!(item_member_names(&g.items), vec!["visitors.source"]);
+        }
+        _ => panic!("expected group preserved"),
+    }
+}
+
+#[test]
+fn keep_only_members_drops_partially_matching_or_group() {
     let ctx = ctx();
     let visitor_id = make_dim_filter(&ctx, "visitors.visitor_id", "1");
     let source = make_dim_filter(&ctx, "visitors.source", "google");
@@ -207,14 +243,7 @@ fn keep_only_members_preserves_partially_matching_group() {
     )));
 
     let result = tree_ops::keep_only_members(&[member_id("visitors.source")], &[group]);
-    assert_eq!(result.len(), 1);
-    match &result[0] {
-        FilterItem::Group(g) => {
-            assert!(matches!(g.operator, FilterGroupOperator::Or));
-            assert_eq!(item_member_names(&g.items), vec!["visitors.source"]);
-        }
-        _ => panic!("expected group preserved with surviving children"),
-    }
+    assert!(result.is_empty());
 }
 
 #[test]
