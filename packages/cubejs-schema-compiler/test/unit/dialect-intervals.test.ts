@@ -90,6 +90,7 @@ describe('interval rendering across dialects', () => {
       '3 month 14 day': 'ADD_MONTHS(x, -3) - NUMTODSINTERVAL(14, \'DAY\')',
       // NUMTODSINTERVAL has no week unit, so a week is spelled as seven days
       '1 week': 'x - NUMTODSINTERVAL(7, \'DAY\')',
+      '1 week 1 day': 'x - NUMTODSINTERVAL(8, \'DAY\')',
       '2 week 1 day 6 hour': 'x - NUMTODSINTERVAL(15, \'DAY\') - NUMTODSINTERVAL(6, \'HOUR\')',
     }],
     ['SqliteQuery', {
@@ -161,6 +162,7 @@ describe('interval rendering across dialects', () => {
   it.each([
     ['1 week', 'x + NUMTODSINTERVAL(7, \'DAY\')'],
     ['1 week 1 day', 'x + NUMTODSINTERVAL(8, \'DAY\')'],
+    ['2 week 1 day 6 hour', 'x + NUMTODSINTERVAL(15, \'DAY\') + NUMTODSINTERVAL(6, \'HOUR\')'],
   ])('OracleQuery adds %s', (interval, sql) => {
     expect(query(dialect('OracleQuery')).addInterval('x', interval)).toEqual(sql);
   });
