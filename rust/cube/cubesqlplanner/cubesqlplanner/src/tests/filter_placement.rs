@@ -8,6 +8,7 @@ use crate::planner::planners::QueryPlanner;
 use crate::planner::{MeasureRenderModifier, MemberSymbol, QueryAnalysis};
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
+use cubenativeutils::CubeError;
 use indoc::indoc;
 use std::rc::Rc;
 
@@ -18,14 +19,22 @@ fn context() -> TestContext {
     .unwrap()
 }
 
-fn placement(yaml: &str, merges_legs: bool, selected: &[&str]) -> FilterPlacement {
+fn try_placement(
+    yaml: &str,
+    merges_legs: bool,
+    selected: &[&str],
+) -> Result<FilterPlacement, CubeError> {
     let context = context();
     let analysis = QueryAnalysis::try_new(context.create_query_properties(yaml).unwrap()).unwrap();
     let selected = selected
         .iter()
         .map(|path| context.create_dimension(path).unwrap())
         .collect::<Vec<Rc<MemberSymbol>>>();
-    analysis.filter_placement(merges_legs, &selected).unwrap()
+    analysis.filter_placement(merges_legs, &selected)
+}
+
+fn placement(yaml: &str, merges_legs: bool, selected: &[&str]) -> FilterPlacement {
+    try_placement(yaml, merges_legs, selected).unwrap()
 }
 
 fn members(items: &[FilterItem]) -> Vec<String> {
@@ -127,6 +136,38 @@ fn a_filter_on_an_unselected_multi_stage_dimension_is_recorded_as_unrenderable()
         Some(
             "Filtering on multi-stage dimension activity.tier_ms_dim requires it to be selected as a dimension"
         )
+    );
+}
+
+// `QueryPlanner` plans these over base rows; reaching this select is a planner bug.
+#[test]
+fn an_or_group_mixing_multi_stage_and_other_members_is_an_internal_error() {
+    let result = try_placement(
+        indoc! {r#"
+            dimensions:
+              - activity.tier_ms_dim
+            filters:
+              - or:
+                  - member: activity.tier_ms_dim
+                    operator: equals
+                    values:
+                      - low
+                  - member: activity.player
+                    operator: equals
+                    values:
+                      - p2
+        "#},
+        false,
+        &["activity.tier_ms_dim"],
+    );
+
+    let Err(err) = result else {
+        panic!("a mixed OR group over the dimension subquery was accepted");
+    };
+    assert!(
+        err.message.contains("must be planned over base rows"),
+        "{}",
+        err.message
     );
 }
 
