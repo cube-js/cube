@@ -1,7 +1,9 @@
 use super::super::context::PushDownBuilderContext;
 use super::super::{LogicalNodeProcessor, ProcessableNode};
 use crate::logical_plan::transforms as logical_transforms;
-use crate::logical_plan::{MultiStageCalculationWindowFunction, MultiStageMeasureCalculation};
+use crate::logical_plan::{
+    MultiStageCalculationType, MultiStageCalculationWindowFunction, MultiStageMeasureCalculation,
+};
 use crate::physical_plan::{Expr, MemberExpression, QueryPlan, SelectBuilder};
 use crate::physical_plan::{ReferenceSubstitutions, ReferencesBuilder};
 use crate::physical_plan_builder::PhysicalPlanBuilder;
@@ -108,7 +110,13 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
             select_builder.add_projection_member(measure, alias);
         }
 
-        if !measure_calculation.is_ungrouped() {
+        // Plain aggregates next to the dimensions need a GROUP BY even in an
+        // ungrouped query; the enclosing join spreads the result back over the rows.
+        let renders_plain_aggregates = measure_calculation.calculation_type()
+            == &MultiStageCalculationType::Aggregate
+            && measure_calculation.window_function_to_use()
+                == &MultiStageCalculationWindowFunction::None;
+        if !measure_calculation.is_ungrouped() || renders_plain_aggregates {
             let group_by = all_dimensions
                 .iter()
                 .map(|dim| -> Result<_, CubeError> {
@@ -116,6 +124,8 @@ impl<'a> LogicalNodeProcessor<'a, MultiStageMeasureCalculation>
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             select_builder.set_group_by(group_by);
+        }
+        if !measure_calculation.is_ungrouped() {
             select_builder.set_order_by(self.builder.make_order_by(
                 &schema,
                 measure_calculation.order_by(),

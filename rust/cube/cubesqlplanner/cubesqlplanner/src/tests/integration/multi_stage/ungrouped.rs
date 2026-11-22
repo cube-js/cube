@@ -57,6 +57,60 @@ async fn test_ungrouped_with_dimension() {
     }
 }
 
+// A sum over count_distinct cannot take the window path, so its stage
+// projects a plain sum() next to the query dimensions and must stay grouped.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_group_by_locked_aggregate_with_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.unique_customers_group_by_status
+        dimensions:
+          - orders.category
+        ungrouped: true
+        order:
+          - id: orders.category
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(
+        sql.contains("GROUP BY"),
+        "aggregate stage is not grouped: {sql}"
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_reduce_by_aggregate_with_dimension() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.unique_customers_reduce_category
+        dimensions:
+          - orders.status
+          - orders.category
+        ungrouped: true
+        order:
+          - id: orders.status
+          - id: orders.category
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(
+        sql.contains("GROUP BY"),
+        "aggregate stage is not grouped: {sql}"
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
 // Cross-product issue: ungrouped mode prevents aggregation in both
 // current and shifted CTEs. The JOIN between them produces a cartesian
 // product — Feb has 5 current rows × 5 shifted Jan rows = 25 rows,
