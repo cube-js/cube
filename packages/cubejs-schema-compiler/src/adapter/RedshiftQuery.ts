@@ -23,7 +23,7 @@ export class RedshiftQuery extends PostgresQuery {
     let result = date;
 
     for (const [datePart, intervalValue] of Object.entries(intervalParsed)) {
-      result = `DATEADD(${datePart}, -${intervalValue}, ${result})`;
+      result = `DATEADD(${datePart}, ${-intervalValue}, ${result})`;
     }
 
     return result;
