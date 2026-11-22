@@ -491,9 +491,9 @@ async fn test_multi_stage_dim_and_nested_in_mixed_or_group() {
 }
 
 // The select reads the source table next to the multi-stage dimension subquery,
-// so that subquery can't be served by a rollup kept in CubeStore.
+// so that subquery is served by the rollup kept in the source database.
 #[tokio::test(flavor = "multi_thread")]
-async fn test_multi_stage_dim_mixed_or_group_skips_external_rollup() {
+async fn test_multi_stage_dim_mixed_or_group_uses_source_rollup() {
     let path = format!(
         "{}/src/test_fixtures/schemas/yaml_files/common/integration_multi_stage_dimension_filter.yaml",
         env!("CARGO_MANIFEST_DIR")
@@ -507,6 +507,13 @@ async fn test_multi_stage_dim_mixed_or_group_skips_external_rollup() {
             dimensions:
                 - player
             external: true
+          - name: by_player_in_source
+            type: rollup
+            measures:
+                - theo_win
+            dimensions:
+                - player
+            external: false
 ";
     let yaml = std::fs::read_to_string(path).unwrap() + rollup;
     let ctx = TestContext::new(MockSchema::from_yaml(&yaml).unwrap()).unwrap();
@@ -525,15 +532,13 @@ async fn test_multi_stage_dim_mixed_or_group_skips_external_rollup() {
                   - p2
     "#};
     let (_, usages) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert!(!usages.is_empty(), "no rollup served the subquery");
     assert!(
         usages.iter().all(|u| !u.pre_aggregation.external()),
         "external rollup used under a select reading the source table"
     );
 
     if let Some(result) = ctx.try_execute(query, SEED).await {
-        insta::assert_snapshot!(
-            "multi_stage_dim_mixed_or_group_skips_external_rollup",
-            result
-        );
+        insta::assert_snapshot!("multi_stage_dim_mixed_or_group_uses_source_rollup", result);
     }
 }
