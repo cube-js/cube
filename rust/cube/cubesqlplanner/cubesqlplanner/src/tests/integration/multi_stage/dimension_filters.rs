@@ -431,3 +431,28 @@ async fn test_multi_stage_dim_mixed_or_group_nested_in_and() {
     )
     .await;
 }
+
+// p1 (300) is high and passes the OR; p2 (110) is low and above 100, so it fails.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_measure_in_mixed_or_measure_filter() {
+    assert_query(
+        "multi_stage_measure_in_mixed_or_measure_filter",
+        indoc! {r#"
+        measures:
+          - activity.theo_win
+        dimensions:
+          - activity.player
+        filters:
+          - or:
+              - member: activity.tier
+                operator: equals
+                values:
+                  - high
+              - member: activity.theo_win
+                operator: lt
+                values:
+                  - "100"
+    "#},
+    )
+    .await;
+}
