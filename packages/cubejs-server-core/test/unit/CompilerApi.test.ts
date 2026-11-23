@@ -1247,6 +1247,26 @@ cubes:
       - name: created_at
         sql: created_at
         type: time
+      - name: created_at_ref
+        sql: "{CUBE.created_at}"
+        type: time
+      - name: status
+        sql: status
+        type: string
+      - name: status_all_time
+        multi_stage: true
+        sql: "{CUBE.status}"
+        type: string
+        filter:
+          exclude:
+            - orders.created_at
+      - name: status_keep_only_id
+        multi_stage: true
+        sql: "{CUBE.status}"
+        type: string
+        filter:
+          keep_only:
+            - orders.id
     measures:
       - name: total
         sql: amount
@@ -1281,6 +1301,20 @@ cubes:
         filter:
           keep_only:
             - orders.id
+      - name: total_any_status
+        multi_stage: true
+        sql: "{total}"
+        type: sum
+        filter:
+          exclude:
+            - orders.status
+      - name: total_keep_only_created_at
+        multi_stage: true
+        sql: "{total}"
+        type: sum
+        filter:
+          keep_only:
+            - orders.created_at
       - name: total_from_march
         multi_stage: true
         sql: "{total}"
@@ -1304,6 +1338,14 @@ cubes:
             - member: created_at
               operator: inDateRange
               values: ["2025-02-01", "2025-03-31"]
+      - group: dates_ref
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: created_at_ref
+              operator: inDateRange
+              values: ["2025-02-01", "2025-03-31"]
 `;
   const repository: SchemaFileRepository = {
     localPath: () => '/mock/path',
@@ -1316,12 +1358,16 @@ cubes:
 
   afterAll(() => compilerApi.dispose());
 
-  const maskedMembers = async (group: string, measure: string, filter: any) => {
-    const query: any = { timezone: 'UTC', measures: [`orders.${measure}`], filters: [filter] };
+  const maskedMembersOf = async (group: string, members: any, filter: any) => {
+    const query: any = { timezone: 'UTC', ...members, filters: [filter] };
     const context: any = { securityContext: { groups: [group] }, requestId: 'test' };
     const result = await compilerApi.applyRowLevelSecurity(query, query, context);
     return ((result.query as any).maskedMembers || []).map((m: any) => m.member);
   };
+
+  const maskedMembers = (group: string, measure: string, filter: any) => (
+    maskedMembersOf(group, { measures: [`orders.${measure}`] }, filter)
+  );
 
   const policyRange = { member: 'orders.created_at', operator: 'inDateRange', values: ['2025-02-01', '2025-03-31'] };
 
@@ -1337,6 +1383,34 @@ cubes:
 
   test('a measure whose filter directive drops query filters stays masked, also behind another measure', async () => {
     for (const measure of ['total_all_time', 'total_all_time_doubled', 'total_keep_only_id']) {
+      expect(await maskedMembers('dates', measure, policyRange)).toContain(`orders.${measure}`);
+    }
+  });
+
+  test('a dimension whose filter directive drops query filters stays masked', async () => {
+    for (const dimension of ['status_all_time', 'status_keep_only_id']) {
+      expect(await maskedMembersOf('dates', { dimensions: [`orders.${dimension}`] }, policyRange))
+        .toContain(`orders.${dimension}`);
+    }
+  });
+
+  test('such a dimension keeps the mask on a measure queried next to it', async () => {
+    const members = { measures: ['orders.total'], dimensions: ['orders.status_all_time'] };
+    expect(await maskedMembersOf('dates', members, policyRange)).toContain('orders.total');
+    expect(await maskedMembersOf('dates', { measures: ['orders.total'], dimensions: ['orders.status'] }, policyRange))
+      .toEqual([]);
+  });
+
+  // The planner drops a filter on created_at_ref when created_at is excluded,
+  // although the directive doesn't name the member the policy filters on.
+  test('excluding a member the policy filter only references keeps the mask', async () => {
+    const refRange = { ...policyRange, member: 'orders.created_at_ref' };
+    expect(await maskedMembers('dates_ref', 'total', refRange)).toEqual([]);
+    expect(await maskedMembers('dates_ref', 'total_all_time', refRange)).toContain('orders.total_all_time');
+  });
+
+  test('a directive that leaves the policy filter in place still keeps the mask', async () => {
+    for (const measure of ['total_any_status', 'total_keep_only_created_at']) {
       expect(await maskedMembers('dates', measure, policyRange)).toContain(`orders.${measure}`);
     }
   });
