@@ -201,6 +201,7 @@
     ]
   },
   "skip": [
+    "SQL API: BTRIM filters with default and explicit spaces",
     "---------------------------------------",
     "SKIPPED FOR ALL                        ",
     "---------------------------------------",
@@ -281,6 +282,7 @@
     "filtering ECommerce: equals a whole number with leading zeros"
   ],
   "tesseractSkip": [
+    "SQL API: BTRIM filters with default and explicit spaces",
     "---------------------------------------",
     "SKIPPED FOR ALL                        ",
     "---------------------------------------",

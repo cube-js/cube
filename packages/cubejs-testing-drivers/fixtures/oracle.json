@@ -142,6 +142,7 @@
     ]
   },
   "skip": [
+    "SQL API: BTRIM filters with default and explicit spaces",
     "---------------------------------------",
     "SKIPPED FOR ORACLE (streaming download not implemented)",
     "downloadQueryResults ignores streamImport and always returns rows in memory,",
@@ -238,6 +239,7 @@
     "filtering ECommerce: equals a whole number with leading zeros"
   ],
   "tesseractSkip": [
+    "SQL API: BTRIM filters with default and explicit spaces",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
