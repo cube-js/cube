@@ -68,7 +68,7 @@ also needs **Access SQL Runner** (`SqlRunnerRead`); see [Jinja templates](#jinja
 <Steps>
   <Step title="Configure publication">
     Open your deployment's **Settings → Data Sources** and edit the Databricks data source.
-    Expand **Databricks Metric Views**. Enter the target catalog and schema. Choose all public
+    Expand **Databricks Metric View sync**. Enter the target catalog and schema. Choose all public
     views, selected views, or a name pattern; optionally add a target-name prefix. Choose what
     happens when a view leaves the scope (see [Removed views](#removed-views)). Turn publication
     on and save. This alone does not start a write.
@@ -151,7 +151,7 @@ Databricks driver prefers a data source's OAuth client variables over the per-us
 2. In **Settings → Data Sources**, select **Set up Metric View sync for a cube.py data source**.
    Enter the data source name your cubes set in `data_source` (`default` for cubes that set none)
    and select **Continue**.
-3. In **Databricks Metric Views**, under **Databricks connection**, enter the SQL warehouse's
+3. In **Databricks Metric View sync**, under **Databricks connection**, enter the SQL warehouse's
    **Server hostname** and **HTTP path** and the service principal's **OAuth client ID** and
    **OAuth client secret**. If a cube uses a two-part `schema.table` name, also enter the
    **Default catalog** it resolves in; it replaces `CUBEJS_DB_DATABRICKS_CATALOG` for this data
@@ -173,7 +173,7 @@ Omit it to keep the stored credential, or pass `null` to remove it.
 Cube can publish every time a build of the deployment succeeds, so Databricks follows your Cube
 model without a manual sync or a CI step. Set up publication as in [Publish a view](#publish-a-view),
 including **Preview**, **Test access**, and a first sync. Then turn on **Publish after each
-deployment** in the **Databricks Metric Views** card and save. Through the API, save
+deployment** in the **Databricks Metric View sync** card and save. Through the API, save
 `syncOnDeploy: true`. The setting is off by default, and a save that omits it turns it off.
 
 After each successful build, Cube starts a run for every Databricks data source of the deployment,
@@ -373,7 +373,7 @@ own Metric Views. What this page says about a data source's settings, runs, and 
 for each publication target. Give each one its own catalog or schema: a Metric View belongs to one
 publication target, so another that publishes to the same name is blocked with `ownership-conflict`.
 
-Every data source has the `default` publication target. In the **Databricks Metric Views** card,
+Every data source has the `default` publication target. In the **Databricks Metric View sync** card,
 pick one under **Publication target**: the settings, **Preview**, **Test access**, and run history
 below it are that target's own. To create one, select **Add target**, enter its name, then save its
 settings. Through the API, add `?target=<name>` when
@@ -398,30 +398,31 @@ needs no `target`.
 - **Turning off:** saving `enabled: false` drops nothing, and the publication target keeps its
   Metric Views: another that publishes to the same names is blocked with `ownership-conflict`
   until it [takes them over](#take-over-an-existing-metric-view).
-- **Deleting:** turn publication off and save, then select **Delete target**, or send
+- **Deleting:** turn off **Publish to Databricks** and save, then select **Delete target**, or send
   `DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}?target=<name>&expectedConfigurationVersion=<n>`.
   `default` can't be deleted (`400`). A delete returns `409` while the target is enabled, while it
   has an active run or one that ended `CANCELLED` or `FAILED` in the last 10 minutes, or when the
   version is stale. Its Metric Views stay in Databricks, managed by no publication target, and the
-  response lists them as `retainedMetricViews`: drop them, or name them in another target's
-  `takeOverTargets` before it publishes there. Its runs stay readable by `runId`, but none can be
-  cancelled or promoted.
+  card lists them, as does the response's `retainedMetricViews`: drop them, or name them in another
+  target's `takeOverTargets` before it publishes there. Its runs stay readable by `runId`, but none
+  can be cancelled or promoted.
 
 To publish to production the build you tested in staging:
 
 1. Create `staging` and `production` with **Add target**, each with its own catalog or schema and
-   publication turned on, and run **Test access** for each. Through the API, save each with
+   **Publish to Databricks** on, and run **Test access** for each. Through the API, save each with
    `?target=<name>`, `expectedConfigurationVersion: 0`, and `enabled: true`. Leave
    `syncOnDeploy` off for production, so that no deployment publishes there untested.
 2. Publish to staging: turn on [Publish after each deployment](#publish-after-each-deployment)
    for it with `syncOnDeploy: true`, or start its runs yourself.
 3. Once a staging run is **Completed**, run your own checks against the staging Metric Views. Cube
    doesn't know whether they passed.
-4. Promote the staging run: in staging's run history, select **Promote run to…** on that run and
-   choose `production`. Through the API, start a production run with production's
-   `configurationVersion` and `promoteFromRunId` set to the staging run's `runId`, here
-   `STAGING_RUN_ID`. Set `PROMOTION_IDEMPOTENCY_KEY` to a UUID unique to this promotion, so that
-   retrying the step doesn't start a second run:
+4. Promote the staging run: in staging's run history, select **Promote run to…** on that run,
+   choose `production`, and confirm, which switches the card to production. The menu lists only
+   the other publication targets with **Publish to Databricks** on. Through the API, start a
+   production run with production's `configurationVersion` and `promoteFromRunId` set to the
+   staging run's `runId`, here `STAGING_RUN_ID`. Set `PROMOTION_IDEMPOTENCY_KEY` to a UUID unique
+   to this promotion, so that retrying the step doesn't start a second run:
 
 ```bash
 set -euo pipefail
@@ -657,7 +658,7 @@ sensitive source data.
 ### Databricks behind the deployed model {#databricks-behind-the-deployed-model}
 
 Databricks serves the Metric Views of the last build that a **Completed** or **Partial** run
-published. When the deployment runs a newer build, the **Databricks Metric Views** card shows
+published. When the deployment runs a newer build, the **Databricks Metric View sync** card shows
 **Databricks is behind the deployed model**. The warning names the commit Databricks was last
 published from and the commit the deployment runs. When both builds share a commit, as after a
 redeploy, it names their build numbers instead. Select **Publish now** in the warning to publish
