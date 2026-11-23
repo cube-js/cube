@@ -2,7 +2,7 @@ import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { ParamAllocator } from './ParamAllocator';
-import { isInt64Literal } from './numericLiteral';
+import { isInt64Literal, isNumberLiteral } from './numericLiteral';
 import type { QueryFilterTreeItem } from './QueryTypes';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
@@ -27,7 +27,10 @@ class PostgresParamAllocator extends ParamAllocator {
 // would make its index unusable, hence bigint for whole numbers.
 class PostgresFilter extends BaseFilter {
   public castParameter(param?: unknown) {
-    if (this.measure || this.definition().type === 'number') {
+    const { type } = this.definition();
+    const isNumber = type === 'number' || (this.measure && !['string', 'time', 'boolean'].includes(type));
+    // min/max measures take the type of their operand, which may be text or a timestamp.
+    if (isNumber && isNumberLiteral(param)) {
       return isInt64Literal(param) ? '?::bigint' : `?::${(this.query as PostgresQuery).fractionalParamType()}`;
     }
     return '?';

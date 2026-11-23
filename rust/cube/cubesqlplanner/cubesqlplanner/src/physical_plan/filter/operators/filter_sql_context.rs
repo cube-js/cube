@@ -14,6 +14,18 @@ fn is_int64_literal(value: &str) -> bool {
     !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) && value.parse::<i64>().is_ok()
 }
 
+// A min/max measure is typed as a number whatever its operand is, so a text or
+// timestamp value can reach a number cast, which the database then rejects.
+fn is_number_literal(value: &str) -> bool {
+    let value = value.trim();
+    let unsigned = value.strip_prefix(['-', '+']).unwrap_or(value);
+    unsigned
+        .bytes()
+        .next()
+        .is_some_and(|b| b.is_ascii_digit() || b == b'.')
+        && value.parse::<f64>().is_ok()
+}
+
 #[derive(Clone, Copy)]
 enum DateBound {
     From,
@@ -82,7 +94,7 @@ impl<'a> FilterSqlContext<'a> {
     ) -> Result<String, CubeError> {
         match member_type.as_deref() {
             Some("boolean") => self.plan_templates.bool_param_cast(placeholder),
-            Some("number") => self
+            Some("number") if is_number_literal(value) => self
                 .plan_templates
                 .number_param_cast(placeholder, is_int64_literal(value)),
             Some("time") => self.plan_templates.time_param_cast(placeholder),
@@ -329,7 +341,35 @@ pub trait FilterOperationSql {
 
 #[cfg(test)]
 mod tests {
-    use super::FilterSqlContext;
+    use super::{is_number_literal, FilterSqlContext};
+
+    #[test]
+    fn number_literal_accepts_what_a_number_cast_accepts() {
+        assert!(is_number_literal("5"));
+        assert!(is_number_literal("-5"));
+        assert!(is_number_literal("+5"));
+        assert!(is_number_literal("1.5"));
+        assert!(is_number_literal(".5"));
+        assert!(is_number_literal("5."));
+        assert!(is_number_literal("1e3"));
+        assert!(is_number_literal("1.5E-3"));
+        assert!(is_number_literal(" 5 "));
+        assert!(is_number_literal("0523"));
+    }
+
+    #[test]
+    fn number_literal_rejects_text_and_timestamps() {
+        assert!(!is_number_literal(""));
+        assert!(!is_number_literal("c"));
+        assert!(!is_number_literal("true"));
+        assert!(!is_number_literal("2024-01-01T00:00:00.000"));
+        assert!(!is_number_literal("inf"));
+        assert!(!is_number_literal("NaN"));
+        assert!(!is_number_literal("-"));
+        assert!(!is_number_literal("."));
+        assert!(!is_number_literal("0x10"));
+        assert!(!is_number_literal("1,5"));
+    }
 
     fn as_operand(member_sql: &str) -> String {
         FilterSqlContext::as_operand(member_sql)

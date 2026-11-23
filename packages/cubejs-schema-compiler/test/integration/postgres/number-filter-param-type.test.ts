@@ -10,10 +10,10 @@ cubes:
   - name: amounts
     sql: >
       SELECT * FROM (VALUES
-        (1, 1::real, 1::double precision, 1::numeric(10, 2), 1::int, 1::bigint),
-        (2, 2::real, 2::double precision, 2::numeric(10, 2), 2::int, 9007199254740993::bigint),
-        (3, 3::real, 3::double precision, 3::numeric(10, 2), 3::int, 9223372036854775807::bigint)
-      ) AS t(id, real_amount, double_amount, numeric_amount, int_amount, bigint_amount)
+        (1, 1::real, 1::double precision, 1::numeric(10, 2), 1::int, 1::bigint, 'a', '2024-01-01'::timestamp, TRUE),
+        (2, 2::real, 2::double precision, 2::numeric(10, 2), 2::int, 9007199254740993::bigint, '2', '2024-01-02'::timestamp, FALSE),
+        (3, 3::real, 3::double precision, 3::numeric(10, 2), 3::int, 9223372036854775807::bigint, 'c', '2024-01-03'::timestamp, TRUE)
+      ) AS t(id, real_amount, double_amount, numeric_amount, int_amount, bigint_amount, label, created_at, flag)
 
     dimensions:
       - name: id
@@ -49,6 +49,26 @@ cubes:
       - name: real_total
         sql: real_amount
         type: sum
+
+      - name: labels
+        sql: "string_agg(label, ',')"
+        type: string
+
+      - name: last_created_at
+        sql: "max(created_at)"
+        type: time
+
+      - name: any_flag
+        sql: "bool_or(flag)"
+        type: boolean
+
+      - name: max_label
+        sql: label
+        type: max
+
+      - name: max_created_at
+        sql: created_at
+        type: max
   `);
 
   async function expectIds(filters: any[], ids: number[]) {
@@ -140,6 +160,32 @@ cubes:
 
     it('whole bound with leading zeros', async () => {
       await expectIds([filter('int_amount', 'equals', '03')], [3]);
+    });
+  });
+
+  describe('measure that is not a number', () => {
+    it('string measure', async () => {
+      await expectIds([filter('labels', 'equals', 'a')], [1]);
+    });
+
+    it('string measure with a value that reads as a number', async () => {
+      await expectIds([filter('labels', 'equals', '2')], [2]);
+    });
+
+    it('time measure', async () => {
+      await expectIds([filter('last_created_at', 'equals', '2024-01-02T00:00:00.000')], [2]);
+    });
+
+    it('boolean measure', async () => {
+      await expectIds([filter('any_flag', 'equals', 'true')], [1, 3]);
+    });
+
+    it('max over a text column', async () => {
+      await expectIds([filter('max_label', 'equals', 'c')], [3]);
+    });
+
+    it('max over a timestamp column', async () => {
+      await expectIds([filter('max_created_at', 'gt', '2024-01-01T00:00:00.000')], [2, 3]);
     });
   });
 
