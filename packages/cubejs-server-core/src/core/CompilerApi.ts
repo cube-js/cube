@@ -1105,11 +1105,8 @@ export class CompilerApi {
     if (q === null || t === null) {
       return false;
     }
-    // An inclusive query bound only fits inside an exclusive policy bound when it is
-    // strictly tighter (`x >= q` implies `x > t` only for q > t). The database compares
-    // in the column type, which can round two different bounds to the same value
-    // (`real`, fixed-scale decimal), and that type is unknown here, so such a pair is
-    // never proven.
+    // `x >= q` implies `x > t` only for q > t, and the column type (`real`, fixed-scale
+    // decimal) can round two distinct bounds to one value, so such a pair is never proven.
     const needsStrictlyTighter = (qOp === 'gte' && tOp === 'gt') || (qOp === 'lte' && tOp === 'lt');
     if (needsStrictlyTighter) {
       return false;
