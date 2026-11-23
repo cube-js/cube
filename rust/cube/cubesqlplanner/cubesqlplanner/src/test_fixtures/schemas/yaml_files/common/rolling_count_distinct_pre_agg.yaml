@@ -1,0 +1,60 @@
+cubes:
+  - name: rcd_sessions
+    sql: "SELECT * FROM rcd_sessions"
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: weekly_users
+        type: count_distinct
+        sql: user_id
+        rolling_window:
+          trailing: 1 week
+      - name: weekly_avg_amount
+        type: avg
+        sql: amount
+        rolling_window:
+          trailing: 1 week
+      - name: weekly_amount
+        type: sum
+        sql: amount
+        rolling_window:
+          trailing: 1 week
+      - name: weekly_users_approx
+        type: count_distinct_approx
+        sql: user_id
+        rolling_window:
+          trailing: 1 week
+    pre_aggregations:
+      - name: daily
+        type: rollup
+        measures:
+          - weekly_users
+          - weekly_avg_amount
+          - weekly_amount
+        time_dimension: created_at
+        granularity: day
+      # Keeps every source row, so it can stand in for the rows a window reads.
+      - name: by_id
+        type: rollup
+        measures:
+          - weekly_users
+          - weekly_avg_amount
+          - weekly_amount
+        dimensions:
+          - id
+        time_dimension: created_at
+        granularity: day
+      - name: by_id_approx
+        type: rollup
+        measures:
+          - weekly_users_approx
+        dimensions:
+          - id
+        time_dimension: created_at
+        granularity: day

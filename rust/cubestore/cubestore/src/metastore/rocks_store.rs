@@ -19,12 +19,15 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::{Cursor, Read, Write};
 
+use crate::app_metrics;
 use crate::metastore::snapshot_info::SnapshotInfo;
+use crate::util::metrics;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use cuberockstore::rocksdb;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 use std::{env, mem, time};
 use tokio::fs;
 use tokio::fs::File;
@@ -823,46 +826,206 @@ pub trait RocksStoreDetails: Send + Sync {
 
 pub type RocksStoreRWLoopFn = Box<dyn FnOnce() -> Result<(), CubeError> + Send + 'static>;
 
+#[derive(Debug, Clone, Copy)]
+pub enum RWLoopOperation {
+    Read,
+    Write,
+}
+
+const RW_LOOP_STATS_INTERVAL: Duration = Duration::from_secs(10);
+
+// Loops run far too many operations to send a metric packet for each, so activity accumulates
+// here and a separate thread reports it: a loop stuck on one task must still show its backlog.
+#[derive(Debug)]
+struct RWLoopStats {
+    read_tags: Vec<String>,
+    write_tags: Vec<String>,
+    loop_tags: Vec<String>,
+    reads: AtomicU64,
+    read_time_us: AtomicU64,
+    writes: AtomicU64,
+    write_time_us: AtomicU64,
+    busy_us: AtomicU64,
+    epoch: Instant,
+    // Microseconds since `epoch` plus one at which the running task's unreported time starts;
+    // zero while the loop is idle.
+    running_since_us: AtomicU64,
+}
+
+impl RWLoopStats {
+    fn new(store_name: &'static str, name: &'static str) -> Self {
+        let loop_tags = vec![
+            metrics::format_tag("store", store_name),
+            metrics::format_tag("loop", name),
+        ];
+        let with_kind = |kind: &str| {
+            let mut tags = loop_tags.clone();
+            tags.push(metrics::format_tag("kind", kind));
+            tags
+        };
+        Self {
+            read_tags: with_kind("read"),
+            write_tags: with_kind("write"),
+            loop_tags,
+            reads: AtomicU64::new(0),
+            read_time_us: AtomicU64::new(0),
+            writes: AtomicU64::new(0),
+            write_time_us: AtomicU64::new(0),
+            busy_us: AtomicU64::new(0),
+            epoch: Instant::now(),
+            running_since_us: AtomicU64::new(0),
+        }
+    }
+
+    fn now_us(&self) -> u64 {
+        self.epoch.elapsed().as_micros() as u64 + 1
+    }
+
+    fn record_operation(&self, operation: RWLoopOperation, elapsed: Duration) {
+        let (count, time_us) = match operation {
+            RWLoopOperation::Read => (&self.reads, &self.read_time_us),
+            RWLoopOperation::Write => (&self.writes, &self.write_time_us),
+        };
+        count.fetch_add(1, Ordering::Relaxed);
+        time_us.fetch_add(elapsed.as_micros() as u64, Ordering::Relaxed);
+    }
+
+    fn task_started(&self) {
+        self.running_since_us
+            .store(self.now_us(), Ordering::Relaxed);
+    }
+
+    fn task_finished(&self) {
+        let since = self.running_since_us.swap(0, Ordering::Relaxed);
+        if since != 0 {
+            self.busy_us
+                .fetch_add(self.now_us().saturating_sub(since), Ordering::Relaxed);
+        }
+    }
+
+    // Moves the running task's time so far into `busy_us`; the task itself adds only the rest.
+    fn account_running_task(&self) {
+        let since = self.running_since_us.load(Ordering::Relaxed);
+        if since == 0 {
+            return;
+        }
+        let now = self.now_us();
+        if self
+            .running_since_us
+            .compare_exchange(since, now, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+        {
+            self.busy_us
+                .fetch_add(now.saturating_sub(since), Ordering::Relaxed);
+        }
+    }
+
+    fn report(&self, queue_size: usize) {
+        self.account_running_task();
+        let report_sum = |metric: &metrics::Counter, value: &AtomicU64, tags: &Vec<String>| {
+            let value = value.swap(0, Ordering::Relaxed);
+            if value > 0 {
+                metric.add_with_tags(value as i64, Some(tags));
+            }
+        };
+        report_sum(
+            &app_metrics::RW_LOOP_OPERATIONS,
+            &self.reads,
+            &self.read_tags,
+        );
+        report_sum(
+            &app_metrics::RW_LOOP_OPERATION_TIME_US,
+            &self.read_time_us,
+            &self.read_tags,
+        );
+        report_sum(
+            &app_metrics::RW_LOOP_OPERATIONS,
+            &self.writes,
+            &self.write_tags,
+        );
+        report_sum(
+            &app_metrics::RW_LOOP_OPERATION_TIME_US,
+            &self.write_time_us,
+            &self.write_tags,
+        );
+        report_sum(
+            &app_metrics::RW_LOOP_BUSY_US,
+            &self.busy_us,
+            &self.loop_tags,
+        );
+        app_metrics::RW_LOOP_QUEUE_SIZE.report_with_tags(queue_size as i64, Some(&self.loop_tags));
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct RocksStoreRWLoop {
     name: &'static str,
     tx: tokio::sync::mpsc::Sender<RocksStoreRWLoopFn>,
+    stats: Arc<RWLoopStats>,
 }
 
 impl RocksStoreRWLoop {
     pub fn new(store_name: &'static str, name: &'static str) -> Self {
         let (tx, mut rx) = tokio::sync::mpsc::channel::<RocksStoreRWLoopFn>(32_768);
+        let stats = Arc::new(RWLoopStats::new(store_name, name));
+        let loop_stats = stats.clone();
 
         let thread_name = format!("{}-{}-rwloop", store_name, name);
         std::thread::Builder::new()
             .name(thread_name)
             .spawn(move || loop {
-                if let Some(fun) = rx.blocking_recv() {
-                    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(fun)) {
-                        Err(panic_payload) => {
-                            let restore_error = CubeError::from_panic_payload(panic_payload);
-                            log::error!(
-                                "Panic during read write loop execution: {}",
-                                restore_error
-                            );
-                        }
-                        Ok(res) => {
-                            if let Err(e) = res {
-                                log::error!("Error during read write loop execution: {}", e);
-                            }
+                let Some(fun) = rx.blocking_recv() else {
+                    return;
+                };
+                loop_stats.task_started();
+                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(fun)) {
+                    Err(panic_payload) => {
+                        let restore_error = CubeError::from_panic_payload(panic_payload);
+                        log::error!("Panic during read write loop execution: {}", restore_error);
+                    }
+                    Ok(res) => {
+                        if let Err(e) = res {
+                            log::error!("Error during read write loop execution: {}", e);
                         }
                     }
-                } else {
-                    return;
                 }
+                loop_stats.task_finished();
             })
             .expect(&format!(
                 "Failed to spawn RWLoop thread for store '{}', name '{}'",
                 store_name, name
             ));
 
+        // A weak sender, so the reporter does not keep the loop alive; it stops with the loop.
+        let weak_tx = tx.downgrade();
+        let reporter_stats = stats.clone();
+        let spawned = std::thread::Builder::new()
+            .name(format!("{}-{}-rwloop-stats", store_name, name))
+            .spawn(move || loop {
+                std::thread::sleep(RW_LOOP_STATS_INTERVAL);
+                let Some(tx) = weak_tx.upgrade() else {
+                    return;
+                };
+                let queue_size = tx.max_capacity() - tx.capacity();
+                drop(tx);
+                reporter_stats.report(queue_size);
+            });
+        if let Err(e) = spawned {
+            log::error!(
+                "Failed to spawn RWLoop stats thread for store '{}', name '{}': {}",
+                store_name,
+                name,
+                e
+            );
+        }
+
         // Thread handle is intentionally dropped - thread will exit when tx is dropped
-        Self { name, tx }
+        Self { name, tx, stats }
+    }
+
+    /// Records a finished operation, timed by its caller so that the time spent queued counts.
+    pub fn record_operation(&self, operation: RWLoopOperation, elapsed: Duration) {
+        self.stats.record_operation(operation, elapsed);
     }
 
     pub async fn schedule(&self, fun: RocksStoreRWLoopFn) -> Result<(), CubeError> {
@@ -946,7 +1109,7 @@ impl RocksStore {
             last_check_seq: Arc::new(RwLock::new(db_arc.latest_sequence_number())),
             snapshots_upload_stopped: Arc::new(AsyncMutex::new(false)),
             config,
-            rw_loop_default_cf: RocksStoreRWLoop::new("metastore", "default"),
+            rw_loop_default_cf: RocksStoreRWLoop::new(details.get_name(), "default"),
             details,
         };
 
@@ -1085,6 +1248,7 @@ impl RocksStore {
         R: Send + Sync + 'static,
         S: Send + Sync + 'static,
     {
+        let started = Instant::now();
         let db = self.db.clone();
         let mem_seq = MemorySequence::new(self.seq_store.clone());
         let db_to_send = db.clone();
@@ -1154,6 +1318,7 @@ impl RocksStore {
         let res = rx.await.map_err(|err| {
             CubeError::internal(format!("Unable to receive result for write task: {}", err))
         })?;
+        rw_loop.record_operation(RWLoopOperation::Write, started.elapsed());
         let (spawn_res, events) = res?;
 
         self.write_notify.notify_waiters();
@@ -1420,6 +1585,7 @@ impl RocksStore {
         F: for<'a> FnOnce(DbTableRef<'a>) -> Result<R, CubeError> + Send + Sync + 'static,
         R: Send + Sync + 'static,
     {
+        let started = Instant::now();
         let mem_seq = MemorySequence::new(self.seq_store.clone());
         let db_to_send = self.db.clone();
         let (tx, rx) = oneshot::channel::<Result<R, CubeError>>();
@@ -1459,9 +1625,11 @@ impl RocksStore {
             )));
         }
 
-        rx.await.map_err(|err| {
+        let res = rx.await.map_err(|err| {
             CubeError::internal(format!("Unable to receive result for read task: {}", err))
-        })?
+        })?;
+        rw_loop.record_operation(RWLoopOperation::Read, started.elapsed());
+        res
     }
 
     pub async fn read_operation_out_of_queue_opt<F, R>(
@@ -1869,5 +2037,81 @@ mod tests {
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
         Ok(())
+    }
+
+    #[test]
+    fn rw_loop_stats_report_sums_since_last_report() {
+        use crate::util::metrics::test_capture;
+        for name in [
+            "cs.metastore.operations",
+            "cs.metastore.operation_time.us",
+            "cs.metastore.rw_loop.busy.us",
+            "cs.metastore.rw_loop.queue_size",
+        ] {
+            test_capture::watch(name);
+        }
+        let of_this_loop = |name: &str| {
+            test_capture::samples(name)
+                .into_iter()
+                .filter(|(_, tags)| tags.contains(&"store:stats_test".to_string()))
+                .collect::<Vec<_>>()
+        };
+        let tags = |kind: Option<&str>| {
+            let mut tags = vec!["store:stats_test".to_string(), "loop:default".to_string()];
+            tags.extend(kind.map(|kind| format!("kind:{}", kind)));
+            tags
+        };
+
+        let stats = RWLoopStats::new("stats_test", "default");
+        stats.record_operation(RWLoopOperation::Read, Duration::from_micros(300));
+        stats.record_operation(RWLoopOperation::Read, Duration::from_micros(200));
+        stats.busy_us.fetch_add(400, Ordering::Relaxed);
+        stats.report(7);
+        // Nothing happened since: only the queue size is reported again.
+        stats.report(0);
+
+        assert_eq!(
+            of_this_loop("cs.metastore.operations"),
+            vec![(2, tags(Some("read")))]
+        );
+        assert_eq!(
+            of_this_loop("cs.metastore.operation_time.us"),
+            vec![(500, tags(Some("read")))]
+        );
+        assert_eq!(
+            of_this_loop("cs.metastore.rw_loop.busy.us"),
+            vec![(400, tags(None))]
+        );
+        assert_eq!(
+            of_this_loop("cs.metastore.rw_loop.queue_size"),
+            vec![(7, tags(None)), (0, tags(None))]
+        );
+    }
+
+    #[test]
+    fn rw_loop_stats_report_time_of_a_task_still_running() {
+        use crate::util::metrics::test_capture;
+        test_capture::watch("cs.metastore.rw_loop.busy.us");
+        let busy_reports = || {
+            test_capture::samples("cs.metastore.rw_loop.busy.us")
+                .into_iter()
+                .filter(|(_, tags)| tags.contains(&"store:running_test".to_string()))
+                .map(|(value, _)| value)
+                .collect::<Vec<_>>()
+        };
+
+        let stats = RWLoopStats::new("running_test", "default");
+        stats.task_started();
+        std::thread::sleep(Duration::from_millis(20));
+        stats.report(1);
+        assert_eq!(busy_reports().len(), 1);
+        assert!(busy_reports()[0] >= 20_000);
+
+        std::thread::sleep(Duration::from_millis(5));
+        stats.task_finished();
+        stats.report(0);
+        let reports = busy_reports();
+        assert_eq!(reports.len(), 2);
+        assert!(reports[1] >= 5_000);
     }
 }

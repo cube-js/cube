@@ -1,8 +1,14 @@
 use super::*;
-use crate::{physical_plan::QualifiedColumnName, planner::MemberSymbol};
+use crate::{
+    physical_plan::QualifiedColumnName,
+    planner::{time_dimension::Granularity, MemberSymbol},
+};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 use typed_builder::TypedBuilder;
 
 /// A matched pre-aggregation usable as a query source — its table
@@ -136,34 +142,23 @@ impl PreAggregation {
                 QualifiedColumnName::new(None, alias),
             );
         }
-        for dim in self.time_dimensions().iter() {
-            let (base_symbol, granularity) = if let Ok(td) = dim.as_time_dimension() {
-                (td.base_symbol().clone(), td.granularity().clone())
-            } else {
-                (dim.clone(), None)
-            };
-            let suffix = if let Some(granularity) = &granularity {
-                format!("_{}", granularity.clone())
-            } else {
-                "".to_string()
-            };
-            let alias = format!("{}{}", base_symbol.canonical_alias(), suffix);
-            res.insert(
-                base_symbol.peel_refs().full_name(),
-                QualifiedColumnName::new(None, alias),
-            );
-        }
 
         for segment in self.segments().iter() {
             let alias = segment.alias();
             res.insert(segment.full_name(), QualifiedColumnName::new(None, alias));
         }
 
+        // A join key is read from the legs' column, which is a grain column
+        // when the key is stored truncated.
         if let PreAggregationSource::Join(join) = self.source().as_ref() {
-            for item in join.items.iter() {
-                for member in item.from_members.iter().chain(item.to_members.iter()) {
+            let truncated = join.truncated_keys();
+            for member in join.key_members() {
+                let key = member.symbol.peel_refs();
+                if truncated.contains(key.id()) {
+                    res.remove(&key.full_name());
+                } else if member.granularity.is_none() {
                     res.insert(
-                        member.symbol.peel_refs().full_name(),
+                        key.full_name(),
                         QualifiedColumnName::new(None, member.column.clone()),
                     );
                 }
@@ -183,6 +178,66 @@ impl PreAggregation {
 
         res
     }
+
+    /// The grain column of each stored time dimension, with its granularity
+    /// where one is known, in declaration order, then the columns of a
+    /// rollupJoin's truncated keys.
+    pub fn time_dimensions_references(
+        &self,
+    ) -> Vec<(String, QualifiedColumnName, Option<Granularity>)> {
+        let join_keys = match self.source().as_ref() {
+            PreAggregationSource::Join(join) => join
+                .key_members()
+                .map(|member| member.symbol.peel_refs().id().clone())
+                .collect(),
+            _ => HashSet::new(),
+        };
+        let mut res = Vec::new();
+        for dim in self.time_dimensions().iter() {
+            let (base_symbol, granularity, granularity_obj) =
+                if let Ok(td) = dim.as_time_dimension() {
+                    (
+                        td.base_symbol().clone(),
+                        td.granularity().clone(),
+                        td.granularity_obj().clone(),
+                    )
+                } else {
+                    (dim.clone(), None, None)
+                };
+            // The legs store a key in a column of their own, added below.
+            if join_keys.contains(base_symbol.peel_refs().id()) {
+                continue;
+            }
+            let suffix = if let Some(granularity) = &granularity {
+                format!("_{}", granularity.clone())
+            } else {
+                "".to_string()
+            };
+            let alias = format!("{}{}", base_symbol.canonical_alias(), suffix);
+            res.push((
+                base_symbol.peel_refs().full_name(),
+                QualifiedColumnName::new(None, alias),
+                granularity_obj,
+            ));
+        }
+        // A key the legs store truncated is read from their grain column; one
+        // they store raw stays a raw column, in the database timezone.
+        if let PreAggregationSource::Join(join) = self.source().as_ref() {
+            let truncated = join.truncated_keys();
+            for member in join.key_members() {
+                let key = member.symbol.peel_refs();
+                if truncated.contains(key.id()) {
+                    res.push((
+                        key.full_name(),
+                        QualifiedColumnName::new(None, member.column.clone()),
+                        None,
+                    ));
+                }
+            }
+        }
+        res
+    }
+
     pub fn all_measures_refererences(&self) -> HashMap<String, QualifiedColumnName> {
         self.measures()
             .iter()

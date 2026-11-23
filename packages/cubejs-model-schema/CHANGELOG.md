@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.32](https://github.com/cube-js/cube/compare/v1.8.31...v1.8.32) (2026-11-21)
+
+**Note:** Version bump only for package @cubejs-backend/model-schema
+
+## [1.8.31](https://github.com/cube-js/cube/compare/v1.8.30...v1.8.31) (2026-11-20)
+
+**Note:** Version bump only for package @cubejs-backend/model-schema
+
+## [1.8.30](https://github.com/cube-js/cube/compare/v1.8.29...v1.8.30) (2026-11-19)
+
+**Note:** Version bump only for package @cubejs-backend/model-schema
+
+## [1.8.29](https://github.com/cube-js/cube/compare/v1.8.28...v1.8.29) (2026-11-19)
+
+**Note:** Version bump only for package @cubejs-backend/model-schema
+
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+### Features
+
+- **schema-compiler:** QUERY_CONTEXT conditions in measure case ([#12473](https://github.com/cube-js/cube/issues/12473)) ([8441639](https://github.com/cube-js/cube/commit/8441639c7a5d42aefaaa5156b0aed8d35adb2fb2))
+
+## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
+
+**Note:** Version bump only for package @cubejs-backend/model-schema
+
 ## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
 
 **Note:** Version bump only for package @cubejs-backend/model-schema

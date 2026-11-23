@@ -1,7 +1,9 @@
 use crate::cube_bridge::base_query_options::FilterValue;
 use crate::planner::query_tools::QueryTools;
+use crate::planner::time_dimension::QueryDateTimeHelper;
 use crate::planner::Compiler;
 use crate::planner::MemberSymbol;
+use chrono::{Duration, NaiveDateTime};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -62,6 +64,19 @@ pub enum RollingScanBand {
 }
 
 impl FilterOp {
+    /// Whether the filter bounds the member by dates, which are resolved in
+    /// the query timezone.
+    pub fn is_date_bounded(&self) -> bool {
+        matches!(
+            self,
+            FilterOp::DateRange(_)
+                | FilterOp::DateSingle(_)
+                | FilterOp::RegularRollingWindow(_)
+                | FilterOp::RollingWindowOffset(_)
+                | FilterOp::ToDateRollingWindow(_)
+        )
+    }
+
     /// The band a rolling-window filter's base scan reads, or `None` for any
     /// other filter. `span_end` picks a series' upper bound, which depends on
     /// the shape the dialect renders the series in.
@@ -148,6 +163,43 @@ impl TypedFilter {
     pub fn use_raw_values(&self) -> bool {
         self.use_raw_values
     }
+
+    /// The inclusive range a date filter's bounds align as, local to the query
+    /// timezone. A single bound gives an empty range starting where its
+    /// comparison flips. `None` for any other filter or a bound with an offset.
+    pub fn date_bounds(&self) -> Option<(String, String)> {
+        let values = self
+            .values
+            .iter()
+            .map(|value| match value {
+                FilterValue::Str(value) if QueryDateTimeHelper::is_local_date_time(value) => {
+                    Some(value.as_str())
+                }
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()?;
+        match (&self.operator, values.as_slice()) {
+            (FilterOperator::InDateRange | FilterOperator::NotInDateRange, [from, to]) => Some((
+                QueryDateTimeHelper::format_from_date(from, 3).ok()?,
+                QueryDateTimeHelper::inclusive_to_date(to).ok()?,
+            )),
+            (FilterOperator::BeforeDate | FilterOperator::AfterOrOnDate, [at]) => {
+                boundary_at(&QueryDateTimeHelper::format_from_date(at, 3).ok()?, 0)
+            }
+            (FilterOperator::BeforeOrOnDate | FilterOperator::AfterDate, [at]) => {
+                boundary_at(&QueryDateTimeHelper::inclusive_to_date(at).ok()?, 1)
+            }
+            _ => None,
+        }
+    }
+}
+
+fn boundary_at(at: &str, shift_ms: i64) -> Option<(String, String)> {
+    let start =
+        QueryDateTimeHelper::parse_native_date_time(at).ok()? + Duration::milliseconds(shift_ms);
+    let end = start - Duration::milliseconds(1);
+    let format = |date: NaiveDateTime| date.format("%Y-%m-%dT%H:%M:%S%.3f").to_string();
+    Some((format(start), format(end)))
 }
 
 #[derive(Default)]

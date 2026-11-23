@@ -16,11 +16,11 @@ use std::rc::Rc;
 /// pre-aggregation entry.
 pub struct FinalPreAggregationMeasureSqlNode {
     input: Rc<dyn SqlNode>,
-    references: PreAggregationColumns,
+    references: Rc<PreAggregationColumns>,
 }
 
 impl FinalPreAggregationMeasureSqlNode {
-    pub fn new(input: Rc<dyn SqlNode>, references: PreAggregationColumns) -> Rc<Self> {
+    pub fn new(input: Rc<dyn SqlNode>, references: Rc<PreAggregationColumns>) -> Rc<Self> {
         Rc::new(Self { input, references })
     }
 

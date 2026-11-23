@@ -3,6 +3,34 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.32](https://github.com/cube-js/cube/compare/v1.8.31...v1.8.32) (2026-11-21)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.8.31](https://github.com/cube-js/cube/compare/v1.8.30...v1.8.31) (2026-11-20)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.8.30](https://github.com/cube-js/cube/compare/v1.8.29...v1.8.30) (2026-11-19)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.8.29](https://github.com/cube-js/cube/compare/v1.8.28...v1.8.29) (2026-11-19)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+### Bug Fixes
+
+- **cubesql:** Plan SELECT \* over wide views without per-member rewrites ([#12722](https://github.com/cube-js/cube/issues/12722)) ([989e114](https://github.com/cube-js/cube/commit/989e114572d0f7c19b126982ca0849895b44d25a)), closes [#12669](https://github.com/cube-js/cube/issues/12669)
+
+## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
+
+### Bug Fixes
+
+- **cubesql:** Fix generate_series overflow, non-finite float and NULL edges ([#12821](https://github.com/cube-js/cube/issues/12821)) ([7e63200](https://github.com/cube-js/cube/commit/7e6320006281260f3970ac5d1eb4def963134975))
+
 ## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

@@ -3,6 +3,34 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.32](https://github.com/cube-js/cube/compare/v1.8.31...v1.8.32) (2026-11-21)
+
+### Features
+
+- **api-gateway:** Add force and dry-run options to the pre-aggregation jobs API ([#12882](https://github.com/cube-js/cube/issues/12882)) ([67f452a](https://github.com/cube-js/cube/commit/67f452ae60da39b7f68f2eba0aa56e8c2e02ebbf))
+
+## [1.8.31](https://github.com/cube-js/cube/compare/v1.8.30...v1.8.31) (2026-11-20)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.8.30](https://github.com/cube-js/cube/compare/v1.8.29...v1.8.30) (2026-11-19)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.8.29](https://github.com/cube-js/cube/compare/v1.8.28...v1.8.29) (2026-11-19)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+### Bug Fixes
+
+- **api-gateway:** Build the GraphQL schema from members visible to the caller ([#12833](https://github.com/cube-js/cube/issues/12833)) ([974dc5a](https://github.com/cube-js/cube/commit/974dc5a9c880916c0206bf0eefc4f0c6ecdfbcda)), closes [#10590](https://github.com/cube-js/cube/issues/10590)
+
+## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
 ## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
 
 **Note:** Version bump only for package @cubejs-backend/testing

@@ -9,4 +9,8 @@ export type JDBCDriverConfiguration = {
   properties: Record<string, any>,
   poolOptions?: PoolOptions;
   prepareConnectionQueries?: string[];
+  /**
+   * Number of rows read from a result set per round trip to the JVM.
+   */
+  batchSize?: number;
 };

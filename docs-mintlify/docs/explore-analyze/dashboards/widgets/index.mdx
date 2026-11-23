@@ -1,9 +1,9 @@
 ---
 title: Widgets
-description: Building blocks for dashboards — charts, text, controls, AI summaries, and layout elements that you arrange on the canvas to tell your data story.
+description: Building blocks for dashboards — charts, text, controls, Analysis widgets, and layout elements that you arrange on the canvas to tell your data story.
 ---
 
-Widgets are the building blocks of a dashboard. Each tile placed on the canvas in the [dashboard builder][ref-workbooks] is a widget — a chart, a block of text, a control that viewers interact with, an AI-generated summary, or a layout element such as a spacer, divider, stack, grid, or tabs container. Combine them to assemble polished, interactive views of your data.
+Widgets are the building blocks of a dashboard. Each tile placed on the canvas in the [dashboard builder][ref-workbooks] is a widget — a chart, a block of text, a control that viewers interact with, an AI analysis, or a layout element such as a spacer, divider, stack, grid, or tabs container. Combine them to assemble polished, interactive views of your data.
 
 <iframe
   width="100%"
@@ -22,12 +22,12 @@ The dashboard builder supports the following widget types:
 - [Charts](/docs/explore-analyze/dashboards/widgets/charts) — Visualize reports from your workbook
 - [Text](/docs/explore-analyze/dashboards/widgets/text) — Add titles, descriptions, and rich formatting in Markdown
 - [Controls](/docs/explore-analyze/dashboards/widgets/controls) — Let viewers filter the data, switch the time granularity, swap which field the charts are built on, or drive several controls at once — or, with a [Dynamic controls](/docs/explore-analyze/dashboards/widgets/controls#dynamic-controls) widget, add their own
-- [AI summary](/docs/explore-analyze/dashboards/widgets/ai-summary) — Generate narrative summaries of dashboard data on demand
+- [Analysis](/docs/explore-analyze/dashboards/widgets/analysis) — Run an AI analysis of the dashboard data on demand
 - [Spacer, Divider, Stack, Grid & Tabs](/docs/explore-analyze/dashboards/widgets/layout) — Non-data layout elements for whitespace, section breaks, and grouping widgets
 
 ## Adding widgets
 
-Add widgets from the toolbar at the top of the dashboard builder, in the order the buttons sit there: pick reports from the **Charts** picker to add charts, then, after the **Add:** label, **Controls** for **Filter**, **Time granularity**, **Field switcher** and **Parent** controls and the [**Dynamic controls**](/docs/explore-analyze/dashboards/widgets/controls#setting-up-dynamic-controls) widget, **Containers** for **Tabs**, **Horizontal stack**, **Vertical stack** and **Grid**, and **Other** for **Text**, **Analysis** (the [AI summary](/docs/explore-analyze/dashboards/widgets/ai-summary) widget), **Spacer** and **Divider**.
+Add widgets from the toolbar at the top of the dashboard builder, in the order the buttons sit there: pick reports from the **Charts** picker to add charts, or [create a new one](/docs/explore-analyze/dashboards/widgets/charts#creating-a-chart-from-the-builder) in the workbook, then **Controls** for **Filter**, **Time granularity**, **Field switcher** and **Parent** controls and the [**Dynamic controls**](/docs/explore-analyze/dashboards/widgets/controls#setting-up-dynamic-controls) widget, **Containers** for **Tabs**, **Horizontal stack**, **Vertical stack** and **Grid**, and **Other** for **Text**, **[Analysis](/docs/explore-analyze/dashboards/widgets/analysis)**, **Spacer** and **Divider**.
 
 Each item — a toolbar button, or an option inside the **Controls**, **Containers** or **Other** menus — can be added in two ways. **Dynamic controls** follows its own placement rules for both; see [Setting up the widget](/docs/explore-analyze/dashboards/widgets/controls#setting-up-dynamic-controls):
 
@@ -66,7 +66,7 @@ Widgets are sized in the dashboard's grid cells. Each type is added at its own s
 | --- | --- | --- |
 | Chart | 6×8 | 2×3 |
 | Text | 6×6 | 2×3 |
-| AI summary | 6×10 | 2×4 |
+| Analysis | 6×10 | 2×4 |
 
 A [KPI chart](/docs/explore-analyze/charts/chart-types/kpi) is added smaller, at 3×3, and carries the same minimum as any other chart. A control resizes by width only — its height is fixed by the input it renders — and never narrows below 2 columns. The [Dynamic controls](/docs/explore-analyze/dashboards/widgets/controls#dynamic-controls) widget is added at 12×2 and can't be resized at all. The [layout widgets](/docs/explore-analyze/dashboards/widgets/layout) carry their own sizes, listed on their page.
 

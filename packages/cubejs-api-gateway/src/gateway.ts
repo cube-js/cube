@@ -56,6 +56,7 @@ import {
   PreAggsSelector,
   PreAggJob,
   PreAggJobStatusItem,
+  PreAggJobDryRunItem,
   PreAggJobStatusResponse,
   SqlApiRequest,
   MetaResponseResultFn,
@@ -427,16 +428,17 @@ class ApiGateway {
 
         const compilerApi = await this.getCompilerApi(req.context);
 
-        // Cache unfiltered schema - RBAC enforcement happens at query execution time
-        // via annotation-based validation in the Rust result transform layer
-        let schema = compilerApi.getGraphQLSchema();
+        // Built from the caller's visibility-patched meta so introspection doesn't list members
+        // their access policies hide. The compiler id carries the visibility mask, so callers
+        // with the same visible members share a schema.
+        const { cubes, compilerId } = await compilerApi.metaConfig(req.context, {
+          requestId: req.context.requestId,
+          includeCompilerId: true,
+        });
+        let schema = compilerApi.getGraphQLSchema(compilerId);
         if (!schema) {
-          const metaConfig = await compilerApi.metaConfig(req.context, {
-            requestId: req.context.requestId,
-            skipVisibilityPatch: true,
-          });
-          schema = makeSchema(metaConfig);
-          compilerApi.setGraphQLSchema(schema);
+          schema = makeSchema(cubes);
+          compilerApi.setGraphQLSchema(compilerId, schema);
         }
         return graphqlHTTP({
           schema,
@@ -1171,6 +1173,9 @@ class ApiGateway {
    *     "preAggregations": ["Events.TemporaryData"]
    *   }
    * }
+   * // `"force": false` in the selector builds only partitions without their
+   * // target version; `"dryRun": true` builds nothing and answers with each
+   * // partition's status (`done`, `outdated` or `missing_partition`).
    * // or
    * {
    *   "action": "get",
@@ -1216,6 +1221,7 @@ class ApiGateway {
       switch (query.action) {
         case 'post':
           result = await this.preAggregationsJobsPOST(
+            req,
             context,
             <PreAggsSelector>value.selector
           );
@@ -1228,6 +1234,7 @@ class ApiGateway {
           break;
         case 'get':
           result = await this.preAggregationsJobsGET(
+            req,
             context,
             <string[]>query.tokens,
             query.resType,
@@ -1249,10 +1256,11 @@ class ApiGateway {
    * Post pre-aggregations build jobs entry point.
    */
   private async preAggregationsJobsPOST(
+    req: Request,
     context: RequestContext,
     selector: PreAggsSelector,
-  ): Promise<string[]> {
-    let jobs: string[] = [];
+  ): Promise<string[] | PreAggJobDryRunItem[]> {
+    let jobs: (string | PreAggJobDryRunItem)[] = [];
 
     // There might be a few contexts but dateRange if present is still the same
     // so let's normalize it only once.
@@ -1269,13 +1277,11 @@ class ApiGateway {
 
     const promise = Promise.all(
       selector.contexts.map(async (config) => {
-        const ctx = <RequestContext>{
-          ...context,
-          ...config,
-        };
+        const ctx = await this.preAggregationsJobContext(req, config.securityContext, context.requestId);
         const _jobs = await this.postPreAggregationsBuildJobs(
           ctx,
           selector,
+          { securityContext: config.securityContext },
         );
         return _jobs;
       })
@@ -1285,16 +1291,30 @@ class ApiGateway {
       jobs = jobs.concat(_jobs);
     });
 
-    return jobs;
+    return <string[] | PreAggJobDryRunItem[]>jobs;
   }
 
   /**
-   * Add pre-aggregations build job. Returns added jobs ids.
+   * Runs extendContext for the job's own security context; the caller's extensions are dropped.
+   * Each job gets its own request object, as contextByReq sets req.securityContext.
+   */
+  protected async preAggregationsJobContext(
+    req: Request,
+    securityContext: any,
+    requestId: string,
+  ): Promise<RequestContext> {
+    return this.contextByReq(Object.create(req), securityContext, requestId);
+  }
+
+  /**
+   * Add pre-aggregations build job. Returns added jobs ids, or on a dry run
+   * each partition's version status.
    */
   private async postPreAggregationsBuildJobs(
     context: RequestContext,
-    selector: PreAggsSelector
-  ): Promise<string[]> {
+    selector: PreAggsSelector,
+    jobContext: PreAggJob['context'],
+  ): Promise<string[] | PreAggJobDryRunItem[]> {
     const compiler = await this.getCompilerApi(context);
     const { timezones, dateRange } = selector;
     const preaggs = await compiler.preAggregations({
@@ -1305,24 +1325,40 @@ class ApiGateway {
     if (preaggs.length === 0) {
       return [];
     } else {
-      const jobs: string[] = await this
+      const queryingOptions = {
+        metadata: undefined,
+        timezones,
+        dateRange,
+        preAggregations: preaggs.map(p => ({
+          id: p.id,
+          cacheOnly: false,
+          partitions: undefined, // string[]
+        })),
+        forceBuildPreAggregations: selector.force ?? true,
+        throwErrors: false,
+      };
+
+      if (selector.dryRun) {
+        const jobs = await this
+          .refreshScheduler()
+          .getBuildJobsStatus(context, queryingOptions, jobContext);
+
+        return jobs.map((job) => ({
+          table: job.target,
+          status: <PreAggJobDryRunItem['status']>job.status,
+          selector: {
+            cubes: [job.preagg.split('.')[0]],
+            preAggregations: [job.preagg],
+            contexts: [job.context],
+            timezones: [job.timezone],
+            dataSources: [job.dataSource],
+          },
+        }));
+      }
+
+      return this
         .refreshScheduler()
-        .postBuildJobs(
-          context,
-          {
-            metadata: undefined,
-            timezones,
-            dateRange,
-            preAggregations: preaggs.map(p => ({
-              id: p.id,
-              cacheOnly: false,
-              partitions: undefined, // string[]
-            })),
-            forceBuildPreAggregations: false,
-            throwErrors: false,
-          }
-        );
-      return jobs;
+        .postBuildJobs(context, queryingOptions, jobContext);
     }
   }
 
@@ -1330,6 +1366,7 @@ class ApiGateway {
    * Get pre-aggregations build jobs entry point.
    */
   private async preAggregationsJobsGET(
+    req: Request,
     context: RequestContext,
     tokens: string[],
     resType = 'array',
@@ -1337,6 +1374,19 @@ class ApiGateway {
     const jobs: { job: PreAggJob | null, token: string }[] = await this
       .refreshScheduler()
       .getCachedBuildJobs(context, tokens);
+
+    // A selector context posts one job per partition, so many tokens share a
+    // security context: extend each distinct one once per request.
+    const jobContexts = new Map<string, Promise<RequestContext>>();
+    const jobContext = (securityContext: any): Promise<RequestContext> => {
+      const key = JSON.stringify(securityContext);
+      let ctx = jobContexts.get(key);
+      if (!ctx) {
+        ctx = this.preAggregationsJobContext(req, securityContext, context.requestId);
+        jobContexts.set(key, ctx);
+      }
+      return ctx;
+    };
 
     const response: PreAggJobStatusItem[] = await Promise.all(
       jobs.map(async ({ job, token }) => {
@@ -1347,7 +1397,7 @@ class ApiGateway {
           };
         }
 
-        const ctx = { ...context, ...job.context };
+        const ctx = await jobContext(job.context.securityContext);
         const orchestrator = await this.getAdapterApi(ctx);
         const compiler = await this.getCompilerApi(ctx);
         // TODO(1.8): drop the fallback, no job posted by 1.7 can still be in the cache.
@@ -2985,20 +3035,21 @@ class ApiGateway {
 
   /**
    * The redacted twin of a SQL API statement for the log sink, the same one
-   * cubesql attaches to its own events. Nothing when redaction is off or when
-   * the body carried no statement (validation failed on it).
+   * cubesql attaches to its own events. Nothing when redaction is off, when
+   * the body carried no statement (validation failed on it) or when redaction failed.
    */
   private redactedSqlForLog(query: unknown): { sql: string } | undefined {
     if (!getEnv('logRedaction', this.devServer) || typeof query !== 'string') {
       return undefined;
     }
 
-    // Not guarded against the native module failing to load, on purpose: this
-    // endpoint runs the statement through that same module, so a platform
-    // without it cannot serve the endpoint at all, and the error may propagate.
-    // On such a platform this also turns a scope or validation error, raised
-    // before the statement ran, into a 500 with no event logged.
-    return { sql: redactSqlLiterals(query) };
+    // Fails open: a redaction failure must not replace the error being logged.
+    // With no twin, the log sink drops the statement instead of writing it.
+    try {
+      return { sql: redactSqlLiterals(query) };
+    } catch {
+      return undefined;
+    }
   }
 
   protected exposedRequestId(context?: any): string | undefined {

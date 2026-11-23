@@ -3,6 +3,44 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.32](https://github.com/cube-js/cube/compare/v1.8.31...v1.8.32) (2026-11-21)
+
+### Features
+
+- **cubestore:** Process identity, liveness and failure metrics ([#12878](https://github.com/cube-js/cube/issues/12878)) ([59c5594](https://github.com/cube-js/cube/commit/59c559491ec8a1a7f940fa598a7b38400267e2f4))
+
+## [1.8.31](https://github.com/cube-js/cube/compare/v1.8.30...v1.8.31) (2026-11-20)
+
+### Bug Fixes
+
+- **cubestore:** Keep in-memory compaction and chunk GC alive under load ([#12767](https://github.com/cube-js/cube/issues/12767)) ([fd7c40e](https://github.com/cube-js/cube/commit/fd7c40e939ecdc0bef6e799e213a9b106e5442bf))
+
+## [1.8.30](https://github.com/cube-js/cube/compare/v1.8.29...v1.8.30) (2026-11-19)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.29](https://github.com/cube-js/cube/compare/v1.8.28...v1.8.29) (2026-11-19)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+### Bug Fixes
+
+- **cubestore:** Don't kill RWLoop threads when telemetry tracks errors outside of a Tokio runtime ([#12416](https://github.com/cube-js/cube/issues/12416)), closes [#12415](https://github.com/cube-js/cube/issues/12415)
+
+### BREAKING CHANGES
+
+- **cubestore:** cubestore::telemetry::agent_event_spawn is renamed to
+  track_agent_event; track_event and EventSender::track_event(\_object) are no
+  longer async.
+
+## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
+
+### Features
+
+- **cubestore:** Allowlist hosts for http(s) import locations ([#12820](https://github.com/cube-js/cube/issues/12820)) ([cdeb005](https://github.com/cube-js/cube/commit/cdeb00598d5e28ca9310dc9106ac0f9724c83c68))
+
 ## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
 
 ### Bug Fixes

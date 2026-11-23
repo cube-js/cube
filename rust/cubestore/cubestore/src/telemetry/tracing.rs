@@ -93,6 +93,17 @@ pub fn record_trace_obj(span: &Span, trace_obj: Option<&str>) {
     }
 }
 
+/// The `requestId` Cube sends along with a query.
+pub fn trace_obj_request_id(trace_obj: Option<&str>) -> Option<String> {
+    let serde_json::Value::Object(trace_obj) = serde_json::from_str(trace_obj?).ok()? else {
+        return None;
+    };
+    trace_obj
+        .get("requestId")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string())
+}
+
 /// Process heap figures of a unit of work that had the process to itself.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProcessMemoryUsage {
@@ -291,5 +302,16 @@ mod tests {
         });
 
         assert!(fields.is_empty());
+    }
+
+    #[test]
+    fn request_id_is_read_from_trace_obj() {
+        assert_eq!(
+            trace_obj_request_id(Some(r#"{"requestId":"abc-1","instance":"x"}"#)),
+            Some("abc-1".to_string())
+        );
+        assert_eq!(trace_obj_request_id(Some(r#"{"instance":"x"}"#)), None);
+        assert_eq!(trace_obj_request_id(Some("not json")), None);
+        assert_eq!(trace_obj_request_id(None), None);
     }
 }

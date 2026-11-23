@@ -19,6 +19,8 @@ maintainers for this package.** If you'd like to become a maintainer, please con
 
 ## Java installation
 
+Java 11 or newer is required.
+
 ### macOS
 
 ```sh
@@ -46,13 +48,13 @@ all native packages or just delete `node_modules` and run `yarn` again.
 ### Debian, Ubuntu, etc.
 
 ```sh
-sudo apt install openjdk-8-jdk
+sudo apt install openjdk-17-jdk
 ```
 
 ### Fedora, Oracle Linux, Red Hat Enterprise Linux, etc.
 
 ```sh
-su -c "yum install java-1.8.0-openjdk"
+su -c "yum install java-17-openjdk"
 ```
 
 ### Windows

@@ -2,7 +2,7 @@ use crate::config::ConfigObj;
 use crate::di_service;
 use crate::remotefs::{CommonRemoteFsUtils, ExtendedRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use core::fmt;
 use datafusion::cube_ext;
@@ -372,6 +372,7 @@ impl QueueRemoteFs {
         if let Some(expected_file_size) = expected_file_size {
             let actual_size = metadata.len();
             if actual_size != expected_file_size {
+                app_metrics::REMOTE_FS_FILE_SIZE_MISMATCH.increment();
                 tokio::fs::remove_file(local_path).await?;
                 return Err(CubeError::corrupt_data(format!(
                     "Expected file size for '{}' is {} but {} received",

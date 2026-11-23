@@ -102,6 +102,7 @@ docker run -it -p 4000:4000 --env-file=.env cube-jdk
 | [`CUBEJS_DB_DATABRICKS_CATALOG`](/reference/configuration/environment-variables#cubejs_db_databricks_catalog)       | The name of the [Databricks catalog][databricks-catalog] to connect to                                                | A valid catalog name  |    ❌    |
 | [`CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`](/reference/configuration/environment-variables#cubejs_db_export_bucket_mount_dir)  | The path for the [Databricks DBFS mount][databricks-docs-dbfs] (Not needed if using Unity Catalog connection)         | A valid mount path    |    ❌    |
 | [`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool)                 | The maximum number of concurrent database connections to pool. Default is `8`                   | A valid number        |    ❌    |
+| [`CUBEJS_JDBC_BATCH_SIZE`](/reference/configuration/environment-variables#cubejs_jdbc_batch_size) | The number of rows read from a result set in one batch. Default is `1024` | A power of two between `16` and `32768` |    ❌    |
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency

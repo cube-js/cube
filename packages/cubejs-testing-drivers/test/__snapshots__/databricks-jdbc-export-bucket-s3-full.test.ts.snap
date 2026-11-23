@@ -13199,12 +13199,12 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
-    "BigECommerce.totalSales": "48.896",
+    "BigECommerce.totalSales": "48.89600",
   },
   Object {
     "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
-    "BigECommerce.totalSales": "232.88",
+    "BigECommerce.totalSales": "232.88000",
   },
 ]
 `;
@@ -20792,31 +20792,31 @@ Array [
     "SwitchSourceTest.city": "Detroit",
     "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
-    "SwitchSourceTest.totalSales": "210.98",
+    "SwitchSourceTest.totalSales": "210.98000",
   },
   Object {
     "SwitchSourceTest.city": "Lorain",
     "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
-    "SwitchSourceTest.totalSales": "48.896",
+    "SwitchSourceTest.totalSales": "48.89600",
   },
   Object {
     "SwitchSourceTest.city": "Decatur",
     "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
-    "SwitchSourceTest.totalSales": "18.368",
+    "SwitchSourceTest.totalSales": "18.36800",
   },
   Object {
     "SwitchSourceTest.city": "Houston",
     "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
-    "SwitchSourceTest.totalSales": "2399.96",
+    "SwitchSourceTest.totalSales": "2399.96000",
   },
   Object {
     "SwitchSourceTest.city": "New York City",
     "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
-    "SwitchSourceTest.totalSales": "71.6",
+    "SwitchSourceTest.totalSales": "71.60000",
   },
 ]
 `;
@@ -20827,31 +20827,31 @@ Array [
     "SwitchSourceTest.city": "Detroit",
     "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
-    "SwitchSourceTest.totalSales": "1265.88",
+    "SwitchSourceTest.totalSales": "1265.88000",
   },
   Object {
     "SwitchSourceTest.city": "Lorain",
     "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
-    "SwitchSourceTest.totalSales": "293.376",
+    "SwitchSourceTest.totalSales": "293.37600",
   },
   Object {
     "SwitchSourceTest.city": "Decatur",
     "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
-    "SwitchSourceTest.totalSales": "110.208",
+    "SwitchSourceTest.totalSales": "110.20800",
   },
   Object {
     "SwitchSourceTest.city": "Houston",
     "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
-    "SwitchSourceTest.totalSales": "14399.76",
+    "SwitchSourceTest.totalSales": "14399.76000",
   },
   Object {
     "SwitchSourceTest.city": "New York City",
     "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
-    "SwitchSourceTest.totalSales": "429.6",
+    "SwitchSourceTest.totalSales": "429.60000",
   },
 ]
 `;
@@ -20862,31 +20862,31 @@ Array [
     "SwitchSourceTest.city": "Detroit",
     "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
-    "SwitchSourceTest.totalSalesA": "421.96",
+    "SwitchSourceTest.totalSalesA": "421.96000",
   },
   Object {
     "SwitchSourceTest.city": "Lorain",
     "SwitchSourceTest.orderDate": "2020-01-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-01-01T00:00:00.000",
-    "SwitchSourceTest.totalSalesA": "97.792",
+    "SwitchSourceTest.totalSalesA": "97.79200",
   },
   Object {
     "SwitchSourceTest.city": "Decatur",
     "SwitchSourceTest.orderDate": "2020-02-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-02-01T00:00:00.000",
-    "SwitchSourceTest.totalSalesA": "36.736",
+    "SwitchSourceTest.totalSalesA": "36.73600",
   },
   Object {
     "SwitchSourceTest.city": "Houston",
     "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
-    "SwitchSourceTest.totalSalesA": "4799.92",
+    "SwitchSourceTest.totalSalesA": "4799.92000",
   },
   Object {
     "SwitchSourceTest.city": "New York City",
     "SwitchSourceTest.orderDate": "2020-03-01T00:00:00.000",
     "SwitchSourceTest.orderDate.month": "2020-03-01T00:00:00.000",
-    "SwitchSourceTest.totalSalesA": "143.2",
+    "SwitchSourceTest.totalSalesA": "143.20000",
   },
 ]
 `;

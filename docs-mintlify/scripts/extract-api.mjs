@@ -207,6 +207,32 @@ const EXCLUDE_OPERATIONS = new Set([
   'GET /api/v1/access-requests/mine',
   'POST /api/v1/access-requests/{id}/approve',
   'POST /api/v1/access-requests/{id}/decline',
+  'GET /api/v1/access-requests/{id}',
+  // Apps are flag-gated; these serve Apps frames and launches. Remove once Apps ship.
+  'GET /api/v1/app-theme/body-font',
+  'GET /api/v1/app-theme/logo',
+  'POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/app-launch',
+  'POST /api/v1/embed/dashboard/{publicId}/app-launch',
+  // Flag-gated settings token exchange for agent evaluations.
+  'POST /api/v1/ai-engineer/settings/console-server-token',
+  // Automations: flag-gated, and every operation's own description says "This is
+  // currently in preview". Remove once the feature ships.
+  'GET /api/v1/deployments/{deploymentId}/automations',
+  'POST /api/v1/deployments/{deploymentId}/automations',
+  'GET /api/v1/deployments/{deploymentId}/automations/{automationUuid}',
+  'GET /api/v1/deployments/{deploymentId}/automations/{automationUuid}/runs',
+  'GET /api/v1/deployments/{deploymentId}/automations/{automationUuid}/webhook',
+  'POST /api/v1/deployments/{deploymentId}/automations/{automationUuid}/webhook',
+  'DELETE /api/v1/deployments/{deploymentId}/automations/{automationUuid}/webhook',
+  'POST /api/v1/deployments/{deploymentId}/automations/{automationUuid}/webhook/regenerate-secret',
+  'GET /api/v1/deployments/{deploymentId}/automation-runs',
+  'GET /api/v1/deployments/{deploymentId}/automation-runs/{runUuid}',
+  'GET /api/v1/deployments/{deploymentId}/automation-templates',
+  'GET /api/v1/deployments/{deploymentId}/automation-triggers',
+  'POST /api/v1/deployments/{deploymentId}/automations/{automationUuid}/runs',
+  // Automation settings: flag-gated with the rest of automations (assertAutomationsEnabled).
+  'GET /api/v1/automation-settings',
+  'PUT /api/v1/automation-settings',
 ]);
 
 // Cube-staff-only operations (provisioning real cloud infrastructure — Regions,
@@ -338,6 +364,58 @@ const src = yaml.load(fs.readFileSync(SRC, 'utf8'));
   delete src.components.schemas.NotificationDto?.properties?.alert;
   delete src.components.schemas.Notification?.properties?.alert;
   delete src.components.schemas.UpdateNotificationInput?.properties?.alert;
+}
+
+// Fields of flag-gated or preview features stay out of the reference until the
+// feature ships. Remove each line once its feature ships.
+const DROPPED_PROPS = {
+  AppConfigResponse: [
+    'dashboardAppServingEnabled',
+    'customTimeGranularitiesEnabled',
+    'chartDownloadSettingsEnabled',
+    'createChartFromBuilderEnabled',
+  ],
+  Dashboard: ['useCustomTimeGranularities'],
+  DashboardAppManifest: ['template'],
+  DashboardAppManifestInput: ['template'],
+  DashboardConfig: ['parameters'],
+  Workbook: ['parameters'],
+  UserSettingsInput: ['notificationEmail'],
+};
+{
+  const sch = src.components.schemas;
+  const dropProps = (name, props) => {
+    const def = sch[name];
+    if (!def?.properties) {
+      console.error(`Aborting: DROPPED_PROPS schema ${name} not found (renamed upstream?)`);
+      process.exit(1);
+    }
+    for (const p of props) delete def.properties[p];
+    if (Array.isArray(def.required)) def.required = def.required.filter((r) => !props.includes(r));
+  };
+  for (const [name, props] of Object.entries(DROPPED_PROPS)) dropProps(name, props);
+  for (const name of ['WorkbookParameter', 'WorkbookParameterType', 'DashboardParameter', 'DashboardParameterType', 'NotificationEmailUserSettingsInput']) {
+    delete sch[name];
+  }
+  if (Array.isArray(sch.CreateDeploymentInputStarterProject?.enum)) {
+    sch.CreateDeploymentInputStarterProject.enum = sch.CreateDeploymentInputStarterProject.enum.filter((v) => v !== 'demo');
+  }
+  const starter = sch.CreateDeploymentInput?.properties?.starterProject;
+  if (typeof starter?.description === 'string') {
+    starter.description = starter.description.replace(
+      /; `demo`: sample e-commerce\s+data on DuckDB with a ready data model, workbooks and dashboards,\s+where the tenant\s+offers it;/,
+      ';',
+    );
+  }
+  const stripProse = (text) =>
+    text
+      .replace(/\s*`starterProject: demo` starts it on the sample e-commerce project instead, connected\s+and\s+ready\./, '')
+      .replace(/`sheets`, `memory` and `notificationEmail` merge field-by-field/, '`sheets` and `memory` merge field-by-field');
+  for (const ops of Object.values(src.paths)) {
+    for (const m of METHODS) {
+      if (typeof ops[m]?.description === 'string') ops[m].description = stripProse(ops[m].description);
+    }
+  }
 }
 
 // 1. Filter to v1 REST paths, normalize keys (keep the real absolute path; drop a
@@ -584,6 +662,25 @@ function hoistNullableMeta(node) {
 if (/subjectType|SubjectType|user_email|\{user_|\.@\+/.test(JSON.stringify({ paths, schemas }))) {
   console.error('Aborting: per-user OIDC fields survived stripping (did the upstream spec change?)');
   process.exit(1);
+}
+
+// Fail closed: abort if a flag-gated field stripped above survives (upstream
+// renamed or reworded it).
+{
+  const json = JSON.stringify({ paths, schemas });
+  const leaked = [
+    /starterProject: demo|`demo`:/,
+    /dashboardAppServingEnabled|customTimeGranularitiesEnabled|chartDownloadSettingsEnabled|createChartFromBuilderEnabled|useCustomTimeGranularities/,
+    /WorkbookParameter|DashboardParameter|notificationEmail|NotificationEmailUserSettingsInput/,
+  ].filter((re) => re.test(json));
+  if (schemas.CreateDeploymentInputStarterProject?.enum?.includes('demo')) leaked.push('CreateDeploymentInputStarterProject: demo');
+  for (const [name, props] of Object.entries(DROPPED_PROPS)) {
+    for (const p of props) if (schemas[name]?.properties?.[p]) leaked.push(`${name}.${p}`);
+  }
+  if (leaked.length) {
+    console.error('Aborting: flag-gated fields survived stripping (did the upstream spec change?):\n  ' + leaked.join('\n  '));
+    process.exit(1);
+  }
 }
 
 hoistNullableMeta(paths);

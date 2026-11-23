@@ -87,6 +87,20 @@ jobs:
           # the next attempt with EUNCOMMIT. from-package skips what was already published.
           on_retry_command: git checkout -- .
 
+  npm-wait:
+    needs: [npm]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Install Node.js 24.x
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+      - name: Wait for published packages to be available
+        run: ./.github/actions/wait-for-npm-packages.sh
+
   native_linux:
     # Please use minimal possible version of ubuntu, because it produces constraint on glibc
     runs-on: ubuntu-22.04
@@ -318,7 +332,7 @@ jobs:
           overwrite: true
 
   docker-default:
-    needs: [npm, cubestore_linux, native_linux, detect_branch]
+    needs: [npm-wait, cubestore_linux, native_linux, detect_branch]
     name: Debian docker image
     runs-on: ${{ matrix.os }}
     strategy:
@@ -404,7 +418,7 @@ jobs:
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
   docker-debian-jdk:
-    needs: [npm, cubestore_linux, native_linux, detect_branch]
+    needs: [npm-wait, cubestore_linux, native_linux, detect_branch]
     name: Debian with jdk docker image
     runs-on: ubuntu-24.04
     timeout-minutes: 30

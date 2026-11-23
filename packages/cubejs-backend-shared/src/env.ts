@@ -456,6 +456,13 @@ const variables: Record<string, (...args: any) => any> = {
     });
   },
   preAggregationsBuilder: () => get('CUBEJS_PRE_AGGREGATIONS_BUILDER').asBool(),
+  /**
+   * Use `contextToCubeStoreRouterId` as the default `contextToPreAggregationOrchestratorId`,
+   * so orchestrators routed to one Cube Store share its pre-aggregation queues and caches.
+   */
+  preAggregationsOrchestratorIdFromRouter: () => get('CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER')
+    .default('false')
+    .asBoolStrict(),
   gracefulShutdown: () => get('CUBEJS_GRACEFUL_SHUTDOWN')
     .asIntPositive(),
   dockerImageVersion: () => get('CUBEJS_DOCKER_IMAGE_VERSION')
@@ -1071,6 +1078,24 @@ const variables: Record<string, (...args: any) => any> = {
   }: DataSourceOpts) => (
     get(keyByDataSource('CUBEJS_JDBC_DRIVER', dataSource, preAggregations)).asString()
   ),
+
+  /**
+   * Number of rows the JDBC driver reads from a result set per round trip to the JVM.
+   */
+  jdbcBatchSize: ({
+    dataSource,
+    preAggregations,
+  }: DataSourceOpts) => {
+    const key = keyByDataSource('CUBEJS_JDBC_BATCH_SIZE', dataSource, preAggregations);
+    const value = get(key).default(1024).asIntPositive();
+
+    // eslint-disable-next-line no-bitwise
+    if (value < 16 || value > 32768 || (value & (value - 1)) !== 0) {
+      throw new InvalidConfiguration(key, value, 'Must be a power of two between 16 and 32768.');
+    }
+
+    return value;
+  },
 
   /** ****************************************************************
    * Export Bucket options                                           *

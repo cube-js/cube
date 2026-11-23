@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, LocalResult, NaiveDate, NaiveDateTime, TimeZone};
+use chrono::{DateTime, Duration, LocalResult, NaiveDate, NaiveDateTime, TimeZone, Timelike};
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
@@ -45,6 +45,14 @@ impl QueryDateTimeHelper {
         }
 
         Err(CubeError::user(format!("Can't parse date: '{}'", date)))
+    }
+
+    /// A date or date-time carrying no UTC offset, read in the query timezone.
+    pub fn is_local_date_time(date: &str) -> bool {
+        DATE_RE.is_match(date)
+            || ["%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S%.f"]
+                .iter()
+                .any(|format| NaiveDateTime::parse_from_str(date, format).is_ok())
     }
 
     pub fn resolve_local_result(
@@ -150,6 +158,17 @@ impl QueryDateTimeHelper {
             ));
         }
         Ok(date.to_string())
+    }
+
+    /// An inclusive end bound at millisecond precision: one written to the
+    /// second, like `23:59:59`, covers that whole second.
+    pub fn inclusive_to_date(date: &str) -> Result<String, CubeError> {
+        let to = Self::format_to_date(date, 3)?;
+        let mut end = Self::parse_native_date_time(&to)?;
+        if end.nanosecond() == 0 {
+            end = end.with_nanosecond(999_000_000).unwrap_or(end);
+        }
+        Ok(end.format("%Y-%m-%dT%H:%M:%S%.3f").to_string())
     }
 
     pub fn format_to_date(date: &str, precision: u32) -> Result<String, CubeError> {

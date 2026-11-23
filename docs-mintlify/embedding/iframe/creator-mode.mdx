@@ -49,12 +49,12 @@ that is the Cube app's own surface, with its own separate setting.
 
 ## AI
 
-Creator Mode workbooks show the same AI entry points as the full Cube app — the chat side panel, the launchpad's "Ask Cube Agent" button, "Fix in chat" on a failed report, and AI summary widgets — unless you turn them off.
+Creator Mode workbooks show the same AI entry points as the full Cube app — the chat side panel, the launchpad's "Ask Cube Agent" button, "Fix in chat" on a failed report, and Analysis widgets — unless you turn them off.
 
 Three account-wide switches under **Embed → Settings** control this, each overridable per session via [Generate Session][ref-generate-session]:
 
 - **AI** (`allowAi`) is the master switch. Turning it off is enforced server-side — a denied session can't obtain AI credentials at all, so it can't spend AI tokens, and it overrides the toggles below.
-- **Workbook chat** (`showWorkbookChat`) and **AI widgets** (`showAiWidgets`) hide those specific entry points without disabling AI as a whole. While the master switch is off, these are disabled rather than cleared, so turning AI back on restores their configured state.
+- **Workbook chat** (`showWorkbookChat`) and **Analysis widgets** (`showAiWidgets`) hide those specific entry points without disabling AI as a whole. While the master switch is off, these are disabled rather than cleared, so turning AI back on restores their configured state.
 
 The agent creates and modifies workbooks, explorations, and dashboards only in Creator Mode sessions. In a session for an `externalId` user minted without `creatorMode: true` — an embedded dashboard, an [embedded chat](/embedding/iframe/analytics-chat), or a [Chat API](/reference/embed-apis/chat-api) session — it can answer questions with queries, tables, and charts, but it does not save them.
 

@@ -57,8 +57,11 @@ tags:
   - name: Dashboard Embed Access
   - name: Usage Analytics
   - name: OpenAPI Spec
+  - name: Audit Log
   - name: Chat History
+  - name: Data Model History
   - name: Ossie Conversion
+  - name: Query History
   - name: Report Deliveries
 paths:
   /api/v1/api-keys:
@@ -155,6 +158,60 @@ paths:
       summary: Get app config
       tags:
         - App Theme
+  /api/v1/audit-logs/export:
+    get:
+      operationId: exportAuditLog
+      parameters:
+        - in: query
+          name: start
+          required: true
+          description: First day of the range, `YYYY-MM-DD`.
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end
+          required: true
+          description: Last day of the range, `YYYY-MM-DD`.
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: search
+          required: false
+          description: Free-text filter.
+          schema:
+            type: string
+        - in: query
+          name: eventName
+          required: false
+          description: Only events with this name.
+          schema:
+            type: string
+        - in: query
+          name: userEmail
+          required: false
+          description: Only events by the user with this email.
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                format: binary
+                type: string
+          description: The audit log events in the range.
+      summary: Export the audit log
+      tags:
+        - Audit Log
+      x-mint:
+        content: >-
+          Stream the account audit log for a date range as a CSV attachment. Requires the
+          `AuditLogManage` action.
+
+
+          An API key scoped to specific deployments answers `403` here.
   /api/v1/deployments:
     get:
       operationId: getDeployments
@@ -869,15 +926,16 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DatabricksMetricViewIntegrationResponse'
+                $ref: '#/components/schemas/DatabricksMetricViewIntegrationWithBuildsResponse'
           description: ''
       summary: Get Databricks Metric View publication settings
       tags:
         - Databricks Metric View Integration
       x-mint:
         content: >-
-          Requires a Databricks datasource. This is currently in preview — reach out to the Cube
-          support team to activate it for your account.
+          Also returns the deployment's newest successful build and the build last published, so
+          automation can tell when Databricks lags the deployed model. This is currently in preview
+          — reach out to the Cube support team to activate it for your account.
     put:
       operationId: saveIntegration
       parameters:
@@ -911,8 +969,9 @@ paths:
       x-mint:
         content: >-
           Uses optimistic configuration versioning. Pass `expectedConfigurationVersion` 0 to create.
-          Requires a Databricks datasource. This is currently in preview — reach out to the Cube
-          support team to activate it for your account.
+          Requires a Databricks datasource defined in environment variables, or a `connection` for
+          one with none, such as a datasource driver_factory in cube.py serves. This is currently in
+          preview — reach out to the Cube support team to activate it for your account.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs:
     get:
       operationId: listSyncs
@@ -955,8 +1014,8 @@ paths:
       x-mint:
         content: >-
           Durable run history for this datasource, newest first. It remains available after a run
-          finishes. Requires a Databricks datasource. This is currently in preview — reach out to
-          the Cube support team to activate it for your account.
+          finishes. This is currently in preview — reach out to the Cube support team to activate it
+          for your account.
     post:
       operationId: startSync
       parameters:
@@ -990,14 +1049,19 @@ paths:
       x-mint:
         content: >-
           Converts the configured Cube views from the deployment's latest successful build and
-          creates or replaces each one's managed Databricks Metric View. Views publish
-          independently: one that is incompatible, fails Databricks validation, or whose destination
-          belongs to another integration keeps its last good definition and does not stop the
-          others, and a view whose definition is unchanged is skipped without a Databricks write.
+          creates or replaces each one's managed Databricks Metric View. For a caller with
+          `SqlRunnerRead`, other than an embedded analytics session, Jinja-templated YAML files are
+          first rendered in the deployment's Cube runtime with its default context, and the request
+          returns 409 while a rollout leaves that runtime on another build; otherwise a templated
+          file fails the request. Views publish independently: one that is incompatible, fails
+          Databricks validation, or whose destination belongs to another integration keeps its last
+          good definition and does not stop the others, and a view whose definition is unchanged is
+          skipped without a Databricks write. A view whose destination already holds an object this
+          integration does not manage is refused unless `takeOverTargets` names that destination.
           One run per integration at a time; a second start while one is active returns 409.
-          Requires a Databricks datasource, enabled publication settings, and SchemaUpdate access.
-          This is currently in preview — reach out to the Cube support team to activate it for your
-          account.
+          Requires a Databricks connection (env-defined, or the integration's own credential),
+          enabled publication settings, and SchemaUpdate access. This is currently in preview —
+          reach out to the Cube support team to activate it for your account.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/syncs/{runId}:
     delete:
       operationId: cancelSync
@@ -1091,15 +1155,25 @@ paths:
         - Databricks Metric View Publication
       x-mint:
         content: >-
-          Queues an offline conversion of static YAML from the deployment's latest successful build
-          and returns polling URLs immediately. Exact retries while the same content-addressed
-          preview is running reuse that work; a later submission starts a fresh execution. Preview
-          payloads and results are retained for at most seven days. The conversion supports scalar
-          dimensions, common and calculated measures, and acyclic many-to-one equi-joins from one
-          Databricks datasource. Access policies, templating, extends, unsafe fanout, unsupported
-          expressions, multiple datasources, and converter loss are blocked per view. Two-part
-          schema.table sources are qualified with `CUBEJS_DB_DATABRICKS_CATALOG` for the selected
-          datasource; without that setting they fail closed with an actionable issue. Requires
+          Queues an offline conversion of the YAML data model from the deployment's latest
+          successful build and returns polling URLs immediately. For a caller with `SqlRunnerRead`,
+          other than an embedded analytics session, Jinja-templated YAML files are first rendered in
+          the deployment's Cube runtime with its default context, and the request returns 409 while
+          a rollout leaves that runtime on another build; otherwise a templated file fails the
+          request. With `source: 'files'`, it converts the YAML `files` sent with the request
+          instead, such as a pull request's checkout, so CI can compare that preview with one of the
+          deployment before merging; the response then has no `buildJobId`, and a Jinja-templated
+          file fails the request. Exact retries while the same content-addressed preview is running
+          reuse that work; a later submission starts a fresh execution. Preview payloads and results
+          are retained for at most seven days. The conversion supports scalar dimensions, common and
+          calculated measures, and acyclic many-to-one equi-joins from one Databricks datasource.
+          Access policies (including a cube's inherited ones), `extends` of a cube outside the YAML
+          model, unsafe fanout, unsupported expressions, multiple datasources, and converter loss
+          are blocked per view. Two-part schema.table sources are qualified with the integration
+          credential's `catalog`, or with `CUBEJS_DB_DATABRICKS_CATALOG` for the selected datasource
+          when the integration has no credential; without either they fail closed with an actionable
+          issue. A datasource with no env-defined Databricks connection, such as one driver_factory
+          in cube.py serves, previews only once its integration has a credential. Requires
           `SchemaRead` or `SchemaUpdate` access. This is currently in preview — reach out to the
           Cube support team to activate it for your account.
   /api/v1/deployments/{deploymentId}/databricks-metric-view-previews/{previewId}:
@@ -2404,11 +2478,17 @@ paths:
           Interchange)](https://github.com/apache/ossie) model, and returns polling URLs
           immediately. An export converts the YAML data model of the deployment's latest successful
           build, or uploaded YAML files, to one Ossie model; an import converts an uploaded Ossie
-          model to Cube data model files. Neither changes the deployment. Only static YAML model
-          files are converted; JavaScript models and Jinja-templated files are skipped. Uploads are
-          limited to 512 files of at most 2 MiB each and 20 MiB in total. Requests and results are
-          kept for at most one day. Requires `SchemaRead` or `SchemaUpdate` access. This is
-          currently in preview — reach out to the Cube support team to activate it for your account.
+          model to Cube data model files. Neither changes the deployment. Only YAML model files are
+          converted; JavaScript models are skipped. For a caller with `SqlRunnerRead`, other than an
+          embedded analytics session, a deployment export renders its Jinja-templated YAML files,
+          `.yml.jinja` ones included, in the deployment's Cube runtime before the conversion starts,
+          and the request returns 409 while a rollout leaves that runtime on another build;
+          otherwise, and for uploads, they are skipped. They render with the deployment's default
+          context, so Jinja that reads the security context or `COMPILE_CONTEXT` exports that one
+          variant. Uploads are limited to 512 files of at most 2 MiB each and 20 MiB in total.
+          Requests and results are kept for at most one day. Requires `SchemaRead` or `SchemaUpdate`
+          access. This is currently in preview — reach out to the Cube support team to activate it
+          for your account.
   /api/v1/deployments/{deploymentId}/ossie-conversions/{conversionId}:
     delete:
       operationId: cancelConversion
@@ -2559,6 +2639,136 @@ paths:
       summary: List the pods currently scheduled for a deployment
       tags:
         - Deployments
+  /api/v1/deployments/{deploymentId}/query-history/requests:
+    get:
+      operationId: listQueryHistoryRequests
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: from
+          schema:
+            description: >-
+              Only requests at or after this ISO 8601 date or date-time, UTC unless it names a zone.
+              Defaults to 24 hours before `to`. A window that starts earlier than the deployment’s
+              Query History retention answers `400`.
+            oneOf:
+              - pattern: ^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$
+                type: string
+              - type: 'null'
+        - in: query
+          name: to
+          schema:
+            description: >-
+              Only requests at or before this ISO 8601 date-time, UTC unless it names a zone. A date
+              alone (`2026-10-01`) includes that whole day. Defaults to now.
+            oneOf:
+              - pattern: ^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$
+                type: string
+              - type: 'null'
+        - in: query
+          name: status
+          schema:
+            description: >-
+              `success`, `error`, `running` (no response yet), or `noResponse` (no response, and
+              silent for five minutes).
+            oneOf:
+              - $ref: '#/components/schemas/QueryHistoryRequestsQueryStatus'
+              - type: 'null'
+        - in: query
+          name: apiType
+          schema:
+            description: The API the request came in on. Repeat the parameter to match any of several.
+            oneOf:
+              - items:
+                  type: string
+                  enum:
+                    - rest
+                    - graphql
+                    - sql
+                    - ws
+                type: array
+                maxItems: 4
+              - type: 'null'
+        - in: query
+          name: minDurationMs
+          schema:
+            description: Only requests that took at least this many milliseconds.
+            oneOf:
+              - minimum: 0
+                type: integer
+              - type: 'null'
+        - in: query
+          name: search
+          schema:
+            description: A substring of the query, the security context, the request id or the span id.
+            oneOf:
+              - maxLength: 1000
+                type: string
+              - type: 'null'
+        - in: query
+          name: after
+          schema:
+            type: string
+        - in: query
+          name: first
+          schema:
+            minimum: 1
+            type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryHistoryRequestListResponse'
+          description: ''
+      summary: List Query History requests
+      tags:
+        - Query History
+      x-mint:
+        content: >-
+          API requests to the deployment, newest first. Covers the deployment's production API
+          requests that queried data (REST, GraphQL, SQL and WebSocket), as the Query History page
+          in Cube Cloud shows them; requests to development branches and metadata calls are left
+          out. How far back it reaches is the deployment's Query History retention. Filters combine
+          with AND. A page holds up to 200 requests (100 by default). An `endCursor` keeps its first
+          page's filters: with `after`, the other filters are ignored. Open a request with `GET
+          …/query-history/requests/{id}` to see the SQL it generated.
+  /api/v1/deployments/{deploymentId}/query-history/requests/{id}:
+    get:
+      operationId: getQueryHistoryRequest
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: 'The `id` a listed request carries: `<epochMs>-<spanId>`.'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryHistoryRequestDetail'
+          description: ''
+      summary: Get a Query History request
+      tags:
+        - Query History
+      x-mint:
+        content: >-
+          One API request with the SQL it generated, to the data source and to Cube Store, and how
+          long each query waited and ran. Covers the deployment's production API requests that
+          queried data (REST, GraphQL, SQL and WebSocket), as the Query History page in Cube Cloud
+          shows them; requests to development branches and metadata calls are left out. How far back
+          it reaches is the deployment's Query History retention.
   /api/v1/deployments/{deploymentId}/report-deliveries:
     get:
       operationId: getReportDeliveries
@@ -4216,6 +4426,10 @@ paths:
 
           - `name` — rename the workbook.
 
+          - `renamed` — set to `true` when a person renamed the workbook. A suggested name then
+          stops following the workbook's content. Without it, a `name` equal to a name a suggestion
+          replaced is ignored as a stale value.
+
           - `meta` — replace the workbook's metadata object.
 
           - `folderId` — move the workbook between folders. Set it to a folder id to move the
@@ -4623,6 +4837,45 @@ paths:
           Requires **manage** access to the workbook. Returns `404` if the workbook or the named
           embed tenant does not exist, and `400` if the request specifies no change or sets
           `allowEmbed` on a workbook that has no published dashboard.
+  /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/name-suggestion:
+    post:
+      operationId: suggestWorkbookName
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: workbookId
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuggestWorkbookNameInput'
+        description: SuggestWorkbookNameInput
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workbook'
+          description: ''
+      summary: Suggest a workbook name
+      tags:
+        - Workbooks
+      x-mint:
+        content: >-
+          Names a workbook created with a placeholder name (`nameSource: "default"`) from its tabs
+          and dashboard tiles. The name follows the content, at most once per 5 minutes, until the
+          workbook is renamed. Returns the workbook, renamed or as it was.
+
+
+          Requires **edit** access to the workbook.
   /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/promotion:
     get:
       operationId: getWorkbookPromotion
@@ -5985,6 +6238,39 @@ paths:
           security applies to the viewer, and the stored result other viewers see is left untouched.
           Results are cached briefly per (report, code, SQL, user); failures are not cached. Returns
           `403` when Python analysis is not enabled for the account.
+  /api/v1/embed/deployments/{deploymentId}/dashboards/by-slug/{slug}:
+    get:
+      operationId: getDashboardBySlug
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: number
+        - in: path
+          name: slug
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbedDashboardBySlugResponse'
+          description: ''
+      summary: Find an embeddable dashboard by slug
+      tags:
+        - Embed
+      x-mint:
+        content: >-
+          Returns the `publicId` and title of the published dashboard whose workbook holds `slug` in
+          the deployment, so an embedded view can open it.
+
+
+          Access is authorized exactly as for `GET /api/v1/embed/dashboard/{publicId}`. Returns
+          `404` if no published dashboard holds the slug, and `403` when the caller may not read it
+          or signed embedding is not allowed for it.
   /api/v1/embed/generate-session:
     post:
       operationId: generateSession
@@ -7591,6 +7877,165 @@ paths:
       summary: Commit (and push) the active branch's pending changes
       tags:
         - Data Model
+  /build/api/v1/deployments/{deploymentId}/data-model/branch-diff:
+    get:
+      operationId: getBranchDiff
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: branchName
+          required: true
+          schema:
+            type: string
+          description: The branch whose changes to show.
+        - in: query
+          name: baseBranch
+          required: false
+          schema:
+            type: string
+          description: The branch to compare against.
+        - in: query
+          name: maxDiffBytes
+          required: false
+          schema:
+            type: integer
+          description: >-
+            Cuts the unified diff at this many bytes (default 12000); `diffTruncated` says when. A
+            diff of many files can still be large: narrow it to a commit or a file first.
+        - in: query
+          name: maxFiles
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: >-
+            Lists at most this many changed files (default 50); `totalFiles` says how many there
+            were when the list is cut. `insertions` and `deletions` always cover the whole change.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchDiffResponse'
+          description: ''
+      summary: Show what a data-model branch changed against its base (git diff of branches)
+      tags:
+        - Data Model History
+      x-mint:
+        content: >-
+          The committed changes on `branchName` since it forked from `baseBranch`, which defaults to
+          its parent branch, else the deploy branch.
+  /build/api/v1/deployments/{deploymentId}/data-model/commit-diff:
+    get:
+      operationId: getCommitDiff
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: branchName
+          required: false
+          schema:
+            type: string
+          description: The branch whose history to read; the deploy branch when omitted.
+        - in: query
+          name: fromCommit
+          required: false
+          schema:
+            type: string
+          description: Full or abbreviated SHA of the left side.
+        - in: query
+          name: toCommit
+          required: false
+          schema:
+            type: string
+          description: Full or abbreviated SHA of the right side.
+        - in: query
+          name: maxDiffBytes
+          required: false
+          schema:
+            type: integer
+          description: >-
+            Cuts the unified diff at this many bytes (default 12000); `diffTruncated` says when. A
+            diff of many files can still be large: narrow it to a commit or a file first.
+        - in: query
+          name: maxFiles
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: >-
+            Lists at most this many changed files (default 50); `totalFiles` says how many there
+            were when the list is cut. `insertions` and `deletions` always cover the whole change.
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitDiffResponse'
+          description: ''
+      summary: Show what data-model git commits on a branch changed (git diff of commits)
+      tags:
+        - Data Model History
+      x-mint:
+        content: >-
+          `toCommit` alone diffs that commit against its first parent, `fromCommit` and `toCommit`
+          diff the range, and `fromCommit` alone diffs it against the branch tip. Both must be in
+          the branch’s history.
+  /build/api/v1/deployments/{deploymentId}/data-model/commits:
+    get:
+      operationId: listCommits
+      parameters:
+        - in: path
+          name: deploymentId
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: branchName
+          required: false
+          schema:
+            type: string
+          description: The branch whose history to read; the deploy branch when omitted.
+        - in: query
+          name: filePath
+          required: false
+          schema:
+            type: string
+          description: >-
+            Only commits that changed this file, relative to the project root:
+            `model/cubes/orders.yml`, without a `/data-model/` prefix.
+        - in: query
+          name: after
+          schema:
+            oneOf:
+              - type: string
+              - type: 'null'
+        - in: query
+          name: first
+          schema:
+            oneOf:
+              - minimum: 1
+                type: integer
+              - type: 'null'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitLogListResponse'
+          description: ''
+      summary: List a branch's data-model git commits (the git log), newest first
+      tags:
+        - Data Model History
+      x-mint:
+        content: '`first` defaults to 20 and is capped at 100.'
   /build/api/v1/deployments/{deploymentId}/data-model/file-hashes:
     get:
       operationId: fileHashes
@@ -8479,6 +8924,73 @@ components:
         - expectedSourceHash
         - idempotencyKey
       type: object
+    BranchDiffFile:
+      properties:
+        binary:
+          oneOf:
+            - type: boolean
+            - type: 'null'
+        deletions:
+          oneOf:
+            - type: number
+            - type: 'null'
+        insertions:
+          oneOf:
+            - type: number
+            - type: 'null'
+        path:
+          type: string
+        previousPath:
+          oneOf:
+            - type: string
+            - type: 'null'
+        status:
+          type: string
+      required:
+        - path
+        - status
+      type: object
+    BranchDiffResponse:
+      properties:
+        baseBranch:
+          type: string
+        baseRef:
+          type: string
+        branchName:
+          type: string
+        deletions:
+          type: number
+        diff:
+          type: string
+        diffOmittedReason:
+          oneOf:
+            - type: string
+            - type: 'null'
+        diffTruncated:
+          type: boolean
+        files:
+          items:
+            $ref: '#/components/schemas/BranchDiffFile'
+          type: array
+        insertions:
+          type: number
+        totalFiles:
+          oneOf:
+            - type: number
+            - type: 'null'
+        usedMergeBase:
+          type: boolean
+      required:
+        - branchName
+        - baseBranch
+        - baseRef
+        - usedMergeBase
+        - files
+        - insertions
+        - deletions
+        - diff
+        - diffTruncated
+      type: object
     BranchResponse:
       properties:
         id:
@@ -9104,6 +9616,75 @@ components:
             - type: boolean
             - type: 'null'
       type: object
+    CommitDiffResponse:
+      properties:
+        branchName:
+          type: string
+        deletions:
+          type: number
+        diff:
+          type: string
+        diffOmittedReason:
+          oneOf:
+            - type: string
+            - type: 'null'
+        diffTruncated:
+          type: boolean
+        files:
+          items:
+            $ref: '#/components/schemas/BranchDiffFile'
+          type: array
+        fromCommit:
+          type: string
+        insertions:
+          type: number
+        toCommit:
+          type: string
+        totalFiles:
+          oneOf:
+            - type: number
+            - type: 'null'
+      required:
+        - branchName
+        - fromCommit
+        - toCommit
+        - files
+        - insertions
+        - deletions
+        - diff
+        - diffTruncated
+      type: object
+    CommitLogEntryResponse:
+      properties:
+        authorEmail:
+          type: string
+        authorName:
+          type: string
+        committedAt:
+          type: string
+        sha:
+          type: string
+        subject:
+          type: string
+      required:
+        - sha
+        - authorName
+        - authorEmail
+        - committedAt
+        - subject
+      type: object
+    CommitLogListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/CommitLogEntryResponse'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
     ConnectGitHubRequest:
       properties:
         deployBranchName:
@@ -9384,6 +9965,15 @@ components:
           type: string
         region:
           type: string
+        starterProject:
+          description: >-
+            The project the deployment starts with: `empty` (the default); or `none`, for a
+            deployment the console wizard goes on to set up from its `creationStep` (e.g.
+            `databases`: connect a database, then build the project from the tables chosen). Not
+            used when `creationMethod` is `github`.
+          oneOf:
+            - $ref: '#/components/schemas/CreateDeploymentInputStarterProject'
+            - type: 'null'
         targetPlatform:
           type: string
         template:
@@ -9418,6 +10008,11 @@ components:
       enum:
         - git
         - cli
+      type: string
+    CreateDeploymentInputStarterProject:
+      enum:
+        - empty
+        - none
       type: string
     CreateDeploymentInputTemplate:
       enum:
@@ -9927,7 +10522,15 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        nameSource:
+          oneOf:
+            - $ref: '#/components/schemas/CreateWorkbookInputNameSource'
+            - type: 'null'
       type: object
+    CreateWorkbookInputNameSource:
+      enum:
+        - default
+      type: string
     CreatedDeploymentEnvironmentToken:
       properties:
         created_at:
@@ -10241,10 +10844,6 @@ components:
               additionalProperties:
                 type: string
             - type: 'null'
-        html:
-          oneOf:
-            - type: string
-            - type: 'null'
         manifest:
           oneOf:
             - $ref: '#/components/schemas/DashboardAppManifest'
@@ -10262,10 +10861,6 @@ components:
             - type: object
               additionalProperties:
                 type: string
-            - type: 'null'
-        html:
-          oneOf:
-            - type: string
             - type: 'null'
         manifest:
           oneOf:
@@ -10707,8 +11302,10 @@ components:
         value:
           description: >-
             Filter value. Omit for is_null / is_not_null / is_empty / is_not_empty; provide a
-            2-element [start, end] array for between. An empty array or empty string with no
-            operator renders the filter cleared; with an operator, the filter keeps that operator.
+            2-element [start, end] array for between; a whole number of members of at least 1 for
+            top_n / bottom_n, which set a Top N control and rank by the measure it is configured
+            with. An empty array or empty string with no operator renders the filter cleared; with
+            an operator, the filter keeps that operator.
           oneOf:
             - oneOf:
                 - type: string
@@ -10746,6 +11343,8 @@ components:
         - is_not_empty
         - between
         - custom
+        - top_n
+        - bottom_n
       type: string
     DashboardFilterOperator:
       enum:
@@ -10773,6 +11372,8 @@ components:
         - is_not_empty
         - between
         - custom
+        - top_n
+        - bottom_n
       type: string
     DashboardLayout:
       properties:
@@ -11201,8 +11802,78 @@ components:
       required:
         - success
       type: object
+    DatabricksMetricViewBuildResponse:
+      properties:
+        buildJobId:
+          type: integer
+        commit:
+          oneOf:
+            - type: string
+            - type: 'null'
+      required:
+        - buildJobId
+      type: object
+    DatabricksMetricViewConnectionInput:
+      properties:
+        catalog:
+          description: >-
+            Catalog for two-part sql_table names, as CUBEJS_DB_DATABRICKS_CATALOG is for an
+            env-defined connection.
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        clientId:
+          description: OAuth client ID of the Databricks service principal.
+          maxLength: 255
+          type: string
+        clientSecret:
+          description: >-
+            OAuth secret of the service principal. Write-only, never returned. Omit to keep the
+            stored secret, which is kept only while host and clientId are unchanged.
+          oneOf:
+            - maxLength: 1024
+              type: string
+            - type: 'null'
+        host:
+          description: Workspace hostname, without https://.
+          maxLength: 255
+          type: string
+        httpPath:
+          description: SQL warehouse HTTP path, like /sql/1.0/warehouses/<id>.
+          maxLength: 255
+          type: string
+      required:
+        - host
+        - httpPath
+        - clientId
+      type: object
+    DatabricksMetricViewConnectionResponse:
+      properties:
+        catalog:
+          oneOf:
+            - type: string
+            - type: 'null'
+        clientId:
+          type: string
+        host:
+          type: string
+        httpPath:
+          type: string
+      required:
+        - host
+        - httpPath
+        - clientId
+      type: object
     DatabricksMetricViewIntegrationConfigurationResponse:
       properties:
+        connection:
+          description: >-
+            The integration's own credential, without its secret. Absent when the datasource's
+            env-defined connection is used.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewConnectionResponse'
+            - type: 'null'
         deletionPolicy:
           $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponseDeletionPolicy'
         enabled:
@@ -11215,6 +11886,9 @@ components:
               additionalProperties:
                 type: string
             - type: 'null'
+        syncOnDeploy:
+          description: True when a successful build of the deployment starts a publication run.
+          type: boolean
         targetCatalog:
           type: string
         targetNamePrefix:
@@ -11244,6 +11918,7 @@ components:
       required:
         - version
         - enabled
+        - syncOnDeploy
         - targetCatalog
         - targetSchema
         - selectionMode
@@ -11286,6 +11961,58 @@ components:
           type: integer
         publicId:
           type: string
+        updatedAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+      required:
+        - publicId
+        - deploymentId
+        - dataSourceName
+        - configurationVersion
+        - configuration
+        - createdAt
+        - updatedAt
+      type: object
+    DatabricksMetricViewIntegrationWithBuildsResponse:
+      properties:
+        accessTest:
+          oneOf:
+            - type: object
+            - type: 'null'
+        configuration:
+          $ref: '#/components/schemas/DatabricksMetricViewIntegrationConfigurationResponse'
+        configurationVersion:
+          type: integer
+        createdAt:
+          oneOf:
+            - format: date
+              type: string
+            - format: date-time
+              type: string
+        dataSourceName:
+          type: string
+        deployedBuild:
+          description: >-
+            The deployment's newest successful build: the one a publication run converts. Null when
+            the deployment has none.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewBuildResponse'
+            - type: 'null'
+        deploymentId:
+          type: integer
+        publicId:
+          type: string
+        publishedBuild:
+          description: >-
+            The build the newest COMPLETED or PARTIAL run converted. Null when no run has published
+            or that run recorded no build; absent when the run history could not be read. Databricks
+            lags the deployed model while its buildJobId differs from deployedBuild.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewBuildResponse'
+            - type: 'null'
         updatedAt:
           oneOf:
             - format: date
@@ -11374,11 +12101,30 @@ components:
       properties:
         dataSourceName:
           type: string
+        files:
+          description: >-
+            With source 'files' only. `.yml`/`.yaml` paths relative to the model folder, mapped to
+            their contents. A path has no `.` or `..` segments and uses only letters, digits, `_`,
+            `-`, `.` and `/`. Jinja-templated files are refused: only a deployed model can be
+            rendered.
+          oneOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
         selectionMode:
           $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInputSelectionMode'
           description: >-
             Choose every deployed Cube view ('all'), an exact ordered list ('selected'), or names
             matching viewNameRegex ('pattern').
+        source:
+          description: >-
+            'deployment' (the default) converts the YAML data model of the deployment's latest
+            successful build; 'files' converts the `files` sent with the request, such as a pull
+            request's checkout, so CI can compare it with a preview of the deployment.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewPublicationPreviewInputSource'
+            - type: 'null'
         sourceOverrides:
           description: >-
             Optional map of Cube view name to the root source dataset the view projects from, for
@@ -11419,10 +12165,18 @@ components:
         - selected
         - pattern
       type: string
+    DatabricksMetricViewPublicationPreviewInputSource:
+      enum:
+        - deployment
+        - files
+      type: string
     DatabricksMetricViewPublicationPreviewResultResponse:
       properties:
         buildJobId:
-          type: integer
+          description: The converted build. Absent for source 'files'.
+          oneOf:
+            - type: integer
+            - type: 'null'
         commit:
           oneOf:
             - type: string
@@ -11454,7 +12208,6 @@ components:
         - previewId
         - deploymentId
         - dataSourceName
-        - buildJobId
         - completedAt
         - durationMs
         - version
@@ -11476,7 +12229,10 @@ components:
     DatabricksMetricViewPublicationPreviewStartResponse:
       properties:
         buildJobId:
-          type: integer
+          description: The converted build. Absent for source 'files'.
+          oneOf:
+            - type: integer
+            - type: 'null'
         commit:
           oneOf:
             - type: string
@@ -11499,7 +12255,6 @@ components:
         - previewId
         - deploymentId
         - dataSourceName
-        - buildJobId
         - reused
         - status
         - statusUrl
@@ -11770,6 +12525,11 @@ components:
           description: >-
             PARTIAL means at least one view published and another did not. Every non-successful view
             keeps its previous Databricks definition.
+        takeOverTargets:
+          description: Destinations, as catalog.schema.name, this run was started to take over.
+          items:
+            type: string
+          type: array
         targetCatalog:
           oneOf:
             - type: string
@@ -11780,6 +12540,9 @@ components:
             - type: 'null'
         trigger:
           $ref: '#/components/schemas/DatabricksMetricViewSyncRunResponseTrigger'
+          description: >-
+            MANUAL for a run a user started, DEPLOYMENT for one a successful build of the deployment
+            started.
         viewNames:
           description: The Cube views this run was planned against.
           items:
@@ -11797,6 +12560,7 @@ components:
         - trigger
         - status
         - viewNames
+        - takeOverTargets
         - views
         - incompleteViewCount
         - createdAt
@@ -11814,6 +12578,7 @@ components:
     DatabricksMetricViewSyncRunResponseTrigger:
       enum:
         - MANUAL
+        - DEPLOYMENT
       type: string
     DatabricksMetricViewSyncStartResponse:
       properties:
@@ -11851,12 +12616,20 @@ components:
         cubeViewName:
           type: string
         detail:
-          description: A stable reason code, never raw Databricks output.
+          description: >-
+            A stable reason code, never raw Databricks output. `unmanaged-target` and
+            `ownership-conflict` mean an object this integration does not manage holds the
+            destination; pass its `target` in `takeOverTargets` to replace it.
           oneOf:
             - type: string
             - type: 'null'
         outcome:
           $ref: '#/components/schemas/DatabricksMetricViewSyncViewOutcomeResponseOutcome'
+        target:
+          description: The destination, as catalog.schema.name; null when conversion blocked the view.
+          oneOf:
+            - type: string
+            - type: 'null'
         withheldMembers:
           description: >-
             Measures this view published without, as 'cube.member'. Non-empty means the Metric View
@@ -11965,12 +12738,33 @@ components:
       type: object
     DbtSyncManifestStats:
       properties:
+        importedMetrics:
+          description: Number of imported dbt semantic metrics, when import is enabled.
+          oneOf:
+            - type: integer
+            - type: 'null'
         macros:
           type: integer
         models:
           type: integer
+        skippedMetrics:
+          description: >-
+            The first 25 skipped metrics by unique ID, with the reason for each;
+            `unsupportedMetrics` counts them all.
+          oneOf:
+            - items:
+                $ref: '#/components/schemas/DbtSyncSkippedMetric'
+              type: array
+            - type: 'null'
         sources:
           type: integer
+        unsupportedMetrics:
+          description: >-
+            Number of dbt semantic metrics skipped because they cannot be imported exactly, when
+            import is enabled.
+          oneOf:
+            - type: integer
+            - type: 'null'
       required:
         - models
         - sources
@@ -12186,6 +12980,11 @@ components:
           oneOf:
             - type: integer
             - type: 'null'
+        importedMetrics:
+          description: Number of imported dbt semantic metrics, when import is enabled.
+          oneOf:
+            - type: integer
+            - type: 'null'
         macros:
           description: dbt macros found in the manifest.
           oneOf:
@@ -12206,6 +13005,13 @@ components:
             - type: 'null'
         sources:
           description: dbt sources found in the manifest.
+          oneOf:
+            - type: integer
+            - type: 'null'
+        unsupportedMetrics:
+          description: >-
+            Number of dbt semantic metrics skipped because they cannot be imported exactly, when
+            import is enabled.
           oneOf:
             - type: integer
             - type: 'null'
@@ -12241,6 +13047,22 @@ components:
         - agent
         - unknown
       type: string
+    DbtSyncSkippedMetric:
+      properties:
+        name:
+          description: The dbt metric name.
+          type: string
+        reason:
+          description: Why the metric cannot be imported exactly.
+          type: string
+        uniqueId:
+          description: The dbt metric unique ID.
+          type: string
+      required:
+        - name
+        - uniqueId
+        - reason
+      type: object
     DbtSyncStatusResponse:
       properties:
         error:
@@ -12867,6 +13689,16 @@ components:
         - read
         - none
       type: string
+    EmbedDashboardBySlugResponse:
+      properties:
+        publicId:
+          type: string
+        title:
+          type: string
+      required:
+        - publicId
+        - title
+      type: object
     EmbedDashboardComment:
       properties:
         body:
@@ -13056,8 +13888,10 @@ components:
             agent cannot save or update standalone explorations/reports, create or modify workbooks,
             create or publish dashboards, or direct users to those Cube UI surfaces. Omit or set to
             `true` to preserve the session user's role-derived authoring capabilities; `true` never
-            grants access the user does not already have. This setting changes only AI Chat tools
-            and instructions. It does not change user roles or permissions for direct API calls.
+            grants access the user does not already have. For an `externalId` session, authoring
+            also requires `creatorMode: true`: outside creator mode the agent never saves workspace
+            content. This setting changes only AI Chat tools and instructions. It does not change
+            user roles or permissions for direct API calls.
           oneOf:
             - type: boolean
             - type: 'null'
@@ -14123,6 +14957,9 @@ components:
             - type: boolean
             - type: 'null'
         message:
+          description: >-
+            Commit message for the merge. If empty or missing, the agent writes it from the branch's
+            diff; if AI is not available, Git's default merge message is used.
           oneOf:
             - type: string
             - type: 'null'
@@ -14152,13 +14989,16 @@ components:
         branchName:
           type: string
         message:
-          type: string
+          description: >-
+            Commit message for the merge. If empty or missing, the agent writes it from the branch's
+            diff; if AI is not available, Git's default merge message is used.
+          oneOf:
+            - type: string
+            - type: 'null'
         removeBranchAfterMerge:
           oneOf:
             - type: boolean
             - type: 'null'
-      required:
-        - message
       type: object
     MoveWorkspaceObjectInput:
       properties:
@@ -15275,6 +16115,10 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        expectedVersionId:
+          oneOf:
+            - type: integer
+            - type: 'null'
         title:
           oneOf:
             - type: string
@@ -15326,6 +16170,244 @@ components:
         - stderr
         - inputRowCount
       type: object
+    QueryHistoryRequest:
+      properties:
+        apiType:
+          description: '`rest`, `graphql`, `sql` or `ws`.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        cacheType:
+          description: >-
+            Where the answer came from: `cube` (a pre-aggregation in Cube Store), `cube-suboptimal`
+            (Cube Store with a suboptimal plan), `base` (the data source), `internal` (Cube’s
+            in-memory cache) or `none`.
+          type: string
+        durationMs:
+          description: Time to the API response.
+          oneOf:
+            - type: number
+            - type: 'null'
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          description: >-
+            Pass to `GET …/query-history/requests/{id}`. It is the id in the request’s Query History
+            link in Cube Cloud, not `requestId`.
+          type: string
+        isPlayground:
+          type: boolean
+        isSubscription:
+          type: boolean
+        preAggregations:
+          description: The pre-aggregations the request used, as APM recorded them.
+          oneOf:
+            - type: string
+            - type: 'null'
+        query:
+          description: 'The query as the API received it: REST query JSON, or the SQL text.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        requestId:
+          description: The request id the client sent or Cube assigned.
+          type: string
+        responseBytes:
+          oneOf:
+            - type: number
+            - type: 'null'
+        securityContext:
+          description: The security context JSON.
+          oneOf:
+            - type: string
+            - type: 'null'
+        spanId:
+          type: string
+        status:
+          $ref: '#/components/schemas/QueryHistoryRequestStatus'
+          description: >-
+            `success`, `error`, `running` (no response yet), or `noResponse` (no response, and
+            silent for five minutes).
+        timestamp:
+          description: When the request arrived, ISO 8601 UTC.
+          type: string
+        usedPreAggregations:
+          type: boolean
+      required:
+        - id
+        - requestId
+        - spanId
+        - timestamp
+        - status
+        - cacheType
+        - usedPreAggregations
+        - isPlayground
+        - isSubscription
+      type: object
+    QueryHistoryRequestDetail:
+      properties:
+        apiType:
+          description: '`rest`, `graphql`, `sql` or `ws`.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        cacheType:
+          description: >-
+            Where the answer came from: `cube` (a pre-aggregation in Cube Store), `cube-suboptimal`
+            (Cube Store with a suboptimal plan), `base` (the data source), `internal` (Cube’s
+            in-memory cache) or `none`.
+          type: string
+        durationMs:
+          description: Time to the API response.
+          oneOf:
+            - type: number
+            - type: 'null'
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+        id:
+          description: >-
+            Pass to `GET …/query-history/requests/{id}`. It is the id in the request’s Query History
+            link in Cube Cloud, not `requestId`.
+          type: string
+        isPlayground:
+          type: boolean
+        isSubscription:
+          type: boolean
+        preAggregations:
+          description: The pre-aggregations the request used, as APM recorded them.
+          oneOf:
+            - type: string
+            - type: 'null'
+        query:
+          description: 'The query as the API received it: REST query JSON, or the SQL text.'
+          oneOf:
+            - type: string
+            - type: 'null'
+        requestId:
+          description: The request id the client sent or Cube assigned.
+          type: string
+        responseBytes:
+          oneOf:
+            - type: number
+            - type: 'null'
+        securityContext:
+          description: The security context JSON.
+          oneOf:
+            - type: string
+            - type: 'null'
+        spanId:
+          type: string
+        sqlQueries:
+          description: >-
+            The SQL the request generated, oldest first: up to 100 queries, each to the data source
+            or Cube Store.
+          items:
+            $ref: '#/components/schemas/QueryHistorySqlQuery'
+          type: array
+        status:
+          $ref: '#/components/schemas/QueryHistoryRequestDetailStatus'
+          description: >-
+            `success`, `error`, `running` (no response yet), or `noResponse` (no response, and
+            silent for five minutes).
+        timestamp:
+          description: When the request arrived, ISO 8601 UTC.
+          type: string
+        usedPreAggregations:
+          type: boolean
+      required:
+        - sqlQueries
+        - id
+        - requestId
+        - spanId
+        - timestamp
+        - status
+        - cacheType
+        - usedPreAggregations
+        - isPlayground
+        - isSubscription
+      type: object
+    QueryHistoryRequestDetailStatus:
+      enum:
+        - success
+        - error
+        - running
+        - noResponse
+      type: string
+    QueryHistoryRequestListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/QueryHistoryRequest'
+          type: array
+        pageInfo:
+          $ref: '#/components/schemas/PageInfo'
+      required:
+        - items
+        - pageInfo
+      type: object
+    QueryHistoryRequestStatus:
+      enum:
+        - success
+        - error
+        - running
+        - noResponse
+      type: string
+    QueryHistoryRequestsQueryStatus:
+      enum:
+        - success
+        - error
+        - running
+        - noResponse
+      type: string
+    QueryHistorySqlQuery:
+      properties:
+        durationMs:
+          oneOf:
+            - type: number
+            - type: 'null'
+        error:
+          oneOf:
+            - type: string
+            - type: 'null'
+        executionDurationMs:
+          description: Time the data source spent executing.
+          oneOf:
+            - type: number
+            - type: 'null'
+        executor:
+          $ref: '#/components/schemas/QueryHistorySqlQueryExecutor'
+        params:
+          description: The values bound to the SQL’s placeholders, in order.
+          items: {}
+          type: array
+        queueDurationMs:
+          description: Time spent waiting in the query queue.
+          oneOf:
+            - type: number
+            - type: 'null'
+        spanId:
+          type: string
+        sql:
+          oneOf:
+            - type: string
+            - type: 'null'
+        timestamp:
+          type: string
+      required:
+        - spanId
+        - timestamp
+        - params
+        - executor
+      type: object
+    QueryHistorySqlQueryExecutor:
+      enum:
+        - dataSource
+        - cubeStore
+      type: string
     RefreshReportInput:
       properties:
         anchorCell:
@@ -16575,11 +17657,21 @@ components:
       type: object
     SaveDatabricksMetricViewIntegrationInput:
       properties:
+        connection:
+          description: >-
+            The integration's own Databricks service-principal credential, for a datasource with no
+            env-defined Databricks connection (for example one served by driver_factory in cube.py).
+            When set, it is used instead of the datasource's env vars. Omit to keep the stored one;
+            null removes it.
+          oneOf:
+            - $ref: '#/components/schemas/DatabricksMetricViewConnectionInput'
+            - type: 'null'
         deletionPolicy:
           $ref: '#/components/schemas/SaveDatabricksMetricViewIntegrationInputDeletionPolicy'
           description: >-
-            Use retain. The delete-managed value is deprecated and currently retains obsolete Metric
-            Views; it does not delete them.
+            What a sync does with a Metric View Cube created once it is obsolete: its Cube view left
+            the scope or its target name changed. retain keeps it; delete-managed drops it, under
+            fixed safety rules. Omitted, it saves retain, also on an update.
         enabled:
           type: boolean
         expectedConfigurationVersion:
@@ -16592,6 +17684,11 @@ components:
           additionalProperties:
             type: string
           type: object
+        syncOnDeploy:
+          description: >-
+            Start a publication run after each successful build of the deployment, while enabled is
+            also true. Defaults to false.
+          type: boolean
         targetCatalog:
           maxLength: 255
           type: string
@@ -16621,13 +17718,10 @@ components:
         - selectionMode
       type: object
     SaveDatabricksMetricViewIntegrationInputDeletionPolicy:
-      oneOf:
-        - const: retain
-          type: string
-        - const: delete-managed
-          type: string
-          deprecated: true
-          description: Managed deletion is not implemented. Use retain.
+      enum:
+        - retain
+        - delete-managed
+      type: string
     SaveDatabricksMetricViewIntegrationInputSelectionMode:
       enum:
         - all
@@ -17300,6 +18394,19 @@ components:
             - format: uuid
               type: string
             - type: 'null'
+        takeOverTargets:
+          description: >-
+            Destinations, each as catalog.schema.name (a refused view's `target` in run history),
+            that this run replaces whatever Databricks object holds them and records as managed by
+            this integration — including one another integration manages. Each must be where a Cube
+            view in the integration's scope publishes; every other destination stays guarded. Omit
+            it and no object Cube does not manage is overwritten.
+          oneOf:
+            - items:
+                type: string
+              type: array
+              maxItems: 128
+            - type: 'null'
       required:
         - configurationVersion
       type: object
@@ -17488,6 +18595,19 @@ components:
       required:
         - transaction
         - deploymentName
+      type: object
+    SuggestWorkbookNameInput:
+      properties:
+        fallbackName:
+          oneOf:
+            - maxLength: 255
+              type: string
+            - type: 'null'
+        language:
+          maxLength: 35
+          type: string
+      required:
+        - language
       type: object
     TenantSettings:
       properties:
@@ -17899,8 +19019,7 @@ components:
             Cross-filters the notification renders with: each is one chart's selection ("Filter
             dashboard by this"), as the dashboard's `xf_<sourceWidgetId>` link param holds it, and
             every other chart renders filtered by it. The chart must be on the published dashboard,
-            with Cross-filtering on. Replaces the stored set when
-            provided; [] clears it.
+            with Cross-filtering on. Replaces the stored set when provided; [] clears it.
           oneOf:
             - items:
                 $ref: '#/components/schemas/DashboardCrossFilterInput'
@@ -18335,6 +19454,10 @@ components:
         name:
           oneOf:
             - type: string
+            - type: 'null'
+        renamed:
+          oneOf:
+            - type: boolean
             - type: 'null'
         slug:
           oneOf:

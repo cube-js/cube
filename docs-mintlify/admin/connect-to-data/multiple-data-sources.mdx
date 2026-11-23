@@ -20,12 +20,54 @@ Cube Cloud tests the connection before saving; on success it persists the
 env vars and restarts the development environment, on failure it surfaces
 the driver's error and saves nothing.
 
+The first named source also creates `CUBEJS_DATASOURCES` (see
+[Under the hood](#under-the-hood)). Once it's set, Cube rejects queries to
+any data source it doesn't list, so the page first shows the list it will
+save and asks you to confirm it:
+
+- The list holds the data sources configured on this page and the ones your
+  data model uses. A data source whose driver fails to load while the page
+  reads the data model is left out.
+- If the page can't read which data sources your data model uses, the
+  dialog says so, and the list holds only the ones configured on this page.
+- If a data source is missing, click **Cancel**, which saves nothing. Add
+  `CUBEJS_DATASOURCES` with every data source name in
+  [**Settings → Environment Variables**][ref-config-ref-env], then add the
+  source again: the page keeps every name the variable lists. You can
+  also save and add the missing name afterwards, but queries to that data
+  source fail until you do.
+
 ## Editing and deleting
 
-Use the **Edit** action on a row to update credentials, or the **Delete**
-action to remove a named source. The **default** source can be edited but
-not deleted — to remove it, clear the bare `CUBEJS_DB_*` variables from
-[**Settings → Environment Variables**][ref-config-ref-env] by hand.
+Use the **Edit** action on a row to update its connection, or **Delete** to
+remove the source. Deleting a named source removes its `CUBEJS_DS_<NAME>_*`
+variables. Deleting the **default** source clears only its connection
+variables, since other bare `CUBEJS_*` variables apply to the whole
+deployment; cubes without a `data_source` stop working until you set up a
+new default. Either way, the page removes the source's name from
+`CUBEJS_DATASOURCES`.
+
+## Data sources served by `driver_factory` {#data-sources-served-by-driver_factory}
+
+Once `CUBEJS_DATASOURCES` is set, Cube rejects queries to any data source it doesn't list,
+including the ones [`driver_factory`](/reference/configuration/config#driver_factory) in
+`cube.py` serves:
+
+```text
+The clickhouse data source is missing in the declared CUBEJS_DATASOURCES.
+```
+
+The Data Sources page adds the data sources your data model uses when it creates the variable (see
+[Adding a data source](#adding-a-data-source)). If `driver_factory` serves a data source that
+isn't in the list, such as one no cube uses yet, add its name to `CUBEJS_DATASOURCES` in
+[**Settings → Environment Variables**][ref-config-ref-env]. Names are case-sensitive.
+
+Don't give a data source that `driver_factory` serves a connection of its own with
+**+ Add data source** or **Edit**. Its driver reads those variables too, and a Databricks
+service principal saved there takes precedence over the per-user `token` the factory returns.
+To publish Databricks Metric Views from such a data source, give the integration its own
+credential instead: see
+[Data sources served by `driver_factory`](/docs/integrations/databricks-metric-views#data-sources-served-by-driver_factory).
 
 ## Source name rules
 
@@ -64,9 +106,9 @@ Cubes that don't set `data_source` use the default source — there's no
 need to write `data_source: default` explicitly, though you can if you
 prefer to be explicit.
 
-A single query can also span sources: see [querying across data
-sources](/recipes/data-modeling/cross-data-source-queries) for appending rows
-from cubes in different databases into one result set.
+A single SQL API query can also span sources, in some query shapes: see
+[querying across data sources](/recipes/data-modeling/cross-data-source-queries)
+for unions, joins, and views over cubes in different databases.
 
 For multitenancy scenarios where the data source is selected dynamically
 per request, see [`driver_factory`](/reference/configuration/config#driver_factory)
@@ -88,9 +130,17 @@ variables — inspect or hand-edit them from
 [**Settings → Environment Variables**][ref-config-ref-env] at any time.
 
 The default source uses bare `CUBEJS_DB_*` variables; each named source
-uses a `CUBEJS_DS_<NAME>_*` prefix. `CUBEJS_DATASOURCES` is auto-maintained
-whenever at least one named source exists, with `default` first and named
-entries lowercased:
+uses a `CUBEJS_DS_<NAME>_*` prefix. `CUBEJS_DATASOURCES` lists the data
+sources Cube accepts queries for, and the page sets it whenever at least
+one named source exists:
+
+- The save that creates it, usually adding the first named source, lists
+  the data sources configured on the page and the ones your data model
+  uses, after you confirm them (see [Adding a data source](#adding-a-data-source)).
+- Later saves keep every name it lists and add new sources. Deleting a
+  source removes its name.
+- Deleting the last named source removes the variable, and Cube then
+  accepts every data source name.
 
 ```dotenv
 CUBEJS_DATASOURCES=default,analytics

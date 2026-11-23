@@ -1027,6 +1027,61 @@ describe('Refresh Scheduler', () => {
   });
 
   describe('Manual pre-aggregations rebuild via postBuildJobs', () => {
+    test('A dry run reports statuses and builds nothing', async () => {
+      process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
+      process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
+
+      const {
+        refreshScheduler, mockDriver, serverCore
+      } = setupScheduler({ repository: repositoryWithPreAggregations });
+
+      const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
+      const options = {
+        metadata: undefined as unknown,
+        preAggregations: [{ id: 'Foo.first' }],
+        timezones: ['UTC'],
+        throwErrors: false,
+        preAggregationLoadConcurrency: 1,
+      };
+      const retryContinueWait = async <T>(fn: () => Promise<T>): Promise<T> => {
+        for (;;) {
+          try {
+            return await fn();
+          } catch (err: any) {
+            if (err.error !== 'Continue wait') {
+              throw err;
+            }
+          }
+        }
+      };
+      const waitForQueue = async () => {
+        const orchestrator = await serverCore.getOrchestratorApi(ctx);
+        const lock = createPromiseLock();
+        const interval = setInterval(async () => {
+          if ((await orchestrator.getPreAggregationQueueStates()).length === 0) {
+            lock.resolve();
+          }
+        }, 500);
+        await lock.promise;
+        clearInterval(interval);
+      };
+
+      const before = await retryContinueWait(() => refreshScheduler.getBuildJobsStatus(ctx, options));
+      expect(before.length).toEqual(5);
+      expect(before.map(({ status }) => status)).toEqual(Array(5).fill('missing_partition'));
+      await waitForQueue();
+      expect(mockDriver.createdTables).toEqual([]);
+
+      await retryContinueWait(() => refreshScheduler.postBuildJobs(ctx, options));
+      await waitForQueue();
+      const createdTables = mockDriver.createdTables.length;
+      expect(createdTables).toEqual(5);
+
+      const after = await retryContinueWait(() => refreshScheduler.getBuildJobsStatus(ctx, options));
+      expect(after.map(({ status }) => status)).toEqual(Array(5).fill('done'));
+      expect(mockDriver.createdTables.length).toEqual(createdTables);
+    });
+
     test('All pre-aggregations', async () => {
       process.env.CUBEJS_EXTERNAL_DEFAULT = 'false';
       process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
@@ -1092,6 +1147,7 @@ describe('Refresh Scheduler', () => {
       buildJobs.forEach(({ job }) => {
         expect(job?.dataSource).toEqual('default');
         expect(['UTC', 'America/Los_Angeles']).toContain(job?.timezone);
+        expect(job?.context.securityContext).toMatchObject({ tenantId: 'tenant1' });
       });
     });
 
@@ -1106,10 +1162,13 @@ describe('Refresh Scheduler', () => {
       const ctx = { authInfo: { tenantId: 'tenant1' }, securityContext: { tenantId: 'tenant1' }, requestId: 'XXX' };
 
       let finish = false;
+      let jobs: string[] = [];
+      // What the job stores when the context it runs in was extended from it.
+      const jobContext = { securityContext: { tenant: 'posted' } };
 
       while (!finish) {
         try {
-          await refreshScheduler.postBuildJobs(
+          jobs = await refreshScheduler.postBuildJobs(
             ctx,
             {
               metadata: undefined,
@@ -1117,7 +1176,8 @@ describe('Refresh Scheduler', () => {
               timezones: ['UTC', 'America/Los_Angeles'],
               forceBuildPreAggregations: false,
               throwErrors: false,
-            }
+            },
+            jobContext,
           );
           finish = true;
         } catch (err: any) {
@@ -1145,6 +1205,10 @@ describe('Refresh Scheduler', () => {
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_first') && o.timezone === 'America/Los_Angeles').length).toEqual(5);
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_orphaned')).length).toEqual(0);
       expect(mockDriver.createdTables.filter(o => o.tableName.includes('foo_second')).length).toEqual(0);
+
+      const buildJobs = await refreshScheduler.getCachedBuildJobs(ctx, jobs);
+      expect(buildJobs.length).toBeGreaterThan(0);
+      buildJobs.forEach(({ job }) => expect(job?.context).toEqual(jobContext));
     });
 
     test('Only `first` pre-aggregation with dateRange', async () => {

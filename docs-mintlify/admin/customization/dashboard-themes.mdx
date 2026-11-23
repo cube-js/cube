@@ -43,14 +43,14 @@ Themes are created from the dashboard builder rather than from this page — see
 
 ## Create a custom theme
 
-Custom themes are saved from the dashboard builder's **Styling** tab.
+Custom themes are saved from the dashboard builder's **Theme** tab.
 
 <Steps>
   <Step title="Open a dashboard">
-    Open a dashboard in a workbook and switch to the dashboard builder.
+    Open a dashboard in a workbook and click the **Builder** tab in the top bar.
   </Step>
   <Step title="Open dashboard options">
-    Click the dashboard options button and switch to the **Styling** tab.
+    Click the gear icon, then the **Theme** tab.
   </Step>
   <Step title="Edit styling">
     Adjust the dashboard background, widget card styles, borders, titles, and text until the dashboard looks the way you want.
@@ -60,12 +60,12 @@ Custom themes are saved from the dashboard builder's **Styling** tab.
   </Step>
 </Steps>
 
-The new theme appears in the **Admin → Customization → Dashboard Themes** list and becomes selectable in the **Styling** tab on every other dashboard in the account.
+The new theme appears in the **Admin → Customization → Dashboard Themes** list and becomes selectable in the **Theme** tab on every other dashboard in the account.
 
 ## Apply a theme to a dashboard
 
-1. Open the dashboard in the dashboard builder.
-2. Open dashboard options and switch to the **Styling** tab.
+1. Open the dashboard and click the **Builder** tab in the top bar.
+2. Click the gear icon, then the **Theme** tab.
 3. Pick a theme from the theme picker.
 
 You can also tweak any styling properties on top of the selected theme — those changes are stored as overrides on the dashboard and do not modify the underlying theme.
@@ -74,7 +74,7 @@ You can also tweak any styling properties on top of the selected theme — those
 
 After tweaking styling on a dashboard that uses a custom theme, you can push those changes back into the theme so every other dashboard using it picks them up.
 
-1. From the dashboard's **Styling** tab, make your changes.
+1. From the dashboard's **Theme** tab, make your changes.
 2. Click **Save** to write the current effective styles back into the theme.
 
 <Warning>
@@ -94,4 +94,4 @@ Dashboards that were using the deleted theme revert to the built-in **Cube** the
 
 - **Themes** are defined once and shared across all deployments in the account.
 - **Theme assignment** is per dashboard — different dashboards in the same workbook can use different themes.
-- New dashboards use the built-in **Cube** theme until you assign a custom theme.
+- A new dashboard has no theme assigned. Its theme picker shows **Cube** and it takes the **Cube** theme's widget, border, title, and text styles, but its canvas uses the background of Cube's own pages instead of `#F9F9FB` (see [Background](/docs/explore-analyze/dashboards/styling#background)).

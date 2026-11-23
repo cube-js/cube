@@ -1,19 +1,19 @@
 ---
 title: Styling
-description: Customize the appearance of a dashboard from the Styling panel in the Dashboard Builder.
+description: Customize the appearance of a dashboard from the Theme tab in the dashboard builder.
 ---
 
-You can customize the appearance of any dashboard — background, padding, widget cards, borders, titles, and fonts — from the **Styling** panel in the Dashboard Builder.
+You can customize the appearance of any dashboard — background, padding, widget cards, borders, titles, and fonts — from the **Theme** tab in the dashboard builder.
 
 Styling is **per-dashboard**: settings are saved to the dashboard's configuration and apply equally to the dashboard in Cube and to its [embedded view](/embedding/iframe/dashboards) (both [private](/embedding/iframe/auth/private) and [signed](/embedding/iframe/auth/signed) embedding).
 
-## Open the Styling panel
+## Open the Theme tab {#open-the-styling-panel}
 
 1. Open your dashboard
-2. Click **Dashboard builder** in the top bar
-3. Click the gear icon to open the **Styling** panel
+2. Click the **Builder** tab in the top bar
+3. Click the gear icon, then the **Theme** tab
 
-Click **Apply** to preview your changes. Click **Reset** to revert to the defaults. Publish the dashboard for the styling to take effect in embedded views.
+Changes show in the builder as you make them. Click **Reset** to discard them and return to the theme's defaults. Publish the dashboard for the styling to take effect in embedded views.
 
 ## Options
 
@@ -27,6 +27,8 @@ Settings that apply to the dashboard canvas as a whole.
 |--------------|----------------------------------------------------|-------------|
 | Background   | Dashboard background color                         | `#f9f9fb`   |
 | Padding      | Outer padding around the dashboard grid            | `16px`      |
+
+When neither the dashboard nor its [theme](/admin/customization/dashboard-themes) sets a background, the canvas has the same background as Cube's own pages, such as **Home**, and follows the app's light, dark, and high-contrast modes. The built-in **Cube** theme sets `#F9F9FB`, so a dashboard with that theme assigned uses `#F9F9FB` instead.
 
 ### Widgets
 

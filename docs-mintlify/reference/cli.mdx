@@ -205,6 +205,7 @@ Run `cube <command> --help` for the full options of any command.
 | `deploy` | Upload a local project directory and build it (`--directory`, `--keep-missing`, `-m`); `--branch` uploads onto a data model branch instead |
 | `validate` | Compile a deployment's data model and report compilation errors (`--branch`, `--dev-mode`) |
 | `logs` | Tail deployment pod logs (`--pod`, `-c/--container`, `--source production\|dev`) |
+| `query-history` (`qh`) | A deployment's Query History — see [Query History commands](#query-history-commands) |
 | `regions` | List available deployment regions |
 | `github` (`gh`) | GitHub integration — see [GitHub commands](#github-commands) |
 | `data-model` | Data model files and Git workflow — see [Data model commands](#data-model-commands) |
@@ -252,6 +253,13 @@ takes its id as the first argument.
 | `environments tokens`, `create-token` | List tokens issued for an environment, or create one |
 | `variables list` | List environment variables — the API masks secret values |
 | `variables set` | Upsert environment variables; omitted variables keep their values |
+
+### Query History commands
+
+| Command | Description |
+| --- | --- |
+| `query-history list` | List a deployment's API requests, newest first: production requests that queried data. Filter with `--from`, `--to`, `--status`, `--api-type` (repeatable), `--min-duration-ms` and `--search`; page with `--first` and `--after`, which keeps the first page's filters |
+| `query-history get` | Show one request, by the id `list` prints, with the SQL it generated and its params |
 
 ### GitHub commands
 
@@ -331,7 +339,7 @@ Usage is under [Apache Ossie](#apache-ossie).
 | `workbooks list`, `get`, `create`, `update`, `delete` | Manage workbooks and dashboards |
 | `workbooks duplicate` | Clone a workbook, including its reports and published dashboard |
 | `workbooks publish`, `dashboard` | Publish a workbook's dashboard, or update its draft |
-| `workbooks ai-thread` | Attach an AI widget thread to a published dashboard |
+| `workbooks ai-thread` | Attach an Analysis widget's thread to a published dashboard |
 | `reports list`, `get`, `create`, `update`, `delete` | Manage reports |
 | `reports refresh` | Re-run a report's query |
 | `reports connect-workbook` | Link a report to a spreadsheet placement |

@@ -1,10 +1,10 @@
+pub mod process;
 pub mod tracing;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{SecondsFormat, Utc};
 use core::mem;
 use core::time::Duration;
-use datafusion::cube_ext;
 use deflate::deflate_bytes_zlib;
 use futures::{Sink, StreamExt};
 use futures_timer::Delay;
@@ -17,7 +17,7 @@ use std::env;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::net::TcpStream;
-use tokio::sync::{Mutex, Notify, RwLock};
+use tokio::sync::{Notify, RwLock};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
@@ -33,7 +33,7 @@ lazy_static! {
 }
 
 pub struct EventSender {
-    events: Mutex<Vec<Map<String, Value>>>,
+    events: std::sync::Mutex<Vec<Map<String, Value>>>,
     notify: Arc<Notify>,
     stopped: RwLock<bool>,
     transport: Arc<dyn TelemetryTransport>,
@@ -270,28 +270,24 @@ impl TelemetryTransport for WsTelemetryTransport {
 impl EventSender {
     pub fn new(transport: Arc<dyn TelemetryTransport>) -> Self {
         Self {
-            events: Mutex::new(Vec::new()),
+            events: std::sync::Mutex::new(Vec::new()),
             notify: Arc::new(Notify::new()),
             stopped: RwLock::new(false),
             transport,
         }
     }
 
-    pub async fn track_event(&self, event: String, properties: HashMap<String, String>) {
+    /// Only enqueues the event; `send_loop` sends it. Doesn't need a Tokio runtime.
+    pub fn track_event(&self, event: String, properties: HashMap<String, String>) {
         let mut obj = Map::new();
         for (k, v) in properties.iter() {
             obj.insert(k.to_string(), Value::String(v.to_string()));
         }
-        self.track_event_object(event, obj, false).await
+        self.track_event_object(event, obj, false)
     }
 
-    pub async fn track_event_object(
-        &self,
-        event: String,
-        obj: Map<String, Value>,
-        is_agent_event: bool,
-    ) {
-        let mut properties = obj.clone();
+    pub fn track_event_object(&self, event: String, obj: Map<String, Value>, is_agent_event: bool) {
+        let mut properties = obj;
         if is_agent_event {
             properties.insert("msg".to_string(), Value::String(event));
         } else {
@@ -313,7 +309,10 @@ impl EventSender {
                 Value::String(Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)),
             );
         }
-        self.events.lock().await.push(properties);
+        self.events
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .push(properties);
         self.notify.notify_waiters();
     }
 
@@ -332,8 +331,11 @@ impl EventSender {
             }
             let mut to_send = vec![];
             {
-                let mut events = self.events.lock().await;
-                mem::swap(&mut to_send, &mut events);
+                let mut events = self
+                    .events
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                mem::swap(&mut to_send, &mut *events);
             }
             if !to_send.is_empty() {
                 if let Err(_) = self.transport.send_events(to_send).await {
@@ -350,20 +352,19 @@ impl EventSender {
     }
 }
 
-pub async fn track_event(event: String, properties: HashMap<String, String>) {
-    SENDER.track_event(event, properties).await;
+/// Doesn't need a Tokio runtime, so it is safe to call from plain threads (e.g. RWLoop).
+pub fn track_event(event: String, properties: HashMap<String, String>) {
+    SENDER.track_event(event, properties);
 }
 
-pub fn track_event_spawn(event: String, properties: HashMap<String, String>) {
-    cube_ext::spawn(async move { SENDER.track_event(event, properties).await });
-}
-
-pub fn agent_event_spawn(event: String, properties: Map<String, Value>) {
-    cube_ext::spawn(async move {
-        if let Some(sender) = AGENT_SENDER.read().await.as_ref() {
-            sender.track_event_object(event, properties, true).await;
+/// Doesn't need a Tokio runtime. The write lock is only taken by `init_agent_sender` on
+/// startup, so the event is dropped if it is held.
+pub fn track_agent_event(event: String, properties: Map<String, Value>) {
+    if let Ok(sender) = AGENT_SENDER.try_read() {
+        if let Some(sender) = sender.as_ref() {
+            sender.track_event_object(event, properties, true);
         }
-    });
+    }
 }
 
 pub fn incoming_traffic_agent_event(trace_obj: &str, bytes: u64) -> Result<(), CubeError> {
@@ -377,7 +378,7 @@ pub fn incoming_traffic_agent_event(trace_obj: &str, bytes: u64) -> Result<(), C
             "bytes".to_string(),
             Value::Number(Number::from_f64(bytes as f64).unwrap()),
         );
-        agent_event_spawn("Incoming network usage".to_string(), obj);
+        track_agent_event("Incoming network usage".to_string(), obj);
         Ok(())
     } else {
         Err(CubeError::user(format!(
@@ -391,7 +392,7 @@ pub fn suboptimal_query_plan_event(trace_obj: &str, flags: Value) -> Result<(), 
     let obj: Value = serde_json::from_str(trace_obj)?;
     if let Value::Object(mut obj) = obj {
         obj.insert("flags".to_string(), flags);
-        agent_event_spawn("Suboptimal Query Plan".to_string(), obj);
+        track_agent_event("Suboptimal Query Plan".to_string(), obj);
         Ok(())
     } else {
         Err(CubeError::user(format!(
@@ -475,15 +476,15 @@ impl Log for ReportingLogger {
     }
 
     fn log<'a>(&self, record: &Record<'a>) {
+        self.logger.log(record);
         if let Level::Error = record.metadata().level() {
-            track_event_spawn(
+            track_event(
                 "Cube Store Error".to_string(),
                 vec![("error".to_string(), format!("{}", record.args()))]
                     .into_iter()
                     .collect(),
             )
         }
-        self.logger.log(record)
     }
 
     fn flush(&self) {
@@ -532,5 +533,95 @@ mod tests {
                 "{\"authorization\": \"token\", \"content-length\": \"10000\"}".to_string()
             )
         );
+    }
+
+    struct NoopLogger;
+
+    impl Log for NoopLogger {
+        fn enabled(&self, _: &Metadata) -> bool {
+            true
+        }
+
+        fn log(&self, _: &Record) {}
+
+        fn flush(&self) {}
+    }
+
+    #[test]
+    fn test_reporting_logger_error_outside_of_tokio_runtime() {
+        let res = std::thread::spawn(|| {
+            let logger = ReportingLogger::new(Box::new(NoopLogger));
+            logger.log(
+                &Record::builder()
+                    .level(Level::Error)
+                    .args(format_args!("error logged outside of a Tokio runtime"))
+                    .build(),
+            );
+        })
+        .join();
+
+        assert!(
+            res.is_ok(),
+            "ReportingLogger must not panic when an error is logged outside of a Tokio runtime"
+        );
+    }
+
+    #[test]
+    fn test_track_agent_event_outside_of_tokio_runtime() {
+        let res = std::thread::spawn(|| track_agent_event("test".to_string(), Map::new())).join();
+
+        assert!(
+            res.is_ok(),
+            "track_agent_event must not panic outside of a Tokio runtime"
+        );
+    }
+
+    #[derive(Default)]
+    struct RecordingTransport {
+        sent: std::sync::Mutex<Vec<Map<String, Value>>>,
+    }
+
+    #[async_trait]
+    impl TelemetryTransport for RecordingTransport {
+        async fn send_events(&self, to_send: Vec<Map<String, Value>>) -> Result<(), CubeError> {
+            self.sent.lock().unwrap().extend(to_send);
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_event_sender_send_loop_drains_events() {
+        let transport = Arc::new(RecordingTransport::default());
+        let sender = Arc::new(EventSender::new(transport.clone()));
+
+        let loop_sender = sender.clone();
+        let send_loop = tokio::spawn(async move { loop_sender.send_loop().await });
+
+        // Enqueue from a plain thread (no runtime), as RWLoop does.
+        let thread_sender = sender.clone();
+        tokio::task::spawn_blocking(move || {
+            std::thread::spawn(move || {
+                thread_sender.track_event("test".to_string(), HashMap::new())
+            })
+            .join()
+            .unwrap()
+        })
+        .await
+        .unwrap();
+
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while transport.sent.lock().unwrap().is_empty() {
+                // The send loop may not be waiting on `notify` yet, so poke it again.
+                sender.notify.notify_waiters();
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("event must be delivered by the send loop");
+
+        sender.stop_loop().await;
+        send_loop.await.unwrap();
+
+        assert!(sender.events.lock().unwrap().is_empty());
     }
 }

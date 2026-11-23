@@ -15,6 +15,7 @@ use crate::cluster::{Cluster, ClusterImpl, ClusterMetaStoreClient};
 use crate::config::injection::{DIService, Injector};
 use crate::config::processing_loop::ProcessingLoop;
 use crate::http::HttpServer;
+use crate::import::host_filter::LocationHostFilter;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{ImportService, ImportServiceImpl, LocationsValidator, LocationsValidatorImpl};
 use crate::metastore::{
@@ -49,6 +50,7 @@ use crate::telemetry::{
 };
 use crate::util::memory::{MemoryHandler, MemoryHandlerImpl};
 use crate::CubeError;
+use chrono::Utc;
 use cuberockstore::rocksdb::{Options, DB};
 use datafusion::cube_ext;
 use futures::future::join_all;
@@ -67,6 +69,9 @@ use std::{env, fs};
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio::time::{timeout_at, Duration, Instant};
+
+const LOST_IN_MEMORY_CHUNKS_CLEANUP_ATTEMPTS: usize = 40;
+const LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY: Duration = Duration::from_secs(15);
 
 #[derive(Clone)]
 pub struct CubeServices {
@@ -107,6 +112,7 @@ impl CubeServices {
     }
 
     async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
+        let started_at = Utc::now();
         let mut futures = Vec::new();
 
         let cluster = self.cluster.clone();
@@ -189,6 +195,38 @@ impl CubeServices {
                 Ok(())
             }))
         }
+        if self
+            .injector
+            .has_service_typed::<dyn CompactionService>()
+            .await
+        {
+            let compaction_service = self
+                .injector
+                .get_service_typed::<dyn CompactionService>()
+                .await;
+            let node = self.cluster.server_name().to_string();
+            let stop_token = self.cluster.stop_token();
+            // In-memory chunks don't survive a restart, but the metastore still lists them as
+            // active. Retried because a worker can start before the metastore node is reachable.
+            cube_ext::spawn(async move {
+                for _ in 0..LOST_IN_MEMORY_CHUNKS_CLEANUP_ATTEMPTS {
+                    let cleanup = compaction_service
+                        .deactivate_lost_in_memory_chunks(node.clone(), started_at);
+                    tokio::select! {
+                        _ = stop_token.cancelled() => return,
+                        res = cleanup => match res {
+                            Ok(()) => return,
+                            Err(e) => log::error!("Error deactivating lost in-memory chunks: {}", e),
+                        }
+                    }
+                    tokio::select! {
+                        _ = stop_token.cancelled() => return,
+                        _ = tokio::time::sleep(LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY) => {}
+                    }
+                }
+            });
+        }
+
         futures.push(cube_ext::spawn(async move {
             start_track_event_loop().await;
             Ok(())
@@ -466,6 +504,14 @@ pub trait ConfigObj: DIService {
     /// Whether `CREATE TABLE ... LOCATION` may read a local filesystem path.
     /// `temp://` import locations are always allowed regardless of this setting.
     fn location_allow_local_fs(&self) -> bool;
+
+    /// Hosts `http(s)://` import locations may point to: `host`, `host:port`, a pattern like
+    /// `*.example.com` or a subnet. `*` (the default) allows every host, empty allows none.
+    fn location_allow_hosts(&self) -> &Vec<String>;
+
+    /// Whether `http(s)://` import locations are refused non-public IP addresses (also after
+    /// DNS resolution) that `location_allow_hosts` does not list as a subnet or IP.
+    fn location_deny_private_ips(&self) -> bool;
 
     fn meta_store_snapshot_interval(&self) -> u64;
 
@@ -797,6 +843,8 @@ pub struct ConfigObjImpl {
     pub max_ingestion_data_frames: usize,
     pub upload_to_remote: bool,
     pub location_allow_local_fs: bool,
+    pub location_allow_hosts: Vec<String>,
+    pub location_deny_private_ips: bool,
     pub enable_topk: bool,
     pub load_aware_import_placement_enabled: bool,
     pub repartition_chunks_time_budget_secs: u64,
@@ -989,6 +1037,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn location_allow_local_fs(&self) -> bool {
         self.location_allow_local_fs
+    }
+
+    fn location_allow_hosts(&self) -> &Vec<String> {
+        &self.location_allow_hosts
+    }
+
+    fn location_deny_private_ips(&self) -> bool {
+        self.location_deny_private_ips
     }
 
     fn meta_store_snapshot_interval(&self) -> u64 {
@@ -2109,6 +2165,12 @@ impl Config {
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
                 location_allow_local_fs: env_flag("CUBESTORE_LOCATION_ALLOW_LOCAL_FS", false),
+                location_allow_hosts: env_parse_list(
+                    "CUBESTORE_LOCATION_ALLOW_HOSTS",
+                    vec!["*".to_string()],
+                    |h| LocationHostFilter::validate_entry(h).map_err(|e| e.message),
+                ),
+                location_deny_private_ips: env_flag("CUBESTORE_LOCATION_DENY_PRIVATE_IPS", false),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 load_aware_import_placement_enabled: env_flag(
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
@@ -2413,6 +2475,8 @@ impl Config {
                 upload_to_remote: true,
                 // Tests import CSV files straight from disk.
                 location_allow_local_fs: true,
+                location_allow_hosts: vec!["*".to_string()],
+                location_deny_private_ips: false,
                 enable_topk: true,
                 load_aware_import_placement_enabled: true,
                 repartition_chunks_time_budget_secs: 60,
@@ -2978,7 +3042,13 @@ impl Config {
         self.injector
             .register_typed::<dyn LocationsValidator, _, _, _>(async move |i| {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
-                LocationsValidatorImpl::new(config.location_allow_local_fs())
+                let host_filter = LocationHostFilter::new(
+                    config.location_allow_hosts(),
+                    config.location_deny_private_ips(),
+                )
+                .expect("Invalid import location host allowlist");
+                LocationsValidatorImpl::new(config.location_allow_local_fs(), host_filter)
+                    .expect("Unable to create import HTTP client")
             })
             .await;
 

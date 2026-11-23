@@ -385,6 +385,13 @@ impl Table {
         location.starts_with("stream:")
     }
 
+    pub fn is_streaming(&self) -> bool {
+        self.locations
+            .iter()
+            .flatten()
+            .any(|location| Self::is_stream_location(location))
+    }
+
     pub fn partition_split_threshold(&self) -> &Option<u64> {
         &self.partition_split_threshold
     }
