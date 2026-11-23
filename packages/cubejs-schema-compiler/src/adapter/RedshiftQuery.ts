@@ -14,9 +14,10 @@ export class RedshiftQuery extends PostgresQuery {
     return 'GETDATE()';
   }
 
-  // A bare NUMERIC is DECIMAL(18,0) here and would round the bound.
+  // A bare NUMERIC is DECIMAL(18,0) here and would round the bound, and a float8 bound
+  // would compare a DECIMAL column at float8 precision.
   public override fractionalParamType(): string {
-    return 'double precision';
+    return 'decimal(38, 18)';
   }
 
   /**
