@@ -1485,6 +1485,7 @@ pub struct RocksMetaStore {
     disk_space_compute_lock: Arc<tokio::sync::Mutex<()>>,
     in_memory_compaction_cache: Arc<RwLock<Option<(HashMap<String, Vec<u64>>, SystemTime)>>>,
     in_memory_compaction_compute_lock: Arc<tokio::sync::Mutex<()>>,
+    job_tables: Arc<Mutex<HashMap<u64, JobTable>>>,
     upload_loop: Arc<WorkerLoop>,
 }
 
@@ -1511,6 +1512,7 @@ impl RocksMetaStore {
             disk_space_compute_lock: Arc::new(tokio::sync::Mutex::new(())),
             in_memory_compaction_cache: Arc::new(RwLock::new(None)),
             in_memory_compaction_compute_lock: Arc::new(tokio::sync::Mutex::new(())),
+            job_tables: Arc::new(Mutex::new(HashMap::new())),
             upload_loop: Arc::new(WorkerLoop::new("Metastore upload")),
         })
     }
@@ -4490,6 +4492,7 @@ impl MetaStore for RocksMetaStore {
         pool: JobRunnerPool,
     ) -> Result<Option<IdRow<Job>>, CubeError> {
         let order_by_table = self.store.config.job_order_by_table_enabled();
+        let job_tables = self.job_tables.clone();
         self.write_operation("start_processing_job", move |db_ref, batch_pipe| {
             let table = JobRocksTable::new(db_ref.clone());
             let candidates = table
@@ -4504,18 +4507,21 @@ impl MetaStore for RocksMetaStore {
                 .filter(|j| !matches!(j.get_row().job_type(), JobType::Unknown))
                 .filter(|j| j.get_row().matches_pool(pool));
             let next_job = if order_by_table {
-                let mut arrival = JobArrival::new(db_ref);
-                candidates
+                let mut job_tables = job_tables.lock().unwrap();
+                let mut arrival = JobArrival::new(db_ref, &mut job_tables);
+                let next_job = candidates
                     .map(|j| {
                         let key = (
                             std::cmp::Reverse(j.get_row().priority()),
-                            arrival.of(j.get_row()),
+                            arrival.of(&j),
                             j.get_id(),
                         );
                         (key, j)
                     })
                     .min_by(|a, b| a.0.cmp(&b.0))
-                    .map(|(_, j)| j)
+                    .map(|(_, j)| j);
+                arrival.forget_unseen();
+                next_job
             } else {
                 //We use min_by instead of the max_by because of min_by returns the first element
                 //if priority is equal while max_by returns the last element
@@ -5451,29 +5457,63 @@ fn swap_active_partitions_impl(
     Ok(())
 }
 
-/// When a scheduled job joined the queue for the purpose of ordering jobs by table. Jobs of a
-/// not-ready table take the table's creation time, so tables created together become ready one
-/// after another instead of sharing the runners until they all hit their deadlines at once.
-/// Every other job keeps its own enqueue time, so it is never passed by a table created later.
-struct JobArrival<'a> {
+// The table a job works on never changes, so it is resolved once per job.
+#[derive(Clone, Copy)]
+enum JobTable {
+    None,
+    Dropped,
+    Table(u64),
+}
+
+// Queue time used to order jobs by table: jobs of a not-ready table take the table's creation
+// time; every other job keeps its own enqueue time, so a later table never passes it.
+struct JobArrival<'a, 'c> {
     db_ref: DbTableRef<'a>,
+    job_tables: &'c mut HashMap<u64, JobTable>,
+    seen: HashSet<u64>,
     index_tables: HashMap<u64, Option<u64>>,
     partition_tables: HashMap<u64, Option<u64>>,
     not_ready_tables: HashMap<u64, Option<DateTime<Utc>>>,
 }
 
-impl<'a> JobArrival<'a> {
-    fn new(db_ref: DbTableRef<'a>) -> Self {
+impl<'a, 'c> JobArrival<'a, 'c> {
+    fn new(db_ref: DbTableRef<'a>, job_tables: &'c mut HashMap<u64, JobTable>) -> Self {
         Self {
             db_ref,
+            job_tables,
+            seen: HashSet::new(),
             index_tables: HashMap::new(),
             partition_tables: HashMap::new(),
             not_ready_tables: HashMap::new(),
         }
     }
 
-    fn of(&mut self, job: &Job) -> DateTime<Utc> {
-        let table_id = match job.row_reference() {
+    fn of(&mut self, job: &IdRow<Job>) -> DateTime<Utc> {
+        self.seen.insert(job.get_id());
+        let job_table = match self.job_tables.get(&job.get_id()) {
+            Some(t) => *t,
+            None => {
+                let t = self.resolve(job.get_row().row_reference());
+                self.job_tables.insert(job.get_id(), t);
+                t
+            }
+        };
+        let enqueued = *job.get_row().last_heart_beat();
+        match job_table {
+            JobTable::None => enqueued,
+            // Run it first so it fails fast.
+            JobTable::Dropped => DateTime::<Utc>::MIN_UTC,
+            JobTable::Table(table_id) => self.not_ready_since(table_id).unwrap_or(enqueued),
+        }
+    }
+
+    fn forget_unseen(&mut self) {
+        let seen = &self.seen;
+        self.job_tables.retain(|id, _| seen.contains(id));
+    }
+
+    fn resolve(&mut self, key: &RowKey) -> JobTable {
+        let table_id = match key {
             RowKey::Table(TableId::Tables, id) => Some(*id),
             RowKey::Table(TableId::Partitions, id) => self.partition_table(*id),
             RowKey::Table(TableId::Chunks, id) => ChunkRocksTable::new(self.db_ref.clone())
@@ -5481,15 +5521,9 @@ impl<'a> JobArrival<'a> {
                 .ok()
                 .flatten()
                 .and_then(|c| self.partition_table(c.get_row().get_partition_id())),
-            _ => return *job.last_heart_beat(),
+            _ => return JobTable::None,
         };
-        match table_id {
-            Some(table_id) => self
-                .not_ready_since(table_id)
-                .unwrap_or(*job.last_heart_beat()),
-            // The job's rows are gone with a dropped table; run it first so it fails fast.
-            None => DateTime::<Utc>::MIN_UTC,
-        }
+        table_id.map_or(JobTable::Dropped, JobTable::Table)
     }
 
     fn partition_table(&mut self, partition_id: u64) -> Option<u64> {

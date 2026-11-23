@@ -1510,7 +1510,7 @@ impl SchedulerImpl {
         Ok(())
     }
 
-    /// Schedules the first build of a deferred table once its last import is gone.
+    // Schedules the first build of a deferred table once its last import is gone.
     async fn schedule_deferred_build(&self, table_id: u64) -> Result<(), CubeError> {
         let table = match self.meta_store.get_table_by_id(table_id).await {
             Ok(t) => t,
