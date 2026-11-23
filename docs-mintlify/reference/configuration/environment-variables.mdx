@@ -2939,7 +2939,9 @@ Larger values use more memory per build; values below `2` are raised to `2`.
 The maximum number of rows a single build or chunk merge rewrites when
 [`CUBESTORE_DEFERRED_TABLE_BUILD`](#cubestore_deferred_table_build) is enabled, so
 that each job finishes within the job timeout and merged chunks stay bounded. Rows
-beyond it are moved into the built partitions afterwards.
+beyond it are moved into the built partitions afterwards; partition boundaries come
+from the rows built first, so for data imported in sort-key order the last partition
+can receive most of the rest and split again.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |

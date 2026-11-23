@@ -4549,18 +4549,10 @@ impl MetaStore for RocksMetaStore {
             let next_job = if order_by_table {
                 let mut job_tables = job_tables.lock().unwrap();
                 let mut arrival = JobArrival::new(db_ref, &mut job_tables, max_table_boost);
-                let next_job = candidates
-                    .map(|j| {
-                        let key = (
-                            std::cmp::Reverse(j.get_row().priority()),
-                            arrival.of(&j),
-                            j.get_id(),
-                        );
-                        (key, j)
-                    })
-                    .min_by(|a, b| a.0.cmp(&b.0))
-                    .map(|(_, j)| j);
-                next_job
+                let jobs = candidates
+                    .map(|j| Ok((arrival.of(&j)?, j)))
+                    .collect::<Result<Vec<_>, CubeError>>()?;
+                pick_job_by_arrival(jobs)
             } else {
                 //We use min_by instead of the max_by because of min_by returns the first element
                 //if priority is equal while max_by returns the last element
@@ -5507,6 +5499,45 @@ enum JobTable {
     Table(u64),
 }
 
+#[derive(Clone, Copy)]
+enum Arrival {
+    Plain(DateTime<Utc>),
+    Streaming(DateTime<Utc>),
+}
+
+// Picks by (priority, arrival). A job enqueued after the oldest streaming job of the same or lower
+// priority never goes first, so streaming jobs wait exactly as long as in FIFO order.
+fn pick_job_by_arrival(jobs: Vec<(Arrival, IdRow<Job>)>) -> Option<IdRow<Job>> {
+    let time = |a: &Arrival| match a {
+        Arrival::Plain(t) | Arrival::Streaming(t) => *t,
+    };
+    let enqueued = |j: &IdRow<Job>| *j.get_row().last_heart_beat();
+    let key = |(a, j): &&(Arrival, IdRow<Job>)| {
+        (
+            std::cmp::Reverse(j.get_row().priority()),
+            time(a),
+            j.get_id(),
+        )
+    };
+    let oldest_streaming = jobs
+        .iter()
+        .filter(|(a, _)| matches!(a, Arrival::Streaming(_)))
+        .min_by_key(key);
+    let best = jobs.iter().min_by_key(key)?;
+    let pick = match oldest_streaming {
+        Some((_, s))
+            if enqueued(&best.1) > enqueued(s)
+                && best.1.get_row().priority() <= s.get_row().priority() =>
+        {
+            jobs.iter()
+                .filter(|(_, j)| enqueued(j) <= enqueued(s))
+                .min_by_key(key)?
+        }
+        _ => best,
+    };
+    Some(pick.1.clone())
+}
+
 // Queue time for ordering jobs by table: a not-ready table's job takes the table's creation time,
 // but no earlier than `max_table_boost` before its own enqueue time; other jobs keep their own.
 struct JobArrival<'a, 'c> {
@@ -5541,82 +5572,82 @@ impl<'a, 'c> JobArrival<'a, 'c> {
         }
     }
 
-    fn of(&mut self, job: &IdRow<Job>) -> DateTime<Utc> {
+    fn of(&mut self, job: &IdRow<Job>) -> Result<Arrival, CubeError> {
         let job_table = match self.job_tables.get(&job.get_id()) {
             Some(t) => *t,
             None => {
-                let t = self.resolve(job.get_row().row_reference());
+                let t = self.resolve(job.get_row().row_reference())?;
                 self.job_tables.insert(job.get_id(), t);
                 t
             }
         };
         let enqueued = *job.get_row().last_heart_beat();
-        match job_table {
-            JobTable::None => enqueued,
+        Ok(match job_table {
+            JobTable::None => Arrival::Plain(enqueued),
             // Run it first so it fails fast.
-            JobTable::Dropped => DateTime::<Utc>::MIN_UTC,
-            JobTable::Table(table_id) => match self.table_order(table_id) {
-                TableOrder::Streaming => enqueued - self.max_table_boost,
-                TableOrder::NotReadySince(created) => created.max(enqueued - self.max_table_boost),
-                TableOrder::Regular => enqueued,
+            JobTable::Dropped => Arrival::Plain(DateTime::<Utc>::MIN_UTC),
+            JobTable::Table(table_id) => match self.table_order(table_id)? {
+                TableOrder::Streaming => Arrival::Streaming(enqueued),
+                TableOrder::NotReadySince(created) => {
+                    Arrival::Plain(created.max(enqueued - self.max_table_boost))
+                }
+                TableOrder::Regular => Arrival::Plain(enqueued),
             },
-        }
+        })
     }
 
-    fn resolve(&mut self, key: &RowKey) -> JobTable {
+    fn resolve(&mut self, key: &RowKey) -> Result<JobTable, CubeError> {
         let table_id = match key {
             RowKey::Table(TableId::Tables, id) => Some(*id),
-            RowKey::Table(TableId::Partitions, id) => self.partition_table(*id),
-            RowKey::Table(TableId::Chunks, id) => ChunkRocksTable::new(self.db_ref.clone())
-                .get_row(*id)
-                .ok()
-                .flatten()
-                .and_then(|c| self.partition_table(c.get_row().get_partition_id())),
-            _ => return JobTable::None,
-        };
-        table_id.map_or(JobTable::Dropped, JobTable::Table)
-    }
-
-    fn partition_table(&mut self, partition_id: u64) -> Option<u64> {
-        if let Some(table_id) = self.partition_tables.get(&partition_id) {
-            return *table_id;
-        }
-        let index_id = PartitionRocksTable::new(self.db_ref.clone())
-            .get_row(partition_id)
-            .ok()
-            .flatten()
-            .map(|p| p.get_row().get_index_id());
-        let table_id = index_id.and_then(|index_id| self.index_table(index_id));
-        self.partition_tables.insert(partition_id, table_id);
-        table_id
-    }
-
-    fn index_table(&mut self, index_id: u64) -> Option<u64> {
-        let db_ref = self.db_ref.clone();
-        *self.index_tables.entry(index_id).or_insert_with(|| {
-            IndexRocksTable::new(db_ref)
-                .get_row(index_id)
-                .ok()
-                .flatten()
-                .map(|i| i.get_row().table_id())
-        })
-    }
-
-    fn table_order(&mut self, table_id: u64) -> TableOrder {
-        let db_ref = self.db_ref.clone();
-        *self.tables.entry(table_id).or_insert_with(|| {
-            let table = TableRocksTable::new(db_ref)
-                .get_row(table_id)
-                .ok()
-                .flatten();
-            match table.as_ref().map(|t| t.get_row()) {
-                Some(t) if t.is_streaming() => TableOrder::Streaming,
-                Some(t) if !t.is_ready() => t
-                    .created_at()
-                    .map_or(TableOrder::Regular, TableOrder::NotReadySince),
-                _ => TableOrder::Regular,
+            RowKey::Table(TableId::Partitions, id) => self.partition_table(*id)?,
+            RowKey::Table(TableId::Chunks, id) => {
+                match ChunkRocksTable::new(self.db_ref.clone()).get_row(*id)? {
+                    Some(c) => self.partition_table(c.get_row().get_partition_id())?,
+                    None => None,
+                }
             }
-        })
+            _ => return Ok(JobTable::None),
+        };
+        Ok(table_id.map_or(JobTable::Dropped, JobTable::Table))
+    }
+
+    fn partition_table(&mut self, partition_id: u64) -> Result<Option<u64>, CubeError> {
+        if let Some(table_id) = self.partition_tables.get(&partition_id) {
+            return Ok(*table_id);
+        }
+        let table_id = match PartitionRocksTable::new(self.db_ref.clone()).get_row(partition_id)? {
+            Some(p) => self.index_table(p.get_row().get_index_id())?,
+            None => None,
+        };
+        self.partition_tables.insert(partition_id, table_id);
+        Ok(table_id)
+    }
+
+    fn index_table(&mut self, index_id: u64) -> Result<Option<u64>, CubeError> {
+        if let Some(table_id) = self.index_tables.get(&index_id) {
+            return Ok(*table_id);
+        }
+        let table_id = IndexRocksTable::new(self.db_ref.clone())
+            .get_row(index_id)?
+            .map(|i| i.get_row().table_id());
+        self.index_tables.insert(index_id, table_id);
+        Ok(table_id)
+    }
+
+    fn table_order(&mut self, table_id: u64) -> Result<TableOrder, CubeError> {
+        if let Some(order) = self.tables.get(&table_id) {
+            return Ok(*order);
+        }
+        let table = TableRocksTable::new(self.db_ref.clone()).get_row(table_id)?;
+        let order = match table.as_ref().map(|t| t.get_row()) {
+            Some(t) if t.is_streaming() => TableOrder::Streaming,
+            Some(t) if !t.is_ready() => t
+                .created_at()
+                .map_or(TableOrder::Regular, TableOrder::NotReadySince),
+            _ => TableOrder::Regular,
+        };
+        self.tables.insert(table_id, order);
+        Ok(order)
     }
 }
 
@@ -8332,9 +8363,9 @@ mod tests {
             for (key, name) in [
                 (RowKey::Table(TableId::Tables, second.get_id()), "second"),
                 (RowKey::Table(TableId::Tables, ready.get_id()), "ready"),
-                (RowKey::Table(TableId::Tables, stream.get_id()), "stream"),
                 (RowKey::Table(TableId::Partitions, first_partition), "first"),
                 (RowKey::Table(TableId::WALs, 2), "wal_after"),
+                (RowKey::Table(TableId::Tables, stream.get_id()), "stream"),
                 // Its partition is gone, as after a table drop.
                 (RowKey::Table(TableId::Partitions, 999), "dropped"),
             ] {
@@ -8361,37 +8392,37 @@ mod tests {
                 "wal_before",
                 "second",
                 "ready",
-                "stream",
                 "first",
                 "wal_after",
+                "stream",
                 "dropped"
             ]
         );
-        // Jobs of not-ready tables queue as of the table's creation; other jobs keep their own
-        // enqueue time, and a streaming table's job is never passed by a later one.
+        // Not-ready tables run in creation order; nothing enqueued after the streaming job,
+        // not even the dropped table's job, goes before it.
         assert_eq!(
             picked_job_order("start_processing_job_order_by_table", true, 600).await?,
             vec![
-                "dropped",
-                "stream",
                 "wal_before",
                 "first",
                 "second",
                 "ready",
-                "wal_after"
+                "wal_after",
+                "stream",
+                "dropped"
             ]
         );
         // With no time left before the create-table deadline, tables get no boost.
         assert_eq!(
             picked_job_order("start_processing_job_order_by_table_no_boost", true, 0).await?,
             vec![
-                "dropped",
                 "wal_before",
                 "second",
                 "ready",
-                "stream",
                 "first",
-                "wal_after"
+                "wal_after",
+                "stream",
+                "dropped"
             ]
         );
         Ok(())
