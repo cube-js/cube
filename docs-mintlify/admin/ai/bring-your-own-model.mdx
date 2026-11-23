@@ -39,8 +39,9 @@ admin panel:
 2. Click **Add model**
 3. Provide a **name** for the model
 4. Select the **model type** (LLM or Embedding)
-5. Choose a **provider** and **model**. The custom-endpoint providers have no
-   model list: you enter the model name with the endpoint settings instead
+5. Choose a **provider** and **model**. Custom OpenAI-compatible and Custom
+   Anthropic-compatible have no model list: you enter the model name with the
+   endpoint settings instead
 6. Optionally, pick a [small model](#small-model)
 7. Enter the required credentials for the provider
 
@@ -190,8 +191,8 @@ so leave out the version segment — use `https://gateway.acme.com`, not
 the model name is free text, also pick the **Thinking mode** that matches the
 model behind your endpoint:
 
-- **Adaptive** — Claude Opus 4.7 and later, Sonnet 5 and later, Haiku 5.5, and
-  Fable 5. This is the default
+- **Adaptive** — Claude Opus 4.7 and later, Sonnet 5 and later, Haiku 5.5 and
+  later, and Fable 5 and later. This is the default
 - **Budgeted** — Claude Sonnet 3.7 through 4.6, Opus 4 through 4.6, and Haiku 4.5
 
 A mode that doesn't match the model makes every request fail: adaptive models
