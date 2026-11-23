@@ -11,5 +11,5 @@ export function isInt64Literal(value: unknown): boolean {
 }
 
 export function isNumberLiteral(value: unknown): boolean {
-  return /^\s*[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?\s*$/.test(String(value));
+  return /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$/.test(String(value));
 }
