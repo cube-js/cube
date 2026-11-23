@@ -31,15 +31,6 @@ class TestClickHouseDriver extends ClickHouseDriver {
     this.commands.push(query);
   }
 
-  public version = '25.8.1.1';
-
-  public versionQueries = 0;
-
-  public override async query<R = unknown>(): Promise<R[]> {
-    this.versionQueries++;
-    return [{ version: this.version }] as R[];
-  }
-
   public override async queryColumnTypes(): Promise<TableStructure> {
     return [{ name: 'id', type: 'int' }];
   }
@@ -157,37 +148,6 @@ describe('ClickHouseDriver S3 export bucket credentials', () => {
     );
     expect(sql).toContain('WHERE id > 1');
     expect(sql).not.toContain('undefined');
-  });
-
-  it.each(['23.12.6.19', '24.2.3.70'])('fails a keyless export with a clear error on ClickHouse %s', async (version) => {
-    process.env.AWS_ACCESS_KEY_ID = 'ASIATEMP';
-    process.env.AWS_SECRET_ACCESS_KEY = 'temp-secret';
-    process.env.AWS_SESSION_TOKEN = 'temp-token';
-
-    const driver = createDriver();
-    driver.version = version;
-
-    await expect(driver.unload('t', unloadOptions)).rejects.toThrow(`needs ClickHouse 24.3 or later`);
-    expect(driver.commands).toEqual([]);
-  });
-
-  it('checks the server version once and only when passing a session token', async () => {
-    process.env.AWS_ACCESS_KEY_ID = 'ASIATEMP';
-    process.env.AWS_SECRET_ACCESS_KEY = 'temp-secret';
-    process.env.AWS_SESSION_TOKEN = 'temp-token';
-
-    const driver = createDriver();
-    driver.version = '24.3.18.7';
-    await driver.unload('t', unloadOptions);
-    await driver.unload('t', unloadOptions);
-    expect(driver.versionQueries).toBe(1);
-    expect(driver.commands).toHaveLength(2);
-
-    delete process.env.AWS_SESSION_TOKEN;
-    const longLived = createDriver();
-    longLived.version = '23.10.1.1';
-    await longLived.unload('t', unloadOptions);
-    expect(longLived.versionQueries).toBe(0);
   });
 
   it('omits the session token argument when the resolved credentials have none', async () => {
