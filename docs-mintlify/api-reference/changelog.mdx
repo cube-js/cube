@@ -7,6 +7,38 @@ rss: true
 {/* GENERATED FILE — do not edit by hand. */}
 {/* Run scripts/extract-changelog.mjs against the platform client CHANGELOG.md. */}
 
+<Update label="2026-11-22" description="v0.29.0" tags={["Added"]}>
+  ### Added
+
+  - Query History: `GET /api/v1/deployments/{deploymentId}/query-history/requests` (`QueryHistoryPublicController.listQueryHistoryRequests`) lists the deployment's API requests, newest first, filtered by `from`, `to`, `status`, `apiType`, `minDurationMs` and `search`, with up to 200 requests a page (`first`, 100 by default) and an `after` cursor that keeps its first page's filters. `GET …/query-history/requests/{id}` (`getQueryHistoryRequest`) returns one request with the SQL it generated, for the data source and for Cube Store, with its bound `params` and how long each query waited and ran. New schemas: `QueryHistoryRequest`, `QueryHistoryRequestDetail`, `QueryHistoryRequestDetailStatus`, `QueryHistoryRequestListResponse`, `QueryHistoryRequestStatus`, `QueryHistoryRequestsQueryStatus`, `QueryHistorySqlQuery`, `QueryHistorySqlQueryExecutor`.
+</Update>
+
+<Update label="2026-11-21" description="v0.28.0" tags={["Added","Removed"]}>
+  ### Added
+
+  - `starterProject` on `POST /build/api/v1/deployments` (`CreateDeploymentInput`) chooses the project the deployment starts with. `empty` (the default) is the empty starter project. `none` scaffolds no project, so the console wizard sets up the deployment from its `creationStep`, for example `databases`. The field is ignored when `creationMethod` is `github`. New schema: `CreateDeploymentInputStarterProject`.
+  - Data model git history: `GET /build/api/v1/deployments/{deploymentId}/data-model/commits` lists a branch's commits, newest first (`branchName`, optional `filePath`, `first` up to 100 with a default of 20, and an `after` cursor); `GET …/data-model/commit-diff` diffs one commit against its parent or a range (`fromCommit`, `toCommit`); and `GET …/data-model/branch-diff` diffs a branch's committed changes against `baseBranch`, its parent branch or the deploy branch by default. Both diffs list at most `maxFiles` changed files (default 50, with `totalFiles` when the list is cut) and cut the patch at `maxDiffBytes` (default 12000, with `diffTruncated`). New schemas: `CommitLogListResponse`, `CommitLogEntryResponse`, `CommitDiffResponse`, `BranchDiffResponse`, `BranchDiffFile`.
+
+  ### Removed
+
+  - `html` on `DashboardAppSource` and `DashboardAppSourceInput`. It was deprecated, always `null`, and never stored: an app is its `files` and `entry`. A request that still sends it has the field dropped.
+</Update>
+
+<Update label="2026-11-17" description="v0.27.0" tags={["Added","Changed"]}>
+  ### Added
+
+  - `GET /api/v1/audit-logs/export` (`AuditLogPublicController.exportAuditLog`) streams the account audit log for a date range as CSV. Parameters: `start`, `end` (required, `YYYY-MM-DD`), `search`, `eventName`, `userEmail`. Requires the `AuditLogManage` action; an API key scoped to specific deployments answers `403`.
+  - `POST /api/v1/deployments/{deploymentId}/workbooks/{workbookId}/name-suggestion` (`WorkbooksPublicController.suggestWorkbookName`) names a workbook created with a placeholder name from its content and returns the workbook. Requires edit access. New schema: `SuggestWorkbookNameInput`.
+  - `nameSource` (`"default"`) on `CreateWorkbookInput` marks a workbook for name suggestions, and `renamed` on `UpdateWorkbookInput` stops them once a person has renamed it.
+  - dbt sync reports the semantic metrics it imports as Cube measures: `importedMetrics` and `unsupportedMetrics` on `DbtSyncManifestStats` and `DbtSyncRunStats`, and `skippedMetrics` on `DbtSyncManifestStats` (the first 25 metrics that cannot be imported exactly, with the reason for each). New schema: `DbtSyncSkippedMetric`.
+  - `crossFilters` on `CreateNotificationInput`, `UpdateNotificationInput` and `Notification`: a scheduled refresh, delivery or alert of a dashboard renders with the given charts' cross-filter selections, each one a `sourceWidgetId`, the `view` it queries and its `dimensions`. On an update, a set replaces the stored one and `[]` clears it. New schemas: `DashboardCrossFilter`, `DashboardCrossFilterDimension`, `DashboardCrossFilterInput`, `DashboardCrossFilterDimensionInput`.
+
+  ### Changed
+
+  - `MergeToDefaultBranchRequest.message` is optional, as on `MergeIntoParentBranchRequest`. When it is empty or missing, the agent writes the commit message from the branch's diff; without AI, Git's default merge message is used.
+  - `EmbedSessionSettings.allowChatWorkspaceAuthoring` on an embed session with an `externalId` lets the agent save workspace content only with `creatorMode: true`. Outside creator mode the agent never saves workspace content.
+</Update>
+
 <Update label="2026-11-07" description="v0.26.0" tags={["Added","Changed","Deprecated"]}>
   ### Added
 

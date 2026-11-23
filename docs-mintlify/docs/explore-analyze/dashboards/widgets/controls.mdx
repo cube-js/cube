@@ -12,11 +12,11 @@ Controls are widgets that let dashboard viewers change what's shown without leav
 
 A [Dynamic controls](#dynamic-controls) widget goes one step further: instead of placing a control yourself, you let viewers add their own filters, time granularity switchers and field switchers on the published dashboard.
 
-The first three each target a member from your semantic model, and apply the viewer's choice to every [chart][ref-charts] on the dashboard built on that member's semantic view. Filters and time granularity switchers change *how a member is queried* — which rows come back, which buckets they fall into. A field switcher goes further and changes *which member is queried at all*. A parent control works one level up: it targets no member of its own and drives *other controls* instead.
+The first three each target a member from your semantic model, and apply the viewer's choice to every [chart][ref-charts] on the dashboard built on that member's semantic view. Filters and time granularity switchers change *how a member is queried* — which rows come back, which buckets they fall into. A field switcher goes further and changes *which member is queried at all*. A parent control works one level up: it targets no member of its own and drives *other controls* instead. A filter can also [fill a parameter](#parameter-filters) instead of targeting a member; it then reaches charts through their SQL.
 
 ## Filter
 
-Filter widgets let viewers narrow down the data shown on the dashboard. In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar's **Add:** group and choose **Filter**. The new filter is added in an unconfigured state — click **Configure filter** (or open the widget's settings menu) to pick a semantic view and a dimension.
+Filter widgets let viewers narrow down the data shown on the dashboard. In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar and choose **Filter**. The new filter is added in an unconfigured state — click **Configure filter** (or open the widget's settings menu) to pick a semantic view and a dimension.
 
 ### Operators by dimension type
 
@@ -24,8 +24,8 @@ The available operators depend on the type of the underlying dimension:
 
 | Dimension type | Operators |
 |---|---|
-| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, `is null`, `is not null`, `is empty`, `is not empty` |
-| **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, `is null`, `is not null` |
+| **String** | `is`, `is not`, `contains`, `not contains`, `starts with`, `not starts with`, `ends with`, `not ends with`, [`top`, `bottom`](#top-n-and-bottom-n), `is null`, `is not null`, `is empty`, `is not empty` |
+| **Number** | `is`, `is not`, `greater than`, `greater than or equal`, `less than`, `less than or equal`, [`top`, `bottom`](#top-n-and-bottom-n), `is null`, `is not null` |
 | **Boolean** | `is` — no operator menu; the value picker's `is true` and `is false` set it |
 | **Time** | `is`, `is not`, `in the month`, `not in the month`, `in the quarter`, `not in the quarter`, `in the year`, `not in the year`, `after`, `after or on`, `before`, `before or on`, `between`, `is null`, `is not null` |
 
@@ -58,6 +58,24 @@ The filter shows the range's name, such as "Last month, up to now", with its dat
 
 No tab offers a list of values: each field takes one, and a `between` filter's two fields fill its two-entry `value` array with one bound each rather than with alternatives. The [**Selection mode**](#single-vs-multiple-selection) switch is not offered for a time dimension either, so a time filter carries *several values* for one condition only when a hand-written [URL parameter](#sharing-the-current-selection) passes a list in its `value` — `f_orders.created_at={"type":"equals","value":["2026-01-01","2026-02-01"]}`.
 
+### Top N and Bottom N
+
+`top` and `bottom` keep the N members of the dimension with the highest or lowest value of a measure, such as the 10 cities with the most orders, on every chart the filter reaches. They work like the [Top N filter][ref-top-n-filter] in a workbook: every other filter applies before the ranking, ties are broken by the member's value, and a member with a null measure value never takes a slot. They are offered on string and number dimensions of the semantic view, not on [calculated dimensions](#calculated-dimensions), and only when the view has a measure.
+
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/a7BMtuhSTAw"
+  title="Top N in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
+In the filter's edit sidebar, **Viewers can rank by** lists the measures of the view the filter may rank by. At least one must stay checked. The filter itself has two settings: **Number of values** and, when more than one measure is allowed, **Ranked by**. It reads like "10 by Count". With a single allowed measure, viewers set only the number.
+
+A [parent control](#parent)'s **Set to** can set a filter to `top` or `bottom`, with a number and a measure. When a filter ranks by a measure that is no longer in the semantic view, it says so; pick another measure in the filter.
+
 ### Single vs. multiple selection
 
 Filters can allow either a single value or multiple values. The filter's edit sidebar sets this under **Selection mode**, on a switch labelled **Enable multiple values** — offered on a string filter using `is`, and on no other combination. What each filter holds:
@@ -70,6 +88,7 @@ Filters can allow either a single value or multiple values. The filter's edit si
 | **Time** on any condition except `is null` and `is not null` | One per field in the UI; several only on `is` / `is not`, and only through a hand-written [URL parameter](#sharing-the-current-selection) |
 | **Boolean** | One, set by its `is true` / `is false` picker |
 | Substring conditions (`contains`, `starts with`, `ends with` and their negations) | One |
+| `top` / `bottom` | One: the number of members to keep |
 | `is null`, `is not null`, `is empty`, `is not empty` | None |
 
 ### Default values
@@ -142,7 +161,7 @@ When several values tie on the measure, **Max value by measure** and **Min value
 The first and last value are offered on string, number and time dimensions. Picking either shows a sentence — *The first value of Status, according to the selected sort order.* — and a sort order dropdown beneath it:
 
 - **Natural**, the default, is the dimension's own order: alphabetical for a string, numeric for a number, chronological for a time dimension. The first value is the lowest, and the last value is the highest.
-- **Database** is the order this filter's own value list shows its values in, and is offered on a string dimension only. That list holds the first 100 values, so **Last value of dimension** under **Database** is the last of those 100 — not the last value the dimension holds.
+- **Database** is the order the database returns the dimension's values in when it's asked for no order, and is offered on a string dimension only. It reads the first 100 of them, so **Last value of dimension** under **Database** is the 100th value in that order, not the last value the dimension holds.
 
 The max and min options show a measure dropdown instead, grouped by semantic view, with nothing picked and the note *Measures of views that share this dimension.* under it. It lists the measures of the filter's own view first, followed by those of every other view that includes the same dimension — one the data model declares as the same underlying cube member, the way a **Customers** view and an **Orders** view can both include the users cube's city. For a measure of another view, the ranking query runs in that view, over its own copy of the dimension, and the value it returns is applied to this filter. A view is not matched by name: one holding a same-named dimension of a *different* cube offers no measures. Where no view has any measures to offer, neither option appears in the **Default value** dropdown.
 
@@ -173,6 +192,16 @@ When the data gives no value, the filter applies none: the note after its title 
 - A faceted filter's sibling condition has no matching dimension in the view of the measure you picked, so it cannot be carried over. The measure itself is fine; the sibling filter's dimension has no counterpart in that view.
 
 In the dashboard builder, clicking the warning icon opens the filter's settings, where you can pick another measure or option.
+
+### The value list
+
+A string filter's value list shows the dimension's values in alphabetical order. It loads them 100 at a time: the second 100 load as soon as the list opens, and each next 100 load as you scroll toward the end, so you can scroll to any value the dimension holds. When you reach the end before the next values arrive, a *Loading…* row shows below the last value. The values you've selected are listed first.
+
+Typing in the list searches every value of the dimension, not only the ones loaded so far, and its matches load the same way.
+
+A filter on a [`switch` dimension](#switch-dimensions) is the exception: it lists every value the data model declares at once, in the declared order.
+
+When the next values fail to load, the ones already listed stay, and the bottom of the list reads *Couldn't load more values*. Click **Try again** to load them.
 
 ### When the value list fails to load
 
@@ -251,6 +280,19 @@ Such a filter works like any other, with these differences:
 - It can't be [faceted](#faceted-filters) or be a facet source, and its **Default value** can't be [resolved from the data](#defaults-resolved-from-the-data).
 - Cube computes the field at query time, so the filter doesn't use [pre-aggregations][ref-pre-aggregations] and can be slower. The filter settings say so.
 
+#### After a field's type changes {#calculated-dimension-type-change}
+
+A filter is set up for the value type its workbook dimension had at the time: its operator and **Default value** fit that type. When you change the dimension's **Value type** in the [**Update calculated field** dialog][ref-calculated-fields-editing], the filter shows a warning icon in the dashboard builder, and its settings explain what saving will do.
+
+Saving the filter fits it to the new type:
+
+- It keeps its operator if the new type [offers it](#operators-by-dimension-type). Otherwise, it switches to the new type's default operator: for example, `contains` on a String dimension becomes `is` on a Number one.
+- Its **Default value** is cleared.
+
+A [field switcher](#choosing-what-it-switches) with an alternative that became Time shows a warning too. Saving it removes the field from **Alternatives**, and if that field was the [default option](#field-switcher-default-option), the switcher opens on the member it replaces, as it does with no default option.
+
+Until you save each flagged control, the builder doesn't publish the dashboard or send it for [review][ref-reviews], and says which controls to save. A dashboard published through the API or by the [agent][ref-dashboard-agent], or copied along with its workbook, keeps such a control as it was saved, with the field's previous expression and type, so it runs as before the change.
+
 ### Switch dimensions
 
 A filter on a [`switch` dimension][ref-switch-dimensions] lists the values the data model declares, in the order it declares them, rather than alphabetically. The list doesn't depend on the data, so [faceting](#faceted-filters) doesn't narrow it, and under the **Database** order the first and last values are the first and last declared ones. This needs Cube v1.8.19 or later; on an older version, the values are listed alphabetically.
@@ -259,7 +301,7 @@ A filter on a [`switch` dimension][ref-switch-dimensions] lists the values the d
 
 Time granularity switchers let viewers change the granularity of time-based dimensions on the dashboard — for example, switching a revenue chart from daily to weekly or monthly. The widget targets a single time dimension and applies the chosen [granularity][ref-granularities] to every chart that groups by that dimension.
 
-In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar's **Add:** group and choose **Time granularity**. The new switcher is added in an unconfigured state — open its settings to pick a semantic view and a time dimension.
+In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar and choose **Time granularity**. The new switcher is added in an unconfigured state — open its settings to pick a semantic view and a time dimension.
 
 ### Allowed granularities
 
@@ -267,7 +309,7 @@ By default, viewers can choose between **day**, **week**, **month**, **quarter**
 
 For time dimensions backed by a `TIMESTAMP` or `DATETIME` column, sub-day granularities (**second**, **minute**, **hour**) are also available. `DATE`-typed columns don't expose sub-day granularities, since they would bucket the entire day into a single point.
 
-Custom granularities defined in the [data model][ref-granularities] aren't offered in this list yet — the switcher exposes the built-in granularities only.
+Custom granularities defined in the [data model][ref-granularities] aren't offered in this list yet — the widget's settings list the built-in granularities only. A custom granularity already saved on the switcher, such as one written through the API, stays allowed when you check or uncheck built-in ones, and the settings show it by its name, for example `fiscal_year`.
 
 ### Default granularity
 
@@ -328,7 +370,7 @@ A field switcher lets viewers change *which* dimension or measure the charts are
 
 Where a [filter](#filter) narrows the rows and a [time granularity switcher](#time-granularity-switcher) rebuckets them, a field switcher replaces the member itself in the chart's query. One dashboard can then answer several questions that would otherwise need a chart each.
 
-In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar's **Add:** group and choose **Field switcher**, then click **Configure field switcher** to set it up.
+In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar and choose **Field switcher**, then click **Configure field switcher** to set it up.
 
 ### Choosing what it switches
 
@@ -342,7 +384,7 @@ A field switcher works on one member kind at a time — set **Field type** to ei
 
 Alternatives come from the control's own semantic view, and must be the same kind as the replaced member — a dimension switcher offers dimensions, a measure switcher offers measures.
 
-A dimension switcher also offers the view's [workbook calculated dimensions][ref-calculated-fields] as alternatives, listed under **Workbook fields**. Time-typed ones are not offered. A switcher with such an alternative applies only to charts on its own semantic view.
+A dimension switcher also offers the view's [workbook calculated dimensions][ref-calculated-fields] as alternatives, listed under **Workbook fields**. Time-typed ones are not offered. A switcher with such an alternative applies only to charts on its own semantic view. If an alternative's type [changes to Time](#calculated-dimension-type-change), saving the switcher removes it.
 
 ### Default option {#field-switcher-default-option}
 
@@ -400,7 +442,7 @@ Unlike the other control types, a parent control targets no member and never tou
 
 For example, an **Analysis** parent with the presets `Retail`, `Wholesale` and `Promo` can set a **Channel** filter, a **Minimum order value** filter, and a **Date range** filter to a different combination for each preset. Viewers see one dropdown; you can [hide](#visibility) the children if the individual values aren't worth showing.
 
-In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar's **Add:** group and choose **Parent**, then click **Configure parent** to set it up — or let [**Add to new Parent control**](#save-preset) create one from the values the controls hold. The editor gives each preset its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what a preset does to the whole row at a glance.
+In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar and choose **Parent**, then click **Configure parent** to set it up — or let [**Add to new Parent control**](#save-preset) create one from the values the controls hold. The editor gives each preset its own tab, and lists every filter, time granularity switcher and [field switcher](#field-switcher) on the dashboard inside it — so one tab is one complete arrangement, and you can read off what a preset does to the whole row at a glance.
 
 <Info>
 A parent added to an empty dashboard has nothing to drive yet. A control added later appears in the tabs by itself, but is not driven until you save the parent's settings again.
@@ -563,13 +605,15 @@ A Dynamic controls widget lets viewers add their own controls on the published d
 
 ### Setting up the widget {#setting-up-dynamic-controls}
 
-In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar's **Add:** group and click **Dynamic controls**, the last item in the menu. The widget is added across the full width of the dashboard, below the controls at its top and above the first other widget, and its settings sidebar opens. Like the other items in the menu, you can also drag it onto the canvas: it lands across the full width of the dashboard at the row you drop it on, and its settings sidebar opens. While the dashboard has one, the menu item is greyed out with the reason *This dashboard already has a Dynamic controls widget*. You can also click an [empty spot of the canvas](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas) and pick **Dynamic controls** in the menu that opens, after **Parent**: the widget lands across the full width of the dashboard, covering the clicked row, and its settings sidebar opens. That menu greys it out with the same reason while the dashboard has one, and in an empty cell of a [grid](/docs/explore-analyze/dashboards/widgets/layout#grid) with the reason *Dynamic controls can't be placed inside a container.*
+In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar and click **Dynamic controls**, the last item in the menu. The widget is added across the full width of the dashboard, below the controls at its top and above the first other widget, and its settings sidebar opens. Like the other items in the menu, you can also drag it onto the canvas: it lands across the full width of the dashboard at the row you drop it on, and its settings sidebar opens. While the dashboard has one, the menu item is greyed out with the reason *This dashboard already has a Dynamic controls widget*. You can also click an [empty spot of the canvas](/docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas) and pick **Dynamic controls** in the menu that opens, after **Parent**: the widget lands across the full width of the dashboard, covering the clicked row, and its settings sidebar opens. That menu greys it out with the same reason while the dashboard has one, and in an empty cell of a [grid](/docs/explore-analyze/dashboards/widgets/layout#grid) with the reason *Dynamic controls can't be placed inside a container.*
 
 The sidebar lists the three types viewers can add — **Filter**, **Time granularity** and **Field switcher** — all unchecked. Check a type to allow it. A fields dropdown appears under it, listing every field the type can take — every dimension for a filter, every time dimension for a time granularity switcher, and every dimension and measure for a field switcher — grouped by semantic view, with an **All fields** option at the top. Every field starts checked, and the dropdown reads *All fields*; uncheck the fields viewers shouldn't get, and it names the fields left checked instead. **Save** stores the selection in the dashboard draft, and viewers get it once you [publish][ref-publishing]; **Cancel** closes the sidebar without changing anything.
 
 <Info>
 While every field of a type is checked — through **All fields** or one by one — the widget reads the semantic views each time the dashboard opens, so a field added to the data model later can be added by viewers without republishing the dashboard. To keep viewers to a fixed set of fields, leave at least one field unchecked.
 </Info>
+
+A chart's [drill-through](/docs/explore-analyze/dashboards/drill-through#adding-a-drill-through) dialog can also allow filters on the dashboard the chart opens: it adds the fields it needs to the filters the widget allows, adds the widget at the top of that dashboard when it has none, and publishes that change at once.
 
 Until at least one type allows a field — no type is checked, or every checked type has no field checked in its dropdown, which then reads *Select fields* — the widget is unconfigured. The builder shows it as it shows any unconfigured control, with a **Configure dynamic controls** button that reopens the sidebar, and the published dashboard shows nothing in its place. Once configured, the builder shows **Dynamic controls** and a line naming what viewers can add, such as `Viewers can add: Filter (all fields) · Field switcher (2 fields)`, beside an **Add control** button that is greyed out there, since viewers add controls on the published dashboard. Where only one type allows a field, the button is named after it — **Add filter**, **Add time granularity** or **Add field switcher** — here and on the published dashboard. The widget's settings menu offers **Edit control** and **Delete control**.
 
@@ -674,9 +718,9 @@ What travels in the link, and what wins when a link value arrives:
 - **A link value wins at load.** A parent opening on its own resolved preset leaves alone any control the link claimed, so the recipient sees the shared value rather than what that preset maps. For a child the link carries nothing for, their own preset decides: the same preset as the sharer's re-applies that clear or reset, a different one does whatever it maps, and a parent resolving no preset leaves the control on its own default. Picking a preset by hand afterwards applies it, link or no link.
 - **Written out on published dashboards only.** Reading these parameters works anywhere, including [embedded][ref-embed-url-filters] dashboards; it's the writing that is published-only. In the dashboard builder the URL is left to the editing session, so changing a control there doesn't rewrite it.
 
-A control a viewer [added](#adding-a-dynamic-control) writes a `dc_` parameter carrying its settings, beside the value parameter its type writes for a placed control. The key after `dc_` is a short id the page picks. The JSON holds the control's `type` — `FILTER`, `TIME_GRAIN` or `FIELD` — and its settings under `config`: `dimension`, the `<semantic_view>.<member>` it is on, and `title` for every type; `filterType` and `isMultipleSelectionAllowed` for a filter; `allowedGrains` for a time granularity switcher; and `memberKind`, `options` and `optionGrains` for a field switcher. Any other key is dropped, so a link can't give an added control a visibility or a default. The control is added only where the dashboard's Dynamic controls widget allows its type on that field and no placed control of that type is on it. A field switcher's options the widget doesn't allow are dropped, and two `dc_` parameters with the same key add one control, from the first. A value parameter has no effect without a control to apply it to, so an `f_`, `tg_` or `ms_` for a field with no placed control and no `dc_` parameter adds nothing.
+A control a viewer [added](#adding-a-dynamic-control) writes a `dc_` parameter carrying its settings, beside the value parameter its type writes for a placed control. The key after `dc_` is a short id the page picks. The JSON holds the control's `type` — `FILTER`, `TIME_GRAIN` or `FIELD` — and its settings under `config`: `dimension`, the `<semantic_view>.<member>` it is on, and `title` for every type; `filterType` and `isMultipleSelectionAllowed` for a filter; `allowedGrains` for a time granularity switcher; and `memberKind`, `options` and `optionGrains` for a field switcher. Any other key is dropped, so a link can't give an added control a visibility or a default. The control is added only where the dashboard's Dynamic controls widget allows its type on that field and no placed control of that type is on it. A field switcher's options the widget doesn't allow are dropped, and two `dc_` parameters with the same key add one control, from the first. A `tg_` or `ms_` has no effect without a control to apply it to, so one for a field with no placed control and no `dc_` parameter adds nothing. An `f_` for such a field is placed by the published dashboard itself, as a [drill-through][ref-drill-through-landing] arrival is, except in a download or a scheduled capture: on a placed filter on the same cube dimension in another semantic view, else on a filter the Dynamic controls widget allows, which the page adds with a `dc_` parameter of its own. When neither takes it, the page drops the `f_` and shows "Unable to filter by" and the field's title.
 
-When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that member, the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities), or the selected member is one the field switcher doesn't offer — its **Alternatives**, plus the replaced member. An `f_` parameter is also ignored when its filter's [visibility](#visibility) is **Disabled**: the filter opens on the value it would have without the link. A time granularity switcher or field switcher set to **Disabled** still takes its `tg_` or `ms_` value.
+When a dashboard opens with these parameters, they are applied on top of whatever defaults the controls carry. A parameter is ignored when nothing on the dashboard can honor it — there is no matching control for that member (for an `f_`, none that the previous paragraph finds), the requested granularity isn't in the switcher's [allowed granularities](#allowed-granularities), or the selected member is one the field switcher doesn't offer — its **Alternatives**, plus the replaced member. An `f_` parameter is also ignored when its filter's [visibility](#visibility) is **Disabled**: the filter opens on the value it would have without the link, and on a published dashboard the page drops the `f_` and shows "Unable to filter by" and the field's title. A time granularity switcher or field switcher set to **Disabled** still takes its `tg_` or `ms_` value.
 
 ## Visibility
 
@@ -698,7 +742,7 @@ To keep a Hidden control's value out of a downloaded file, download it with the 
 
 This section applies to filters, time granularity switchers and field switchers. A [parent control](#parent) has no member of its own and never applies to a chart itself, so it doesn't appear in any chart's [Controls mapping](#controls-mapping) — it acts only through the children it drives, and it's those children that show up here.
 
-When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] built on the same semantic view as the control's member. Charts built on other semantic views are left alone, so a dashboard can mix scoped and unscoped charts by default. Filters and time granularity switchers always target a dimension; a [field switcher](#field-switcher) targets a dimension or a measure depending on its **Field type**, and scopes on whichever it is set to. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different member.
+When a control is added to a dashboard, it's automatically wired up to every [chart][ref-charts] built on the same semantic view as the control's member. Charts built on other semantic views are left alone, so a dashboard can mix scoped and unscoped charts by default. Filters and time granularity switchers always target a dimension; a [field switcher](#field-switcher) targets a dimension or a measure depending on its **Field type**, and scopes on whichever it is set to. You can override this default per chart from its [Controls mapping](#controls-mapping) — disable the control for that chart, or remap it onto a different member. A filter that [fills a parameter](#parameter-filters) is wired up differently: it reaches every chart whose SQL uses the parameter.
 
 Adding a chart built on a different semantic view is the case where this needs attention. If at least one control has a [mapping suggestion](#controls-mapping) on the new chart's view, a prompt appears with **Review…**, which opens the chart's [Controls mapping](#controls-mapping) with the suggestions pre-selected, and **Dismiss**, which leaves the mappings as they are. If no control has a suggestion, no prompt appears, and you map controls to the chart by hand.
 
@@ -719,12 +763,12 @@ Hover over the icon for details. Click it to open the chart's [Controls mapping]
 
 Each chart decides which controls apply to it through its **Controls mapping**. The mapping is resolved automatically in most cases and only needs manual attention when a control targets a member that isn't on the chart's semantic view.
 
-Open **Controls mapping** from a chart's settings menu to inspect or override the mapping for that chart. For each control on the dashboard you can:
+Open **Controls mapping** from a chart's settings menu to inspect or override the mapping for that chart. For each control on the dashboard that targets a member, you can:
 
 - **Toggle the control on or off** for the chart, even when a mapping exists
 - **Pick a different member** from the chart's semantic view to remap the control to
 
-Four states show up in the mapping sidebar:
+Four mapping states show up for controls that target a member. Filters that fill a parameter have their own labels, described [below](#parameter-filters).
 
 | Status | What it means |
 |---|---|
@@ -746,9 +790,20 @@ Each control's picker offers only the members it can actually be resolved agains
 
 For filter, time granularity, and field switcher controls — the three that map onto a member — the [Workbook Agent][ref-workbook-agent] can set the same per-chart overrides you would from **Controls mapping**: exclude a chart from a filter, or remap any of the three onto a different member for one chart. That lets it wire these controls across charts on different semantic views without you revisiting each chart manually.
 
+#### Filters that fill a parameter {#parameter-filters}
+
+A [filter](#filter) with **Parameter** picked under **Filter by** fills a workbook SQL parameter instead of targeting a member. It reaches every chart whose SQL uses that parameter (`:name`), whatever semantic view the chart is built on, so it needs no mapping. Its card in **Controls mapping** reads **Fills parameter** and the parameter, or **Fills parameters** and both of them for a filter that fills the start and the end of a range. Charts whose SQL doesn't use the parameter get no card.
+
+The card has no member picker. To opt the chart out, open the card's ⋮ menu and choose **Disable**: the chart runs with its own value of the parameter, and the card shows **Disabled**. **Enable** in the same menu brings the filter back. **Edit** opens the filter's settings.
+
+On a chart built on an [advanced semantic query][ref-advanced-queries], member controls don't apply, and their cards are greyed out under the notice *Member filters are currently not supported for advanced query. Parameter filters still apply.* Cards of filters that fill a parameter stay usable there.
+
+The controls icon on a chart counts these filters along with the other controls, as in *1 of 2 controls apply to this report*. Clicking it opens the chart's **Controls mapping**.
+
 [ref-embed-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
 [ref-relative-date-values]: /reference/data-modeling/view#default_ui_filters
 [ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
+[ref-advanced-queries]: /docs/explore-analyze/workbooks/querying-data#advanced-semantic-queries
 [ref-print-version]: /docs/explore-analyze/dashboards#print-version
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
@@ -756,6 +811,9 @@ For filter, time granularity, and field switcher controls — the three that map
 [ref-charts]: /docs/explore-analyze/dashboards/widgets/charts
 [ref-period-comparison]: /docs/explore-analyze/workbooks/querying-data#period-over-period-comparison
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields#promoting-to-a-workbook-field
+[ref-calculated-fields-editing]: /docs/explore-analyze/workbooks/calculated-fields#editing-a-calculated-field
+[ref-reviews]: /docs/explore-analyze/dashboards/reviews
+[ref-top-n-filter]: /docs/explore-analyze/workbooks/querying-data#top-n-and-bottom-n
 [ref-pre-aggregations]: /docs/pre-aggregations
 [ref-switch-dimensions]: /reference/data-modeling/dimensions#type
 [ref-granularities]: /docs/data-modeling/dimensions
@@ -765,6 +823,7 @@ For filter, time granularity, and field switcher controls — the three that map
 [ref-dashboard-agent]: /docs/explore-analyze/dashboards/dashboard-agent
 [ref-member-level-security]: /docs/data-modeling/access-control/member-level-security
 [ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
+[ref-drill-through-landing]: /docs/explore-analyze/dashboards/drill-through#how-the-target-applies-the-values
 [ref-cross-filters-combine]: /docs/explore-analyze/dashboards/cross-filtering#how-cross-filters-combine
 [ref-data-freshness]: /docs/explore-analyze/dashboards#data-freshness
 [ref-live-mode]: /docs/explore-analyze/dashboards#live-mode

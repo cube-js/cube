@@ -23,7 +23,7 @@ Cross-filtering works on published dashboards in Cube and on [embedded dashboard
 
 ## Filtering by a data point
 
-Click a data point and choose **Filter dashboard by this point**. The cross-filter items come last in the menu, after **Drill down** and **Comment on this point** when the chart offers them. The point's values become the chart's cross-filter:
+Click a data point and choose **Filter dashboard by this point**. The cross-filter items come last in the menu, after **Drill down** and **Comment on this point** when the chart offers them; a chart with a [drill-through][ref-drill-through] lists its **Open in** item first. The point's values become the chart's cross-filter:
 
 - a bar, a line or area point, or a pie slice filters by its category, plus its color or series value on a stacked, grouped or multi-series chart;
 - a scatter point filters by every dimension it carries;
@@ -70,7 +70,7 @@ A chart that has a cross-filter of its own and is filtered by other charts shows
 
 Several charts can each have a cross-filter, and every other chart gets all of them at once: rows must match each one. A chart is never filtered by its own cross-filter, but it is filtered by the other charts'. Cross-filters combine with the dashboard's [controls][ref-controls] the same way, and clearing a control leaves the cross-filters in place, and the other way round.
 
-A cross-filter reaches a chart on the same semantic view through the same dimension. A chart on another semantic view gets it when that view includes the same cube dimension once; otherwise it isn't filtered. A cross-filter that holds several dimensions, such as a category and a color, reaches only the charts that can take all of them. [Python analysis][ref-python] reports and [AI summaries][ref-ai-summary] are never cross-filtered.
+A cross-filter reaches a chart on the same semantic view through the same dimension. A chart on another semantic view gets it when that view includes the same cube dimension once; otherwise it isn't filtered. A cross-filter that holds several dimensions, such as a category and a color, reaches only the charts that can take all of them. [Python analysis][ref-python] reports and [Analysis widgets][ref-analysis] are never cross-filtered.
 
 A [faceted filter][ref-faceted-filters] whose sources are left at **All** narrows its value list by the cross-filters too, and its tooltip names each as *Status (cross-filter)*. A cross-filter on the filter's own field, or one holding several periods of a date, doesn't narrow it, and neither does any cross-filter when you picked the filter's sources.
 
@@ -97,8 +97,9 @@ Other features read your cross-filters as they read your control selections:
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-faceted-filters]: /docs/explore-analyze/dashboards/widgets/controls#faceted-filters
 [ref-python]: /docs/explore-analyze/workbooks/python-analysis
-[ref-ai-summary]: /docs/explore-analyze/dashboards/widgets/ai-summary
+[ref-analysis]: /docs/explore-analyze/dashboards/widgets/analysis
 [ref-drill-down]: /docs/explore-analyze/charts/chart-types/table#cell-menu
+[ref-drill-through]: /docs/explore-analyze/dashboards/drill-through
 [ref-downloads]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
 [ref-print-version]: /docs/explore-analyze/dashboards#print-version
 [ref-dashboard-agent]: /docs/explore-analyze/dashboards/dashboard-agent#changing-filters-and-time-granularity

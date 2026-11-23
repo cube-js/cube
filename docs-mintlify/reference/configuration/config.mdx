@@ -498,6 +498,69 @@ Store routers are available on Multi-cluster deployments with
 [Multi-router Cube Store][ref-multi-router-cube-store] enabled, and the number
 of distinct ids should stay at or below **Number of clusters**.
 
+### `context_to_pre_aggregation_orchestrator_id`
+
+`context_to_pre_aggregation_orchestrator_id` is a function used to determine the
+id that keys an orchestrator's pre-aggregation queues and caches: builds, refresh
+key results, table versions, and the touches that decide which tables a cleanup
+keeps. Orchestrators that resolve to the same id share them. Any of them can run
+a pre-aggregation build that another one queued, they share its concurrency, and
+the cleanup of one keeps the tables that the others use. With
+[`CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`](/reference/configuration/environment-variables#cubejs_drop_pre_agg_without_touch),
+a cleanup drops untouched tables only once every orchestrator that ran a
+[scheduled refresh](/docs/pre-aggregations/refreshing-pre-aggregations) under the id within
+[`CUBEJS_TOUCH_PRE_AGG_TIMEOUT`](/reference/configuration/environment-variables#cubejs_touch_pre_agg_timeout)
+has finished its own refresh.
+
+When the id differs from the orchestrator id, pre-aggregation refresh key
+queries run in a queue of their own, so each Cube instance can open up to
+[`concurrency`](#orchestrator_options) more connections to a data source, and
+the orchestrators that share the id share that queue's concurrency.
+
+When this function is not set, the id comes from
+[`context_to_orchestrator_id`][self-orchestrator-id], and each orchestrator has
+its own queues and caches. If
+[`CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER`](/reference/configuration/environment-variables#cubejs_pre_aggregations_orchestrator_id_from_router)
+is `true`, the id comes from
+[`context_to_cube_store_router_id`](#context_to_cube_store_router_id) instead,
+when that function is set.
+
+<Warning>
+
+Builds and refresh key queries run with the [`driver_factory`](#driver_factory)
+of the orchestrator that picks them up, and their results are shared. Return the
+same id only for orchestrators that build pre-aggregations from the same data
+sources.
+
+An orchestrator that builds pre-aggregations only through the
+[`/v1/pre-aggregations/jobs`](/reference/core-data-apis/rest-api/reference) endpoint
+isn't waited for. With `CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH`, another orchestrator's
+cleanup can drop its tables until they are used or touched under the id.
+
+</Warning>
+
+Called once per orchestrator, when it is created.
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+@config('context_to_pre_aggregation_orchestrator_id')
+def context_to_pre_aggregation_orchestrator_id(ctx: dict) -> str:
+  return f"CUBE_REGION_{ctx['securityContext']['region']}"
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  contextToPreAggregationOrchestratorId: ({ securityContext }) => {
+    return `CUBE_REGION_${securityContext.region}`
+  }
+}
+```
+
+</CodeGroup>
+
 ### `driver_factory`
 
 A function to provide a custom configuration for the data source driver.
@@ -513,6 +576,9 @@ Should be used to configure data source connections **dynamically** in
 Not recommended to be used when [multiple data sources][ref-multiple-data-sources]
 can be configured **statically**. Use [`CUBEJS_DATASOURCES`](/reference/configuration/environment-variables#cubejs_datasources) and decorated environment
 variables in that case.
+
+If `CUBEJS_DATASOURCES` is set, it must list every data source the factory serves: Cube rejects
+queries to a data source missing from the list, even though `driver_factory` serves it.
 
 In Python, should return a dictionary; in JavaScript, should return an object.
 It should contain the `type` element corresponding to data source type and other

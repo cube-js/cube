@@ -28,6 +28,7 @@ use cubehll::HllSketch;
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::cube_ext::ordfloat::OrdF64;
+use crate::import::host_filter::{HttpLocationError, LocationHostFilter, LocationHttpClient};
 use crate::import::limits::ConcurrencyLimits;
 use crate::metastore::table::Table;
 use crate::metastore::{is_valid_plain_binary_hll, HllFlavour, IdRow};
@@ -47,6 +48,7 @@ use crate::CubeError;
 use cubedatasketches::HLLDataSketch;
 use tokio::time::{sleep, Duration};
 
+pub mod host_filter;
 pub mod limits;
 
 impl ImportFormat {
@@ -552,6 +554,10 @@ fn append_csv_value(
 #[async_trait]
 pub trait LocationsValidator: DIService + Send + Sync {
     async fn validate(&self, locations: &Vec<String>) -> Result<(), CubeError>;
+
+    /// The only client `http(s)://` locations may be requested with: it applies the host
+    /// allowlist to the location, its redirects and the addresses it resolves to.
+    fn http(&self) -> &LocationHttpClient;
 }
 
 /// How an import location is read. The validator, `resolve_location` and
@@ -580,6 +586,7 @@ impl LocationKind {
 
 pub struct LocationsValidatorImpl {
     location_allow_local_fs: bool,
+    http: LocationHttpClient,
 }
 
 #[async_trait]
@@ -590,18 +597,27 @@ impl LocationsValidator for LocationsValidatorImpl {
         }
         Ok(())
     }
+
+    fn http(&self) -> &LocationHttpClient {
+        &self.http
+    }
 }
 
 impl LocationsValidatorImpl {
-    pub fn new(location_allow_local_fs: bool) -> Arc<Self> {
-        Arc::new(Self {
+    pub fn new(
+        location_allow_local_fs: bool,
+        host_filter: LocationHostFilter,
+    ) -> Result<Arc<Self>, CubeError> {
+        Ok(Arc::new(Self {
             location_allow_local_fs,
-        })
+            http: LocationHttpClient::new(host_filter)?,
+        }))
     }
 
     fn validate_location(&self, location: &str) -> Result<(), CubeError> {
         match LocationKind::of(location) {
-            LocationKind::Stream | LocationKind::Http => Ok(()),
+            LocationKind::Stream => Ok(()),
+            LocationKind::Http => self.http.check(location),
             LocationKind::Temp => {
                 // Fails early on traversal instead of waiting for the import job to pick it up.
                 LocationHelper::temp_uploads_path(location)?;
@@ -728,31 +744,38 @@ impl ImportServiceImpl {
                 .try_download_http_location(location, table_id, temp_dir)
                 .await;
 
+            let err = match result {
+                Ok(downloaded) => return Ok(downloaded),
+                Err(HttpLocationError::Denied(err)) => return Err(err),
+                Err(HttpLocationError::Failed(err)) => err,
+            };
             if retry_attempts <= 0 {
-                return result;
+                return Err(err);
             }
-            match result {
-                Ok(size) => {
-                    return Ok(size);
-                }
-                Err(err) => {
-                    log::error!(
-                        "Import {} download error: {}. Retrying {}/{}...",
-                        location,
-                        err,
-                        retry_attempts,
-                        max_retries
-                    );
-                    sleep(retries_sleep).await;
-                    retries_sleep *= sleep_multiplier;
-                }
-            }
+            log::error!(
+                "Import {} download error: {}. Retrying {}/{}...",
+                location,
+                err,
+                retry_attempts,
+                max_retries
+            );
+            sleep(retries_sleep).await;
+            retries_sleep *= sleep_multiplier;
         }
     }
 
     async fn try_download_http_location(
         &self,
         location: &str,
+        table_id: u64,
+        temp_dir: &Path,
+    ) -> Result<(File, usize, TempPath), HttpLocationError> {
+        let res = self.validator.http().get(location).await?;
+        Ok(Self::save_http_response(res, table_id, temp_dir).await?)
+    }
+
+    async fn save_http_response(
+        res: reqwest::Response,
         table_id: u64,
         temp_dir: &Path,
     ) -> Result<(File, usize, TempPath), CubeError> {
@@ -769,7 +792,6 @@ impl ImportServiceImpl {
             .into_parts();
         let mut file = File::from_std(file);
 
-        let res = reqwest::get(location).await?;
         if !res.status().is_success() {
             return Err(CubeError::user(format!(
                 "Unable to import from http location, status code: {}",
@@ -1003,8 +1025,12 @@ impl ImportService for ImportServiceImpl {
     }
 
     async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError> {
-        let file_size =
-            LocationHelper::location_file_size(location, self.remote_fs.clone()).await?;
+        let file_size = LocationHelper::location_file_size(
+            location,
+            self.remote_fs.clone(),
+            self.validator.http(),
+        )
+        .await?;
         Ok(ImportServiceImpl::estimate_rows(location, file_size))
     }
 
@@ -1019,23 +1045,20 @@ impl LocationHelper {
     pub async fn location_file_size(
         location: &str,
         remote_fs: Arc<dyn RemoteFs>,
+        http: &LocationHttpClient,
     ) -> Result<Option<u64>, CubeError> {
         let res = match LocationKind::of(location) {
             LocationKind::Http => {
-                let client = reqwest::Client::new();
-                let req = client.head(location).build()?;
-
                 // S3 doesn't support HEAD for pre signed urls with GetObject command
-                if req
-                    .url()
-                    .domain()
-                    .map(|v| v.contains("amazonaws.com"))
+                if url::Url::parse(location)
+                    .ok()
+                    .and_then(|url| url.domain().map(|v| v.contains("amazonaws.com")))
                     .unwrap_or(false)
                 {
                     return Ok(None);
                 }
 
-                let res = client.execute(req).await?;
+                let res = http.head(location).await?;
 
                 let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
 
@@ -1695,13 +1718,43 @@ mod temp_upload_name_tests {
 #[cfg(test)]
 mod location_validator_tests {
     use super::{
-        Column, ColumnType, ImportFormat, ImportService, LocationKind, LocationsValidatorImpl,
+        Column, ColumnType, ImportFormat, ImportService, LocationHostFilter, LocationKind,
+        LocationsValidatorImpl,
     };
     use crate::config::Config;
     use std::sync::Arc;
 
     fn validator(allow_local: bool) -> Arc<LocationsValidatorImpl> {
-        LocationsValidatorImpl::new(allow_local)
+        LocationsValidatorImpl::new(allow_local, LocationHostFilter::default()).unwrap()
+    }
+
+    fn validator_with_hosts(hosts: &[&str]) -> Arc<LocationsValidatorImpl> {
+        let filter = LocationHostFilter::new(
+            &hosts.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            false,
+        )
+        .unwrap();
+        LocationsValidatorImpl::new(false, filter).unwrap()
+    }
+
+    #[test]
+    fn http_locations_are_checked_against_allowed_hosts() {
+        let v = validator_with_hosts(&["127.0.0.1", "*.s3.amazonaws.com"]);
+        assert!(v
+            .validate_location("http://127.0.0.1:19099/data.csv")
+            .is_ok());
+        assert!(v
+            .validate_location("https://bucket.s3.amazonaws.com/data.csv")
+            .is_ok());
+        let err = v
+            .validate_location("http://169.254.169.254/latest/meta-data")
+            .unwrap_err()
+            .message;
+        assert!(err.contains("CUBESTORE_LOCATION_ALLOW_HOSTS"), "{}", err);
+        // The allowlist only covers http(s); other kinds keep their own rules.
+        assert!(v.validate_location("temp://orders-0.csv").is_ok());
+        assert!(v.validate_location("stream://kafka/events/0").is_ok());
+        assert!(v.validate_location("/etc/passwd").is_err());
     }
 
     #[test]

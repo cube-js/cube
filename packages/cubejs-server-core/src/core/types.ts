@@ -137,6 +137,7 @@ export type ContextToAppIdFn = (context: RequestContext) => string | Promise<str
 export type ContextToGroupsFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToCubeStoreRouterIdFn = (context: RequestContext) => string | Promise<string>;
+export type ContextToPreAggregationOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
 
@@ -207,6 +208,12 @@ export interface CreateOptions {
   contextToGroups?: ContextToGroupsFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
   contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;
+  /**
+   * Id the pre-aggregation queues and caches of an orchestrator are keyed by. Defaults to
+   * `contextToOrchestratorId`, or to `contextToCubeStoreRouterId` when
+   * `CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER` is set.
+   */
+  contextToPreAggregationOrchestratorId?: ContextToPreAggregationOrchestratorIdFn;
   contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
   checkAuth?: CheckAuthFn;

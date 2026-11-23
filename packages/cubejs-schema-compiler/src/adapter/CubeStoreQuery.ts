@@ -345,6 +345,12 @@ export class CubeStoreQuery extends BaseQuery {
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     templates.expressions.wrap_segment_select = 'IF({{ expr }}, 1, 0)';
     templates.expressions.wrap_segment_filter = '{{ expr }} = 1';
+    // CONCAT rather than `||`: Cube Store before v1.6 rejects `||` with "Unsupported SQL binary
+    // operator StringConcat", and a deployment may run an older Cube Store than its Cube API.
+    // Matches what the legacy planner emits (`concatStringsSql`, `CubeStoreFilter.likeIgnoreCase`).
+    // ILIKE is already case-insensitive in Cube Store, so the value isn't wrapped in LOWER.
+    templates.expressions.concat_strings = 'CONCAT({{ strings | join(\', \' ) }})';
+    templates.filters.like_pattern = 'CONCAT({% if start_wild %}\'%\'{% else %}\'\'{% endif %}, {{ value }}, {% if end_wild %}\'%\'{% else %}\'\'{% endif %})';
     // CubeStore has no native FULL OUTER JOIN (it is emulated via LEFT JOIN chains), and its
     // distributed join executor assumes the left-most table is the split root, so RIGHT/FULL
     // across partitioned tables is unsafe. Don't push those join types down to CubeStore.

@@ -1,0 +1,246 @@
+cubes:
+  - name: activity
+    sql: "SELECT * FROM mg_activity"
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: app_name
+        sql: app_name
+        type: string
+
+      - name: cohort_date
+        sql: cohort_date
+        type: time
+        granularities:
+          - name: half_day
+            interval: 12 hours
+            origin: "2024-07-01"
+
+      - name: cohort_date_alias
+        sql: "{cohort_date}"
+        type: time
+
+      - name: cohort_date_shifted
+        sql: "{cohort_date} + INTERVAL '12 hours'"
+        type: time
+
+    measures:
+      - name: count
+        type: count
+
+      - name: amount
+        type: sum
+        sql: amount
+
+      - name: amount_all_january
+        type: number
+        multi_stage: true
+        sql: "{amount}"
+        filter:
+          include:
+            - member: activity.cohort_date
+              operator: inDateRange
+              values: ["2025-01-01", "2025-01-31"]
+
+      - name: amount_january_to_last_second
+        type: number
+        multi_stage: true
+        sql: "{amount}"
+        filter:
+          include:
+            - member: activity.cohort_date
+              operator: inDateRange
+              values: ["2025-01-01T00:00:00", "2025-01-31T23:59:59"]
+
+      - name: amount_q4_2024
+        type: number
+        multi_stage: true
+        sql: "{amount}"
+        filter:
+          include:
+            - member: activity.cohort_date
+              operator: inDateRange
+              values: ["2024-10-01", "2024-12-31"]
+
+      - name: amount_early_january
+        type: number
+        multi_stage: true
+        sql: "{amount}"
+        filter:
+          include:
+            - member: activity.cohort_date
+              operator: inDateRange
+              values: ["2025-01-04", "2025-01-06"]
+
+    pre_aggregations:
+      - name: all_grains
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+        time_dimensions:
+          - dimension: cohort_date
+            granularity: day
+          - dimension: cohort_date
+            granularity: week
+          - dimension: cohort_date
+            granularity: month
+          - dimension: cohort_date
+            granularity: quarter
+          - dimension: cohort_date
+            granularity: year
+
+      - name: month_then_day
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+        time_dimensions:
+          - dimension: cohort_date
+            granularity: month
+          - dimension: cohort_date
+            granularity: day
+
+      - name: week_and_month
+        type: rollup
+        measures:
+          - count
+          - amount
+        time_dimensions:
+          - dimension: cohort_date
+            granularity: week
+          - dimension: cohort_date
+            granularity: month
+
+      - name: raw_and_grains
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimensions:
+          - dimension: cohort_date
+            granularity: day
+          - dimension: cohort_date
+            granularity: year
+
+      - name: day_with_raw_dimension
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimension: cohort_date
+        granularity: day
+
+      - name: rows_with_raw_dimension
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - id
+          - app_name
+          - cohort_date
+        time_dimension: cohort_date
+        granularity: day
+
+      - name: month_with_raw_dimension
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimension: cohort_date
+        granularity: month
+
+      - name: raw_only
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+
+      - name: quarter_only
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+        time_dimension: cohort_date
+        granularity: quarter
+
+      - name: quarter_with_raw_dimension
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimension: cohort_date
+        granularity: quarter
+
+      - name: week_with_raw_dimension
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimension: cohort_date
+        granularity: week
+
+      - name: half_day_only
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+        time_dimension: cohort_date
+        granularity: half_day
+
+      - name: non_strict_month_with_raw_dimension
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimension: cohort_date
+        granularity: month
+        allow_non_strict_date_range_match: true
+
+      - name: raw_week_and_month
+        type: rollup
+        measures:
+          - count
+          - amount
+        dimensions:
+          - app_name
+          - cohort_date
+        time_dimensions:
+          - dimension: cohort_date
+            granularity: week
+          - dimension: cohort_date
+            granularity: month

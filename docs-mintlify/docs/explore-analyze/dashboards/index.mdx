@@ -154,11 +154,11 @@ link also carries [`autoRefresh`](#live-mode-link).
 
 Live mode keeps a published dashboard current while it is open, for example on
 a wall display: every few minutes it refreshes the whole dashboard, as
-**Refresh** on the dashboard's [freshness](#data-freshness) leaf does, and also
-regenerates every AI summary that has already run. It runs only in a browser
-tab that has the dashboard open. [Refreshes, deliveries and
-alerts][ref-scheduled-refreshes] run on Cube's servers whether anyone has the
-dashboard open or not.
+**Refresh all charts** on the dashboard's [freshness](#data-freshness) leaf
+does, and also re-runs every [Analysis widget][ref-analysis] that has already
+run. It runs only in a browser tab that has the dashboard open. [Refreshes,
+deliveries and alerts][ref-scheduled-refreshes] run on Cube's servers whether
+anyone has the dashboard open or not.
 
 To offer it to viewers, open the dashboard in the builder, open the options
 sidebar, and turn on **Live mode** on the **Editing** tab, right below
@@ -188,23 +188,23 @@ it, as **Exit live mode**; once that stops the refreshes, the item is gone.
 While live mode runs:
 
 - The interval counts from the end of the last refresh of the whole dashboard,
-  including one started with **Refresh** on the dashboard's freshness leaf.
-  Refreshing a single chart doesn't restart it. A refresh still running when
-  the next one comes due is never doubled: the interval starts again when it
-  ends.
+  including one started with **Refresh all charts** on the dashboard's
+  freshness leaf. Refreshing a single chart doesn't restart it. A refresh still
+  running when the next one comes due is never doubled: the interval starts
+  again when it ends.
 - Your control selections, cross-filters and open tabs are kept, and every
   refresh uses them.
-- An AI summary is regenerated only once it has run; one still being written
-  is left to finish. The regenerated summary stays in that browser tab and is
-  not published, so other viewers keep seeing the published one.
+- An Analysis widget is re-run only once it has run; one still running is left
+  to finish. The re-run analysis stays in that browser tab and is not
+  published, so other viewers keep seeing the published one.
 - In a hidden browser tab, such as one behind another tab, nothing refreshes.
   Shown again after a refresh came due, the dashboard refreshes at once;
   shown sooner, it refreshes when the refresh is due.
 - A refresh that succeeds shows no notice. One that fails shows the same
-  notice **Refresh** does, every time: **Failed to refresh dashboard** when a
-  chart's query failed, or **Couldn't load filter values** when only a
-  [filter's value list][ref-filter-values-failed] failed. The chart or filter
-  that failed shows its error.
+  notice **Refresh all charts** does, every time: **Failed to refresh
+  dashboard** when a chart's query failed, or **Couldn't load filter values**
+  when only a [filter's value list][ref-filter-values-failed] failed. The
+  chart or filter that failed shows its error.
 - It keeps running in [full screen](#full-screen) and after a reload, since it
   is kept in the page's address as an [`autoRefresh`](#live-mode-link)
   parameter: **Enter live mode** adds `autoRefresh=true`, and a link's own
@@ -288,16 +288,26 @@ Links][ref-dimension-links] to define them.
 Turn on [cross-filtering][ref-cross-filtering] to let viewers of the published
 dashboard click a chart's data to filter the other charts on it.
 
+## Drill-through
+
+Add a [drill-through][ref-drill-through] to a chart to let viewers of the
+published dashboard click its data and open another dashboard, filtered by what
+they clicked. Unlike a `dashboard:` link, it is set on the chart in the
+dashboard builder rather than on a dimension in the data model.
+
 ## Dashboard slug
 
 A dashboard can have a **slug** — a short, stable, human-readable identifier
 (e.g. `orders-detail`) used to link to it from the data model. Data-model
 [dimension links][ref-dimension-links] with a `dashboard:` value reference a
-dashboard by its slug to drill into it.
+dashboard by its slug to drill into it, and so does a chart's
+[drill-through][ref-drill-through].
 
 To set it, open the dashboard in the builder, open the **options sidebar**, and
-fill the **Slug** field. Slugs are **unique per deployment** and are resolved
-within the current deployment, so the same model works across environments. The
+fill the **Slug** field, or pick the dashboard as a target in a chart's
+[drill-through][ref-drill-through] dialog, which offers a slug for a dashboard
+you can edit. Slugs are **unique per deployment** and are resolved within the
+current deployment, so the same model works across environments. The
 dashboard's own URL is unaffected (it stays `publicId`-based).
 
 <Note>
@@ -307,8 +317,8 @@ reference a slug from a `dashboard:` link in the data model before any dashboard
 uses it, or set a dashboard's slug before any link references it — neither
 breaks. A link whose slug doesn't (yet) resolve is simply skipped in the cell
 menu, and starts working as soon as a dashboard in the deployment claims that
-slug. (If you later clear or change a slug that links still reference, the
-options sidebar warns you to update those links.)
+slug. (If you later clear or change a slug that links or drill-throughs still
+reference, the options sidebar warns you and lists what references it.)
 
 </Note>
 
@@ -451,9 +461,9 @@ version rebuilds it for A4 pages:
   controls][ref-dynamic-controls] widget: no dropdown, picker or clear button
   appears on the page. A control a viewer added to that widget still states its
   value on the summary line under the title, as a placed one does.
-- Every other widget — charts, tables, KPIs, text and AI summaries — prints
-  full page width, one below another, in the order you read the dashboard: top
-  to bottom, then left to right. Widgets inside a [layout
+- Every other widget — charts, tables, KPIs, text and Analysis widgets —
+  prints full page width, one below another, in the order you read the
+  dashboard: top to bottom, then left to right. Widgets inside a [layout
   container][ref-layout] print in the same flow, and a tabs container prints
   the widgets of **every** tab, in tab order, not only the tab on screen.
 - A table prints every row its query returned, not only the rows its box
@@ -461,8 +471,8 @@ version rebuilds it for A4 pages:
   the dashboard shows. It continues onto the following pages with its column
   headers repeated at the top of each, and none of its rows is split between
   two pages.
-- A chart, KPI, text or AI summary block that doesn't fit in the space left on
-  a page starts on the next page instead of being cut in two.
+- A chart, KPI, text or Analysis widget block that doesn't fit in the space
+  left on a page starts on the next page instead of being cut in two.
 
 <Info>
 
@@ -508,6 +518,7 @@ Plane API print the whole dashboard only.
 [ref-widgets]: /docs/explore-analyze/dashboards/widgets
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
+[ref-drill-through]: /docs/explore-analyze/dashboards/drill-through
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-sharing-selection]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
 [ref-tabs-url]: /docs/explore-analyze/dashboards/widgets/layout#tabs-on-a-published-dashboard
@@ -519,6 +530,7 @@ Plane API print the whole dashboard only.
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-control-data-defaults]: /docs/explore-analyze/dashboards/widgets/controls#defaults-resolved-from-the-data
 [ref-layout]: /docs/explore-analyze/dashboards/widgets/layout
+[ref-analysis]: /docs/explore-analyze/dashboards/widgets/analysis
 [ref-table-pivots]: /docs/explore-analyze/charts/chart-types/table#pivots
 [ref-table-totals]: /docs/explore-analyze/charts/chart-types/table#totals
 [ref-table-row-grouping]: /docs/explore-analyze/charts/chart-types/table#row-grouping

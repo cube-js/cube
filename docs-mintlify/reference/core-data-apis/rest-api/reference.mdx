@@ -775,10 +775,17 @@ This endpoint is part of the [Orchestration API][ref-orchestration-api].
 | `selector.cubes`           | Array of cube names which contain pre-aggregations             | ❌       |
 | `selector.preAggregations` | Array of pre-aggregation names                                 | ❌       |
 | `selector.dateRange`       | Date Range tuple ['range-date-start', 'range-date-end']        | ❌       |
+| `selector.force`           | Rebuild partitions that are already up to date; `true` by default | ❌    |
+| `selector.dryRun`          | Build nothing; return each partition's status instead of tokens | ❌      |
 
 To trigger pre-aggregation builds, send a `POST` request with a payload
 including `post` as the `action` and `selector` properties. The response will
 contain an array of `tokens` (identifiers) of triggered jobs.
+
+Each security context in `selector.contexts` goes through
+[`extend_context`][ref-config-extend-context] like the security context of any
+other request, both when jobs are triggered and when their statuses are
+retrieved.
 
 <Note>
 
@@ -876,6 +883,26 @@ Example response:
   "ea903b10634b2f3141b35a2529870e89"
 ]
 ```
+
+With `"force": false`, only partitions without their current version, or whose
+last build of it failed, are built: a job for a partition that is already up to
+date reports `done` without a rebuild.
+
+With `"dryRun": true`, nothing is built and no jobs are created. The response
+lists every partition the selector matches, in the format of
+[job statuses](#retrieving-statuses-of-jobs) without `token`, with one of
+these statuses:
+
+| Status | Description |
+| --- | --- |
+| `done` | The partition's current version is built. A version whose build is still running or has failed doesn't count |
+| `outdated` | An older version of the partition is built, but not the current one: its refresh key has changed, or the current version's build is still running or has failed |
+| `missing_partition` | No version of the partition is built |
+
+The current version is the one the refresh key yields now, so a dry run
+evaluates refresh keys in the data source, like a build does. `table` names the
+built table only for `done`; for other statuses it is a placeholder that a
+later build won't use.
 
 ### Retrieving statuses of jobs
 
@@ -1641,3 +1668,4 @@ Keep-Alive: timeout=5
 [ref-datasources-env]: /admin/connect-to-data/multiple-data-sources#under-the-hood
 [ref-segments]: /reference/data-modeling/segments
 [ref-request-id]: /reference/core-data-apis/rest-api#request-span-annotation
+[ref-config-extend-context]: /reference/configuration/config#extend_context

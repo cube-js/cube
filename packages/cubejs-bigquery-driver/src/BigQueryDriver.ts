@@ -11,6 +11,7 @@ import {
   pausePromise,
   Required,
 } from '@cubejs-backend/shared';
+import { pipeline } from 'stream';
 import R from 'ramda';
 import {
   BigQuery,
@@ -184,7 +185,10 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     // a dataset's access control list, updating a table's description, or
     // listing user-defined functions in a dataset.
     // @see https://cloud.google.com/bigquery/pricing#free
-    await this.bigquery.getDatasets();
+    // One page of one dataset checks the credentials and the project just as well.
+    // Listing them all pages through the whole project: on a large one that takes
+    // tens of seconds, and /livez, which runs this test, outlasted its probes.
+    await this.bigquery.getDatasets({ maxResults: 1, autoPaginate: false });
   }
 
   public readOnly() {
@@ -348,7 +352,12 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     });
 
     const rowStream = new HydrationStream();
-    stream.pipe(rowStream);
+
+    // Not pipe(): it doesn't forward source errors, so a mid-stream
+    // BigQuery error crashed the process (#10875).
+    pipeline(stream, rowStream, () => {
+      // The error reaches consumers through rowStream's 'error' event
+    });
 
     return {
       rowStream,

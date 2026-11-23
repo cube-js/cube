@@ -958,9 +958,27 @@ const SwitchCaseSchema = Joi.object().keys({
   }).description('Used when the switch dimension matches none of the when values')
 }).required();
 
+const ContextCaseSchema = Joi.object().keys({
+  when: Joi.array().items(Joi.object().keys({
+    context: Joi.func().required().description('QUERY_CONTEXT condition over the query, e.g. "{QUERY_CONTEXT.has_dimension(CUBE.category)}"'),
+    sql: Joi.func().required().description('SQL expression returned when the condition holds for the query')
+  })).min(1)
+    .required()
+    .description('Conditions over the query, checked in order; the first that holds selects its SQL expression'),
+  else: Joi.object().keys({
+    sql: Joi.func().required().description('SQL expression returned when no condition holds for the query')
+  }).required().description('Used when no condition holds for the query')
+}).required();
+
 const CaseVariants = Joi.alternatives().try(
   CaseSchema,
   SwitchCaseSchema
+);
+
+const MeasureCaseVariants = Joi.alternatives().try(
+  CaseSchema,
+  SwitchCaseSchema,
+  ContextCaseSchema
 );
 
 const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.multiStage'), [
@@ -970,7 +988,7 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       multiStage: Joi.boolean().strict().description('Enable multi-stage calculations for this measure. Required for time_shift, group_by, reduce_by, and rank type measures.'),
       type: multiStageMeasureType.required().description('Type of the measure'),
       sql: Joi.func().description('SQL expression for the measure'), // TODO .required(),
-      case: CaseVariants.description("Conditional values: when/else pairs, or a switch on a dimension's values"),
+      case: MeasureCaseVariants.description("Conditional values: when/else pairs, a switch on a dimension's values, or QUERY_CONTEXT conditions"),
       groupBy: Joi.func().description('Dimensions to group by for fixed dimension calculations (e.g., calculate revenue per country regardless of other groupings)'),
       reduceBy: Joi.func().description('Dimensions to reduce by for ranking calculations. The rank will be computed within each unique combination of non-reduced dimensions.'),
       addGroupBy: Joi.func().description('Additional dimensions to include in the inner aggregation stage while preserving query dimensions. Used for nested aggregate calculations in multi-stage measures.'),

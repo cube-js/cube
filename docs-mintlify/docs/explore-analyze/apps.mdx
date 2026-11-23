@@ -3,14 +3,6 @@ title: Apps
 description: Build custom, interactive data experiences backed by governed data from your Cube semantic layer.
 ---
 
-<Warning>
-
-Apps are currently in preview, and their capabilities and authoring experience may
-still change. Reach out to the [Cube support team](/admin/account-billing/support)
-to activate this feature for your account.
-
-</Warning>
-
 Apps let you go beyond a dashboard's grid of widgets. An app is a custom,
 interactive interface with its own layout, components, and controls, powered by
 live data from reports in a Cube workbook.
@@ -20,15 +12,28 @@ interactive data tool that does not fit a standard [dashboard][ref-dashboards]
 layout. A workbook holds one dashboard, and that dashboard is either a standard
 dashboard or an app.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/vyf5XWzCwBE"
+  title="Building and editing apps in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 ## Turn a dashboard into an app
 
-Open a workbook and switch to **Dashboard builder**. In the workbook menu, select
-**App mode**. Cube replaces the dashboard with a starter app that you can edit,
-and the **Dashboard builder** tab reads **App builder**.
+Open a workbook and switch to the **Builder** tab. If the workbook has no
+dashboard yet, Cube asks **What do you want to build?** Pick **App** to start an
+app, or **Dashboard** for a standard dashboard.
 
-To go back to a standard dashboard, select **App mode** again. The tab reads
-**Dashboard builder** again. Cube keeps the standard dashboard's draft while the
-workbook is in app mode, so switching back restores it.
+To turn an existing dashboard into an app, click **Convert to app** in the
+toolbar and confirm. The app starts from your first report.
+
+To go back to a standard dashboard, click **Convert to dashboard** in the app
+editor's toolbar. Cube keeps both the dashboard's widgets and the app in the
+draft, so converting either way restores what you had.
 
 ## Build the app with the agent
 
@@ -488,9 +493,7 @@ responsible for what its code does with the data.
 - **The app rendered nothing** — the app started without errors but put nothing
   on the page. See [Find and fix problems](#find-and-fix-problems).
 
-## Preview limitations
-
-During preview:
+## Limitations {#preview-limitations}
 
 - Workbooks with an app cannot be promoted to another deployment.
 - A PDF of a slide deck holds about 18 slides. Later slides are cut off.
@@ -503,7 +506,6 @@ During preview:
   page with [`cube:action:set-filter`][ref-action-set-filter].
 - An app cannot read reports from [Source SQL tabs][ref-source-sql-tabs].
 - Apps can read workbook report results but cannot write data back to a source.
-- Available components and APIs may change as the feature develops.
 
 [ref-dashboards]: /docs/explore-analyze/dashboards
 [ref-publishing]: /docs/explore-analyze/dashboards#publishing-and-versions

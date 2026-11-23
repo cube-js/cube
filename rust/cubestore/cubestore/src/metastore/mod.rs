@@ -19,8 +19,10 @@ pub use rocks_fs::*;
 pub use rocks_store::*;
 pub use rocks_table::*;
 
+use crate::app_metrics;
 use crate::cluster::node_name_by_partition;
 use crate::metastore::partition::partition_file_name;
+use crate::util::metrics;
 use async_trait::async_trait;
 use cuberockstore::rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
 use log::info;
@@ -56,7 +58,7 @@ use crate::metastore::wal::{WALIndexKey, WALRocksIndex};
 
 use crate::table::{Row, TableValue};
 
-use crate::util::lock::{acquire_lock, acquire_lock_duration};
+use crate::util::lock::acquire_lock_duration;
 use crate::util::WorkerLoop;
 use crate::{meta_store_table_impl, CubeError};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -1472,6 +1474,9 @@ impl CachedTables {
     }
 }
 
+// Long enough for the first scan of a large chunk table, yet bounds waiters of a stuck one.
+const IN_MEMORY_COMPACTION_FIRST_SCAN_WAIT: Duration = Duration::from_secs(600);
+
 #[derive(Clone)]
 pub struct RocksMetaStore {
     store: Arc<RocksStore>,
@@ -1532,6 +1537,7 @@ impl RocksMetaStore {
 
     async fn in_memory_compaction_cached(
         &self,
+        allow_stale: bool,
     ) -> Result<Option<HashMap<String, Vec<u64>>>, CubeError> {
         Ok(
             if let Some((by_node, time)) = self.in_memory_compaction_cache.read().await.as_ref() {
@@ -1542,7 +1548,7 @@ impl RocksMetaStore {
                         .config
                         .compaction_in_memory_chunks_schedule_period_secs(),
                 );
-                if time.elapsed()? < cache_duration {
+                if allow_stale || time.elapsed()? < cache_duration {
                     Some(by_node.clone())
                 } else {
                     None
@@ -1570,15 +1576,27 @@ impl RocksMetaStore {
             return Ok(Vec::new());
         }
 
-        if let Some(by_node) = self.in_memory_compaction_cached().await? {
+        if let Some(by_node) = self.in_memory_compaction_cached(false).await? {
             return Ok(by_node.get(&node).cloned().unwrap_or_default());
         }
-        let _compute_guard = acquire_lock(
-            "in-memory compaction discovery compute",
-            self.in_memory_compaction_compute_lock.lock(),
-        )
-        .await?;
-        if let Some(by_node) = self.in_memory_compaction_cached().await? {
+        // A scan can outlast both the cache TTL and any lock deadline. While one is in flight,
+        // serve the previous result: it only names candidate partitions, the caller re-reads
+        // their chunks.
+        let _compute_guard = match self.in_memory_compaction_compute_lock.try_lock() {
+            Ok(guard) => guard,
+            Err(_) => {
+                if let Some(by_node) = self.in_memory_compaction_cached(true).await? {
+                    return Ok(by_node.get(&node).cloned().unwrap_or_default());
+                }
+                acquire_lock_duration(
+                    "in-memory compaction discovery",
+                    self.in_memory_compaction_compute_lock.lock(),
+                    IN_MEMORY_COMPACTION_FIRST_SCAN_WAIT,
+                )
+                .await?
+            }
+        };
+        if let Some(by_node) = self.in_memory_compaction_cached(false).await? {
             return Ok(by_node.get(&node).cloned().unwrap_or_default());
         }
 
@@ -2526,8 +2544,15 @@ impl MetaStore for RocksMetaStore {
     async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError> {
         self.write_operation("table_ready", move |db_ref, batch_pipe| {
             let rocks_table = TableRocksTable::new(db_ref.clone());
-            let entry =
-                rocks_table.update_with_fn(id, |r| r.update_is_ready(is_ready), batch_pipe)?;
+            let mut was_ready = false;
+            let entry = rocks_table.update_with_fn(
+                id,
+                |r| {
+                    was_ready = r.is_ready();
+                    r.update_is_ready(is_ready)
+                },
+                batch_pipe,
+            )?;
 
             if is_ready {
                 let schema = SchemaRocksTable::new(db_ref)
@@ -2538,8 +2563,20 @@ impl MetaStore for RocksMetaStore {
                     metastore.cached_tables.upsert_table_by_id(id, table_path);
                 });
             } else {
+                // Decided on the write loop, so concurrent deactivations of a table count once.
+                let deactivated_source = was_ready.then(|| {
+                    if entry.get_row().is_streaming() {
+                        "stream"
+                    } else {
+                        "batch"
+                    }
+                });
                 batch_pipe.set_post_commit_callback(move |metastore| {
                     metastore.cached_tables.remove_by_table_id_or_reset(id);
+                    if let Some(source) = deactivated_source {
+                        app_metrics::TABLES_DEACTIVATED
+                            .add_with_tags(1, Some(&vec![metrics::format_tag("source", source)]));
+                    }
                 });
             }
 
@@ -5894,6 +5931,79 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn in_memory_compaction_discovery_in_flight_scan() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let (_remote_fs, meta_store) =
+            RocksMetaStore::prepare_test_metastore("in_memory_compaction_discovery_in_flight");
+        let node = meta_store.store.config.server_name().clone();
+        meta_store.create_schema("s".to_string(), false).await?;
+        meta_store
+            .create_table(
+                "s".to_string(),
+                "stream".to_string(),
+                vec![Column::new("name".to_string(), ColumnType::String, 0)],
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(vec!["name".to_string()]),
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+            .await?;
+        let partition = meta_store.get_partition(1).await?;
+        let chunk = meta_store
+            .create_chunk(partition.get_id(), 10, None, None, true)
+            .await?;
+        meta_store.chunk_uploaded(chunk.get_id()).await?;
+
+        let scan_in_flight = meta_store.in_memory_compaction_compute_lock.clone();
+
+        // Nothing cached yet: a caller waits for the in-flight scan, then runs its own.
+        let guard = scan_in_flight.lock().await;
+        let waiter = {
+            let meta_store = meta_store.clone();
+            let node = node.clone();
+            tokio::spawn(async move { meta_store.in_memory_compaction_partition_ids(node).await })
+        };
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(!waiter.is_finished());
+        drop(guard);
+        assert_eq!(waiter.await.unwrap()?, vec![partition.get_id()]);
+
+        // Expired cache: a caller gets the previous result instead of waiting for the scan.
+        let expired = SystemTime::now() - Duration::from_secs(3600);
+        *meta_store.in_memory_compaction_cache.write().await =
+            Some((HashMap::from([(node.clone(), vec![42])]), expired));
+        let guard = scan_in_flight.lock().await;
+        assert_eq!(
+            meta_store
+                .in_memory_compaction_partition_ids(node.clone())
+                .await?,
+            vec![42]
+        );
+        drop(guard);
+
+        // No scan in flight: the expired cache is recomputed.
+        assert_eq!(
+            meta_store.in_memory_compaction_partition_ids(node).await?,
+            vec![partition.get_id()]
+        );
+
+        RocksMetaStore::cleanup_test_metastore("in_memory_compaction_discovery_in_flight");
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn get_active_partitions_for_indexes_test() -> Result<(), CubeError> {
         init_test_logger().await;
 
@@ -5978,6 +6088,70 @@ mod tests {
         assert_eq!(ids(&batch[1]), ids(&single2));
         assert!(batch[2].is_empty());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn table_deactivation_is_counted_by_source() -> Result<(), CubeError> {
+        use crate::util::metrics::test_capture;
+        init_test_logger().await;
+        test_capture::watch("cs.tables.deactivated");
+
+        let (_remote_fs, meta_store) =
+            RocksMetaStore::prepare_test_metastore("table_deactivation_is_counted_by_source");
+        meta_store.create_schema("foo".to_string(), false).await?;
+        let create = |name: &str, location: &str| {
+            meta_store.create_table(
+                "foo".to_string(),
+                name.to_string(),
+                vec![Column::new("col1".to_string(), ColumnType::Int, 0)],
+                Some(vec![location.to_string()]),
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+        };
+        let stream_table = create("streamed", "stream://source/topic").await?;
+        let batch_table = create("imported", "temp://imported.csv").await?;
+
+        for table in [&stream_table, &batch_table] {
+            deactivate_table_due_to_corrupt_data(
+                meta_store.clone(),
+                table.get_id(),
+                "corrupt".to_string(),
+            )
+            .await?;
+            assert!(!meta_store
+                .get_table_by_id(table.get_id())
+                .await?
+                .get_row()
+                .is_ready());
+        }
+
+        let samples = test_capture::samples("cs.tables.deactivated");
+        assert!(samples.contains(&(1, vec!["source:stream".to_string()])));
+        assert!(samples.contains(&(1, vec!["source:batch".to_string()])));
+
+        deactivate_table_due_to_corrupt_data(
+            meta_store.clone(),
+            batch_table.get_id(),
+            "corrupt again".to_string(),
+        )
+        .await?;
+        assert_eq!(test_capture::samples("cs.tables.deactivated"), samples);
+
+        RocksMetaStore::cleanup_test_metastore("table_deactivation_is_counted_by_source");
         Ok(())
     }
 

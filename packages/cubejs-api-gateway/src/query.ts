@@ -292,6 +292,8 @@ export const preAggsJobsRequestSchema = Joi.object({
       cubes: Joi.array().items(Joi.string()),
       preAggregations: Joi.array().items(Joi.string()),
       dateRange: Joi.array().length(2).items(Joi.string()),
+      force: Joi.boolean(),
+      dryRun: Joi.boolean(),
     }).optional(),
     otherwise: Joi.forbidden(),
   }),

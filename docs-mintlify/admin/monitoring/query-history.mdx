@@ -19,7 +19,8 @@ You can set the [time range](#setting-the-time-range), [explore queries](#explor
 and filter them, drill down on specific queries to [see more details](#inspecting-api-queries).
 
 You can also use [Query History export][ref-query-history-export] to bring Query History
-data to an external monitoring solution for further analysis.
+data to an external monitoring solution for further analysis. To read Query History from a script
+or an agent, use the [API or the CLI](#reading-query-history-programmatically).
 
 <br/>
 <video width="100%" controls>
@@ -244,6 +245,27 @@ while the query is in the query execution queue:
   <img src="https://ucarecdn.com/24eb11a1-4312-4d06-ac1b-6a0575c7dbe6/" />
 </Frame>
 
+## Reading Query History programmatically
+
+You can read the same API requests that the **API** tab shows through the
+[Platform API][ref-platform-api] or the [Cube CLI][ref-cli-query-history]. Both
+cover a deployment's production requests that queried data; requests to
+development branches and metadata calls are left out.
+
+| Method and path | Description |
+| --- | --- |
+| [`GET /query-history/requests`][ref-api-list-requests] | List requests, newest first. Filter by time range (`from`, `to`), `status`, `apiType`, `minDurationMs`, or `search`, and page with `first` and `after`. With `after`, the cursor keeps the first page's filters and other filters are ignored. |
+| [`GET /query-history/requests/{id}`][ref-api-get-request] | Get one request by the `id` that the list returns, with the SQL it generated and its parameters. |
+
+Both paths are under `/api/v1/deployments/{deploymentId}`. [Authenticate][ref-api-auth] with an
+API key or an OAuth token with the `deployment.read` scope. The caller needs the
+`APMRead` [permission][ref-custom-roles] on the deployment, the same as for the
+Query History page.
+
+The deployment's [Query History tier](/admin/account-billing/pricing#query-history-tiers)
+limits how far back you can read. A time range that starts before the retention
+period returns `400`, and a request older than it returns `404`.
+
 [datadog-kb-flamegraph]:
   https://www.datadoghq.com/knowledge-center/distributed-tracing/flame-graph/
 [ref-caching-gs-preaggs]: /docs/pre-aggregations/getting-started-pre-aggregations
@@ -259,3 +281,9 @@ while the query is in the query execution queue:
 [ref-excel]: /docs/integrations/microsoft-excel
 [ref-sheets]: /docs/integrations/google-sheets
 [ref-playground]: /docs/explore-analyze/playground
+[ref-platform-api]: /api-reference/introduction#platform-api
+[ref-cli-query-history]: /reference/cli#query-history-commands
+[ref-api-list-requests]: /api-reference/query-history/list-query-history-requests
+[ref-api-get-request]: /api-reference/query-history/get-a-query-history-request
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
+[ref-api-auth]: /api-reference/authentication

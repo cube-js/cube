@@ -7,6 +7,30 @@ use crate::util::metrics::{Counter, Gauge, Histogram};
 /// The number of process startups.
 pub static STARTUPS: Counter = metrics::counter("cs.startup");
 
+/// Process starts tagged `version`, `build`, `role` and `slot`, counted once the role is known.
+pub static PROCESS_STARTS: Counter = metrics::counter("cs.process.started");
+
+/// Ticks periodically in every live process, tagged like [PROCESS_STARTS]. A counter
+/// rather than a gauge: a statsd bridge may keep serving a dead process's last gauge value.
+pub static PROCESS_HEARTBEAT: Counter = metrics::counter("cs.process.heartbeat");
+pub static PROCESS_RSS_BYTES: Gauge = metrics::gauge("cs.process.rss_bytes");
+/// Peak resident set since the process started; catches spikes between samples.
+pub static PROCESS_PEAK_RSS_BYTES: Gauge = metrics::gauge("cs.process.peak_rss_bytes");
+/// Every panic, caught or not.
+pub static PANICS: Counter = metrics::counter("cs.panics");
+
+/// Pool subprocesses that ended while processing a request, tagged `reason`.
+pub static WORKER_POOL_PROCESS_EXITS: Counter = metrics::counter("cs.worker_pool.process_exits");
+
+/// Tables deactivated on corrupt data, tagged `source`: `stream` tables fail on upstream stream
+/// errors, so they are told apart from `batch` ones.
+pub static TABLES_DEACTIVATED: Counter = metrics::counter("cs.tables.deactivated");
+pub static REMOTE_FS_FILE_SIZE_MISMATCH: Counter =
+    metrics::counter("cs.remote_fs.file_size_mismatch");
+/// Inter-node messages that could not be decoded, tagged `reason`: `version_mismatch` is protocol
+/// skew between builds, `undecodable` a payload this build can't read.
+pub static RPC_DECODE_ERRORS: Counter = metrics::counter("cs.rpc.decode_errors");
+
 /// Errors in IPC.
 pub static WORKER_POOL_ERROR: Counter = metrics::counter("cs.worker_pool.errors");
 
@@ -108,17 +132,15 @@ pub static STREAMING_ROUNDTRIP_CHUNKS: Histogram =
     metrics::histogram("cs.streaming.roundtrip_chunks");
 pub static STREAMING_LAG: Gauge = metrics::gauge("cs.streaming.lag");
 
-pub static METASTORE_QUEUE: Gauge = metrics::gauge("cs.metastore.queue_size");
-pub static METASTORE_READ_OPERATION: Histogram =
-    metrics::histogram("cs.metastore.read_operation.ms");
-pub static METASTORE_INNER_READ_OPERATION: Histogram =
-    metrics::histogram("cs.metastore.inner_read_operation.ms");
-pub static METASTORE_WRITE_OPERATION: Histogram =
-    metrics::histogram("cs.metastore.write_operation.ms");
-pub static METASTORE_INNER_WRITE_OPERATION: Histogram =
-    metrics::histogram("cs.metastore.inner_write_operation.ms");
-pub static METASTORE_READ_OUT_QUEUE_OPERATION: Histogram =
-    metrics::histogram("cs.metastore.read_out_queue_operation.ms");
+/// Metastore and cachestore read-write loops, tagged `store` and `loop`. Reported as sums so the
+/// mean wait (`operation_time.us` / `operations`) and loop utilisation (`busy.us` per second) can
+/// be aggregated across hosts.
+pub static RW_LOOP_OPERATIONS: Counter = metrics::counter("cs.metastore.operations");
+/// Wall time of operations as seen by callers, queueing included.
+pub static RW_LOOP_OPERATION_TIME_US: Counter = metrics::counter("cs.metastore.operation_time.us");
+/// Time the loop thread spent executing tasks.
+pub static RW_LOOP_BUSY_US: Counter = metrics::counter("cs.metastore.rw_loop.busy.us");
+pub static RW_LOOP_QUEUE_SIZE: Gauge = metrics::gauge("cs.metastore.rw_loop.queue_size");
 
 pub static CACHESTORE_ROCKSDB_ESTIMATE_LIVE_DATA_SIZE: Gauge =
     metrics::gauge("cs.cachestore.rocksdb.estimate_live_data_size");

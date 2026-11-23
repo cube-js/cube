@@ -1,0 +1,337 @@
+cubes:
+    - name: Labels
+      sql: "SELECT * FROM sq_labels"
+      dimensions:
+          - name: amount
+            type: number
+            sql: amount
+            primary_key: true
+          - name: label
+            type: string
+            sql: label
+
+    - name: Orders
+      sql: "SELECT * FROM sq_orders"
+      joins:
+          - name: Labels
+            relationship: one_to_one
+            sql: "{Orders.total} = {Labels.amount}"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: total
+            type: number
+            sql: "{Orders.amount_sum}"
+            sub_query: true
+            propagate_filters_to_sub_query: true
+          - name: label
+            type: string
+            sql: "{Labels.label}"
+      measures:
+          - name: amount_sum
+            type: sum
+            sql: amount
+
+    - name: Shipments
+      sql: "SELECT * FROM sq_shipments"
+      joins:
+          - name: Orders
+            relationship: many_to_one
+            sql: "{Shipments}.order_id = {Orders}.id"
+          - name: Customers
+            relationship: many_to_one
+            sql: "{Shipments}.customer_id = {Customers}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+
+    - name: Customers
+      sql: "SELECT * FROM sq_customers"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+
+    - name: Hub
+      sql: "SELECT * FROM sq_hub"
+      joins:
+          - name: Spoke
+            relationship: many_to_one
+            sql: "{Hub}.spoke_id = {Spoke}.id"
+          - name: Tag
+            relationship: many_to_one
+            sql: "{Hub}.tag_id = {Tag}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: kind
+            type: string
+            sql: kind
+      measures:
+          - name: amount_sum
+            type: sum
+            sql: amount
+
+    - name: Spoke
+      sql: "SELECT * FROM sq_spoke"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: total
+            type: number
+            sql: "{Hub.amount_sum}"
+            sub_query: true
+            propagate_filters_to_sub_query: true
+
+    - name: Tag
+      sql: "SELECT * FROM sq_tag"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+
+    - name: Users
+      sql: "SELECT * FROM sq_users"
+      joins:
+          - name: Purchases
+            relationship: one_to_many
+            sql: "{Users}.id = {Purchases}.user_id"
+          - name: Regions
+            relationship: many_to_one
+            sql: "{Users}.region_id = {Regions}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: purchases_count
+            type: number
+            sql: "{Purchases.count}"
+            sub_query: true
+            propagate_filters_to_sub_query: true
+
+    - name: Purchases
+      sql: "SELECT * FROM sq_purchases"
+      joins:
+          - name: Users
+            relationship: many_to_one
+            sql: "{Purchases}.user_id = {Users}.id"
+          - name: Regions
+            relationship: many_to_one
+            sql: "{Purchases}.region_id = {Regions}.id AND {Users.purchases_count} IS NOT NULL"
+          - name: Channels
+            relationship: many_to_one
+            sql: "{Purchases}.channel_id = {Channels}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: count
+            type: count
+
+    - name: Regions
+      sql: "SELECT * FROM sq_regions"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+
+    - name: Channels
+      sql: "SELECT * FROM sq_channels"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: code
+            type: number
+            sql: code
+
+    - name: MsOrders
+      sql: "SELECT * FROM sq_ms_orders"
+      joins:
+          - name: MsLines
+            relationship: one_to_many
+            sql: "{MsOrders}.id = {MsLines}.o_id"
+          - name: MsRegions
+            relationship: many_to_one
+            sql: "{MsOrders}.r_id = {MsRegions}.id AND {MsOrders.ms_tot} IS NOT NULL"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: ms_tot
+            type: number
+            sql: "{MsFacts.amt_ms}"
+            sub_query: true
+            propagate_filters_to_sub_query: true
+
+    - name: MsLines
+      sql: "SELECT * FROM sq_ms_lines"
+      joins:
+          - name: MsFacts
+            relationship: one_to_many
+            sql: "{MsLines}.id = {MsFacts}.m_id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+
+    - name: MsFacts
+      sql: "SELECT * FROM sq_ms_facts"
+      joins:
+          - name: MsOrders
+            relationship: many_to_one
+            sql: "{MsFacts}.o_id = {MsOrders}.id"
+          - name: MsRegions
+            relationship: many_to_one
+            sql: "{MsFacts}.r_id = {MsRegions}.id"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: created_at
+            type: time
+            sql: created_at
+      measures:
+          - name: amt
+            type: sum
+            sql: amt
+          - name: amt_ms
+            type: number
+            multi_stage: true
+            sql: "{CUBE.amt}"
+            time_shift:
+                - interval: 1 year
+                  type: prior
+                  timeDimension: MsFacts.created_at
+
+    - name: MsRegions
+      sql: "SELECT * FROM sq_ms_regions"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+
+    - name: ReentryA
+      sql: "SELECT * FROM sq_reentry_a"
+      joins:
+          - name: ReentryB
+            relationship: one_to_many
+            sql: "{ReentryA}.id = {ReentryB}.a_id"
+          - name: ReentryX
+            relationship: one_to_many
+            sql: "{ReentryA}.id = {ReentryX}.a_id AND {ReentryA.d} IS NOT NULL"
+          - name: ReentryC
+            relationship: many_to_one
+            sql: "{ReentryA}.c_id = {ReentryC}.id AND {ReentryA.e} IS NOT NULL"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: d
+            type: number
+            sql: "{ReentryB.cnt}"
+            sub_query: true
+            propagate_filters_to_sub_query: true
+          - name: e
+            type: number
+            sql: "{ReentryX.cnt}"
+            sub_query: true
+
+    - name: ReentryB
+      sql: "SELECT * FROM sq_reentry_b"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: kind
+            type: string
+            sql: kind
+      measures:
+          - name: cnt
+            type: count
+
+    - name: ReentryX
+      sql: "SELECT * FROM sq_reentry_b"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: cnt
+            type: count
+
+    - name: ReentryC
+      sql: "SELECT * FROM sq_reentry_c"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: name
+            type: string
+            sql: name
+
+    - name: SelfJoined
+      sql: "SELECT * FROM sq_orders"
+      joins:
+          - name: SelfJoinedTarget
+            relationship: one_to_many
+            sql: "{SelfJoined}.id = {SelfJoinedTarget}.id AND {SelfJoined.total} IS NOT NULL"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: total
+            type: number
+            sql: "{SelfJoinedTarget.amount_sum}"
+            sub_query: true
+
+    - name: SelfJoinedTarget
+      sql: "SELECT * FROM sq_orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+      measures:
+          - name: amount_sum
+            type: sum
+            sql: amount

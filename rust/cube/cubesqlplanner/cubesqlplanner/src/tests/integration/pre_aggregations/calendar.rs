@@ -216,6 +216,28 @@ async fn sql_granularity_rollup_declaring_it_matches_source() {
     }
 }
 
+/// The raw date stored beside the `sql` week does not take over its reads: the
+/// week is still read from its own column.
+#[tokio::test(flavor = "multi_thread")]
+async fn sql_granularity_beside_its_raw_dimension_reads_its_own_column() {
+    let query = indoc! {r#"
+        measures:
+          - demand.net_demand_a
+        time_dimensions:
+          - dimension: plain_dates.plain_date
+            granularity: week
+            dateRange:
+              - "2025-02-02"
+              - "2025-02-15"
+        order:
+          - id: plain_dates.plain_date
+    "#};
+    if let Some((rollup, source)) = rollup_vs_source(query, &["demand_by_plain_raw_and_week"]).await
+    {
+        assert_eq!(rollup, source);
+    }
+}
+
 /// Without that opt-in the same rollup must not answer a range whose alignment
 /// with the stored weeks cannot be established.
 #[tokio::test(flavor = "multi_thread")]
@@ -243,9 +265,8 @@ async fn calendar_undeclared_interval_shift_falls_back() {
     }
 }
 
-/// Stored columns are addressed by member alone, so with several grains one
-/// column stands for all; a `sql` week read from the wrong one silently returns
-/// the wrong period, so the rollup is refused.
+/// A `sql` week is read as is, never derived, so a rollup storing it beside
+/// other grains of the same dimension is refused.
 #[tokio::test(flavor = "multi_thread")]
 async fn sql_granularity_rollup_with_several_grains_falls_back() {
     let query = indoc! {r#"
@@ -267,8 +288,7 @@ async fn sql_granularity_rollup_with_several_grains_falls_back() {
     }
 }
 
-/// The same rollup with `day` declared first leaves the `sql` week's column
-/// standing for both, so a day query would read retail weeks: refused too.
+/// The same rollup with `day` declared first is refused for a day query too.
 #[tokio::test(flavor = "multi_thread")]
 async fn plain_grain_beside_a_sql_granularity_falls_back() {
     let query = indoc! {r#"
@@ -372,5 +392,47 @@ async fn sql_granularity_through_a_view_reads_the_stored_column() {
         rollup_vs_source(query, &["demand_by_plain_week_non_strict"]).await
     {
         assert_eq!(rollup, source);
+    }
+}
+
+/// A date filter reads the raw date, never the stored `sql` week, even where
+/// its bounds fall on that week's interval: the calendar decides its buckets.
+#[tokio::test(flavor = "multi_thread")]
+async fn date_filter_reads_the_raw_date_beside_a_sql_week() {
+    // Two-week ranges starting on each weekday, so one shares the week's origin.
+    for (from, to) in [
+        ("2025-01-27", "2025-02-09"),
+        ("2025-01-28", "2025-02-10"),
+        ("2025-01-29", "2025-02-11"),
+        ("2025-01-30", "2025-02-12"),
+        ("2025-01-31", "2025-02-13"),
+        ("2025-02-01", "2025-02-14"),
+        ("2025-02-02", "2025-02-15"),
+    ] {
+        let query = format!(
+            indoc! {r#"
+                measures:
+                  - demand.net_demand_a
+                filters:
+                  - member: plain_dates.plain_date
+                    operator: inDateRange
+                    values:
+                      - "{}"
+                      - "{}"
+            "#},
+            from, to
+        );
+        let (sql, _) = ctx_with(&["demand_by_plain_raw_and_week"])
+            .build_sql_with_used_pre_aggregations(&query)
+            .unwrap();
+        assert!(
+            !sql.contains("plain_date_week\" >="),
+            "{from}..{to}:\n{sql}"
+        );
+        if let Some((rollup, source)) =
+            rollup_vs_source(&query, &["demand_by_plain_raw_and_week"]).await
+        {
+            assert_eq!(rollup, source, "{from}..{to}");
+        }
     }
 }

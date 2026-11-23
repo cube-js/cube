@@ -146,7 +146,15 @@ export class CompilerApi {
 
   protected readonly multiTenantSharing: boolean;
 
-  protected graphqlSchema?: GraphQLSchema;
+  /**
+   * Keyed by the compiler id `metaConfig` returns, which mixes in the caller's visibility mask:
+   * one schema per model version and set of members the access policies leave visible.
+   */
+  protected graphqlSchemas: LRUCache<string, GraphQLSchema> = new LRUCache({
+    max: 64,
+    ttl: 1000 * 60 * 5,
+    updateAgeOnGet: true,
+  });
 
   protected compilers?: Promise<Compilers>;
 
@@ -231,7 +239,7 @@ export class CompilerApi {
     // using safeguard for potential dangling references.
     this.compilers = disposedProxy('compilers', 'disposed CompilerApi instance');
     this.queryFactory = disposedProxy('queryFactory', 'disposed CompilerApi instance');
-    this.graphqlSchema = undefined;
+    this.graphqlSchemas.clear();
 
     // A request can still hold this instance -- the gateway keeps one across
     // several awaits. Clearing the version makes its next getCompilers()
@@ -239,12 +247,12 @@ export class CompilerApi {
     this.compilerVersion = undefined;
   }
 
-  public setGraphQLSchema(schema: GraphQLSchema): void {
-    this.graphqlSchema = schema;
+  public setGraphQLSchema(compilerId: string, schema: GraphQLSchema): void {
+    this.graphqlSchemas.set(compilerId, schema);
   }
 
-  public getGraphQLSchema(): GraphQLSchema {
-    return this.graphqlSchema;
+  public getGraphQLSchema(compilerId: string): GraphQLSchema | undefined {
+    return this.graphqlSchemas.get(compilerId);
   }
 
   public createNativeInstance(): NativeInstance {

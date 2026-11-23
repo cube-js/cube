@@ -6,6 +6,7 @@ import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { testLogger } from '@cubejs-backend/shared';
+import { redactSqlLiterals } from '@cubejs-backend/native';
 
 import * as console from 'console';
 import { ApiGateway, ApiGatewayOptions, Query, QueryRequest, Request } from '../src';
@@ -25,7 +26,7 @@ import { PreAggJob } from '../src/types/request';
 // A Proxy rather than a spread: the module's exports are non-enumerable getters.
 jest.mock('@cubejs-backend/native', () => {
   const actual = jest.requireActual('@cubejs-backend/native');
-  const redactSqlLiterals = (sql: string) => sql.replace(/'[^']*'/g, "'redacted'");
+  const redactSqlLiterals = jest.fn((sql: string) => sql.replace(/'[^']*'/g, "'redacted'"));
   return new Proxy(actual, {
     get: (target, prop) => (prop === 'redactSqlLiterals' ? redactSqlLiterals : target[prop]),
   });
@@ -1445,6 +1446,123 @@ describe('API Gateway', () => {
     });
   });
 
+  describe('/graphql schema visibility', () => {
+    test('introspection lists only members visible to the caller', async () => {
+      const schemas = new Map<string, any>();
+      const metaConfigCalls: any[] = [];
+      const visibilityAwareCompilerApi = async () => ({
+        async metaConfig(ctx: any, options: any) {
+          metaConfigCalls.push(options);
+          const privileged = ctx.securityContext?.role === 'admin';
+          return {
+            compilerId: privileged ? 'compiler-admin' : 'compiler-user',
+            cubes: [{
+              config: {
+                name: 'Orders',
+                measures: [{ name: 'Orders.count', type: 'number', isVisible: true }],
+                dimensions: [{ name: 'Orders.secret', type: 'string', isVisible: privileged }],
+                segments: [],
+              },
+            }],
+          };
+        },
+        getGraphQLSchema: (compilerId: string) => schemas.get(compilerId),
+        setGraphQLSchema: (compilerId: string, schema: any) => schemas.set(compilerId, schema),
+      });
+
+      const apiGateway = new ApiGateway(API_SECRET, visibilityAwareCompilerApi, async () => new AdapterApiMock(), testLogger, {
+        standalone: true,
+        dataSourceStorage: new DataSourceStorageMock(),
+        basePath: '/cubejs-api',
+        refreshScheduler: {},
+      });
+      const app = express();
+      app.use(express.json());
+      apiGateway.initApp(app);
+
+      const fieldsFor = async (role: string) => {
+        const res = await request(app)
+          .post('/cubejs-api/graphql')
+          .set('Authorization', jwt.sign({ role }, API_SECRET))
+          .send({ query: '{ __type(name: "OrdersMembers") { fields { name } } }' })
+          .expect(200);
+        return res.body.data.__type.fields.map((f: any) => f.name);
+      };
+
+      expect(await fieldsFor('admin')).toEqual(['count', 'secret']);
+      expect(await fieldsFor('user')).toEqual(['count']);
+      expect(await fieldsFor('admin')).toEqual(['count', 'secret']);
+
+      expect([...schemas.keys()]).toEqual(['compiler-admin', 'compiler-user']);
+
+      for (const options of metaConfigCalls) {
+        expect(options.skipVisibilityPatch).toBeFalsy();
+      }
+    });
+
+    test('serves a schema without cubes when no member is visible to the caller', async () => {
+      const schemas = new Map<string, any>();
+      const noVisibleMembersCompilerApi = async () => ({
+        async metaConfig() {
+          return {
+            compilerId: 'compiler-none',
+            cubes: [{
+              config: {
+                name: 'Orders',
+                measures: [{ name: 'Orders.count', type: 'number', isVisible: false }],
+                dimensions: [{ name: 'Orders.secret', type: 'string', isVisible: false }],
+                segments: [],
+              },
+            }],
+          };
+        },
+        getGraphQLSchema: (compilerId: string) => schemas.get(compilerId),
+        setGraphQLSchema: (compilerId: string, schema: any) => schemas.set(compilerId, schema),
+      });
+
+      const apiGateway = new ApiGateway(API_SECRET, noVisibleMembersCompilerApi, async () => new AdapterApiMock(), testLogger, {
+        standalone: true,
+        dataSourceStorage: new DataSourceStorageMock(),
+        basePath: '/cubejs-api',
+        refreshScheduler: {},
+      });
+      const app = express();
+      app.use(express.json());
+      apiGateway.initApp(app);
+
+      const introspection = await request(app)
+        .post('/cubejs-api/graphql')
+        .set('Authorization', jwt.sign({}, API_SECRET))
+        .send({ query: '{ __schema { types { name } } }' })
+        .expect(200);
+
+      const typeNames = introspection.body.data.__schema.types.map((t: any) => t.name);
+      expect(typeNames).toContain('Query');
+      expect(typeNames).not.toContain('Result');
+      expect(typeNames.filter((name: string) => name.startsWith('Orders'))).toEqual([]);
+
+      const query = await request(app)
+        .post('/cubejs-api/graphql')
+        .set('Authorization', jwt.sign({}, API_SECRET))
+        .send({ query: '{ cube { orders { count } } }' })
+        .expect(400);
+
+      expect(query.body.data).toBeUndefined();
+      expect(query.body.errors[0].message).toContain('Cannot query field "cube"');
+
+      const reason = 'No cubes or views have members visible to you. Check the data model and the access policies that apply to your security context.';
+
+      const placeholder = await request(app)
+        .post('/cubejs-api/graphql')
+        .set('Authorization', jwt.sign({}, API_SECRET))
+        .send({ query: '{ no_queries_available __type(name: "Query") { fields { name description } } }' })
+        .expect(200);
+
+      expect(placeholder.body.data.no_queries_available).toEqual(reason);
+      expect(placeholder.body.data.__type.fields).toEqual([{ name: 'no_queries_available', description: reason }]);
+    });
+  });
+
   describe('/v1/sql endpoint dataSource', () => {
     test('returns dataSource for single query', async () => {
       const { app } = await createApiGateway();
@@ -1886,6 +2004,7 @@ describe('API Gateway', () => {
         apiGateway.getCompilerApi = async () => compiler;
 
         const [item] = await (apiGateway as any).preAggregationsJobsGET(
+          {},
           { requestId: 'request-id' },
           ['job-token'],
         );
@@ -1902,6 +2021,240 @@ describe('API Gateway', () => {
           job.key,
           'job-token',
         );
+      });
+    });
+
+    describe('extendContext', () => {
+      type SecurityContext = { tenant: string, datasources?: { databricks: { tenant: string } } };
+
+      // A model that reads what extendContext added into securityContext at compile time.
+      const prepare = async () => {
+        const compiledWith: SecurityContext[] = [];
+        const compiledContexts: Record<string, unknown>[] = [];
+        const jobCompilerApi = async (ctx: { securityContext: SecurityContext }) => {
+          compiledWith.push(ctx.securityContext);
+          compiledContexts.push(ctx);
+          // Throws "Cannot read properties of undefined" without the extension.
+          const { tenant } = ctx.securityContext.datasources!.databricks;
+          return {
+            preAggregations: async () => preAggregationsResultFactory()
+              .map(p => ({ ...p, dataSource: `ds_${tenant}` })),
+          };
+        };
+
+        const postedJobContexts: { securityContext: SecurityContext }[] = [];
+        const extendContext = jest.fn((req: Request) => ({
+          securityContext: {
+            ...req.securityContext,
+            datasources: { databricks: { tenant: req.securityContext.tenant } },
+          },
+          // An extension only the caller's security context gets.
+          ...(req.securityContext.tenant === 'caller' ? { callerOnly: true } : {}),
+        }));
+        const refreshScheduler = {
+          postBuildJobs: jest.fn(async (ctx, _options, jobContext) => {
+            postedJobContexts.push(jobContext);
+            return [`token_${ctx.securityContext.tenant}`];
+          }),
+          getCachedBuildJobs: jest.fn(async (_ctx, tokens: string[]) => tokens.map((token) => ({
+            token,
+            job: <PreAggJob>{
+              request: 'request-id',
+              context: { securityContext: { tenant: token.split('_')[1] } },
+              preagg: 'Usage.usages',
+              table: 'usage_usages',
+              target: 'usage_usages_20210430',
+              structure: 'structure',
+              content: 'content',
+              updated: 1,
+              key: [],
+              status: 'done',
+              timezone: 'UTC',
+              dataSource: 'default',
+            },
+          }))),
+        };
+
+        const apiGateway = new ApiGateway(
+          API_SECRET,
+          <any>jobCompilerApi,
+          async () => new AdapterApiMock(),
+          testLogger,
+          {
+            standalone: true,
+            dataSourceStorage: new DataSourceStorageMock(),
+            basePath: '/test',
+            refreshScheduler: () => refreshScheduler,
+            contextToApiScopes: () => Promise.resolve(<ApiScopesTuple>['jobs']),
+            extendContext,
+          }
+        );
+        const app = express();
+        app.use(express.json());
+        apiGateway.initApp(app);
+
+        const token = generateAuthToken({ tenant: 'caller' }, {}, API_SECRET);
+
+        return { app, token, compiledWith, compiledContexts, postedJobContexts, extendContext };
+      };
+
+      const extended = (tenant: string) => expect.objectContaining({
+        tenant,
+        datasources: { databricks: { tenant } },
+      });
+
+      test('applies to each POST selector context', async () => {
+        const { app, token, compiledWith, compiledContexts, postedJobContexts } = await prepare();
+
+        const res = await request(app).post('/test/v1/pre-aggregations/jobs')
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            action: 'post',
+            selector: {
+              contexts: [{ securityContext: { tenant: 'a' } }, { securityContext: { tenant: 'b' } }],
+              timezones: ['UTC'],
+            },
+          });
+
+        expect(res.body).toEqual(['token_a', 'token_b']);
+        expect(res.status).toEqual(200);
+        expect(compiledWith).toEqual([extended('a'), extended('b')]);
+        // Nothing the caller's extendContext returned leaks into a job's context.
+        compiledContexts.forEach(ctx => expect(ctx).not.toHaveProperty('callerOnly'));
+        // The job keeps the context it was posted with, not the extended one.
+        expect(postedJobContexts).toEqual([
+          { securityContext: { tenant: 'a' } },
+          { securityContext: { tenant: 'b' } },
+        ]);
+      });
+
+      test('applies to the context of each job on GET', async () => {
+        const { app, token, compiledWith, extendContext } = await prepare();
+
+        const res = await request(app).post('/test/v1/pre-aggregations/jobs')
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .send({ action: 'get', tokens: ['token_a_1', 'token_a_2', 'token_b_1'] });
+
+        expect(res.status).toEqual(200);
+        expect(res.body.map(({ status }) => status)).toEqual(['done', 'done', 'done']);
+        expect(res.body.map(({ selector }) => selector.contexts)).toEqual([
+          [{ securityContext: { tenant: 'a' } }],
+          [{ securityContext: { tenant: 'a' } }],
+          [{ securityContext: { tenant: 'b' } }],
+        ]);
+        // Once for the request itself, then once per distinct job security context.
+        const extendedTenants = extendContext.mock.calls.map(([req]) => req.securityContext.tenant);
+        expect(extendedTenants.sort()).toEqual(['a', 'b', 'caller']);
+        expect(compiledWith).toEqual(expect.arrayContaining([extended('a'), extended('b')]));
+        expect(compiledWith).not.toContainEqual(expect.objectContaining({ tenant: 'caller' }));
+      });
+    });
+
+    describe('force and dryRun', () => {
+      const prepare = async () => {
+        const job = <PreAggJob>{
+          request: 'request-id',
+          context: { securityContext: { tenant: 'a' } },
+          preagg: 'Usage.usages',
+          table: 'usage_usages',
+          target: 'usage_usages_20210430',
+          structure: 'structure',
+          content: 'content',
+          updated: 1,
+          key: [],
+          status: 'outdated',
+          timezone: 'UTC',
+          dataSource: 'default',
+        };
+        const refreshScheduler = {
+          postBuildJobs: jest.fn(async () => ['token']),
+          getBuildJobsStatus: jest.fn(async () => [job]),
+        };
+        const apiGateway = new ApiGateway(
+          API_SECRET,
+          <any>(async () => ({ preAggregations: async () => preAggregationsResultFactory() })),
+          async () => new AdapterApiMock(),
+          testLogger,
+          {
+            standalone: true,
+            dataSourceStorage: new DataSourceStorageMock(),
+            basePath: '/test',
+            refreshScheduler: () => refreshScheduler,
+            contextToApiScopes: () => Promise.resolve(<ApiScopesTuple>['jobs']),
+          }
+        );
+        const app = express();
+        app.use(express.json());
+        apiGateway.initApp(app);
+
+        const token = generateAuthToken({ tenant: 'caller' }, {}, API_SECRET);
+        const post = (selector: Record<string, unknown>) => request(app).post('/test/v1/pre-aggregations/jobs')
+          .set('Content-type', 'application/json')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            action: 'post',
+            selector: { contexts: [{ securityContext: { tenant: 'a' } }], timezones: ['UTC'], ...selector },
+          });
+
+        return { post, refreshScheduler };
+      };
+
+      test('forces builds by default', async () => {
+        const { post, refreshScheduler } = await prepare();
+
+        const res = await post({});
+
+        expect(res.status).toEqual(200);
+        expect(res.body).toEqual(['token']);
+        expect(refreshScheduler.postBuildJobs).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ forceBuildPreAggregations: true }),
+          expect.anything(),
+        );
+      });
+
+      test('passes force: false to the scheduler', async () => {
+        const { post, refreshScheduler } = await prepare();
+
+        const res = await post({ force: false });
+
+        expect(res.status).toEqual(200);
+        expect(refreshScheduler.postBuildJobs).toHaveBeenCalledWith(
+          expect.anything(),
+          expect.objectContaining({ forceBuildPreAggregations: false }),
+          expect.anything(),
+        );
+      });
+
+      test('a dry run answers with partition statuses and posts no job', async () => {
+        const { post, refreshScheduler } = await prepare();
+
+        const res = await post({ dryRun: true });
+
+        expect(res.status).toEqual(200);
+        expect(refreshScheduler.postBuildJobs).not.toHaveBeenCalled();
+        expect(res.body).toEqual([{
+          table: 'usage_usages_20210430',
+          status: 'outdated',
+          selector: {
+            cubes: ['Usage'],
+            preAggregations: ['Usage.usages'],
+            contexts: [{ securityContext: { tenant: 'a' } }],
+            timezones: ['UTC'],
+            dataSources: ['default'],
+          },
+        }]);
+      });
+
+      test('rejects a non-boolean dryRun', async () => {
+        const { post } = await prepare();
+
+        const res = await post({ dryRun: 'yes' });
+
+        expect(res.status).toEqual(400);
+        expect(res.body.error).toContain('dryRun');
       });
     });
   });
@@ -2035,6 +2388,30 @@ describe('API Gateway', () => {
           query: { sql: "SELECT id FROM test WHERE email = 'john@example.com'" },
           redactedQuery: { sql: "SELECT id FROM test WHERE email = 'redacted'" },
         });
+      });
+
+      test('a redaction failure does not replace the statement error', async () => {
+        const { app, apiGateway } = await createApiGateway();
+        const logSpy = jest.spyOn(apiGateway, 'log');
+        apiGateway.getSQLServer().execSql = jest.fn(async () => {
+          throw new Error('boom');
+        });
+        jest.mocked(redactSqlLiterals).mockImplementationOnce(() => {
+          throw new Error('internal error in Neon module');
+        });
+
+        const res = await request(app)
+          .post('/cubejs-api/v1/cubesql')
+          .set('Content-type', 'application/json')
+          .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+          .send({ query: "SELECT id FROM test WHERE email = 'john@example.com'" })
+          .expect(500);
+
+        expect(res.body.error).toMatch(/boom/);
+        const event = logSpy.mock.calls.find(([e]) => e.type === 'Internal Server Error');
+        expect(event).toBeDefined();
+        expect(event![0].redactedQuery).toBeUndefined();
+        expect(jest.mocked(redactSqlLiterals).mock.results.at(-1)?.type).toBe('throw');
       });
     });
 

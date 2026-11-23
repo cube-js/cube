@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.32](https://github.com/cube-js/cube/compare/v1.8.31...v1.8.32) (2026-11-21)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+## [1.8.31](https://github.com/cube-js/cube/compare/v1.8.30...v1.8.31) (2026-11-20)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+## [1.8.30](https://github.com/cube-js/cube/compare/v1.8.29...v1.8.30) (2026-11-19)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+## [1.8.29](https://github.com/cube-js/cube/compare/v1.8.28...v1.8.29) (2026-11-19)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+**Note:** Version bump only for package @cubejs-backend/duckdb-driver
+
+## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
+
+### Bug Fixes
+
+- **duckdb-driver:** Bump @duckdb/node-api to 1.5.6 for current time zone rules, thanks [@clementperon](https://github.com/clementperon) ([#12789](https://github.com/cube-js/cube/issues/12789)) ([9773cd9](https://github.com/cube-js/cube/commit/9773cd96e279a5f9b14c098f75bc0b3eecc1f4e5))
+
 ## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
 
 **Note:** Version bump only for package @cubejs-backend/duckdb-driver

@@ -20,6 +20,14 @@ export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
   redisPrefix?: string;
 }
 
+/**
+ * The shortest time a connection test gets before it counts as timed out.
+ * BaseDriver's own default (10 s) is too short for warehouses such as BigQuery,
+ * whose metadata calls can take tens of seconds without anything being wrong.
+ * Drivers that ask for longer (JDBC: 60 s) keep their own value.
+ */
+const MIN_TEST_CONNECTION_TIMEOUT = 45000;
+
 export class OrchestratorApi {
   private seenDataSources: Record<string, boolean> = {};
 
@@ -196,7 +204,11 @@ export class OrchestratorApi {
 
   /**
    * Tests connection to the data source specified by the driver factory
-   * function and data source name.
+   * function and data source name. The test is bounded by the driver's
+   * `testConnectionTimeout()`, but never less than 45 s: some drivers' test calls
+   * have no timeout of their own (BigQuery's `getDatasets()`), and the /livez and
+   * /readyz handlers hold a lock while they run, so one hung test would otherwise
+   * hang every probe.
    */
   public async testDriverConnection(
     driverFn?: DriverFactoryByDataSource,
@@ -206,7 +218,21 @@ export class OrchestratorApi {
     if (driverFn) {
       try {
         const driver = await driverFn(dataSource);
-        await driver.testConnection();
+        const driverTimeout = typeof driver.testConnectionTimeout === 'function'
+          ? driver.testConnectionTimeout()
+          : 0;
+        const timeout = Math.max(driverTimeout, MIN_TEST_CONNECTION_TIMEOUT);
+
+        try {
+          await pt.timeout(driver.testConnection(), timeout);
+        } catch (e: any) {
+          if (e instanceof pt.TimeoutError) {
+            throw new Error(`Connection test for data source '${dataSource}' timed out after ${timeout}ms`);
+          }
+
+          throw e;
+        }
+
         this.logger('Connection test completed successfully', {
           driverType,
           dataSource,
@@ -321,5 +347,9 @@ export class OrchestratorApi {
 
   public async updateRefreshEndReached() {
     return this.orchestrator.updateRefreshEndReached();
+  }
+
+  public async markRefreshActive() {
+    return this.orchestrator.markRefreshActive();
   }
 }

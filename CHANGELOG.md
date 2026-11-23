@@ -3,6 +3,86 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.32](https://github.com/cube-js/cube/compare/v1.8.31...v1.8.32) (2026-11-21)
+
+### Bug Fixes
+
+- **api-gateway:** Don't fail SQL API errors when log redaction fails ([#12889](https://github.com/cube-js/cube/issues/12889)) ([a22816f](https://github.com/cube-js/cube/commit/a22816f0d13277f694c25ae4e8e447a04044905b))
+- **query-orchestrator:** Share every pre-aggregation cache key under the pre-aggregation orchestrator id ([#12871](https://github.com/cube-js/cube/issues/12871)) ([c8c884c](https://github.com/cube-js/cube/commit/c8c884c6d850d8764f6721a5ca2a678f5c72085a)), closes [#12808](https://github.com/cube-js/cube/issues/12808)
+
+### Features
+
+- **api-gateway:** Add force and dry-run options to the pre-aggregation jobs API ([#12882](https://github.com/cube-js/cube/issues/12882)) ([67f452a](https://github.com/cube-js/cube/commit/67f452ae60da39b7f68f2eba0aa56e8c2e02ebbf))
+- **cube-cli:** Add query-history command ([#12890](https://github.com/cube-js/cube/issues/12890)) ([b6188ce](https://github.com/cube-js/cube/commit/b6188ced57682f9ff856df67af535ab119063963))
+- **cubestore:** Process identity, liveness and failure metrics ([#12878](https://github.com/cube-js/cube/issues/12878)) ([59c5594](https://github.com/cube-js/cube/commit/59c559491ec8a1a7f940fa598a7b38400267e2f4))
+
+## [1.8.31](https://github.com/cube-js/cube/compare/v1.8.30...v1.8.31) (2026-11-20)
+
+### Bug Fixes
+
+- **cubestore:** Keep in-memory compaction and chunk GC alive under load ([#12767](https://github.com/cube-js/cube/issues/12767)) ([fd7c40e](https://github.com/cube-js/cube/commit/fd7c40e939ecdc0bef6e799e213a9b106e5442bf))
+- **tesseract:** Match rollups storing a time dimension also as a plain dimension ([#12866](https://github.com/cube-js/cube/issues/12866)) ([fcfde87](https://github.com/cube-js/cube/commit/fcfde87d5eae08c4e7d14a5cc7f0e11d9bc2d4a1)), closes [#12578](https://github.com/cube-js/cube/issues/12578)
+
+## [1.8.30](https://github.com/cube-js/cube/compare/v1.8.29...v1.8.30) (2026-11-19)
+
+### Bug Fixes
+
+- **tesseract:** Build Cube Store LIKE patterns with CONCAT instead of || ([#12858](https://github.com/cube-js/cube/issues/12858)) ([2613f2c](https://github.com/cube-js/cube/commit/2613f2cf0c6fca1374d12b627f73a6f88f691ec6))
+
+## [1.8.29](https://github.com/cube-js/cube/compare/v1.8.28...v1.8.29) (2026-11-19)
+
+### Bug Fixes
+
+- **bigquery-driver:** Forward mid-stream errors in SQL API stream mode ([#10877](https://github.com/cube-js/cube/issues/10877)) ([e2b4c67](https://github.com/cube-js/cube/commit/e2b4c6726d1a0d712cf0ad7cc8b164d469d19e28)), closes [#10875](https://github.com/cube-js/cube/issues/10875)
+
+### Performance Improvements
+
+- **jdbc-driver:** Read result sets in JVM-side batches (up to 20x faster) ([#12849](https://github.com/cube-js/cube/issues/12849)) ([77d9d6f](https://github.com/cube-js/cube/commit/77d9d6f38873739a967e0173f92f745666d3482e))
+
+## [1.8.28](https://github.com/cube-js/cube/compare/v1.8.27...v1.8.28) (2026-11-18)
+
+### Bug Fixes
+
+- **api-gateway:** Build the GraphQL schema from members visible to the caller ([#12833](https://github.com/cube-js/cube/issues/12833)) ([974dc5a](https://github.com/cube-js/cube/commit/974dc5a9c880916c0206bf0eefc4f0c6ecdfbcda)), closes [#10590](https://github.com/cube-js/cube/issues/10590)
+- **api-gateway:** Run extendContext on pre-aggregation job contexts ([#12579](https://github.com/cube-js/cube/issues/12579)) ([0373cfc](https://github.com/cube-js/cube/commit/0373cfc0cfe8916f328883e5fe12c2feb1a2d501))
+- **bigquery-driver:** Test the connection with one dataset, not all of them ([#12854](https://github.com/cube-js/cube/issues/12854)) ([3009c60](https://github.com/cube-js/cube/commit/3009c60b86951c8d1b71c8cf2fb9b1df3d09fd2a)), closes [#12750](https://github.com/cube-js/cube/issues/12750)
+- **cubesql:** Plan SELECT \* over wide views without per-member rewrites ([#12722](https://github.com/cube-js/cube/issues/12722)) ([989e114](https://github.com/cube-js/cube/commit/989e114572d0f7c19b126982ca0849895b44d25a)), closes [#12669](https://github.com/cube-js/cube/issues/12669)
+- **cubestore:** Don't kill RWLoop threads when telemetry tracks errors outside of a Tokio runtime ([#12416](https://github.com/cube-js/cube/issues/12416)), closes [#12415](https://github.com/cube-js/cube/issues/12415)
+- **server-core:** Time out data source connection tests in health probes ([#12750](https://github.com/cube-js/cube/issues/12750)) ([0ad7027](https://github.com/cube-js/cube/commit/0ad7027b01b51ef53ec9f23bfc0d3b20204ae527))
+- **tesseract:** Don't propagate a filter into a sub_query dimension whose join it needs ([#12586](https://github.com/cube-js/cube/issues/12586)) ([0d0bd95](https://github.com/cube-js/cube/commit/0d0bd95756bf2098f977963cd76f882e47c0aace)), closes [#8081](https://github.com/cube-js/cube/issues/8081)
+- **tesseract:** Don't serve non-additive rolling windows from rollups ([#12584](https://github.com/cube-js/cube/issues/12584)) ([0aeb908](https://github.com/cube-js/cube/commit/0aeb908a8fcaf64356259e74118d7fde29aa478c)), closes [#7730](https://github.com/cube-js/cube/issues/7730)
+- **tesseract:** Read the matching column of a rollup storing several granularities ([#12578](https://github.com/cube-js/cube/issues/12578)) ([3a80bb9](https://github.com/cube-js/cube/commit/3a80bb90d093322eb3a1a6d0d88243f9f35b809b)), closes [#9495](https://github.com/cube-js/cube/issues/9495)
+
+### Features
+
+- **schema-compiler:** QUERY_CONTEXT conditions in measure case ([#12473](https://github.com/cube-js/cube/issues/12473)) ([8441639](https://github.com/cube-js/cube/commit/8441639c7a5d42aefaaa5156b0aed8d35adb2fb2))
+- **server-core:** Add contextToPreAggregationOrchestratorId ([#12808](https://github.com/cube-js/cube/issues/12808)) ([2ae7d97](https://github.com/cube-js/cube/commit/2ae7d97b9b284132b69afed1a62f6ecd3a89b31c))
+
+### BREAKING CHANGES
+
+- **cubestore:** cubestore::telemetry::agent_event_spawn is renamed to
+  track_agent_event; track_event and EventSender::track_event(\_object) are no
+  longer async.
+
+## [1.8.27](https://github.com/cube-js/cube/compare/v1.8.26...v1.8.27) (2026-11-17)
+
+### Bug Fixes
+
+- **api-gateway:** Bump graphql to 15.11 to bound fragment validation ([#12823](https://github.com/cube-js/cube/issues/12823)) ([0da7aad](https://github.com/cube-js/cube/commit/0da7aadd25e0b25ba02fe666b51445c99ba6af1f))
+- **api-gateway:** Correct GraphQL request normalization ([#12822](https://github.com/cube-js/cube/issues/12822)) ([96c6354](https://github.com/cube-js/cube/commit/96c6354c7ac9160dde5b5dab4b2be1c1bb5d0a25))
+- **client-react:** Accept string filter members in QueryBuilder ([#12804](https://github.com/cube-js/cube/issues/12804)) ([008a269](https://github.com/cube-js/cube/commit/008a2691050a668d363550362f3d4abf2c3d9fd3)), closes [#7383](https://github.com/cube-js/cube/issues/7383)
+- **cubesql:** Fix generate_series overflow, non-finite float and NULL edges ([#12821](https://github.com/cube-js/cube/issues/12821)) ([7e63200](https://github.com/cube-js/cube/commit/7e6320006281260f3970ac5d1eb4def963134975))
+- **duckdb-driver:** Bump @duckdb/node-api to 1.5.6 for current time zone rules, thanks [@clementperon](https://github.com/clementperon) ([#12789](https://github.com/cube-js/cube/issues/12789)) ([9773cd9](https://github.com/cube-js/cube/commit/9773cd96e279a5f9b14c098f75bc0b3eecc1f4e5))
+- **playground:** Generate valid GraphQL for a repeated member in an AND/OR group ([#12824](https://github.com/cube-js/cube/issues/12824)) ([244a5fd](https://github.com/cube-js/cube/commit/244a5fd4486ff698fd8d5ec8de0fdf2c799fc92e)), closes [#12823](https://github.com/cube-js/cube/issues/12823)
+- **tesseract:** Apply time shifts correctly to a joined cube's time dimension ([#12592](https://github.com/cube-js/cube/issues/12592)) ([1fc9445](https://github.com/cube-js/cube/commit/1fc9445821e6aaa4a9b63fab90307c3d238409bb)), closes [#12009](https://github.com/cube-js/cube/issues/12009)
+- **tesseract:** Build subquery dimension join aliases from sql_alias ([#12581](https://github.com/cube-js/cube/issues/12581)) ([8e85a2e](https://github.com/cube-js/cube/commit/8e85a2edec21bee7e1f1a52a723750cc8e96bd34)), closes [#8561](https://github.com/cube-js/cube/issues/8561)
+- **tesseract:** Don't serve calc-group-only queries from a rollup ([#12582](https://github.com/cube-js/cube/issues/12582)) ([f2e354f](https://github.com/cube-js/cube/commit/f2e354f4ade2d29d4c157f596c82a597ef4c5830))
+- **tesseract:** Keep every usage of a rollup that is also a rollupJoin leg ([#12593](https://github.com/cube-js/cube/issues/12593)) ([4d69632](https://github.com/cube-js/cube/commit/4d69632c9af26b30870ee04cd0b2366163e2481d)), closes [#11124](https://github.com/cube-js/cube/issues/11124)
+
+### Features
+
+- **cubestore:** Allowlist hosts for http(s) import locations ([#12820](https://github.com/cube-js/cube/issues/12820)) ([cdeb005](https://github.com/cube-js/cube/commit/cdeb00598d5e28ca9310dc9106ac0f9724c83c68))
+
 ## [1.8.26](https://github.com/cube-js/cube/compare/v1.8.25...v1.8.26) (2026-11-15)
 
 ### Bug Fixes

@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/multi_granularity.rs
+assertion_line: 861
+expression: result
+---
+activity__app_name | activity__count | activity__amount
+-------------------+-----------------+-----------------
+alpha              | 62              | 2263            
+beta               | 62              | 226300

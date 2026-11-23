@@ -44,6 +44,12 @@ export interface QueryOrchestratorOptions {
   rollupOnlyMode?: boolean;
   continueWaitTimeout?: number;
   skipExternalCacheAndQueue?: boolean;
+  /**
+   * Prefix of every pre-aggregation cache key and queue: builds, touches, versions and
+   * refresh keys. Defaults to the orchestrator's own prefix. When set, even to that prefix,
+   * the orchestrator waits for the others sharing it before it drops untouched tables.
+   */
+  preAggregationsRedisPrefix?: string;
 }
 
 function detectQueueAndCacheDriver(options: QueryOrchestratorOptions): CacheAndQueryDriverType {
@@ -72,6 +78,12 @@ function detectQueueAndCacheDriver(options: QueryOrchestratorOptions): CacheAndQ
 
 export class QueryOrchestrator {
   protected queryCache: QueryCache;
+
+  /**
+   * The cache pre-aggregations keep their keys and queues in. It is `queryCache` unless
+   * `preAggregationsRedisPrefix` sets another prefix.
+   */
+  protected readonly preAggregationsQueryCache: QueryCache;
 
   protected readonly preAggregations: PreAggregations;
 
@@ -111,24 +123,27 @@ export class QueryOrchestrator {
       throw new Error('Cube Store was specified as queue/cache driver. Please set CUBEJS_CUBESTORE_HOST and CUBEJS_CUBESTORE_PORT variables. Please see https://docs.cube.dev/cube-core/deployment#set-up-cube-store to learn more.');
     } : undefined;
 
-    this.queryCache = new QueryCache(
-      this.redisPrefix,
-      driverFactory,
-      this.logger,
-      {
-        externalDriverFactory,
-        cacheAndQueueDriver,
-        cubeStoreDriverFactory,
-        continueWaitTimeout,
-        skipExternalCacheAndQueue,
-        ...options.queryCacheOptions,
-      }
-    );
+    const queryCacheOptions = {
+      externalDriverFactory,
+      cacheAndQueueDriver,
+      cubeStoreDriverFactory,
+      continueWaitTimeout,
+      skipExternalCacheAndQueue,
+      ...options.queryCacheOptions,
+    };
+    const preAggregationsRedisPrefix = options.preAggregationsRedisPrefix || this.redisPrefix;
+
+    this.queryCache = new QueryCache(this.redisPrefix, driverFactory, this.logger, queryCacheOptions);
+    // Orchestrators that share a pre-aggregation prefix share its touches, versions and
+    // refresh keys, so one's cleanup sees the tables the others use
+    this.preAggregationsQueryCache = preAggregationsRedisPrefix === this.redisPrefix
+      ? this.queryCache
+      : new QueryCache(preAggregationsRedisPrefix, driverFactory, this.logger, queryCacheOptions);
     this.preAggregations = new PreAggregations(
-      this.redisPrefix,
+      preAggregationsRedisPrefix,
       this.driverFactory,
       this.logger,
-      this.queryCache,
+      this.preAggregationsQueryCache,
       {
         externalDriverFactory,
         cacheAndQueueDriver,
@@ -136,6 +151,7 @@ export class QueryOrchestrator {
         continueWaitTimeout,
         skipExternalCacheAndQueue,
         ...options.preAggregationsOptions,
+        sharedCacheOrchestratorId: options.preAggregationsRedisPrefix ? this.redisPrefix : undefined,
       }
     );
   }
@@ -168,6 +184,10 @@ export class QueryOrchestrator {
     const queryQueue = await this.queryCache.getQueue(datasource);
     if (queryQueue) {
       await queryQueue.reconcileQueue();
+    }
+
+    if (this.preAggregationsQueryCache !== this.queryCache) {
+      await (await this.preAggregationsQueryCache.getQueue(datasource)).reconcileQueue();
     }
   }
 
@@ -364,7 +384,11 @@ export class QueryOrchestrator {
   }
 
   public async cleanup() {
-    return this.queryCache.cleanup();
+    await this.queryCache.cleanup();
+
+    if (this.preAggregationsQueryCache !== this.queryCache) {
+      await this.preAggregationsQueryCache.cleanup();
+    }
   }
 
   public async getPreAggregationVersionEntries(
@@ -452,7 +476,11 @@ export class QueryOrchestrator {
   public async cancelQueryByRequestId(requestId: string) {
     const cancelled: QueryDef[] = [];
 
-    for (const queue of Object.values(this.queryCache.getQueues())) {
+    const queryCaches = this.preAggregationsQueryCache === this.queryCache
+      ? [this.queryCache]
+      : [this.queryCache, this.preAggregationsQueryCache];
+
+    for (const queue of queryCaches.flatMap(queryCache => Object.values(queryCache.getQueues()))) {
       cancelled.push(...await queue.cancelQueryByRequestId(requestId));
     }
 
@@ -465,6 +493,10 @@ export class QueryOrchestrator {
 
   public async updateRefreshEndReached() {
     return this.preAggregations.updateRefreshEndReached();
+  }
+
+  public async markRefreshActive() {
+    return this.preAggregations.markRefreshActive();
   }
 
   private createMetadataQuery(operation: string, params: Record<string, unknown>): QueryWithParams {

@@ -1,0 +1,71 @@
+---
+title: Analysis
+description: Run an AI analysis of the dashboard's data on demand and keep it on the dashboard for every viewer.
+---
+
+Analysis widgets show an AI analysis of the data on the dashboard. Write a prompt — for example, _"Summarize the key trends and call out anything unusual"_ — and the configured [AI agent][ref-agents] writes a Markdown analysis based on the current dashboard state, including the data behind every chart and the values of any active [controls][ref-controls].
+
+## Adding an Analysis widget
+
+In the [dashboard builder][ref-workbooks], choose **Analysis** from the **Other** menu in the toolbar, or from the [insert menu on the canvas][ref-insert-menu]. The new widget is titled **Analysis** and opens with a prompt box holding a starter prompt, the agent picker, and **Run**. Edit the prompt and click **Run** to run the first analysis.
+
+Until the first run, the widget's only action is **Delete analysis**, a red trash button that appears when you hover the widget.
+
+## Use cases
+
+- Add an executive summary at the top of a dashboard
+- Surface anomalies or notable changes since the last refresh
+- Explain numbers to stakeholders who want context without diving into the charts
+- Write a TL;DR for periodic dashboard distributions
+
+## Writing a prompt
+
+Write the prompt as if you were briefing an analyst — describe the audience, the angle you want, and any specific things to call out. The agent has access to the full dashboard context, so you can reference charts and controls by name.
+
+## Editing and refreshing
+
+Once an analysis has run, the widget shows a freshness leaf and a settings menu with **Edit analysis** and **Delete analysis**:
+
+- **Edit analysis** reopens the prompt box. **Run** saves the edited prompt and runs it; **Cancel** keeps the prompt and the analysis as they were.
+- The leaf's color shows how long ago the analysis ran, as on chart widgets, and its tooltip says when, for example _Refreshed 5 minutes ago_. Its popover holds **Refresh**, which runs the saved prompt again against the dashboard as it is now.
+
+In the builder, the leaf is always shown and a run is saved to the dashboard's draft: viewers see it once you publish. On a published dashboard, the leaf appears when you hover the widget.
+
+### What re-runs an analysis
+
+An analysis runs again only when someone clicks **Refresh** on the widget's own leaf or **Run** in its prompt box, or on a published dashboard in [live mode][ref-live-mode]:
+
+- **Refresh all charts** on the dashboard's [freshness][ref-freshness] leaf refreshes the charts and leaves every Analysis widget as it is.
+- Each live-mode refresh also re-runs every Analysis widget that has already run. The new analysis stays in that browser tab and is not published. A widget that has never run is not run by live mode.
+
+## Outdated warning
+
+When the dashboard's control values, SQL parameters, or charts differ from the state the analysis ran against, a warning icon appears beside the leaf; on a published dashboard, it shows with the leaf when you hover the widget. Its tooltip reads _This analysis may not reflect the current filters, parameters, or charts. Refresh to update it._ The analysis stays on screen; click **Refresh** to run it against the dashboard as it is now.
+
+## Choosing the agent
+
+By default, an Analysis widget uses the agent configured at the dashboard level. You can override the agent per widget when you need a particular [agent's][ref-agents] tooling, model, or guardrails for a specific analysis. Use the agent picker next to the **Run** button. See [Which agent answers][ref-which-agent].
+
+## What viewers see
+
+The widget stores a reference to the chat thread that produced its analysis. Viewers loading the published dashboard see that stored analysis without it running again. A widget with no stored analysis shows one of these instead:
+
+- With a prompt that has never run: _Analysis is not run yet_, with a **Run** button.
+- With no prompt: _No analysis available yet. Edit the dashboard to create one._
+- With no configuration at all: _No analysis available yet. Run the analysis in the dashboard editor and publish your changes._
+
+A viewer's **Refresh** or **Run** publishes the new analysis for everyone when that viewer can edit the workbook; in an embed, only a [Creator Mode][ref-creator-mode] session can. For any other viewer, the new analysis shows in their browser tab only, and everyone else keeps seeing the published one.
+
+In an embed with **Allow AI summary widgets in embeds** (`showAiWidgets`, see [Feature visibility][ref-feature-visibility]) turned off, and in [PNG and PDF downloads][ref-downloads] and [deliveries][ref-deliveries], the widget shows its stored analysis with no **Run** or **Refresh**, and live mode doesn't re-run it.
+
+[ref-workbooks]: /docs/explore-analyze/workbooks
+[ref-agents]: /admin/ai
+[ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
+[ref-insert-menu]: /docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas
+[ref-live-mode]: /docs/explore-analyze/dashboards#live-mode
+[ref-freshness]: /docs/explore-analyze/dashboards#data-freshness
+[ref-which-agent]: /docs/explore-analyze/dashboards/dashboard-agent#which-agent-answers
+[ref-creator-mode]: /embedding/iframe/creator-mode
+[ref-feature-visibility]: /embedding/iframe/feature-visibility#ai
+[ref-downloads]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
+[ref-deliveries]: /docs/explore-analyze/dashboard-deliveries
