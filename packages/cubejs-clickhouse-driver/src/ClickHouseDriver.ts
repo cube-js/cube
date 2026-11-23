@@ -890,7 +890,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   protected async resolveWebIdentityCredentials(policy: string, region: string): Promise<S3Credentials> {
-    const { fromTokenFile } = await import('@aws-sdk/credential-providers');
+    const { fromTokenFile } = await import('@aws-sdk/credential-provider-web-identity');
     const { accessKeyId, secretAccessKey, sessionToken, expiration } = await fromTokenFile({
       policy,
       clientConfig: { region },
