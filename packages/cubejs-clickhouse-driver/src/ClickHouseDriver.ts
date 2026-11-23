@@ -120,8 +120,8 @@ interface ClickhouseDriverExportRequiredAWS {
 }
 
 interface ClickhouseDriverExportKeySecretAWS extends ClickhouseDriverExportRequiredAWS {
-  keyId: string,
-  secretKey: string,
+  keyId?: string,
+  secretKey?: string,
 }
 
 interface ClickhouseDriverExportAWS extends ClickhouseDriverExportKeySecretAWS {
@@ -723,31 +723,43 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unload is not configured');
     }
 
+    const { keyId, secretKey, region } = this.config.exportBucket;
+    // Checked here, not in the constructor, so a half-set pair fails only the export, never other queries.
+    if (!keyId !== !secretKey) {
+      throw new Error(
+        'Unsupported configuration exportBucket, keyId and secretKey must be set together, ' +
+        'or both left empty to use the AWS SDK default credential chain'
+      );
+    }
+
     const types = await this.queryColumnTypes(`(${sql})`, params, { requestId: options.requestId });
     const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
     const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
 
+    const staticCredentials = keyId && secretKey ? { accessKeyId: keyId, secretAccessKey: secretKey } : undefined;
+    // ClickHouse writes to S3 itself, so the pod's OIDC identity never reaches it: hand it short-lived credentials.
+    const credentials: { accessKeyId: string, secretAccessKey: string, sessionToken?: string } = staticCredentials ??
+      await this.resolveS3Credentials({ region: process.env.AWS_REGION || region });
+    const credentialParams = [credentials.accessKeyId, credentials.secretAccessKey];
+    // s3(url, key, secret, session_token, format) needs ClickHouse 23.12+.
+    if (credentials.sessionToken) {
+      credentialParams.push(credentials.sessionToken);
+    }
+
     const formattedQuery = formatClickHouse(`
       INSERT INTO FUNCTION
          s3(
-             'https://${bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
-             '${this.config.exportBucket.keyId}',
-             '${this.config.exportBucket.secretKey}',
+             'https://${bucketName}.s3.${region}.amazonaws.com/${exportPrefix}/export.csv.gz',
+             ${credentialParams.map(() => '?').join(',\n             ')},
              'CSV'
           )
       ${sql}
-    `, params);
+    `, [...credentialParams, ...(params ?? [])]);
 
     await this.command(formattedQuery, { requestId: options.requestId });
 
     const csvFile = await this.extractUnloadedFilesFromS3(
-      {
-        credentials: {
-          accessKeyId: this.config.exportBucket.keyId,
-          secretAccessKey: this.config.exportBucket.secretKey,
-        },
-        region: this.config.exportBucket.region,
-      },
+      staticCredentials ? { credentials: staticCredentials, region } : { region },
       bucketName,
       exportPrefix,
     );

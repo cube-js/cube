@@ -39,6 +39,27 @@ export function normalizeS3ClientConfig(clientOptions: S3StorageClientConfig): S
   return config;
 }
 
+export type S3Credentials = {
+  accessKeyId: string,
+  secretAccessKey: string,
+  sessionToken?: string,
+};
+
+/**
+ * Resolves credentials from the AWS SDK default chain (env, web identity token, IRSA, ...)
+ * for a database that writes to S3 itself. Resolved anew per call: never cache the result.
+ */
+export async function resolveS3Credentials(clientOptions: S3StorageClientConfig): Promise<S3Credentials> {
+  const storage = new S3(normalizeS3ClientConfig(clientOptions));
+
+  try {
+    const { accessKeyId, secretAccessKey, sessionToken } = await storage.config.credentials();
+    return { accessKeyId, secretAccessKey, sessionToken };
+  } finally {
+    storage.destroy();
+  }
+}
+
 /**
  * Returns an array of signed AWS S3 URLs of the unloaded csv files.
  */
