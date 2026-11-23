@@ -880,7 +880,10 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     const stsRegion = process.env.AWS_REGION || region;
 
     // Static env keys win in the SDK default chain too, so only scope when web identity is what it would use.
-    if (process.env.AWS_WEB_IDENTITY_TOKEN_FILE && process.env.AWS_ROLE_ARN && !process.env.AWS_ACCESS_KEY_ID) {
+    if (
+      process.env.AWS_WEB_IDENTITY_TOKEN_FILE && process.env.AWS_ROLE_ARN &&
+      !(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY)
+    ) {
       // The bucket ARN must be in the role's partition (aws-us-gov, aws-cn), or the policy matches nothing.
       const partition = process.env.AWS_ROLE_ARN.split(':')[1] || 'aws';
       return this.resolveWebIdentityCredentials(exportBucketSessionPolicy(bucketName, path, partition), stsRegion);

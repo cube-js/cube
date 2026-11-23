@@ -292,6 +292,18 @@ describe('ClickHouseDriver S3 export bucket credentials', () => {
     driver.commands.forEach((command) => expect(command).toContain(`'CSV'\n          )\n      ${sql}\n    `));
   });
 
+  it('still scopes web identity when only AWS_ACCESS_KEY_ID is set, as the SDK skips half-set env keys', async () => {
+    process.env.AWS_WEB_IDENTITY_TOKEN_FILE = '/var/run/secrets/token';
+    process.env.AWS_ROLE_ARN = 'arn:aws:iam::123456789012:role/cube';
+    process.env.AWS_ACCESS_KEY_ID = 'AKIALEFTOVER';
+
+    const driver = createDriver();
+    await driver.unload('t', unloadOptions);
+
+    expect(driver.webIdentityRequests).toHaveLength(1);
+    expect(driver.credentialRequests).toEqual([]);
+  });
+
   it('uses the default chain when static env keys would win over web identity', async () => {
     process.env.AWS_WEB_IDENTITY_TOKEN_FILE = '/var/run/secrets/token';
     process.env.AWS_ROLE_ARN = 'arn:aws:iam::123456789012:role/cube';
