@@ -1263,6 +1263,33 @@ cubes:
         multi_stage: true
         sql: "{total_prev_month} * 2"
         type: number
+      - name: total_all_time
+        multi_stage: true
+        sql: "{total}"
+        type: sum
+        filter:
+          exclude:
+            - orders.created_at
+      - name: total_all_time_doubled
+        multi_stage: true
+        sql: "{total_all_time} * 2"
+        type: number
+      - name: total_keep_only_id
+        multi_stage: true
+        sql: "{total}"
+        type: sum
+        filter:
+          keep_only:
+            - orders.id
+      - name: total_from_march
+        multi_stage: true
+        sql: "{total}"
+        type: sum
+        filter:
+          include:
+            - member: orders.created_at
+              operator: afterOrOnDate
+              values: ["2025-03-01"]
     access_policy:
       - group: "*"
         member_level:
@@ -1306,5 +1333,15 @@ cubes:
     expect(await maskedMembers('dates', 'total_prev_month', policyRange)).toContain('orders.total_prev_month');
     expect(await maskedMembers('dates', 'total_prev_month_doubled', policyRange))
       .toContain('orders.total_prev_month_doubled');
+  });
+
+  test('a measure whose filter directive drops query filters stays masked, also behind another measure', async () => {
+    for (const measure of ['total_all_time', 'total_all_time_doubled', 'total_keep_only_id']) {
+      expect(await maskedMembers('dates', measure, policyRange)).toContain(`orders.${measure}`);
+    }
+  });
+
+  test('a filter directive that only adds filters does not keep the mask', async () => {
+    expect(await maskedMembers('dates', 'total_from_march', policyRange)).toEqual([]);
   });
 });
