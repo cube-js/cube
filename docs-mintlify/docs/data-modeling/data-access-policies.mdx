@@ -364,13 +364,31 @@ group is entitled to (its `row_level` range).
 
 </Info>
 
-If the query itself already constrains rows to a subset of the conditional
-mask's row filter — an equally or more restrictive filter on the same member
-(for example, the query filters `country = 'US'` and the mask filter is
-`country = 'US'`) — then every returned row would show the real value anyway.
-In that case the `CASE WHEN` is unnecessary and the member is **unmasked**. This
-also lets a conditionally-masked _aggregate measure_ render its real value
-instead of being masked, even without grouping by the filter's member.
+If a query filter repeats the conditional mask's row filter, every returned row
+would show the real value anyway. In that case the `CASE WHEN` is unnecessary
+and the member is **unmasked**. This also lets a conditionally-masked _aggregate
+measure_ render its real value instead of being masked, even without grouping by
+the filter's member.
+
+The mask is lifted only when a query filter, at the top level or inside an `and`
+group, is one of the following:
+
+- **The same condition**: the same member, operator and values as the row filter
+  (for example, the query filters `amount > 20` and the row filter is
+  `amount > 20`).
+- **An `equals` on a subset of the values**: the query filters
+  `country = 'US'` and the row filter is `country IN ('US', 'CA')`.
+
+<Note>
+
+A narrower filter with different values doesn't lift the mask. With a row filter
+of `amount > 20`, a query filtered by `amount > 100` still gets the `CASE WHEN`,
+and an aggregate measure stays masked. The same applies to a narrower date
+range, a date range in `timeDimensions`, and the same range written as
+timestamps. The mask is also never lifted when the query includes a
+[time-shifted][ref-time-shift] measure.
+
+</Note>
 
 #### Conditional masking on measures
 
@@ -777,4 +795,4 @@ cube(`orders`, {
 [ref-ref-dap]: /reference/data-modeling/data-access-policies
 [ref-ref-dap-masking]: /reference/data-modeling/data-access-policies#member-masking
 [ref-ref-mask-dim]: /reference/data-modeling/dimensions#mask
-[ref-core-data-apis]: /reference/core-data-apis
+[ref-core-data-apis]: /reference/core-data-apis[ref-time-shift]: /reference/data-modeling/measures#time_shift
