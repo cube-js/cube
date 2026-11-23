@@ -226,6 +226,32 @@ describe('ClickHouseDriver S3 export bucket credentials', () => {
     await expect(createDriver().realWebIdentityCredentials('{}', 'us-west-2')).rejects.toThrow('/nonexistent/cube-test-token');
   });
 
+  it('puts the role partition into the session policy', async () => {
+    process.env.AWS_WEB_IDENTITY_TOKEN_FILE = '/var/run/secrets/token';
+    process.env.AWS_ROLE_ARN = 'arn:aws-us-gov:iam::123456789012:role/cube';
+
+    const driver = createDriver();
+    await driver.unload('t', unloadOptions);
+
+    expect(driver.webIdentityRequests[0].policy).toBe(exportBucketSessionPolicy('my-bucket', '', 'aws-us-gov'));
+    expect(driver.webIdentityRequests[0].policy).toContain('arn:aws-us-gov:s3:::my-bucket/*');
+  });
+
+  it.each([
+    ['static keys', { CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: 'AKIASTATIC', CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: 'static-secret' }],
+    ['the default chain', { AWS_ACCESS_KEY_ID: 'ASIATEMP', AWS_SECRET_ACCESS_KEY: 'temp-secret', AWS_SESSION_TOKEN: 'temp-token' }],
+  ])('keeps a ClickHouse ternary in parameterless SQL intact with %s', async (_label, env) => {
+    Object.assign(process.env, env);
+    const sql = 'SELECT x > 0 ? 1 : 0 AS flag FROM t';
+
+    const driver = createDriver();
+    await driver.unload('t', { maxFileSize: 64, query: { sql, params: [] } });
+    await driver.unload('t', { maxFileSize: 64, query: { sql, params: undefined as unknown as unknown[] } });
+
+    expect(driver.commands).toHaveLength(2);
+    driver.commands.forEach((command) => expect(command).toContain(`'CSV'\n          )\n      ${sql}\n    `));
+  });
+
   it('uses the default chain when static env keys would win over web identity', async () => {
     process.env.AWS_WEB_IDENTITY_TOKEN_FILE = '/var/run/secrets/token';
     process.env.AWS_ROLE_ARN = 'arn:aws:iam::123456789012:role/cube';

@@ -51,7 +51,7 @@ const EXPORT_CREDENTIALS_REFRESH_MARGIN_MS = 30 * 60 * 1000;
  * Inline session policy for the credentials handed to ClickHouse: the role's rights, cut down to the
  * export bucket path. A session policy can only narrow the role, never widen it.
  */
-export function exportBucketSessionPolicy(bucketName: string, path: string): string {
+export function exportBucketSessionPolicy(bucketName: string, path: string, partition: string = 'aws'): string {
   const prefix = path ? `${path}/` : '';
 
   return JSON.stringify({
@@ -60,12 +60,12 @@ export function exportBucketSessionPolicy(bucketName: string, path: string): str
       {
         Effect: 'Allow',
         Action: ['s3:PutObject', 's3:GetObject', 's3:AbortMultipartUpload', 's3:ListMultipartUploadParts'],
-        Resource: `arn:aws:s3:::${bucketName}/${prefix}*`,
+        Resource: `arn:${partition}:s3:::${bucketName}/${prefix}*`,
       },
       {
         Effect: 'Allow',
         Action: ['s3:ListBucket', 's3:GetBucketLocation'],
-        Resource: `arn:aws:s3:::${bucketName}`,
+        Resource: `arn:${partition}:s3:::${bucketName}`,
       },
     ],
   });
@@ -776,15 +776,17 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       credentialParams.push(credentials.sessionToken);
     }
 
-    const formattedQuery = formatClickHouse(`
+    // Formatted apart from `sql`: an empty `params` must keep skipping the scan, or a ClickHouse `a ? b : c` breaks.
+    const insertInto = formatClickHouse(`
       INSERT INTO FUNCTION
          s3(
              'https://${bucketName}.s3.${region}.amazonaws.com/${exportPrefix}/export.csv.gz',
              ${credentialParams.map(() => '?').join(',\n             ')},
              'CSV'
           )
-      ${sql}
-    `, [...credentialParams, ...(params ?? [])]);
+      `, credentialParams);
+    const formattedQuery = insertInto + formatClickHouse(`${sql}
+    `, params);
 
     await this.command(formattedQuery, { requestId: options.requestId });
 
@@ -834,7 +836,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
     // Static env keys win in the SDK default chain too, so only scope when web identity is what it would use.
     if (process.env.AWS_WEB_IDENTITY_TOKEN_FILE && process.env.AWS_ROLE_ARN && !process.env.AWS_ACCESS_KEY_ID) {
-      return this.resolveWebIdentityCredentials(exportBucketSessionPolicy(bucketName, path), stsRegion);
+      // The bucket ARN must be in the role's partition (aws-us-gov, aws-cn), or the policy matches nothing.
+      const partition = process.env.AWS_ROLE_ARN.split(':')[1] || 'aws';
+      return this.resolveWebIdentityCredentials(exportBucketSessionPolicy(bucketName, path, partition), stsRegion);
     }
 
     return this.resolveS3Credentials({ region: stsRegion });

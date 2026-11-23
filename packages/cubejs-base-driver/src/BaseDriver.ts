@@ -692,7 +692,7 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   /**
-   * Resolves temporary AWS credentials from the SDK default provider chain.
+   * Resolves AWS credentials from the SDK default provider chain.
    */
   protected async resolveS3Credentials(clientOptions: S3StorageClientConfig): Promise<S3Credentials> {
     return (await import('./storage-fs/aws.fs.js')).resolveS3Credentials(clientOptions);
