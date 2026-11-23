@@ -92,8 +92,9 @@ also needs **Access SQL Runner** (`SqlRunnerRead`); see [Jinja templates](#jinja
 </Steps>
 
 Preview and sync each resolve the latest successful deployed build when started. If a new build
-lands between them, preview again before syncing. Each Databricks data source currently has one
-saved target; there is no named staging-to-production promotion or pinned-build publication.
+lands between them, preview again before syncing. To test Metric Views in a staging catalog and
+then publish that same build to production, see the
+[Cube CLI](/reference/cli#databricks-metric-views).
 
 Scope rules:
 
@@ -202,6 +203,11 @@ A run that completes sends no notification. A run that fails, ends **Partial**, 
 measure notifies its user in the [Inbox](/docs/inbox).
 
 ## Trigger publication from CI
+
+The [Cube CLI](/reference/cli#databricks-metric-views) can start a run and wait for it with
+`cube dbx-mv sync --wait`, and publish a tested staging build to production. Unlike the recipe
+below, it doesn't retry a start refused with `409`, and it checks only that the run is `COMPLETED`
+with an `incompleteViewCount` of 0.
 
 Run publication from CI after a successful Cube deployment when CI should check the result. To
 just publish after each deployment, [turn on the setting](#publish-after-each-deployment) instead;
