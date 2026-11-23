@@ -1,0 +1,11 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(query, DatabaseProtocol::PostgreSQL).await?"
+---
++------+---------+----------------+
+| c1   | no_else | null_when_else |
++------+---------+----------------+
+| a    | true    | false          |
+| b    | NULL    | true           |
+| NULL | NULL    | true           |
++------+---------+----------------+

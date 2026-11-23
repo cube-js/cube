@@ -104,14 +104,23 @@ before the URL goes anywhere real — pasted as-is into the `src="…"` of the i
 snippet above, its raw `"` closes the attribute and truncates the URL.
 
 `f_`, `tg_`, and `ms_` are read in the dashboard builder and on a published
-dashboard, embedded or not, and are applied only if a matching control for that
-member already exists on the dashboard; a granularity outside the switcher's
-allowed list is ignored, as is a member the field switcher doesn't offer — its
+dashboard, embedded or not, and are applied to the control for that member on
+the dashboard. A `tg_` or `ms_` with no such control is ignored, and so is an
+`f_` in the dashboard builder. On a published dashboard an `f_` with no filter
+for its member goes to a filter on the same cube dimension in another view, or
+to a filter the [Dynamic
+controls](/docs/explore-analyze/dashboards/widgets/controls#dynamic-controls)
+widget allows; when neither takes it, the dashboard drops it and shows "Unable
+to filter by" and the field's title, as for a
+[drill-through](/docs/explore-analyze/dashboards/drill-through#how-the-target-applies-the-values).
+A granularity outside the switcher's allowed list is ignored, as is a member
+the field switcher doesn't offer — its
 [**Alternatives**](/docs/explore-analyze/dashboards/widgets/controls#field-switcher),
 plus the member it replaces. An `f_` is also ignored for a filter whose
 [visibility](/docs/explore-analyze/dashboards/widgets/controls#visibility) is
-**Disabled**, which opens on the value it would have without the link; a
-switcher set to **Disabled** still takes its `tg_` or `ms_`.
+**Disabled**, which opens on the value it would have without the link (a
+published dashboard also shows "Unable to filter by" for it); a switcher set to
+**Disabled** still takes its `tg_` or `ms_`.
 
 A dashboard that is an [app](/docs/explore-analyze/apps#apps-in-embedded-analytics)
 is the exception: it has no controls, so it ignores `tg_`, `ms_`, `dc_` and

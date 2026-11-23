@@ -570,6 +570,9 @@ Preview **blocks** a view when it finds any of these conditions:
 - Cyclic or one-to-many joins, or a join condition that reads a measure or a cube other than the
   two it joins, including a `table.column` whose table is neither of them: simplify the join. For
   `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube.
+- A cube `sql` that reads [context variables](/reference/data-modeling/context-variables), such
+  as `{FILTER_PARAMS…}`, `{SECURITY_CONTEXT…}`, or `{COMPILE_CONTEXT…}` (`CUBE_CONTEXT_IN_SQL`):
+  only Cube can fill them in, so remove them from the cube's `sql` or keep that view in Cube.
 - Unsupported expressions or types, or multi-stage, window, or ranking calculations: simplify
   the model or keep that view in Cube.
 
@@ -595,7 +598,8 @@ Otherwise, a preview or sync of a data model with Jinja templates fails with `40
 says what rendering needs.
 
 Templates render with the deployment's default context, so Jinja that branches on the security
-context or `COMPILE_CONTEXT` publishes only one variant.
+context or `COMPILE_CONTEXT` publishes only one variant. A braced `{COMPILE_CONTEXT…}` or other
+[context variable](#what-can-be-published) left in a cube's `sql` blocks the view.
 
 If a file fails to render, the preview or sync fails with `400` and names the file. A rendered file
 can be up to 2 MiB, the rendered data model up to 20 MiB, and rendering can take up to 2 minutes.

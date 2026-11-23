@@ -230,6 +230,29 @@ to establish too many connections at once can lead to an out-of-memory crash.
 You can use the [`CUBEJS_MAX_SESSIONS`](/reference/configuration/environment-variables#cubejs_max_sessions) environment variable to adjust the session
 limit.
 
+### Connection lifetime
+
+In Cube cloud platform deployments, the SQL API closes a connection once it is
+older than about 10 minutes. Each connection gets a slightly different lifetime,
+from 8 to 12 minutes, so connections opened together don't all close at once.
+This lets new connections reach API instances added by
+[autoscaling][ref-autoscaling]. The lifetime may change, so don't rely on the
+exact value.
+
+A connection is never closed while a query is running or a transaction is open;
+it is closed only once it is idle. The client then gets the standard Postgres
+`FATAL` error with the `57P01` (`admin_shutdown`) code, the same one a Postgres
+server sends when it shuts down.
+
+Most BI tools, drivers, and connection pools reconnect on this error on their
+own. If you manage connections yourself:
+
+- Reconnect when a connection is closed, or use a connection pool that
+  validates connections before it hands them out.
+- Don't rely on session state across long idle periods. Values set with the
+  [`SET` command][ref-set-command] and prepared statements don't carry over to
+  the new connection, so set them again after reconnecting.
+
 ## Cache control
 
 You can use the `cube_cache` session variable with the [`SET` command][ref-set-command]
@@ -287,3 +310,4 @@ Use the following environment variables to allocate more resources for query pla
 [ref-caching]: /docs/pre-aggregations
 [ref-rest-cache-control]: /reference/core-data-apis/rest-api#cache-control
 [ref-set-command]: /reference/core-data-apis/sql-api/reference#set
+[ref-autoscaling]: /admin/deployment/scalability#auto-scaling-of-api-instances
