@@ -786,6 +786,28 @@ describe('Cube RBAC Engine', () => {
       }
     });
 
+    // Lifting the mask on a narrower bound assumes the database compares the bounds as
+    // numbers. Over a text column it orders them as text: '102' sorts below the policy
+    // bound '20' and above the query bound '1000', so the row comes back unmasked.
+    test('a narrower bound on a number dimension over a text column unmasks rows in text order', async () => {
+      const client = cubejs(async () => tokenFor('conditional_text_number_mask_group'), {
+        apiUrl: birdbox.configuration.apiUrl,
+      });
+      const prices = async (filters: Query['filters']) => {
+        const result = await client.load({ dimensions: [`${CUBE}.price_text`], filters, limit: 5000 });
+
+        return result.rawData().map((row) => row[`${CUBE}.price_text`]);
+      };
+
+      const unfiltered = await prices([]);
+      expect(unfiltered).toContain(null);
+      expect(unfiltered).not.toContain('102');
+
+      const narrower = await prices([{ member: `${CUBE}.price_text`, operator: 'gt', values: ['1000'] }]);
+      expect(narrower).toContain('102');
+      expect(narrower).not.toContain(null);
+    });
+
     // The shift moves the date filter with it, so the measure sums January and
     // February rows: the query filter doesn't keep it inside the policy.
     test('a time-shifted measure stays masked under the policy date range', async () => {
