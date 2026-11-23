@@ -1,6 +1,7 @@
 use crate::planner::multi_fact_join_groups::MultiFactJoinGroups;
-use crate::planner::{CubeId, MemberSymbol, SqlCall};
+use crate::planner::{CubeId, MemberId, MemberSymbol, SqlCall};
 use cubenativeutils::CubeError;
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::rc::Rc;
 
@@ -30,6 +31,29 @@ pub struct PreAggregationJoinItem {
 pub struct PreAggregationJoin {
     pub root: Rc<PreAggregationSource>,
     pub items: Vec<PreAggregationJoinItem>,
+}
+
+impl PreAggregationJoin {
+    pub fn key_members(&self) -> impl Iterator<Item = &PreAggregationJoinMember> {
+        self.items
+            .iter()
+            .flat_map(|item| item.from_members.iter().chain(item.to_members.iter()))
+    }
+
+    /// The join keys no leg stores untruncated.
+    pub fn truncated_keys(&self) -> HashSet<MemberId> {
+        let (raw, truncated): (Vec<_>, Vec<_>) =
+            self.key_members().partition(|m| m.granularity.is_none());
+        let raw: HashSet<_> = raw
+            .iter()
+            .map(|m| m.symbol.peel_refs().id().clone())
+            .collect();
+        truncated
+            .iter()
+            .map(|m| m.symbol.peel_refs().id().clone())
+            .filter(|id| !raw.contains(id))
+            .collect()
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -323,25 +323,29 @@ impl AsyncPostgresShim {
                     result
                 }
                 protocol::FrontendMessage::Bind(body) => {
-                    if tracked_error.is_none() {
-                        doing_extended_query_message = true;
+                    if tracked_error.is_some() {
+                        continue;
                     }
+                    doing_extended_query_message = true;
                     let span_id = {
                         let statements_guard = self.session.state.statements.read().await;
                         statements_guard
                             .get(&body.statement)
                             .and_then(|s| s.span_id())
                     };
-                    self.bind(body, span_id).await
+                    self.bind(body, span_id.clone())
+                        .await
+                        .map_err(|e| e.with_span_id(span_id))
                 }
                 protocol::FrontendMessage::Execute(body) => {
                     let span_id = self
                         .portals
                         .get(&body.portal)
                         .and_then(|portal| portal.span_id());
-                    if tracked_error.is_some() {
+                    if let Some(err) = &tracked_error {
                         if let Some(auth_context) = self.session.state.auth_context() {
-                            if let Some(span_id) = span_id {
+                            // Bind is skipped after an error, so the portal may be a stale one
+                            if let Some(span_id) = err.span_id().or(span_id) {
                                 // If there was an error, always show the query
                                 self.session
                                     .session_manager

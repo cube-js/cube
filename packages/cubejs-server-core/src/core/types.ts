@@ -209,7 +209,7 @@ export interface CreateOptions {
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
   contextToCubeStoreRouterId?: ContextToCubeStoreRouterIdFn;
   /**
-   * Id the pre-aggregation queues of an orchestrator are keyed by. Defaults to
+   * Id the pre-aggregation queues and caches of an orchestrator are keyed by. Defaults to
    * `contextToOrchestratorId`, or to `contextToCubeStoreRouterId` when
    * `CUBEJS_PRE_AGGREGATIONS_ORCHESTRATOR_ID_FROM_ROUTER` is set.
    */

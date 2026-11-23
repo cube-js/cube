@@ -1,3 +1,4 @@
+pub mod process;
 pub mod tracing;
 use crate::CubeError;
 use async_trait::async_trait;

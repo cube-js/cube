@@ -15,12 +15,12 @@ use std::rc::Rc;
 /// `substituted` names the members rendered as a stored column. For a `sql`
 /// granularity that column already holds the value, and is its only form.
 pub struct TimeDimensionNode {
-    substituted: PreAggregationColumns,
+    substituted: Rc<PreAggregationColumns>,
     input: Rc<dyn SqlNode>,
 }
 
 impl TimeDimensionNode {
-    pub fn new(substituted: PreAggregationColumns, input: Rc<dyn SqlNode>) -> Rc<Self> {
+    pub fn new(substituted: Rc<PreAggregationColumns>, input: Rc<dyn SqlNode>) -> Rc<Self> {
         Rc::new(Self { substituted, input })
     }
 }

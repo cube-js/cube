@@ -47,6 +47,9 @@ impl VisitorContext {
             use_local_tz: nodes_factory.use_local_tz_in_date_range(),
             filter_params_columns: HashMap::new(),
             reading_pre_aggregation: nodes_factory.reading_pre_aggregation(),
+            pre_aggregation_columns: nodes_factory
+                .pre_aggregation_dimensions_references()
+                .clone(),
         };
         let node_processor = nodes_factory.default_node_processor(&query_tools);
         Self {
@@ -73,6 +76,9 @@ impl VisitorContext {
             use_local_tz: nodes_factory.use_local_tz_in_date_range(),
             filter_params_columns,
             reading_pre_aggregation: nodes_factory.reading_pre_aggregation(),
+            pre_aggregation_columns: nodes_factory
+                .pre_aggregation_dimensions_references()
+                .clone(),
         };
         let node_processor = nodes_factory.default_node_processor(&query_tools);
         Self {

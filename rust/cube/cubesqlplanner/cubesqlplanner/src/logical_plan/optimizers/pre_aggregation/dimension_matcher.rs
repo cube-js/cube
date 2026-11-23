@@ -1,16 +1,10 @@
-use super::CompiledPreAggregation;
-use crate::cube_bridge::base_query_options::FilterValue;
-use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem, FilterOperator};
+use super::{CompiledPreAggregation, PreAggregationSource};
+use crate::planner::filter::{BaseFilter, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
-use crate::planner::time_dimension::{
-    Granularity, QueryDateTime, QueryDateTimeHelper, SqlInterval,
-};
 use crate::planner::DimensionSymbol;
 use crate::planner::GranularityHelper;
 use crate::planner::TimeDimensionSymbol;
 use crate::planner::{MemberId, MemberSymbol};
-use chrono::{Duration, NaiveDateTime};
-use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -50,6 +44,11 @@ pub struct DimensionMatcher<'a> {
     readable_time_columns: HashMap<MemberId, Vec<bool>>,
     pre_aggregation_segments: HashMap<MemberId, bool>,
     projects_stored_dimension: bool,
+    // Join keys a rollupJoin reads only from its legs' grain columns.
+    truncated_join_keys: HashSet<MemberId>,
+    // Set while matching the members a date-filtered member is computed from:
+    // the filter renders their raw columns against database-timezone bounds.
+    in_date_filter_dependencies: bool,
     result: MatchState,
 }
 
@@ -80,6 +79,10 @@ impl<'a> DimensionMatcher<'a> {
             .iter()
             .map(|s| (s.id().clone(), false))
             .collect();
+        let truncated_join_keys = match pre_aggregation.source.as_ref() {
+            PreAggregationSource::Join(join) => join.truncated_keys(),
+            _ => HashSet::new(),
+        };
         Self {
             query_tools,
             pre_aggregation,
@@ -88,6 +91,8 @@ impl<'a> DimensionMatcher<'a> {
             readable_time_columns: HashMap::new(),
             pre_aggregation_segments,
             projects_stored_dimension: false,
+            truncated_join_keys,
+            in_date_filter_dependencies: false,
             result: MatchState::Full,
         }
     }
@@ -292,18 +297,22 @@ impl<'a> DimensionMatcher<'a> {
         dimension: &DimensionSymbol,
         add_to_matched_dimension: bool,
     ) -> Result<MatchState, CubeError> {
-        if self
-            .pre_aggregation_time_dimensions
-            .contains_key(dimension.id())
-        {
-            // Its reads resolve to a stored grain column, which holds the value
-            // truncated and in the query timezone, not the raw value.
-            Ok(MatchState::NotMatched)
-        } else if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
+        if let Some(found) = self.pre_aggregation_dimensions.get_mut(dimension.id()) {
+            if self.in_date_filter_dependencies && self.truncated_join_keys.contains(dimension.id())
+            {
+                return Ok(MatchState::NotMatched);
+            }
             if add_to_matched_dimension {
                 *found = true;
             }
             Ok(MatchState::Full)
+        } else if self
+            .pre_aggregation_time_dimensions
+            .contains_key(dimension.id())
+        {
+            // A grain column holds the value truncated and in the query
+            // timezone, so a raw read needs the member listed as a dimension.
+            Ok(MatchState::NotMatched)
         } else if dimension.is_calc_group() {
             // Calc-group dimensions are virtual enumerations: they carry no
             // stored data, so any rollup can serve them. At query time the
@@ -408,10 +417,9 @@ impl<'a> DimensionMatcher<'a> {
             for entry in entries.iter() {
                 let td = &entry.symbol;
                 let derives = if let Some((from, to)) = &range {
-                    !is_sql_granularity(td)
-                        && td.granularity_obj().as_ref().is_some_and(|grain| {
-                            Self::range_on_grain(grain, from, to, tz).unwrap_or(false)
-                        })
+                    td.granularity_obj()
+                        .as_ref()
+                        .is_some_and(|grain| grain.bounds_on_grain(from, to, tz).unwrap_or(false))
                 } else if is_exact(td) {
                     true
                 } else if is_sql_defined_granularity
@@ -521,9 +529,8 @@ impl<'a> DimensionMatcher<'a> {
         let add_to_matched_dimension = add_to_matched_dimension && filter.is_single_value_equal();
         let symbol = if let Some(time_dimension) = filter.time_dimension_symbol() {
             time_dimension
-        } else if let Some(read) = self.date_filter_as_time_dimension(filter) {
-            // The rollup holds no raw value to stand for a misaligned range.
-            return self.try_match_time_dimension(&read, add_to_matched_dimension, true);
+        } else if filter.operation().is_date_bounded() {
+            return self.try_match_date_filter(filter, add_to_matched_dimension);
         } else {
             filter.member_evaluator().clone()
         };
@@ -531,81 +538,53 @@ impl<'a> DimensionMatcher<'a> {
         Ok(res)
     }
 
-    fn range_on_grain(
-        grain: &Granularity,
-        from: &str,
-        to: &str,
-        tz: Tz,
-    ) -> Result<bool, CubeError> {
-        let on_grain = |date: QueryDateTime| -> Result<bool, CubeError> {
-            if grain.is_predefined_granularity() {
-                date.is_start_of(grain.granularity())
-            } else if Self::has_time_part(grain.granularity_interval()) {
-                // Its buckets follow the wall clock, which origin stepping does
-                // not across a DST change.
-                Ok(false)
-            } else {
-                Ok(grain.align_date_to_origin(date.clone())? == date)
-            }
-        };
-        let start =
-            QueryDateTime::from_date_str(tz, &QueryDateTimeHelper::format_from_date(from, 3)?)?;
-        let end = QueryDateTime::from_date_str(tz, &QueryDateTimeHelper::format_to_date(to, 3)?)?
-            .add_duration(Duration::milliseconds(1))?;
-        Ok(on_grain(start)? && on_grain(end)?)
+    // A date filter reads the raw column of its member, or of the members it
+    // is computed from, and the grain column of a member stored only truncated.
+    fn try_match_date_filter(
+        &mut self,
+        filter: &BaseFilter,
+        add_to_matched_dimension: bool,
+    ) -> Result<MatchState, CubeError> {
+        let member = filter.member_evaluator();
+        let id = member.peel_refs().id().clone();
+        let truncated_key = self.truncated_join_keys.contains(&id);
+        let stored_truncated = self.pre_aggregation_time_dimensions.contains_key(&id);
+        if truncated_key && !stored_truncated {
+            // No time dimension states the key's grain to check the bounds against.
+            return self.try_match_symbol(&member, add_to_matched_dimension);
+        }
+        let stored_raw = self.pre_aggregation_dimensions.contains_key(&id) && !truncated_key;
+        if stored_raw || !stored_truncated {
+            self.in_date_filter_dependencies = true;
+            let res = self.try_match_symbol(&member, add_to_matched_dimension);
+            self.in_date_filter_dependencies = false;
+            return res;
+        }
+        match self.date_filter_as_time_dimension(filter) {
+            // The grain column holds no raw value to stand for a misaligned range.
+            Some(read) => self.try_match_time_dimension(&read, add_to_matched_dimension, true),
+            None => Ok(MatchState::NotMatched),
+        }
     }
 
-    fn has_time_part(interval: &SqlInterval) -> bool {
-        interval.hour != 0 || interval.minute != 0 || interval.second != 0
-    }
-
-    // A grain column holds no raw value, but serves a date filter on the raw
-    // member whose bounds fall on its grain, as it would a time dimension's
-    // range. `None` leaves the filter a raw read.
+    // A grain column serves a date filter whose bounds fall on its grain, as
+    // it would a time dimension's range.
     fn date_filter_as_time_dimension(
         &self,
         filter: &BaseFilter,
     ) -> Option<Rc<TimeDimensionSymbol>> {
         let member = filter.member_evaluator();
         let id = member.peel_refs().id().clone();
-        if !self.pre_aggregation_time_dimensions.contains_key(&id)
-            || !self.pre_aggregation_dimensions.contains_key(&id)
-        {
+        if !self.pre_aggregation_time_dimensions.contains_key(&id) {
             return None;
         }
-        let values: Vec<&str> = filter
-            .values()
-            .iter()
-            .filter_map(|value| match value {
-                FilterValue::Str(value) => Some(value.as_str()),
-                _ => None,
-            })
-            .collect();
-        let date_range = match (filter.filter_operator(), values.as_slice()) {
-            (FilterOperator::Set | FilterOperator::NotSet, _) => None,
-            (FilterOperator::InDateRange | FilterOperator::NotInDateRange, [from, to]) => Some((
-                QueryDateTimeHelper::format_from_date(from, 3).ok()?,
-                QueryDateTimeHelper::inclusive_to_date(to).ok()?,
-            )),
-            (FilterOperator::BeforeDate | FilterOperator::AfterOrOnDate, [at]) => Some(
-                Self::boundary_at(&QueryDateTimeHelper::format_from_date(at, 3).ok()?, 0)?,
-            ),
-            (FilterOperator::BeforeOrOnDate | FilterOperator::AfterDate, [at]) => Some(
-                Self::boundary_at(&QueryDateTimeHelper::inclusive_to_date(at).ok()?, 1)?,
-            ),
-            _ => return None,
-        };
-        Some(TimeDimensionSymbol::new(member, None, None, date_range))
-    }
-
-    // An empty range whose alignment is that of the single bound starting
-    // `shift_ms` after `at`.
-    fn boundary_at(at: &str, shift_ms: i64) -> Option<(String, String)> {
-        let start = QueryDateTimeHelper::parse_native_date_time(at).ok()?
-            + Duration::milliseconds(shift_ms);
-        let end = start - Duration::milliseconds(1);
-        let format = |date: NaiveDateTime| date.format("%Y-%m-%dT%H:%M:%S%.3f").to_string();
-        Some((format(start), format(end)))
+        let date_range = filter.typed_filter().date_bounds()?;
+        Some(TimeDimensionSymbol::new(
+            member,
+            None,
+            None,
+            Some(date_range),
+        ))
     }
 }
 

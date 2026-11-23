@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.32](https://github.com/cube-js/cube/compare/v1.8.31...v1.8.32) (2026-11-21)
+
+### Bug Fixes
+
+- **query-orchestrator:** Share every pre-aggregation cache key under the pre-aggregation orchestrator id ([#12871](https://github.com/cube-js/cube/issues/12871)) ([c8c884c](https://github.com/cube-js/cube/commit/c8c884c6d850d8764f6721a5ca2a678f5c72085a)), closes [#12808](https://github.com/cube-js/cube/issues/12808)
+
+## [1.8.31](https://github.com/cube-js/cube/compare/v1.8.30...v1.8.31) (2026-11-20)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+## [1.8.30](https://github.com/cube-js/cube/compare/v1.8.29...v1.8.30) (2026-11-19)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
 ## [1.8.29](https://github.com/cube-js/cube/compare/v1.8.28...v1.8.29) (2026-11-19)
 
 ### Performance Improvements

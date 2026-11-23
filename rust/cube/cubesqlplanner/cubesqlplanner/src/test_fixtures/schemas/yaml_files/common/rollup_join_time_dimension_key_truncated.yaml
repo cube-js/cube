@@ -1,0 +1,60 @@
+# Both legs store the join key truncated to a day, and the rollupJoin lists it as a plain
+# dimension and as its time dimension: no raw value of the key is stored anywhere.
+cubes:
+  - name: td_facts
+    sql: "SELECT * FROM rjk_facts"
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: day
+        type: time
+        sql: day
+    measures:
+      - name: total_amount
+        type: sum
+        sql: amount
+    pre_aggregations:
+      - name: td_facts_rollup
+        type: rollup
+        measures:
+          - total_amount
+        time_dimension: day
+        granularity: day
+
+  - name: td_dates
+    sql: "SELECT * FROM rjk_dates"
+
+    joins:
+      - name: td_facts
+        relationship: one_to_many
+        sql: "{CUBE.day} = {td_facts.day}"
+    dimensions:
+      - name: day
+        type: time
+        sql: day
+        primary_key: true
+      - name: quarter_label
+        type: string
+        sql: quarter_label
+    pre_aggregations:
+      - name: td_dates_rollup
+        type: rollup
+        dimensions:
+          - quarter_label
+        time_dimension: day
+        granularity: day
+      - name: td_rollup_join
+        type: rollupJoin
+        measures:
+          - td_facts.total_amount
+        dimensions:
+          - quarter_label
+          - td_facts.day
+        time_dimension: td_facts.day
+        granularity: day
+        rollups:
+          - td_dates.td_dates_rollup
+          - td_facts.td_facts_rollup

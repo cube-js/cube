@@ -134,6 +134,15 @@ Publication can't use a connection that
 and sync run without a user for the factory to act for. Give the integration its own Databricks
 service principal instead. Your users' queries keep going through `driver_factory`.
 
+<Warning>
+
+Don't give the data source a service principal with **+ Add data source** or **Edit**. The
+Databricks driver prefers a data source's OAuth client variables over the per-user `token` that
+`driver_factory` returns, so every query on it would run as the service principal. See
+[Data sources served by `driver_factory`](/admin/connect-to-data/multiple-data-sources#data-sources-served-by-driver_factory).
+
+</Warning>
+
 1. In Databricks, create a
    [service principal with an OAuth secret](https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m)
    and grant it the privileges listed in [Before you start](#before-you-start).
@@ -177,6 +186,8 @@ they are deployed. Each run:
   user needs **Access SQL Runner**, or the build is not published.
 - Shows **Deployment** under **Triggered by** in run history (`trigger: DEPLOYMENT` in the API).
   Runs you start from the card or the API show **Manual** (`MANUAL`).
+- Starts the SQL warehouse if it's stopped, as every sync does, even for a build that changes no
+  view.
 
 If another run is active, or the deployment is still rolling out a build with Jinja templates,
 the run retries for about 30 minutes. If a newer build succeeds first, only the newer build
@@ -323,7 +334,9 @@ conversion blocked the view), and a run carries the `takeOverTargets` it was sta
 `blocked` view whose `detail` is `unmanaged-target` or `ownership-conflict` collides with an object
 Cube does not manage, and a `detail` of `taken-over` marks a view a take-over published. After
 you confirm that a blocked destination should belong to this data source, a CI job can pass its
-`target` in `takeOverTargets` to [take it over](#take-over-an-existing-metric-view).
+`target` in `takeOverTargets` to [take it over](#take-over-an-existing-metric-view). A `detail` of
+`metastore-changed` means the data source
+[moved to another metastore](#move-to-another-metastore) during the run; start another run.
 `incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
 zero rejects definitions missing measures.
 
@@ -437,8 +450,10 @@ fi
 The **Preview** result is the authority for your deployed model. This preview release supports
 YAML models, [Jinja-templated](#jinja-templates) ones included, `extends` between YAML cubes,
 one Databricks data source per published view, scalar dimensions, common aggregates and supported
-calculated measures, and conservative many-to-one equality joins. The target uses
-Databricks Metric View YAML 1.1.
+calculated measures, and many-to-one and one-to-one joins. A join condition that is not a plain
+column equality, such as an SCD2 date range, an expression like `CAST(...)` or `date_trunc(...)`,
+or a comparison with a literal, is published as written in the Metric View join's `on`. The target
+uses Databricks Metric View YAML 1.1.
 
 These categories reflect the current preview release. Capabilities may change between releases, so
 run a new **Preview** after a Cube upgrade.
@@ -462,8 +477,12 @@ Preview **blocks** a view when it finds any of these conditions:
 - A two-part `schema.table` source without `CUBEJS_DB_DATABRICKS_CATALOG`: set that variable for
   the selected Databricks data source, or the credential's **Default catalog** for a data source
   served by `driver_factory`, and preview again.
-- Non-equality, cyclic, or one-to-many joins: simplify the join. For
+- Cyclic or one-to-many joins, or a join condition that reads a measure or a cube other than the
+  two it joins, including a `table.column` whose table is neither of them: simplify the join. For
   `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube.
+- A cube `sql` that reads [context variables](/reference/data-modeling/context-variables), such
+  as `{FILTER_PARAMS…}`, `{SECURITY_CONTEXT…}`, or `{COMPILE_CONTEXT…}` (`CUBE_CONTEXT_IN_SQL`):
+  only Cube can fill them in, so remove them from the cube's `sql` or keep that view in Cube.
 - Unsupported expressions or types, or multi-stage, window, or ranking calculations: simplify
   the model or keep that view in Cube.
 
@@ -489,7 +508,8 @@ Otherwise, a preview or sync of a data model with Jinja templates fails with `40
 says what rendering needs.
 
 Templates render with the deployment's default context, so Jinja that branches on the security
-context or `COMPILE_CONTEXT` publishes only one variant.
+context or `COMPILE_CONTEXT` publishes only one variant. A braced `{COMPILE_CONTEXT…}` or other
+[context variable](#what-can-be-published) left in a cube's `sql` blocks the view.
 
 If a file fails to render, the preview or sync fails with `400` and names the file. A rendered file
 can be up to 2 MiB, the rendered data model up to 20 MiB, and rendering can take up to 2 minutes.
@@ -645,3 +665,11 @@ A failed drop is labeled **Obsolete, kept** with its failure code, and the next 
 data model file that fails to load stops the sync before anything is written or dropped. Disabling
 publication, or Cube support deactivating the preview for your account, drops nothing. Dropping
 needs the same Databricks privileges on the target schema as replacing a view.
+
+### Move to another metastore
+
+After you point the data source at a workspace on another Unity Catalog metastore, the next sync
+creates its Metric Views there, or labels a view **Blocked** with `unmanaged-target` when an object
+there already holds its name; if that object should belong to this data source,
+[take it over](#take-over-an-existing-metric-view). The Metric Views in the old metastore stay, and
+syncs no longer list them: drop them in Databricks yourself.

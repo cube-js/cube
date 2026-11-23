@@ -155,18 +155,59 @@ const PRE_AGGREGATION: Partial<PreAggregationDescription> = {
   timezone: 'UTC',
 };
 
-const jobQuery = (requestId: string) => ({
+const jobQuery = (
+  requestId: string,
+  { preAggregation = PRE_AGGREGATION, dependencies = [], force = true, dryRun = false }: {
+    preAggregation?: Partial<PreAggregationDescription>,
+    dependencies?: Partial<PreAggregationDescription>[],
+    force?: boolean,
+    dryRun?: boolean,
+  } = {},
+) => ({
   // The jobs API posts a build query without `query`
   values: [] as string[],
   cacheKeyQueries: { queries: [] as QueryWithParams[] },
-  preAggregations: [PRE_AGGREGATION as PreAggregationDescription],
+  preAggregations: [...dependencies, preAggregation] as PreAggregationDescription[],
   continueWait: true,
   renewQuery: true,
   requestId,
   isJob: true,
-  forceBuildPreAggregations: true,
+  forceBuildPreAggregations: force && !dryRun,
+  dryRun,
   external: true,
 });
+
+// The same pre-aggregation after its refresh key moved: the key query returns
+// another value, so the content version changes while the structure does not.
+const PRE_AGGREGATION_KEY_MOVED: Partial<PreAggregationDescription> = {
+  ...PRE_AGGREGATION,
+  invalidateKeyQueries: [['SELECT \'next refresh key\'', [], { renewalThreshold: 21600 }]],
+};
+
+// A rollupJoin-style pair: the target is built from its dependency's table.
+const DEPENDENCY: Partial<PreAggregationDescription> = {
+  ...PRE_AGGREGATION,
+  tableName: 'stb_pre_aggregations.orders_dep',
+  preAggregationId: 'orders.dep',
+  loadSql: ['CREATE TABLE stb_pre_aggregations.orders_dep AS SELECT * FROM public.orders', []],
+  indexesSql: [],
+};
+
+const DEPENDENCY_KEY_MOVED: Partial<PreAggregationDescription> = {
+  ...DEPENDENCY,
+  invalidateKeyQueries: [['SELECT \'next dependency key\'', [], { renewalThreshold: 21600 }]],
+};
+
+const DEPENDENT: Partial<PreAggregationDescription> = {
+  ...PRE_AGGREGATION,
+  tableName: 'stb_pre_aggregations.orders_joined',
+  preAggregationId: 'orders.joined',
+  loadSql: [
+    'CREATE TABLE stb_pre_aggregations.orders_joined AS SELECT * FROM stb_pre_aggregations.orders_dep',
+    [],
+  ],
+  indexesSql: [],
+};
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -454,6 +495,151 @@ describe('pre-aggregation build jobs', () => {
     );
 
     expect(status).toEqual('done');
+  });
+
+  describe('without force', () => {
+    const buildAndWait = async (requestId: string, preAggregation = PRE_AGGREGATION) => {
+      const [{ targetTableName, queryKey }] = await orchestrator.fetchQuery(jobQuery(requestId, { preAggregation }));
+      expect(await pollUntilSettled(requestId, targetTableName, queryKey)).toEqual('done');
+      return targetTableName;
+    };
+
+    test('a dry run reports a partition that was never built and builds nothing', async () => {
+      const [job] = await orchestrator.fetchQuery(jobQuery('dry run, nothing built', { dryRun: true }));
+
+      expect(job.versionStatus).toEqual('missing_partition');
+      expect(job.targetTableName).toMatch(/^stb_pre_aggregations\.orders_month_/);
+      await delay(200);
+      expect(externalMockDriver.tables).toEqual([]);
+      expect(externalMockDriver.schema).toBeUndefined();
+      // Nor marks its placeholder table as used
+      expect(await orchestrator.getPreAggregations().tablesUsed()).toEqual([]);
+    });
+
+    test('a dry run reports the built target version as done', async () => {
+      const built = await buildAndWait('build before dry run');
+
+      const [job] = await orchestrator.fetchQuery(jobQuery('dry run, built', { dryRun: true }));
+
+      expect(job.versionStatus).toEqual('done');
+      expect(job.targetTableName).toEqual(built);
+    });
+
+    test('a dry run does not report a table whose build has not finished as done', async () => {
+      const built = await buildAndWait('build before its record says building');
+      // A build into this table started again, or was killed, and left its record
+      await orchestrator.getPreAggregations().setPreAggregationBuildStatus(built, {
+        status: 'building',
+        startedAt: Date.now(),
+      });
+
+      const [job] = await orchestrator.fetchQuery(jobQuery('dry run, build in progress', { dryRun: true }));
+
+      expect(job.versionStatus).toEqual('missing_partition');
+
+      await orchestrator.getPreAggregations().setPreAggregationBuildStatus(built, { status: 'failure', error: 'killed' });
+      const [failed] = await orchestrator.fetchQuery(jobQuery('dry run, build failed', { dryRun: true }));
+
+      expect(failed.versionStatus).toEqual('missing_partition');
+    });
+
+    test('an unforced job builds again a table whose last build failed', async () => {
+      const built = await buildAndWait('build before it fails');
+      await orchestrator.getPreAggregations().setPreAggregationBuildStatus(built, { status: 'failure', error: 'killed' });
+      // Table names carry the build time in seconds
+      mockDriver.now += 10000;
+      externalMockDriver.now += 10000;
+
+      const [{ targetTableName, queryKey }] = await orchestrator.fetchQuery(
+        jobQuery('unforced job after failure', { force: false })
+      );
+
+      expect(targetTableName).not.toEqual(built);
+      expect(await pollUntilSettled('unforced job after failure', targetTableName, queryKey)).toEqual('done');
+    });
+
+    test('an unforced job does not start a second build of a table being built', async () => {
+      const built = await buildAndWait('build before another one starts');
+      await orchestrator.getPreAggregations().setPreAggregationBuildStatus(built, {
+        status: 'building',
+        startedAt: Date.now(),
+      });
+
+      const [{ targetTableName }] = await orchestrator.fetchQuery(
+        jobQuery('unforced job during a build', { force: false })
+      );
+
+      expect(targetTableName).toEqual(built);
+    });
+
+    test('a dry run reports a partition as outdated once its refresh key moves', async () => {
+      const built = await buildAndWait('build before key moves');
+
+      const [job] = await orchestrator.fetchQuery(
+        jobQuery('dry run, key moved', { preAggregation: PRE_AGGREGATION_KEY_MOVED, dryRun: true })
+      );
+
+      expect(job.versionStatus).toEqual('outdated');
+      expect(job.targetTableName).not.toEqual(built);
+      await delay(200);
+      expect(externalMockDriver.tables).toEqual([built]);
+    });
+
+    test('a job for an up-to-date partition reports it without a rebuild', async () => {
+      const built = await buildAndWait('build before unforced job');
+
+      const [{ targetTableName, queryKey }] = await orchestrator.fetchQuery(
+        jobQuery('unforced job, up to date', { force: false })
+      );
+
+      expect(targetTableName).toEqual(built);
+      expect(await pollUntilSettled('unforced job, up to date', targetTableName, queryKey)).toEqual('done');
+      await delay(200);
+      expect(externalMockDriver.tables).toEqual([built]);
+    });
+
+    test('a job for an outdated partition builds its target version', async () => {
+      const built = await buildAndWait('build before key moves for unforced job');
+
+      const [{ targetTableName, queryKey }] = await orchestrator.fetchQuery(
+        jobQuery('unforced job, key moved', { preAggregation: PRE_AGGREGATION_KEY_MOVED, force: false })
+      );
+
+      expect(targetTableName).not.toEqual(built);
+      expect(await pollUntilSettled('unforced job, key moved', targetTableName, queryKey)).toEqual('done');
+
+      const [dryRun] = await orchestrator.fetchQuery(
+        jobQuery('dry run after unforced build', { preAggregation: PRE_AGGREGATION_KEY_MOVED, dryRun: true })
+      );
+      expect(dryRun.versionStatus).toEqual('done');
+      expect(dryRun.targetTableName).toEqual(targetTableName);
+    });
+
+    test('a job loads an outdated dependency from a table that exists', async () => {
+      const [builtDependency, first] = await orchestrator.fetchQuery(
+        jobQuery('build with dependency', { preAggregation: DEPENDENT, dependencies: [DEPENDENCY] })
+      );
+      expect(await pollUntilSettled('build with dependency', first.targetTableName, first.queryKey)).toEqual('done');
+
+      const [dependency] = await orchestrator.fetchQuery(
+        jobQuery('dependency key moved', { preAggregation: DEPENDENT, dependencies: [DEPENDENCY_KEY_MOVED] })
+      );
+
+      // The target's build reads the dependency's table, so it gets the one already
+      // built rather than the name of a build the job does not wait for.
+      expect(dependency.targetTableName).toEqual(builtDependency.targetTableName);
+      expect(externalMockDriver.tables).toContain(dependency.targetTableName);
+    });
+
+    test('a dry run builds no dependency either', async () => {
+      const jobs = await orchestrator.fetchQuery(
+        jobQuery('dry run with dependency', { preAggregation: DEPENDENT, dependencies: [DEPENDENCY], dryRun: true })
+      );
+
+      expect(jobs.map(({ versionStatus }: { versionStatus?: string }) => versionStatus)).toEqual(['missing_partition', 'missing_partition']);
+      await delay(200);
+      expect(externalMockDriver.tables).toEqual([]);
+    });
   });
 
   // A partially built external table must not be left behind: it is the newest

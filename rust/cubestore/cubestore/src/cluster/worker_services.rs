@@ -56,6 +56,11 @@ pub trait WorkerProcessing: Send + Sync + 'static {
     fn process_titile() -> String;
 
     fn process_type() -> String;
+
+    /// Names a request in logs, e.g. by the id of the query it serves.
+    fn request_label(_request: &Self::Request) -> Option<String> {
+        None
+    }
 }
 
 pub trait ServicesTransport {

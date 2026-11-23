@@ -18,14 +18,14 @@ use std::rc::Rc;
 /// picked up further down and has to be applied to the column itself.
 pub struct TimeShiftSqlNode {
     shifts: TimeShiftState,
-    substituted: PreAggregationColumns,
+    substituted: Rc<PreAggregationColumns>,
     input: Rc<dyn SqlNode>,
 }
 
 impl TimeShiftSqlNode {
     pub fn new(
         shifts: TimeShiftState,
-        substituted: PreAggregationColumns,
+        substituted: Rc<PreAggregationColumns>,
         input: Rc<dyn SqlNode>,
     ) -> Rc<Self> {
         Rc::new(Self {
