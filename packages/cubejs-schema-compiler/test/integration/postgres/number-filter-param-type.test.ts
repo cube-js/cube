@@ -184,6 +184,10 @@ cubes:
       await expectIds([filter('max_label', 'equals', 'c')], [3]);
     });
 
+    it('max over a text column with a value that reads as a number', async () => {
+      await expectIds([filter('max_label', 'equals', '2')], [2]);
+    });
+
     it('max over a timestamp column', async () => {
       await expectIds([filter('max_created_at', 'gt', '2024-01-01T00:00:00.000')], [2, 3]);
     });

@@ -36,10 +36,6 @@ class BigqueryFilter extends BaseFilter {
     return '?';
   }
 
-  public allocateCastParam(param: unknown): string {
-    return this.query.paramAllocator.allocateParamsForQuestionString(this.castParameter(param), [param]);
-  }
-
   public castToString(sql: string) {
     return `CAST(${sql} as STRING)`;
   }

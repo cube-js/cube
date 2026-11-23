@@ -157,7 +157,7 @@ export class BaseFilter extends BaseDimension {
     return this.valuesArray().indexOf(null) !== -1;
   }
 
-  public castParameter() {
+  public castParameter(_param?: unknown) {
     return '?';
   }
 
@@ -171,7 +171,7 @@ export class BaseFilter extends BaseDimension {
   }
 
   public allocateCastParam(param: unknown): string {
-    return this.query.paramAllocator.allocateParamsForQuestionString(this.castParameter(), [param]);
+    return this.query.paramAllocator.allocateParamsForQuestionString(this.castParameter(param), [param]);
   }
 
   public allocateTimestampParam(param: unknown): string {

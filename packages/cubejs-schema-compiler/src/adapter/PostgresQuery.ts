@@ -2,7 +2,7 @@ import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { ParamAllocator } from './ParamAllocator';
-import { isInt64Literal, isNumberLiteral } from './numericLiteral';
+import { isInt64Literal } from './numericLiteral';
 import type { QueryFilterTreeItem } from './QueryTypes';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
@@ -29,17 +29,13 @@ class PostgresFilter extends BaseFilter {
   public castParameter(param?: unknown) {
     const { type } = this.definition();
 
-    const isNumber = type === 'number' || (this.measure && !['string', 'time', 'boolean'].includes(type));
     // min/max measures take the type of their operand, which may be text or a timestamp.
-    if (isNumber && isNumberLiteral(param)) {
+    const isNumber = type === 'number' || (this.measure && !['string', 'time', 'boolean', 'min', 'max'].includes(type));
+    if (isNumber) {
       return isInt64Literal(param) ? '?::bigint' : `?::${(this.query as PostgresQuery).fractionalParamType()}`;
     }
 
     return '?';
-  }
-
-  public allocateCastParam(param: unknown): string {
-    return this.query.paramAllocator.allocateParamsForQuestionString(this.castParameter(param), [param]);
   }
 }
 
@@ -111,7 +107,7 @@ export class PostgresQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     // eslint-disable-next-line no-template-curly-in-string
     templates.params.param = '${{ param_index + 1 }}';
-    templates.tesseract.number_param_cast = `{{ expr }}::{% if is_integer %}bigint{% else %}${this.fractionalParamType()}{% endif %}`;
+    templates.tesseract.number_param_cast = `{{ expr }}{% if typed_operand %}::{% if is_integer %}bigint{% else %}${this.fractionalParamType()}{% endif %}{% endif %}`;
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.CONCAT = 'CONCAT({% for arg in args %}CAST({{arg}} AS TEXT){% if not loop.last %},{% endif %}{% endfor %})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';

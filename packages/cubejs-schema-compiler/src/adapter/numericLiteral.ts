@@ -9,7 +9,3 @@ export function isInt64Literal(value: unknown): boolean {
   const n = BigInt(str);
   return n >= INT64_MIN && n <= INT64_MAX;
 }
-
-export function isNumberLiteral(value: unknown): boolean {
-  return /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$/.test(String(value));
-}
