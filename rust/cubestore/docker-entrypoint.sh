@@ -1,11 +1,8 @@
 #!/bin/sh
 set -e
 
-# Older images ran Cube Store as root, so existing volumes, PVCs and host
-# bind mounts are owned by root. When started as root, hand the data directories
-# over to the cubestore user and drop privileges, so upgrades keep working.
-# If that is not possible (capabilities dropped, root squashing on NFS,
-# read-only mounts), keep running as root like older images did.
+# Older images ran as root, so existing volumes are root-owned: chown them to
+# cubestore and drop privileges, or keep running as root when that is impossible.
 if [ "$(id -u)" = "0" ]; then
   if ! setpriv --reuid=cubestore --regid=cubestore --init-groups -- true 2>/dev/null; then
     echo "Warning: unable to switch to the cubestore user, running as root" >&2
