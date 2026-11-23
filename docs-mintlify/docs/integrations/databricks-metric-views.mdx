@@ -392,20 +392,22 @@ needs no `target`.
   listing runs, or previewing with a name that doesn't exist returns `404`.
 - **Listing:**
   `GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/targets`
-  returns each publication target's `targetName`, `enabled`, `syncOnDeploy`, `targetCatalog`,
-  `targetSchema`, `configurationVersion`, and `lastRun`: its newest run's `runId` and `status`, or
-  `null` if it never ran.
+  returns every publication target of the data source, `default` included, sorted by name: its
+  `targetName`, `enabled`, `syncOnDeploy`, `targetCatalog`, `targetSchema`, `configurationVersion`,
+  and `lastRun` (its newest run's `runId` and `status`, or `null` if it never ran). Use it to find
+  one created by a misspelled name.
 - **Turning off:** saving `enabled: false` drops nothing, and the publication target keeps its
   Metric Views: another that publishes to the same names is blocked with `ownership-conflict`
   until it [takes them over](#take-over-an-existing-metric-view).
 - **Deleting:** turn off **Publish to Databricks** and save, then select **Delete target**, or send
   `DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}?target=<name>&expectedConfigurationVersion=<n>`.
-  `default` can't be deleted (`400`). A delete returns `409` while the target is enabled, while it
-  has an active run or one that ended `CANCELLED` or `FAILED` in the last 10 minutes, or when the
-  version is stale. Its Metric Views stay in Databricks, managed by no publication target, and the
-  card lists them, as does the response's `retainedMetricViews`: drop them, or name them in another
-  target's `takeOverTargets` before it publishes there. Its runs stay readable by `runId`, but none
-  can be cancelled or promoted.
+  `default` can't be deleted (`400`), and an unknown name returns `404`. A delete returns `409`
+  while the target is enabled, while it has an active run or one that ended `CANCELLED` or `FAILED`
+  in the last 10 minutes, or when the version is stale. The deleted target's Metric Views stay in
+  Databricks, managed by no publication target, and the card lists them, as does the response's
+  `retainedMetricViews`: drop them, or name them in another target's `takeOverTargets` before it
+  publishes there. The deleted target's runs stay readable by `runId` and keep their `targetName`,
+  but can't be promoted from. Its name can be used for a new publication target.
 
 To publish to production the build you tested in staging:
 
