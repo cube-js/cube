@@ -102,6 +102,12 @@ pub trait ExtendedRemoteFs: DIService + RemoteFs {
         };
         Ok(stream)
     }
+
+    /// Whether uploaded files also live outside `local_path()`, so a local copy can be dropped
+    /// without losing data.
+    async fn has_remote_storage(&self) -> bool {
+        false
+    }
 }
 
 pub struct CommonRemoteFsUtils;
@@ -401,7 +407,11 @@ impl RemoteFs for LocalDirRemoteFs {
 }
 
 #[async_trait]
-impl ExtendedRemoteFs for LocalDirRemoteFs {}
+impl ExtendedRemoteFs for LocalDirRemoteFs {
+    async fn has_remote_storage(&self) -> bool {
+        self.remote_dir.read().await.is_some()
+    }
+}
 
 impl LocalDirRemoteFs {
     fn remove_empty_paths_boxed(

@@ -318,7 +318,11 @@ impl RemoteFs for GCSRemoteFs {
 
 // TODO: Make a faster implementation
 #[async_trait]
-impl ExtendedRemoteFs for GCSRemoteFs {}
+impl ExtendedRemoteFs for GCSRemoteFs {
+    async fn has_remote_storage(&self) -> bool {
+        true
+    }
+}
 
 struct LeadingSubpath(Regex);
 

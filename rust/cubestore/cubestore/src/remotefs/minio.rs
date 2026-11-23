@@ -341,7 +341,11 @@ impl RemoteFs for MINIORemoteFs {
 }
 
 #[async_trait]
-impl ExtendedRemoteFs for MINIORemoteFs {}
+impl ExtendedRemoteFs for MINIORemoteFs {
+    async fn has_remote_storage(&self) -> bool {
+        true
+    }
+}
 
 //TODO
 impl MINIORemoteFs {

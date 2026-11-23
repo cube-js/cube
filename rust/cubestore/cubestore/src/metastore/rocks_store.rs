@@ -1870,4 +1870,142 @@ mod tests {
 
         Ok(())
     }
+
+    async fn schema_names(rocks_store: &Arc<RocksStore>) -> Vec<String> {
+        rocks_store
+            .read_operation_out_of_queue("schema_names", |db_ref| {
+                SchemaRocksTable::new(db_ref).all_rows()
+            })
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.get_row().get_name().clone())
+            .collect()
+    }
+
+    fn flex_files(dir: &std::path::Path) -> Vec<String> {
+        let mut res = Vec::new();
+        let Ok(entries) = fs::read_dir(dir) else {
+            return res;
+        };
+        for entry in entries {
+            let entry = entry.unwrap();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if entry.file_type().unwrap().is_dir() {
+                if name.contains("-logs") {
+                    for log in fs::read_dir(entry.path()).unwrap() {
+                        let log = log.unwrap().file_name().to_string_lossy().to_string();
+                        if log.ends_with(".flex") {
+                            res.push(format!("{}/{}", name, log));
+                        }
+                    }
+                }
+            }
+        }
+        res.sort();
+        res
+    }
+
+    async fn write_and_upload_logs(rocks_store: &Arc<RocksStore>, names: &[&str]) {
+        for name in names {
+            write_test_data(rocks_store, name.to_string()).await;
+            rocks_store.run_upload().await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn test_uploaded_logs_dropped_locally_and_restored_from_remote() -> Result<(), CubeError>
+    {
+        let config = Config::test("test_uploaded_logs_dropped_locally");
+        let store_path = env::current_dir()
+            .unwrap()
+            .join("test_uploaded_logs_dropped_locally-local");
+        let remote_store_path = env::current_dir()
+            .unwrap()
+            .join("test_uploaded_logs_dropped_locally-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let details = Arc::new(RocksMetaStoreDetails {});
+        let metastore_path = store_path.join("metastore");
+
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        let rocks_fs = BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj());
+        let rocks_store = RocksStore::new(
+            metastore_path.as_path(),
+            rocks_fs.clone(),
+            config.config_obj(),
+            details.clone(),
+        )?;
+
+        write_test_data(&rocks_store, "snapshot_a".to_string()).await;
+        rocks_store.upload_check_point().await?;
+        write_and_upload_logs(&rocks_store, &["log_a1", "log_a2", "log_a3"]).await;
+        let state_a = schema_names(&rocks_store).await;
+
+        tokio::time::sleep(Duration::from_millis(5)).await;
+        rocks_store.upload_check_point().await?;
+        write_and_upload_logs(&rocks_store, &["log_b1", "log_b2"]).await;
+        let state_b = schema_names(&rocks_store).await;
+
+        let remote_logs = flex_files(&remote_store_path);
+        assert_eq!(remote_logs.len(), 5, "remote logs: {:?}", remote_logs);
+        assert_eq!(flex_files(&store_path), Vec::<String>::new());
+
+        let snapshots = rocks_store.get_snapshots_list().await?;
+        assert_eq!(snapshots.len(), 2);
+        let snapshot_a = snapshots.iter().map(|s| s.id).min().unwrap();
+
+        drop(rocks_store);
+        let _ = fs::remove_dir_all(store_path.clone());
+
+        let path = metastore_path.to_string_lossy().to_string();
+        let restored = rocks_fs
+            .clone()
+            .load_from_remote(&path, config.config_obj(), details.clone())
+            .await?;
+        assert_eq!(schema_names(&restored).await, state_b);
+
+        restored.set_current_snapshot(snapshot_a).await?;
+        drop(restored);
+        let _ = fs::remove_dir_all(store_path.clone());
+
+        let rolled_back = rocks_fs
+            .clone()
+            .load_from_remote(&path, config.config_obj(), details.clone())
+            .await?;
+        assert_eq!(schema_names(&rolled_back).await, state_a);
+        assert_eq!(flex_files(&remote_store_path), remote_logs);
+
+        drop(rolled_back);
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_uploaded_logs_kept_without_remote_storage() -> Result<(), CubeError> {
+        let config = Config::test("test_uploaded_logs_kept_without_remote");
+        let store_path = env::current_dir()
+            .unwrap()
+            .join("test_uploaded_logs_kept_without_remote-local");
+        let _ = fs::remove_dir_all(store_path.clone());
+
+        let remote_fs = LocalDirRemoteFs::new(None, store_path.clone());
+        let rocks_store = RocksStore::new(
+            store_path.join("metastore").as_path(),
+            BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+            config.config_obj(),
+            Arc::new(RocksMetaStoreDetails {}),
+        )?;
+
+        rocks_store.upload_check_point().await?;
+        write_and_upload_logs(&rocks_store, &["log_1", "log_2"]).await;
+        assert_eq!(flex_files(&store_path).len(), 2);
+
+        drop(rocks_store);
+        let _ = fs::remove_dir_all(store_path.clone());
+
+        Ok(())
+    }
 }

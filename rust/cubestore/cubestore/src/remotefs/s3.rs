@@ -583,6 +583,10 @@ impl ExtendedRemoteFs for S3RemoteFs {
 
         Ok(Box::pin(stream))
     }
+
+    async fn has_remote_storage(&self) -> bool {
+        true
+    }
 }
 
 struct LeadingSubpath(Regex);

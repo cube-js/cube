@@ -360,6 +360,10 @@ impl ExtendedRemoteFs for QueueRemoteFs {
     ) -> Result<BoxStream<'static, Result<Vec<String>, CubeError>>, CubeError> {
         self.remote_fs.list_by_page(remote_prefix).await
     }
+
+    async fn has_remote_storage(&self) -> bool {
+        self.remote_fs.has_remote_storage().await
+    }
 }
 
 impl QueueRemoteFs {

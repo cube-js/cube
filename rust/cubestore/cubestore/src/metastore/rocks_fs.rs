@@ -106,6 +106,24 @@ impl BaseRocksStoreFs {
         self.remote_fs.clone()
     }
 
+    /// Drops the local copy of a file that was just uploaded. Readers download from the remote
+    /// store on demand, so keeping it only fills the local disk until the snapshot expires.
+    pub async fn remove_uploaded_local_copy(&self, local_path: &str) {
+        if !self.remote_fs.has_remote_storage().await {
+            return;
+        }
+        if let Err(e) = fs::remove_file(local_path).await {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                log::warn!(
+                    "Can't remove uploaded {} file {}: {}",
+                    self.name,
+                    local_path,
+                    e
+                );
+            }
+        }
+    }
+
     pub async fn upload_snapsots_files(
         &self,
         remote_path: &str,
@@ -484,7 +502,12 @@ impl MetaStoreFs for BaseRocksStoreFs {
         serializer.write_to_file(&file_name).await?;
 
         // TODO persist file size
-        self.remote_fs.upload_file(file_name, log_name).await
+        let size = self
+            .remote_fs
+            .upload_file(file_name.clone(), log_name)
+            .await?;
+        self.remove_uploaded_local_copy(&file_name).await;
+        Ok(size)
     }
 
     async fn upload_checkpoint(
@@ -526,7 +549,16 @@ impl MetaStoreFs for BaseRocksStoreFs {
         logs_to_batch_to_seq.sort_unstable_by_key(|(_, seq)| *seq);
 
         for (log_file, _) in logs_to_batch_to_seq.iter() {
-            let path_to_log = self.remote_fs.local_file(log_file.clone()).await?;
+            let path_to_log = match self.remote_fs.download_file(log_file.clone(), None).await {
+                Ok(path) => path,
+                Err(e) => {
+                    error!(
+                        "Can't download {} WAL file {}: {}. Subsequent logs skipped",
+                        self.name, log_file, e
+                    );
+                    break;
+                }
+            };
             let batch = WriteBatchContainer::read_from_file(&path_to_log).await;
             if let Ok(batch) = batch {
                 let db = rocks_store.db.clone();
