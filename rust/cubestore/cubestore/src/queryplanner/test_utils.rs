@@ -630,6 +630,14 @@ impl MetaStore for MetaStoreMock {
         panic!("MetaStore mock!")
     }
 
+    async fn has_active_jobs_by_ref(
+        &self,
+        _row_reference: RowKey,
+        _job_types: Vec<JobType>,
+    ) -> Result<bool, CubeError> {
+        panic!("MetaStore mock!")
+    }
+
     async fn get_orphaned_jobs(
         &self,
         _orphaned_timeout: Duration,

@@ -1134,6 +1134,12 @@ pub trait MetaStore: DIService + Send + Sync {
         row_reference: RowKey,
         job_type: JobType,
     ) -> Result<Option<IdRow<Job>>, CubeError>;
+    /// Whether a job of any of `job_types` on `row_reference` is scheduled or running.
+    async fn has_active_jobs_by_ref(
+        &self,
+        row_reference: RowKey,
+        job_types: Vec<JobType>,
+    ) -> Result<bool, CubeError>;
     async fn get_orphaned_jobs(
         &self,
         orphaned_timeout: Duration,
@@ -4373,6 +4379,33 @@ impl MetaStore for RocksMetaStore {
                 &JobRocksIndex::RowReference,
             )?;
             Ok(result.into_iter().next())
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip_all)]
+    async fn has_active_jobs_by_ref(
+        &self,
+        row_reference: RowKey,
+        job_types: Vec<JobType>,
+    ) -> Result<bool, CubeError> {
+        self.read_operation("has_active_jobs_by_ref", move |db_ref| {
+            let jobs_table = JobRocksTable::new(db_ref);
+            for job_type in job_types {
+                let jobs = jobs_table.get_rows_by_index(
+                    &JobIndexKey::RowReference(row_reference.clone(), job_type),
+                    &JobRocksIndex::RowReference,
+                )?;
+                if jobs.iter().any(|j| {
+                    matches!(
+                        j.get_row().status(),
+                        JobStatus::Scheduled(_) | JobStatus::ProcessingBy(_)
+                    )
+                }) {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
         })
         .await
     }

@@ -1,7 +1,7 @@
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::chunks::chunk_file_name;
-use crate::metastore::job::{JobStatus, JobType};
+use crate::metastore::job::JobType;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::replay_handle::{union_seq_pointer_by_location, SeqPointerForLocation};
@@ -506,23 +506,19 @@ pub async fn table_imports_pending(
     meta_store: &dyn MetaStore,
     table: &IdRow<Table>,
 ) -> Result<bool, CubeError> {
-    for location in table.get_row().locations().into_iter().flatten() {
-        let job = meta_store
-            .get_job_by_ref(
-                RowKey::Table(TableId::Tables, table.get_id()),
-                JobType::TableImportCSV(location.clone()),
-            )
-            .await?;
-        if let Some(job) = job {
-            if matches!(
-                job.get_row().status(),
-                JobStatus::Scheduled(_) | JobStatus::ProcessingBy(_)
-            ) {
-                return Ok(true);
-            }
-        }
+    let imports = table
+        .get_row()
+        .locations()
+        .into_iter()
+        .flatten()
+        .map(|location| JobType::TableImportCSV(location.clone()))
+        .collect::<Vec<_>>();
+    if imports.is_empty() {
+        return Ok(false);
     }
-    Ok(false)
+    meta_store
+        .has_active_jobs_by_ref(RowKey::Table(TableId::Tables, table.get_id()), imports)
+        .await
 }
 
 // How many of the smallest-first chunks one compaction merges: the first one always, then more
