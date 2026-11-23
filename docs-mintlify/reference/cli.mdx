@@ -1004,6 +1004,7 @@ cube dbx-mv target set DEPLOYMENT_ID default --target production \
   --enabled --catalog main --schema metrics --selection-mode all
 ```
 
+Leave `--sync-on-deploy` off for production, so that no deployment publishes there untested.
 `target set` creates a target that doesn't exist. It reads the target first and saves with the
 configuration version it read, so a save that races another fails with `409`. The flags change
 only what they name. `--data` (inline JSON, `@file`, or `-` for standard input) replaces all
@@ -1024,13 +1025,14 @@ cube dbx-mv sync DEPLOYMENT_ID default --target production \
 non-zero unless the run is `COMPLETED` with an `incompleteViewCount` of 0: every view in scope
 published with all its measures, which is also what promoting the run requires. It doesn't apply
 the other checks of the [CI recipe](/docs/integrations/databricks-metric-views#trigger-publication-from-ci),
-and a start refused with `409`, such as during a rollout, isn't retried. A promotion is refused
-once a newer build has succeeded; this and every other refusal prints the API's reason.
-Without `--wait`, `sync` prints the run id to follow with
+and a start refused with `409` isn't retried. Every refusal prints the API's reason, which tells a
+temporary `409`, such as while another run of the target is active or during a rollout, from one
+a retry won't clear, such as a promotion after a newer build has succeeded or the model files
+changed. Without `--wait`, `sync` prints the run id to follow with
 `cube dbx-mv run DEPLOYMENT_ID default RUN_ID --wait`. `--idempotency-key UUID` makes a retried
 start return the first run instead of publishing twice.
 
-List targets and runs, cancel a run, or retire a target:
+List targets and runs, cancel a run, or turn a target off and delete it:
 
 ```bash
 cube dbx-mv targets DEPLOYMENT_ID default
@@ -1040,9 +1042,13 @@ cube dbx-mv target set DEPLOYMENT_ID default --target staging --enabled=false
 cube dbx-mv target delete DEPLOYMENT_ID default --target staging
 ```
 
-A target must be disabled before it can be deleted, and `default` can't be; a refusal prints the
-API's reason. The target's Metric Views stay in Databricks: `target delete` lists them so you can
-drop them.
+Turning a target off drops nothing, and it keeps its Metric Views: another target that publishes to
+the same names is blocked with `ownership-conflict`. A target must be turned off before it can be
+deleted, and `default` can't be; a refusal prints the API's reason. A deleted target's Metric
+Views stay in Databricks, managed by no target, and `target delete` lists them: drop them, or
+[take them over](/docs/integrations/databricks-metric-views#take-over-an-existing-metric-view)
+from the target that publishes there next. Its runs stay readable with `run`, but none can be
+cancelled or promoted.
 
 ## Environment variables
 
