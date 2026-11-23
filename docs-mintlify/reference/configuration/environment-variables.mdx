@@ -2579,6 +2579,17 @@ a client legitimately keeps open at once, or working connections will be recycle
 | ------------------------- | ---------------------- | --------------------- |
 | A non-negative integer    | `0`                    | `0`                   |
 
+## `CUBESTORE_MERGE_IN_MEMORY_CHUNKS`
+
+If `true`, Cube Store reads all in-memory chunks of a partition through one query
+plan node, which merges them while the query runs. This speeds up queries over
+streaming tables with many in-memory chunks. If `false`, each in-memory chunk is a
+separate input of the query plan.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBESTORE_META_ADDR`
 
 The address/port pair for the Cube Store **router** node in the cluster.
