@@ -146,6 +146,7 @@ Every endpoint of the Console Server public API is covered:
 | `data-model` (`dm`) | list, get, put, delete, rename files; branches, create-branch, enable-branch, disable-branch, delete-branch, dev-mode, exit-dev-mode, commit, file-hashes, pull, merge, merge-to-default. File writes only land on a **dev-mode branch**: `dev-mode <branch>` forks a personal `dev-…` branch and prints its name — pass that via `--branch` (or omit `--branch` to use your active dev-mode branch); puts to any other branch are rejected by the API. `enable-branch` / `disable-branch` toggle whether a shared branch's staging environment stays always active (vs. only while viewed in the UI); `branches` reports it as `ENABLED` and `environments list --type staging` lists the enabled ones |
 | `dbt` | sync (`--manifest` or `--ref`, `--branch`, `--output-path`, `--name-prefix`, `--wait`), generate (write cubes locally, commit nothing: `--out`, `--output-path`, `--name-prefix`, `--check`), status, result, logs, history, cancel |
 | `ossie` | Apache Ossie conversion: export, import, status, result, cancel |
+| `dbx-mv` | Databricks Metric Views: targets, target get/set/delete, sync (`--target`, `--promote-from`, `--wait`), runs, run, cancel |
 | `evals` | agent evals: run, list, status, results |
 | `environments` | list, tokens, create-token (incl. `--meta-sync`) |
 | `variables` | list, set (`KEY=VALUE` upserts) |

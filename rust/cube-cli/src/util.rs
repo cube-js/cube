@@ -411,6 +411,21 @@ pub fn shell_quote(value: &str) -> String {
     }
 }
 
+/// Percent-encode a value for one URL path segment, so a name with `/`, `?` or `#` in it
+/// cannot address another route.
+pub fn path_segment(value: &str) -> String {
+    value
+        .bytes()
+        .map(|byte| {
+            if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
+                (byte as char).to_string()
+            } else {
+                format!("%{byte:02X}")
+            }
+        })
+        .collect()
+}
+
 /// Parse a wait duration: a bare number of seconds, or a number with a `s`/`m`/`h`
 /// suffix (`90`, `30s`, `15m`, `1h`).
 ///
@@ -683,6 +698,13 @@ mod tests {
             shell_quote(&branch_or_placeholder("  main  ")),
             "'  main  '"
         );
+    }
+
+    #[test]
+    fn a_path_segment_cannot_address_another_route() {
+        assert_eq!(path_segment("default"), "default");
+        assert_eq!(path_segment("my ds/x?y#z"), "my%20ds%2Fx%3Fy%23z");
+        assert_eq!(path_segment("a-b_c.d~"), "a-b_c.d~");
     }
 
     #[test]

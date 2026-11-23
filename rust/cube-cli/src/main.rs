@@ -155,6 +155,9 @@ enum Command {
     Dbt(commands::dbt::Args),
     /// Convert between a Cube data model and Apache Ossie
     Ossie(commands::ossie::Args),
+    /// Publish Cube views as Databricks Metric Views: targets, runs and promotion
+    #[command(name = "dbx-mv")]
+    DbxMv(commands::dbx_mv::Args),
     /// Run and inspect AI agent evals
     Evals(commands::evals::Args),
     /// Manage deployment environments and environment tokens
@@ -256,6 +259,7 @@ impl Command {
             DataModel(_) => "data-model",
             Dbt(_) => "dbt",
             Ossie(_) => "ossie",
+            DbxMv(_) => "dbx-mv",
             Evals(_) => "evals",
             Environments(_) => "environments",
             Variables(_) => "variables",
@@ -372,6 +376,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         DataModel(args) => commands::data_model::command(args, &ctx).await,
         Dbt(args) => commands::dbt::command(args, &ctx).await,
         Ossie(args) => commands::ossie::command(args, &ctx).await,
+        DbxMv(args) => commands::dbx_mv::command(args, &ctx).await,
         Evals(args) => commands::evals::command(args, &ctx).await,
         Environments(args) => commands::environments::command(args, &ctx).await,
         Variables(args) => commands::variables::command(args, &ctx).await,

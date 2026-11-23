@@ -212,6 +212,7 @@ Run `cube <command> --help` for the full options of any command.
 | `dbt` | dbt sync and cube generation — see [dbt commands](#dbt-commands) |
 | `evals` | Agent evals — see [Agent eval commands](#agent-eval-commands) |
 | `ossie` | [Apache Ossie](#apache-ossie) conversion — see [Apache Ossie commands](#apache-ossie-commands) |
+| `dbx-mv` | [Databricks Metric Views](#databricks-metric-views) publication — see [Databricks Metric View commands](#databricks-metric-view-commands) |
 | `environments` | Deployment environments and environment tokens — see [Deployment commands](#deployment-commands) |
 | `variables` | Deployment environment variables — see [Deployment commands](#deployment-commands) |
 | `folders`, `workbooks`, `reports`, `workspace` | Workspace content management — see [Workspace content commands](#workspace-content-commands) |
@@ -329,6 +330,21 @@ Usage, including running evals as a CI gate, is under [Agent evals](#agent-evals
 | `ossie cancel` | Cancel a running conversion |
 
 Usage is under [Apache Ossie](#apache-ossie).
+
+### Databricks Metric View commands
+
+| Command | Description |
+| --- | --- |
+| `dbx-mv targets` | List a data source's publication targets, each with its newest run |
+| `dbx-mv target get` | Show a publication target's settings (`--target`) |
+| `dbx-mv target set` | Create or update a publication target (`--target`, `--enabled`, `--sync-on-deploy`, `--catalog`, `--schema`, `--selection-mode`, `--views`, `--view-name-regex`, `--deletion-policy`, `--data`) |
+| `dbx-mv target delete` | Delete a publication target; its Metric Views stay in Databricks (`--target`) |
+| `dbx-mv sync` | Start a publication run, or promote a run of another target (`--target`, `--promote-from`, `--idempotency-key`, `--wait`) |
+| `dbx-mv runs` | List a publication target's runs, newest first (`--target`, `--status`, `--first`, `--after`) |
+| `dbx-mv run` | Show a run and each view's outcome (`--wait`) |
+| `dbx-mv cancel` | Cancel an active run |
+
+Usage is under [Databricks Metric Views](#databricks-metric-views).
 
 ### Workspace content commands
 
@@ -971,6 +987,62 @@ cube ossie status DEPLOYMENT_ID CONVERSION_ID --wait
 cube ossie result DEPLOYMENT_ID CONVERSION_ID --out ossie.yaml
 cube ossie cancel DEPLOYMENT_ID CONVERSION_ID
 ```
+
+## Databricks Metric Views
+
+Publish Cube views as [Databricks Metric Views](/docs/integrations/databricks-metric-views), a
+feature in preview, for example from CI. Each command takes the deployment id and the data source name, and
+`--target` picks a publication target such as `staging` or `production` (default: `default`).
+In CI, authenticate with an [API key][ref-api-keys] that has deployment `SchemaUpdate` access.
+
+Create a staging and a production target, each publishing to its own schema:
+
+```bash
+cube dbx-mv target set DEPLOYMENT_ID default --target staging \
+  --enabled --catalog main --schema metrics_staging --selection-mode all
+cube dbx-mv target set DEPLOYMENT_ID default --target production \
+  --enabled --catalog main --schema metrics --selection-mode all
+```
+
+`target set` creates a target that doesn't exist. It reads the target first and saves with the
+configuration version it read, so a save that races another fails with `409`. The flags change
+only what they name. `--data` (inline JSON, `@file`, or `-` for standard input) replaces all
+settings instead, with the flags winning over the same key; it can also carry the `connection` of
+a data source [served by `driver_factory`](/docs/integrations/databricks-metric-views#data-sources-served-by-driver_factory),
+and an `expectedConfigurationVersion` to send as given.
+
+Publish to staging, run your own checks there, then publish the same build to production:
+
+```bash
+cube dbx-mv sync DEPLOYMENT_ID default --target staging --wait --json > staging.json
+# Check the staging Metric Views here; Cube doesn't know whether your checks passed.
+cube dbx-mv sync DEPLOYMENT_ID default --target production \
+  --promote-from "$(jq -r .runId staging.json)" --wait
+```
+
+`--wait` prints each view's outcome, or the run as the API returns it with `--json`. It exits
+non-zero unless the run is `COMPLETED` with an `incompleteViewCount` of 0: every view in scope
+published with all its measures, which is also what promoting the run requires. It doesn't apply
+the other checks of the [CI recipe](/docs/integrations/databricks-metric-views#trigger-publication-from-ci),
+and a start refused with `409`, such as during a rollout, isn't retried. A promotion is refused
+once a newer build has succeeded; this and every other refusal prints the API's reason.
+Without `--wait`, `sync` prints the run id to follow with
+`cube dbx-mv run DEPLOYMENT_ID default RUN_ID --wait`. `--idempotency-key UUID` makes a retried
+start return the first run instead of publishing twice.
+
+List targets and runs, cancel a run, or retire a target:
+
+```bash
+cube dbx-mv targets DEPLOYMENT_ID default
+cube dbx-mv runs DEPLOYMENT_ID default --target staging
+cube dbx-mv cancel DEPLOYMENT_ID default RUN_ID
+cube dbx-mv target set DEPLOYMENT_ID default --target staging --enabled=false
+cube dbx-mv target delete DEPLOYMENT_ID default --target staging
+```
+
+A target must be disabled before it can be deleted, and `default` can't be; a refusal prints the
+API's reason. The target's Metric Views stay in Databricks: `target delete` lists them so you can
+drop them.
 
 ## Environment variables
 

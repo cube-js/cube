@@ -203,6 +203,11 @@ measure notifies its user in the [Inbox](/docs/inbox).
 
 ## Trigger publication from CI
 
+The [Cube CLI](/reference/cli#databricks-metric-views) can start a run and wait for it with
+`cube dbx-mv sync --wait`, and publish a tested staging build to production. Unlike the recipe
+below, it doesn't retry a start refused with `409`, and it checks only that the run is `COMPLETED`
+with an `incompleteViewCount` of 0.
+
 Run publication from CI after a successful Cube deployment when CI should check the result. To
 just publish after each deployment, [turn on the setting](#publish-after-each-deployment) instead;
 don't do both for one deployment, or each build starts two runs. First, configure **All views**, a
