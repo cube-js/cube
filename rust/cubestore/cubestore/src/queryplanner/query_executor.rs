@@ -902,8 +902,8 @@ impl CubeTable {
                 .config()
                 .get_extension::<MergeInMemoryChunks>()
                 .map_or(false, |m| m.0);
-        let mut merged_chunks = Vec::new();
         for partition_snapshot in partition_snapshots {
+            let mut merged_chunks = Vec::new();
             let partition = partition_snapshot.partition();
             let filter = self
                 .worker_partition_ids
@@ -1048,7 +1048,7 @@ impl CubeTable {
 
             if !merged_chunks.is_empty() {
                 let node: Arc<dyn ExecutionPlan> = Arc::new(InMemoryChunksExec::try_new(
-                    std::mem::take(&mut merged_chunks),
+                    merged_chunks,
                     index_schema.clone(),
                     index_projection_or_none_on_schema_match.clone(),
                     in_memory_chunks_order.clone(),
