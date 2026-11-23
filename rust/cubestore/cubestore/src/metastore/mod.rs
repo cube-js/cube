@@ -4504,16 +4504,18 @@ impl MetaStore for RocksMetaStore {
                 .filter(|j| !matches!(j.get_row().job_type(), JobType::Unknown))
                 .filter(|j| j.get_row().matches_pool(pool));
             let next_job = if order_by_table {
-                // Finishing the oldest table first lets concurrently created tables become ready
-                // one by one; in job-id order they all advance together and miss deadlines together.
-                let resolver = JobTableResolver::new(db_ref);
-                candidates.min_by_key(|j| {
-                    (
-                        std::cmp::Reverse(j.get_row().priority()),
-                        resolver.table_id(j.get_row().row_reference()),
-                        j.get_id(),
-                    )
-                })
+                let mut arrival = JobArrival::new(db_ref);
+                candidates
+                    .map(|j| {
+                        let key = (
+                            std::cmp::Reverse(j.get_row().priority()),
+                            arrival.of(j.get_row()),
+                            j.get_id(),
+                        );
+                        (key, j)
+                    })
+                    .min_by(|a, b| a.0.cmp(&b.0))
+                    .map(|(_, j)| j)
             } else {
                 //We use min_by instead of the max_by because of min_by returns the first element
                 //if priority is equal while max_by returns the last element
@@ -5449,38 +5451,82 @@ fn swap_active_partitions_impl(
     Ok(())
 }
 
-/// Resolves a job's row reference to the id of the table the job works on.
-struct JobTableResolver<'a> {
+/// When a scheduled job joined the queue for the purpose of ordering jobs by table. Jobs of a
+/// not-ready table take the table's creation time, so tables created together become ready one
+/// after another instead of sharing the runners until they all hit their deadlines at once.
+/// Every other job keeps its own enqueue time, so it is never passed by a table created later.
+struct JobArrival<'a> {
     db_ref: DbTableRef<'a>,
+    index_tables: HashMap<u64, Option<u64>>,
+    partition_tables: HashMap<u64, Option<u64>>,
+    not_ready_tables: HashMap<u64, Option<DateTime<Utc>>>,
 }
 
-impl<'a> JobTableResolver<'a> {
+impl<'a> JobArrival<'a> {
     fn new(db_ref: DbTableRef<'a>) -> Self {
-        Self { db_ref }
+        Self {
+            db_ref,
+            index_tables: HashMap::new(),
+            partition_tables: HashMap::new(),
+            not_ready_tables: HashMap::new(),
+        }
     }
 
-    // A job whose rows are gone belongs to a dropped table; id 0 picks it first so it fails fast.
-    fn table_id(&self, key: &RowKey) -> u64 {
-        let partition_table = |partition_id: u64| -> Option<u64> {
-            let partition = PartitionRocksTable::new(self.db_ref.clone())
-                .get_row(partition_id)
-                .ok()??;
-            let index = IndexRocksTable::new(self.db_ref.clone())
-                .get_row(partition.get_row().get_index_id())
-                .ok()??;
-            Some(index.get_row().table_id())
-        };
-        let id = match key {
+    fn of(&mut self, job: &Job) -> DateTime<Utc> {
+        let table_id = match job.row_reference() {
             RowKey::Table(TableId::Tables, id) => Some(*id),
-            RowKey::Table(TableId::Partitions, id) => partition_table(*id),
+            RowKey::Table(TableId::Partitions, id) => self.partition_table(*id),
             RowKey::Table(TableId::Chunks, id) => ChunkRocksTable::new(self.db_ref.clone())
                 .get_row(*id)
                 .ok()
                 .flatten()
-                .and_then(|c| partition_table(c.get_row().get_partition_id())),
-            _ => Some(u64::MAX),
+                .and_then(|c| self.partition_table(c.get_row().get_partition_id())),
+            _ => return *job.last_heart_beat(),
         };
-        id.unwrap_or(0)
+        match table_id {
+            Some(table_id) => self
+                .not_ready_since(table_id)
+                .unwrap_or(*job.last_heart_beat()),
+            // The job's rows are gone with a dropped table; run it first so it fails fast.
+            None => DateTime::<Utc>::MIN_UTC,
+        }
+    }
+
+    fn partition_table(&mut self, partition_id: u64) -> Option<u64> {
+        if let Some(table_id) = self.partition_tables.get(&partition_id) {
+            return *table_id;
+        }
+        let index_id = PartitionRocksTable::new(self.db_ref.clone())
+            .get_row(partition_id)
+            .ok()
+            .flatten()
+            .map(|p| p.get_row().get_index_id());
+        let table_id = index_id.and_then(|index_id| self.index_table(index_id));
+        self.partition_tables.insert(partition_id, table_id);
+        table_id
+    }
+
+    fn index_table(&mut self, index_id: u64) -> Option<u64> {
+        let db_ref = self.db_ref.clone();
+        *self.index_tables.entry(index_id).or_insert_with(|| {
+            IndexRocksTable::new(db_ref)
+                .get_row(index_id)
+                .ok()
+                .flatten()
+                .map(|i| i.get_row().table_id())
+        })
+    }
+
+    fn not_ready_since(&mut self, table_id: u64) -> Option<DateTime<Utc>> {
+        let db_ref = self.db_ref.clone();
+        *self.not_ready_tables.entry(table_id).or_insert_with(|| {
+            TableRocksTable::new(db_ref)
+                .get_row(table_id)
+                .ok()
+                .flatten()
+                .filter(|t| !t.get_row().is_ready())
+                .and_then(|t| t.get_row().created_at().clone())
+        })
     }
 }
 
@@ -8123,7 +8169,7 @@ mod tests {
         Ok(())
     }
 
-    async fn picked_job_order(name: &str, order_by_table: bool) -> Result<Vec<RowKey>, CubeError> {
+    async fn picked_job_order(name: &str, order_by_table: bool) -> Result<Vec<String>, CubeError> {
         let config = Config::test(name).update_config(|mut c| {
             c.job_order_by_table_enabled = order_by_table;
             c
@@ -8140,25 +8186,69 @@ mod tests {
                 BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
                 config.config_obj(),
             )?;
-            for key in [
-                RowKey::Table(TableId::Tables, 2),
-                RowKey::Table(TableId::Tables, 1),
-                // Its partition is gone, as after a table drop.
-                RowKey::Table(TableId::Partitions, 999),
-            ] {
+            let mut names = HashMap::new();
+            let add = async |key: RowKey| {
+                tokio::time::sleep(Duration::from_millis(2)).await;
                 meta_store
                     .add_job(Job::new(
                         key,
                         JobType::PartitionCompaction,
                         "node1".to_string(),
                     ))
-                    .await?;
+                    .await
+            };
+            let create = async |table: &str, is_ready: bool| {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+                meta_store
+                    .create_table(
+                        "s".to_string(),
+                        table.to_string(),
+                        vec![Column::new("c".to_string(), ColumnType::Int, 0)],
+                        None,
+                        None,
+                        vec![],
+                        is_ready,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        false,
+                        None,
+                    )
+                    .await
+            };
+            meta_store.create_schema("s".to_string(), false).await?;
+            names.insert(RowKey::Table(TableId::WALs, 1), "wal_before");
+            add(RowKey::Table(TableId::WALs, 1)).await?;
+            let first = create("first", false).await?;
+            let second = create("second", false).await?;
+            let ready = create("ready", true).await?;
+            let first_index = meta_store.get_table_indexes(first.get_id()).await?[0].get_id();
+            let first_partition = meta_store
+                .get_active_partitions_by_index_id(first_index)
+                .await?[0]
+                .get_id();
+            for (key, name) in [
+                (RowKey::Table(TableId::Tables, second.get_id()), "second"),
+                (RowKey::Table(TableId::Tables, ready.get_id()), "ready"),
+                (RowKey::Table(TableId::Partitions, first_partition), "first"),
+                (RowKey::Table(TableId::WALs, 2), "wal_after"),
+                // Its partition is gone, as after a table drop.
+                (RowKey::Table(TableId::Partitions, 999), "dropped"),
+            ] {
+                names.insert(key.clone(), name);
+                add(key).await?;
             }
             while let Some(job) = meta_store
                 .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
                 .await?
             {
-                picked.push(job.get_row().row_reference().clone());
+                picked.push(names[job.get_row().row_reference()].to_string());
             }
         }
         let _ = fs::remove_dir_all(store_path);
@@ -8171,17 +8261,25 @@ mod tests {
         assert_eq!(
             picked_job_order("start_processing_job_order_by_job_id", false).await?,
             vec![
-                RowKey::Table(TableId::Tables, 2),
-                RowKey::Table(TableId::Tables, 1),
-                RowKey::Table(TableId::Partitions, 999),
+                "wal_before",
+                "second",
+                "ready",
+                "first",
+                "wal_after",
+                "dropped"
             ]
         );
+        // Jobs of not-ready tables queue as of the table's creation; other jobs keep their own
+        // enqueue time.
         assert_eq!(
             picked_job_order("start_processing_job_order_by_table", true).await?,
             vec![
-                RowKey::Table(TableId::Partitions, 999),
-                RowKey::Table(TableId::Tables, 1),
-                RowKey::Table(TableId::Tables, 2),
+                "dropped",
+                "wal_before",
+                "first",
+                "second",
+                "ready",
+                "wal_after"
             ]
         );
         Ok(())

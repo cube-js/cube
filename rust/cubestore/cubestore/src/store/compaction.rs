@@ -568,8 +568,9 @@ impl CompactionService for CompactionServiceImpl {
             .await?;
         all_pending_chunks.sort_by_key(|c| c.get_row().get_row_count());
         // Merge streams cost memory per input, so the first build takes at most `max_fanin`
-        // chunks. Until it can, the smallest chunks are merged into one larger chunk; while
-        // imports run, only freshly imported chunks, so each row is rewritten once at most.
+        // chunks. Until it can, the smallest chunks are merged into one larger chunk. While
+        // imports run, only chunks no larger than an import chunk are merged, so a row is
+        // rewritten again only while its chunk is still that small.
         let max_fanin = if first_build {
             self.config.deferred_table_build_max_fanin()
         } else {
