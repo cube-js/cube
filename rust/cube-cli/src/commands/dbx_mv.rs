@@ -526,8 +526,9 @@ async fn target_command(cmd: TargetCmd, api: &Client, json: bool) -> Result<()> 
                 Some(saved) => check_target(saved, &target)?,
                 // A tenant from before named targets would create `default` instead, so
                 // creating a named one first needs the targets list, which such a tenant lacks.
+                // The list answers 404 for a data source with no target yet.
                 None if is_named(&target) => {
-                    api.get(&format!("{path}/targets"), &Query::new())
+                    api.get_optional(&format!("{path}/targets"), &Query::new())
                         .await
                         .context(
                             "this tenant could not confirm it supports named publication \
