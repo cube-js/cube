@@ -22,10 +22,8 @@ class PostgresParamAllocator extends ParamAllocator {
   }
 }
 
-// An untyped parameter takes the column's type, so a `real` column rounds a fractional
-// bound to float4 and `x >= 1.0000001` also matches 1. Whole numbers stay untyped: a
-// typed bound has no operator against `money` or a text column declared as a number,
-// and a numeric bound would make an index on an integer column unusable.
+// Whole numbers stay untyped: a typed bound has no operator against `money` or a text
+// column declared as a number, and a numeric bound defeats an index on an integer column.
 class PostgresFilter extends BaseFilter {
   public castParameter(param?: unknown) {
     const { type } = this.definition();
