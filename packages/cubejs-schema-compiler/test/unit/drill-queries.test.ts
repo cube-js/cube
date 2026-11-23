@@ -150,6 +150,31 @@ describe('Drill queries', () => {
     ]);
   });
 
+  it('keeps camelizing members named order outside drill queries', async () => {
+    const compilers = prepareYamlCompiler(`
+cubes:
+  - name: line_items
+    sql_table: line_items
+    dimensions:
+      - name: order
+        sql: order_id
+        type: number
+        primary_key: true
+    measures:
+      - name: total
+        sql: amount
+        type: sum
+        drill_queries:
+          - name: by_order
+            members: [order, total]
+            order: { order: asc }
+`);
+    await compilers.compile();
+
+    expect(compilers.cubeEvaluator.cubeFromPath('line_items').dimensions.order.primaryKey).toBe(true);
+    expect(measureMeta(compilers, 'line_items', 'total').drillQueries[0].order).toEqual({ 'line_items.order': 'asc' });
+  });
+
   it('leaves the meta of measures without drill queries unchanged', async () => {
     const compilers = prepareYamlCompiler(CUBES);
     await compilers.compile();
