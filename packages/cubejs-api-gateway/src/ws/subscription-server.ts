@@ -130,9 +130,17 @@ export class SubscriptionServer {
   protected async handleMessage(connectionId: string, message: WsMessage, isSubscription: boolean) {
     let authContext: any = {};
     let context: Partial<ExtendedRequestContext> = {};
+    let endSubscriptionLoad: (() => void) | undefined;
 
     try {
       const connection = this.subscriptionStore.connect(connectionId);
+
+      // Registered before the first await, so an unsubscribe can never slip in ahead of it
+      if ('method' in message && message.method === 'subscribe' && message.messageId) {
+        const { messageId } = message;
+        connection.beginSubscriptionLoad(messageId);
+        endSubscriptionLoad = () => connection.endSubscriptionLoad(messageId);
+      }
 
       if ('authorization' in message) {
         if (connection.isAuthorizing()) {
@@ -262,6 +270,8 @@ export class SubscriptionServer {
         res: this.resultFn(connectionId, messageId, context.requestId),
         context
       });
+    } finally {
+      endSubscriptionLoad?.();
     }
   }
 

@@ -688,6 +688,78 @@ describe('SubscriptionServer', () => {
     });
   });
 
+  describe('Unsubscribe during an in-flight load', () => {
+    const subscribeMessage = (messageId: string) => JSON.stringify({
+      method: 'subscribe',
+      messageId,
+      params: { query: { measures: ['Orders.count'] } },
+    });
+
+    const createServer = () => {
+      const { mockApiGateway, mockSendMessage, mockContextAcceptor } = createMocks();
+      let load = Promise.resolve();
+      // Mirrors the gateway: the subscription is (re)written only after its load completes
+      mockApiGateway.subscribe = jest.fn(async ({ subscribe }) => {
+        await load;
+        await subscribe({ resultHash: 'hash' });
+      });
+      const store = new LocalSubscriptionStore();
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, store, mockContextAcceptor);
+      const slowLoad = () => {
+        const gate = deferred();
+        load = gate.promise;
+        return gate;
+      };
+
+      return { server, store, slowLoad };
+    };
+
+    it('should not revive a subscription unsubscribed during its first load', async () => {
+      const { server, store, slowLoad } = createServer();
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      const gate = slowLoad();
+      const subscribing = server.processMessage('conn-1', subscribeMessage('sub-1'));
+      await server.processMessage('conn-1', JSON.stringify({ unsubscribe: 'sub-1' }));
+      gate.resolve();
+      await subscribing;
+
+      expect(await store.getSubscription('conn-1', 'sub-1')).toBeUndefined();
+      expect(store.getAllSubscriptions()).toEqual([]);
+    });
+
+    it('should not revive a subscription unsubscribed during a tick', async () => {
+      const { server, store, slowLoad } = createServer();
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+      await server.processMessage('conn-1', subscribeMessage('sub-1'));
+      expect(await store.getSubscription('conn-1', 'sub-1')).toBeDefined();
+
+      const gate = slowLoad();
+      const ticking = server.processSubscriptions();
+      await server.processMessage('conn-1', JSON.stringify({ unsubscribe: 'sub-1' }));
+      gate.resolve();
+      await ticking;
+
+      expect(await store.getSubscription('conn-1', 'sub-1')).toBeUndefined();
+      expect(store.getAllSubscriptions()).toEqual([]);
+    });
+
+    it('should keep other subscriptions of the connection', async () => {
+      const { server, store, slowLoad } = createServer();
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      const gate = slowLoad();
+      const first = server.processMessage('conn-1', subscribeMessage('sub-1'));
+      const second = server.processMessage('conn-1', subscribeMessage('sub-2'));
+      await server.processMessage('conn-1', JSON.stringify({ unsubscribe: 'sub-1' }));
+      gate.resolve();
+      await Promise.all([first, second]);
+
+      expect(await store.getSubscription('conn-1', 'sub-1')).toBeUndefined();
+      expect(await store.getSubscription('conn-1', 'sub-2')).toBeDefined();
+    });
+  });
+
   describe('Error replies', () => {
     const deepArray = (depth: number) => `${'['.repeat(depth)}0${']'.repeat(depth)}`;
 

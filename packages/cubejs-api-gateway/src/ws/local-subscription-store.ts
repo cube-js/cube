@@ -17,6 +17,11 @@ export class LocalSubscriptionStoreConnection {
 
   protected closed: boolean = false;
 
+  protected readonly inFlightSubscriptions: Map<string, number> = new Map();
+
+  // An unsubscribe that lands while a load is in flight must outlive it, or the load's final write revives the subscription
+  protected readonly cancelledSubscriptions: Set<string> = new Set();
+
   public isAuthorizing(): boolean {
     return this.authorizing;
   }
@@ -29,6 +34,33 @@ export class LocalSubscriptionStoreConnection {
     } finally {
       this.authorizing = false;
     }
+  }
+
+  public beginSubscriptionLoad(subscriptionId: string): void {
+    this.inFlightSubscriptions.set(subscriptionId, (this.inFlightSubscriptions.get(subscriptionId) || 0) + 1);
+  }
+
+  public endSubscriptionLoad(subscriptionId: string): void {
+    const remaining = (this.inFlightSubscriptions.get(subscriptionId) || 0) - 1;
+    if (remaining > 0) {
+      this.inFlightSubscriptions.set(subscriptionId, remaining);
+      return;
+    }
+
+    this.inFlightSubscriptions.delete(subscriptionId);
+    this.cancelledSubscriptions.delete(subscriptionId);
+  }
+
+  public cancelSubscription(subscriptionId: string): void {
+    this.subscriptions.delete(subscriptionId);
+
+    if (this.inFlightSubscriptions.has(subscriptionId)) {
+      this.cancelledSubscriptions.add(subscriptionId);
+    }
+  }
+
+  public isSubscriptionCancelled(subscriptionId: string): boolean {
+    return this.cancelledSubscriptions.has(subscriptionId);
   }
 
   public isClosed(): boolean {
@@ -74,7 +106,7 @@ export class LocalSubscriptionStore {
   public async subscribe(connectionId: string, subscriptionId: string, subscription) {
     // A subscribe that finishes after the disconnect must not bring the connection back
     const connection = this.getConnection(connectionId);
-    if (!connection) {
+    if (!connection || connection.isSubscriptionCancelled(subscriptionId)) {
       return;
     }
 
@@ -90,11 +122,7 @@ export class LocalSubscriptionStore {
       return;
     }
 
-    if (!connection.subscriptions.has(subscriptionId)) {
-      return;
-    }
-
-    connection.subscriptions.delete(subscriptionId);
+    connection.cancelSubscription(subscriptionId);
   }
 
   public getAllSubscriptions() {

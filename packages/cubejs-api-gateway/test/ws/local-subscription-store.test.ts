@@ -114,6 +114,45 @@ describe('LocalSubscriptionStore', () => {
     expect(subscription).toBeUndefined();
   });
 
+  it('does not revive a subscription unsubscribed while its load was in flight', async () => {
+    const store = new TestSubscriptionStore();
+    const connection = store.connect('conn-1');
+
+    connection.beginSubscriptionLoad('sub-1');
+    await store.unsubscribe('conn-1', 'sub-1');
+    await store.subscribe('conn-1', 'sub-1', { message: {}, state: {} });
+    connection.endSubscriptionLoad('sub-1');
+
+    expect(await store.getSubscription('conn-1', 'sub-1')).toBeUndefined();
+    expect(store.getAllSubscriptions()).toEqual([]);
+  });
+
+  it('forgets the cancellation once the last in-flight load ends', async () => {
+    const store = new TestSubscriptionStore();
+    const connection = store.connect('conn-1');
+
+    connection.beginSubscriptionLoad('sub-1');
+    connection.beginSubscriptionLoad('sub-1');
+    await store.unsubscribe('conn-1', 'sub-1');
+    connection.endSubscriptionLoad('sub-1');
+    expect(connection.isSubscriptionCancelled('sub-1')).toBe(true);
+
+    connection.endSubscriptionLoad('sub-1');
+    expect(connection.isSubscriptionCancelled('sub-1')).toBe(false);
+
+    await store.subscribe('conn-1', 'sub-1', { message: {}, state: {} });
+    expect(await store.getSubscription('conn-1', 'sub-1')).toBeDefined();
+  });
+
+  it('does not mark a subscription cancelled when nothing is in flight', async () => {
+    const store = new TestSubscriptionStore();
+    const connection = store.connect('conn-1');
+
+    await store.unsubscribe('conn-1', 'sub-1');
+
+    expect(connection.isSubscriptionCancelled('sub-1')).toBe(false);
+  });
+
   it('returns all active subscriptions with connectionId', async () => {
     const store = new TestSubscriptionStore();
     store.connect('conn-1');
