@@ -626,9 +626,8 @@ pub trait ConfigObj: DIService {
     /// Off by default; when disabled, chunks are sent whole and filtered only in the subprocess.
     fn prefilter_in_memory_chunks_enabled(&self) -> bool;
 
-    /// When enabled, the worker merges each partition's in-memory chunks into one sorted run
-    /// before sending them to the select subprocess, so a scan gets one merge input per partition
-    /// instead of one per chunk. Off by default.
+    /// When enabled, a scan reads each partition's in-memory chunks through one plan node that
+    /// merges them at execution, instead of one merge input per chunk. Off by default.
     fn merge_in_memory_chunks_enabled(&self) -> bool;
 
     /// When enabled (default), a merge group's chunk parquets (PerPartition / Range strategies)

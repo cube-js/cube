@@ -1694,16 +1694,6 @@ impl ClusterImpl {
             drop(chunk_filter_guard);
         }
 
-        // Done before IPC: serializing and planning cost grows with the number of chunks.
-        if self.config_obj.merge_in_memory_chunks_enabled() {
-            let _chunk_merge_guard =
-                crate::trace::OpGuard::start(OpKind::Execution, "chunks.merge");
-            crate::queryplanner::query_executor::merge_in_memory_chunks(
-                &plan_node,
-                &mut chunk_id_to_record_batches,
-            )?;
-        }
-
         let mut res = None;
         #[cfg(not(target_os = "windows"))]
         {
@@ -1733,14 +1723,13 @@ impl ClusterImpl {
                                         (u64, Vec<SerializedRecordBatchStream>),
                                         CubeError,
                                     > {
-                                        let serialized = match b.first() {
-                                            Some(first) => SerializedRecordBatchStream::write(
-                                                &first.schema(),
+                                        Ok((
+                                            *id,
+                                            SerializedRecordBatchStream::write(
+                                                &b.iter().next().unwrap().schema(),
                                                 b.to_vec(),
                                             )?,
-                                            None => Vec::new(),
-                                        };
-                                        Ok((*id, serialized))
+                                        ))
                                     },
                                 )
                                 .collect::<Result<HashMap<_, _>, _>>()?;

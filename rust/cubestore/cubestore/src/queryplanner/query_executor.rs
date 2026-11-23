@@ -7,6 +7,7 @@ use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
+use crate::queryplanner::in_memory_chunks::{InMemoryChunksExec, MergeInMemoryChunks};
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::metadata_cache::{MetadataCacheFactory, NoopParquetMetadataCache};
 use crate::queryplanner::optimizations::{CubeQueryPlanner, PreOptimizeRule};
@@ -29,10 +30,7 @@ use datafusion::arrow::array::{
     Float64Array, Int16Array, Int32Array, Int64Array, MutableArrayData, NullArray, StringArray,
     TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
-use datafusion::arrow::compute::kernels::sort::{LexicographicalComparator, SortColumn};
-use datafusion::arrow::compute::{
-    concat, filter_record_batch, interleave_record_batch, SortOptions,
-};
+use datafusion::arrow::compute::{filter_record_batch, SortOptions};
 use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use datafusion::arrow::ipc::reader::StreamReader;
 use datafusion::arrow::ipc::writer::StreamWriter;
@@ -505,12 +503,9 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         worker_planning_params: WorkerPlanningParams,
         remote_to_local_names: HashMap<String, String>,
-        mut chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
         data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
-        if self.config.merge_in_memory_chunks_enabled() {
-            restore_merged_in_memory_chunks(&plan, &mut chunk_id_to_record_batches);
-        }
         let pre_serialized_plan = plan.to_pre_serialized(
             remote_to_local_names,
             chunk_id_to_record_batches,
@@ -671,7 +666,10 @@ impl QueryExecutorImpl {
             // TODO upgrade DF if less than 2 then there will be no MergeJoin. Decide on repartitioning.
             .with_target_partitions(2)
             .with_prefer_existing_sort(true)
-            .with_round_robin_repartition(false);
+            .with_round_robin_repartition(false)
+            .with_extension(Arc::new(MergeInMemoryChunks(
+                self.config.merge_in_memory_chunks_enabled(),
+            )));
         config.options_mut().execution.parquet.split_row_group_reads = false;
         config.options_mut().optimizer.prefer_hash_join = false;
         // Redundant with the commented CoalesceBatches::new() line in `Self::optimizer_rules`
@@ -894,6 +892,17 @@ impl CubeTable {
         } else {
             None
         };
+        let in_memory_chunks_order = LexOrdering::new(lex_ordering_for_index(
+            self.index_snapshot.index.get_row(),
+            &index_projection_schema,
+        )?);
+        // Merging needs a sort order; it is empty when the leading key column isn't projected.
+        let merge_in_memory_chunks = !in_memory_chunks_order.is_empty()
+            && state
+                .config()
+                .get_extension::<MergeInMemoryChunks>()
+                .map_or(false, |m| m.0);
+        let mut merged_chunks = Vec::new();
         for partition_snapshot in partition_snapshots {
             let partition = partition_snapshot.partition();
             let filter = self
@@ -966,9 +975,9 @@ impl CubeTable {
                                 chunk
                             ))
                         })?;
-                    // Pre-filtering and merging leave zero-row chunks; each would still cost a
-                    // merge input and its own operators. Chunks without batches are kept: plans
-                    // built without loading chunk data show them as placeholders.
+                    // Pre-filtering leaves zero-row chunks; each would still cost a merge input
+                    // and its own operators. Chunks without batches are kept: plans built without
+                    // loading chunk data show them as placeholders.
                     if !record_batches.is_empty()
                         && record_batches.iter().all(|b| b.num_rows() == 0)
                     {
@@ -982,6 +991,10 @@ impl CubeTable {
                                 record_batches[0].schema()
                             )));
                         }
+                    }
+                    if merge_in_memory_chunks && !record_batches.is_empty() {
+                        merged_chunks.push(record_batches.clone());
+                        continue;
                     }
                     Arc::new(DataSourceExec::new(Arc::new(
                         MemorySourceConfig::try_new(
@@ -1031,6 +1044,20 @@ impl CubeTable {
 
                 let node = FilterByKeyRangeExec::issue_filters(node, filter.clone(), key_len);
                 partition_execs.push(node);
+            }
+
+            if !merged_chunks.is_empty() {
+                let node: Arc<dyn ExecutionPlan> = Arc::new(InMemoryChunksExec::try_new(
+                    std::mem::take(&mut merged_chunks),
+                    index_schema.clone(),
+                    index_projection_or_none_on_schema_match.clone(),
+                    in_memory_chunks_order.clone(),
+                )?);
+                partition_execs.push(FilterByKeyRangeExec::issue_filters(
+                    node,
+                    filter.clone(),
+                    key_len,
+                ));
             }
         }
 
@@ -2516,85 +2543,6 @@ pub fn filter_in_memory_chunks_for_worker(
                 match filter_batch_by_predicate(phys.as_ref().unwrap().as_ref(), b) {
                     Ok(filtered) => *b = filtered,
                     Err(e) => warn!("Skipping in-memory chunk {id} pre-filter: {e}"),
-                }
-            }
-        }
-    }
-}
-
-/// Replaces the in-memory chunks of each partition by one sorted run, so a scan gets one merge
-/// input per partition instead of one per chunk. The run is held by the first chunk of the
-/// group; the others are left without batches.
-pub fn merge_in_memory_chunks(
-    plan: &SerializedPlan,
-    chunks: &mut HashMap<u64, Vec<RecordBatch>>,
-) -> Result<(), CubeError> {
-    for (key_len, chunk_ids) in plan.in_memory_chunk_merge_groups() {
-        let batches = chunk_ids
-            .iter()
-            .filter_map(|id| chunks.get(id))
-            .flatten()
-            .filter(|b| b.num_rows() > 0)
-            .cloned()
-            .collect::<Vec<_>>();
-        if batches.len() < 2 {
-            continue;
-        }
-        // Only the key columns are concatenated to sort; the whole rows are gathered once.
-        let sort_columns = (0..key_len)
-            .map(|i| -> Result<_, CubeError> {
-                let parts = batches.iter().map(|b| b.column(i).as_ref()).collect_vec();
-                Ok(SortColumn {
-                    values: concat(&parts)?,
-                    options: Some(SortOptions::default()),
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let comparator = LexicographicalComparator::try_new(&sort_columns)?;
-        let mut rows = Vec::with_capacity(sort_columns[0].values.len());
-        for (batch_idx, b) in batches.iter().enumerate() {
-            rows.extend((0..b.num_rows()).map(|row| (batch_idx, row)));
-        }
-        // A stable sort keeps rows with equal keys in chunk order, as the scan merge would, so
-        // the last-row dedup still picks the same version. `rows` is in concatenation order,
-        // so a position in it is also a row of the concatenated key columns.
-        let mut order = (0..rows.len()).collect_vec();
-        order.sort_by(|a, b| comparator.compare(*a, *b));
-        let sorted_rows = order.into_iter().map(|i| rows[i]).collect_vec();
-        let sorted = interleave_record_batch(&batches.iter().collect_vec(), &sorted_rows)?;
-
-        let mut run = Some(sorted);
-        for id in &chunk_ids {
-            if let Some(b) = chunks.get_mut(id) {
-                *b = run.take().into_iter().collect();
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Gives the chunks emptied by [merge_in_memory_chunks] a zero-row batch, which the scan skips.
-/// They cross IPC without batches to save a schema per chunk. Chunks of a group that has no
-/// batches at all are left alone: a plan built without chunk data shows them as placeholders.
-pub fn restore_merged_in_memory_chunks(
-    plan: &SerializedPlan,
-    chunks: &mut HashMap<u64, Vec<RecordBatch>>,
-) {
-    for (_, chunk_ids) in plan.in_memory_chunk_merge_groups() {
-        let Some(schema) = chunk_ids
-            .iter()
-            .filter_map(|id| chunks.get(id))
-            .flatten()
-            .next()
-            .map(|b| b.schema())
-        else {
-            continue;
-        };
-        let empty = RecordBatch::new_empty(schema);
-        for id in &chunk_ids {
-            if let Some(b) = chunks.get_mut(id) {
-                if b.is_empty() {
-                    b.push(empty.clone());
                 }
             }
         }

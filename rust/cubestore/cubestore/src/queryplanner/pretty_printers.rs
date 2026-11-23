@@ -29,6 +29,7 @@ use std::sync::Arc;
 use crate::queryplanner::check_memory::CheckMemoryExec;
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::group_by_limit_aggregate::GroupByLimitAggregateExec;
+use crate::queryplanner::in_memory_chunks::InMemoryChunksExec;
 use crate::queryplanner::inline_aggregate::{InlineAggregateExec, InlineAggregateMode};
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::panic::{PanicWorkerExec, PanicWorkerNode};
@@ -757,6 +758,8 @@ fn pp_phys_plan_indented(p: &dyn ExecutionPlan, indent: usize, o: &PPOptions, ou
             *out += "Union";
         } else if let Some(_) = a.downcast_ref::<FilterByKeyRangeExec>() {
             *out += "FilterByKeyRange";
+        } else if let Some(c) = a.downcast_ref::<InMemoryChunksExec>() {
+            *out += &format!("InMemoryChunks, chunks: {}", c.chunk_count());
         } else if let Some(p) = a.downcast_ref::<ParquetExec>() {
             // We don't use ParquetExec any more.
             *out += &format!(
