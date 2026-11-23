@@ -3519,6 +3519,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@cubejs-backend/clickhouse-driver@workspace:packages/cubejs-clickhouse-driver"
   dependencies:
+    "@aws-sdk/credential-providers": "npm:^3.22.0"
     "@clickhouse/client": "npm:^1.23.1"
     "@cubejs-backend/base-driver": "npm:1.8.32"
     "@cubejs-backend/linter": "npm:1.8.32"

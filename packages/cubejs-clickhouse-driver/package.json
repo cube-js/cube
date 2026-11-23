@@ -36,6 +36,7 @@
     "integration:clickhouse": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration"
   },
   "dependencies": {
+    "@aws-sdk/credential-providers": "^3.22.0",
     "@clickhouse/client": "^1.23.1",
     "@cubejs-backend/base-driver": "1.8.32",
     "@cubejs-backend/shared": "1.8.32",

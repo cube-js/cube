@@ -1,6 +1,6 @@
-import type { TableStructure, UnloadOptions } from '@cubejs-backend/base-driver';
+import type { S3Credentials, TableStructure, UnloadOptions } from '@cubejs-backend/base-driver';
 
-import { ClickHouseDriver } from '../../src';
+import { ClickHouseDriver, exportBucketSessionPolicy } from '../../src/ClickHouseDriver';
 
 jest.mock('@clickhouse/client', () => ({
   ...jest.requireActual('@clickhouse/client'),
@@ -23,6 +23,10 @@ class TestClickHouseDriver extends ClickHouseDriver {
 
   public credentialRequests: S3Options[] = [];
 
+  public webIdentityRequests: { policy: string, region: string }[] = [];
+
+  public chainCredentials: S3Credentials | null = null;
+
   public override async command(query: string): Promise<void> {
     this.commands.push(query);
   }
@@ -38,7 +42,20 @@ class TestClickHouseDriver extends ClickHouseDriver {
 
   public override async resolveS3Credentials(options: S3Options) {
     this.credentialRequests.push(options);
-    return super.resolveS3Credentials(options);
+    return this.chainCredentials ?? super.resolveS3Credentials(options);
+  }
+
+  public realWebIdentityCredentials(policy: string, region: string) {
+    return super.resolveWebIdentityCredentials(policy, region);
+  }
+
+  public setCachedCredentials(credentials: S3Credentials) {
+    this.exportCredentials = Promise.resolve(credentials);
+  }
+
+  public override async resolveWebIdentityCredentials(policy: string, region: string): Promise<S3Credentials> {
+    this.webIdentityRequests.push({ policy, region });
+    return { accessKeyId: 'ASIAWEB', secretAccessKey: 'web-secret', sessionToken: 'web-token' };
   }
 }
 
@@ -52,6 +69,8 @@ const ENV_KEYS = [
   'AWS_SECRET_ACCESS_KEY',
   'AWS_SESSION_TOKEN',
   'AWS_REGION',
+  'AWS_WEB_IDENTITY_TOKEN_FILE',
+  'AWS_ROLE_ARN',
 ];
 
 const unloadOptions: UnloadOptions = {
@@ -159,12 +178,65 @@ describe('ClickHouseDriver S3 export bucket credentials', () => {
     process.env.AWS_ACCESS_KEY_ID = 'ASIATEMP';
     process.env.AWS_SECRET_ACCESS_KEY = 'temp-secret';
 
+    const bucketRegionDriver = createDriver();
+    await bucketRegionDriver.unload('t', unloadOptions);
+    process.env.AWS_REGION = 'eu-central-1';
+    const awsRegionDriver = createDriver();
+    await awsRegionDriver.unload('t', unloadOptions);
+
+    expect(bucketRegionDriver.credentialRequests).toEqual([{ region: 'us-west-2' }]);
+    expect(awsRegionDriver.credentialRequests).toEqual([{ region: 'eu-central-1' }]);
+  });
+
+  it('reuses temporary credentials across exports until they near expiry', async () => {
+    const driver = createDriver();
+    driver.chainCredentials = {
+      accessKeyId: 'ASIATEMP',
+      secretAccessKey: 'temp-secret',
+      sessionToken: 'temp-token',
+      expiration: new Date(Date.now() + 50 * 60 * 1000),
+    };
+    await Promise.all([driver.unload('t', unloadOptions), driver.unload('t', unloadOptions)]);
+    expect(driver.credentialRequests).toHaveLength(1);
+
+    driver.setCachedCredentials({ ...driver.chainCredentials, expiration: new Date(Date.now() + 10 * 60 * 1000) });
+    await driver.unload('t', unloadOptions);
+    expect(driver.credentialRequests).toHaveLength(2);
+  });
+
+  it('scopes web identity credentials to the export bucket path with a session policy', async () => {
+    process.env.AWS_WEB_IDENTITY_TOKEN_FILE = '/var/run/secrets/token';
+    process.env.AWS_ROLE_ARN = 'arn:aws:iam::123456789012:role/cube';
+    process.env.CUBEJS_DB_EXPORT_BUCKET = 'my-bucket/exports';
+
     const driver = createDriver();
     await driver.unload('t', unloadOptions);
-    process.env.AWS_REGION = 'eu-central-1';
+
+    expect(driver.webIdentityRequests).toEqual([
+      { policy: exportBucketSessionPolicy('my-bucket', 'exports'), region: 'us-west-2' },
+    ]);
+    expect(driver.credentialRequests).toEqual([]);
+    expect(driver.commands[0]).toContain('\'ASIAWEB\',\n             \'web-secret\',\n             \'web-token\'');
+  });
+
+  it('loads the SDK web identity provider, which reads the token file', async () => {
+    process.env.AWS_WEB_IDENTITY_TOKEN_FILE = '/nonexistent/cube-test-token';
+    process.env.AWS_ROLE_ARN = 'arn:aws:iam::123456789012:role/cube';
+
+    await expect(createDriver().realWebIdentityCredentials('{}', 'us-west-2')).rejects.toThrow('/nonexistent/cube-test-token');
+  });
+
+  it('uses the default chain when static env keys would win over web identity', async () => {
+    process.env.AWS_WEB_IDENTITY_TOKEN_FILE = '/var/run/secrets/token';
+    process.env.AWS_ROLE_ARN = 'arn:aws:iam::123456789012:role/cube';
+    process.env.AWS_ACCESS_KEY_ID = 'AKIAENV';
+    process.env.AWS_SECRET_ACCESS_KEY = 'env-secret';
+
+    const driver = createDriver();
     await driver.unload('t', unloadOptions);
 
-    expect(driver.credentialRequests).toEqual([{ region: 'us-west-2' }, { region: 'eu-central-1' }]);
+    expect(driver.webIdentityRequests).toEqual([]);
+    expect(driver.commands[0]).toContain('\'AKIAENV\'');
   });
 
   it('passes no static credentials to the read side when no static keys are set', async () => {
@@ -186,5 +258,29 @@ describe('ClickHouseDriver S3 export bucket credentials', () => {
     const driver = createDriver();
     await expect(driver.unload('t', unloadOptions)).rejects.toThrow('keyId and secretKey must be set together');
     expect(driver.commands).toEqual([]);
+  });
+});
+
+describe('exportBucketSessionPolicy', () => {
+  it('limits object access to the export path and listing to the bucket', () => {
+    expect(JSON.parse(exportBucketSessionPolicy('my-bucket', 'exports/cube'))).toEqual({
+      Version: '2012-10-17',
+      Statement: [
+        {
+          Effect: 'Allow',
+          Action: ['s3:PutObject', 's3:GetObject', 's3:AbortMultipartUpload', 's3:ListMultipartUploadParts'],
+          Resource: 'arn:aws:s3:::my-bucket/exports/cube/*',
+        },
+        {
+          Effect: 'Allow',
+          Action: ['s3:ListBucket', 's3:GetBucketLocation'],
+          Resource: 'arn:aws:s3:::my-bucket',
+        },
+      ],
+    });
+  });
+
+  it('covers the whole bucket when no path is configured', () => {
+    expect(JSON.parse(exportBucketSessionPolicy('my-bucket', '')).Statement[0].Resource).toBe('arn:aws:s3:::my-bucket/*');
   });
 });

@@ -15,6 +15,7 @@ import {
   GenericDataBaseType,
   QueryOptions,
   QuerySchemasResult,
+  S3Credentials,
   StreamOptions,
   StreamTableDataWithTypes,
   TableColumn,
@@ -41,6 +42,34 @@ import { buildTransformFromMeta, transformRow } from './Transform';
 import { formatError } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
+
+// Cached export credentials are replaced once they have less than this left, so an export never starts on
+// credentials about to lapse. STS web identity sessions last 1h by default.
+const EXPORT_CREDENTIALS_REFRESH_MARGIN_MS = 30 * 60 * 1000;
+
+/**
+ * Inline session policy for the credentials handed to ClickHouse: the role's rights, cut down to the
+ * export bucket path. A session policy can only narrow the role, never widen it.
+ */
+export function exportBucketSessionPolicy(bucketName: string, path: string): string {
+  const prefix = path ? `${path}/` : '';
+
+  return JSON.stringify({
+    Version: '2012-10-17',
+    Statement: [
+      {
+        Effect: 'Allow',
+        Action: ['s3:PutObject', 's3:GetObject', 's3:AbortMultipartUpload', 's3:ListMultipartUploadParts'],
+        Resource: `arn:aws:s3:::${bucketName}/${prefix}*`,
+      },
+      {
+        Effect: 'Allow',
+        Action: ['s3:ListBucket', 's3:GetBucketLocation'],
+        Resource: `arn:aws:s3:::${bucketName}`,
+      },
+    ],
+  });
+}
 
 // Statements without a result set. Sent through `client.query()`, ClickHouse answers them with an
 // empty body, or with a TabSeparated DDL status on a Replicated database: neither parses as JSONCompact.
@@ -156,6 +185,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   protected readonly config: ClickHouseDriverConfig;
 
   protected readonly killQueryTimeout: number = 10 * 1000;
+
+  protected exportCredentials: Promise<S3Credentials> | null = null;
 
   /**
    * Class constructor.
@@ -738,8 +769,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
     const staticCredentials = keyId && secretKey ? { accessKeyId: keyId, secretAccessKey: secretKey } : undefined;
     // ClickHouse writes to S3 itself, so the pod's OIDC identity never reaches it: hand it short-lived credentials.
-    const credentials: { accessKeyId: string, secretAccessKey: string, sessionToken?: string } = staticCredentials ??
-      await this.resolveS3Credentials({ region: process.env.AWS_REGION || region });
+    const credentials: S3Credentials = staticCredentials ?? await this.getExportCredentials(bucketName, path, region);
     const credentialParams = [credentials.accessKeyId, credentials.secretAccessKey];
     // s3(url, key, secret, session_token, format) needs ClickHouse 23.12+.
     if (credentials.sessionToken) {
@@ -771,6 +801,53 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       // Can be controlled via SET format_csv_delimiter
       csvDelimiter: ','
     };
+  }
+
+  /**
+   * Shares one set of temporary credentials across exports until it nears expiry, so a partitioned
+   * build does not make one STS call per partition.
+   */
+  protected async getExportCredentials(bucketName: string, path: string, region: string): Promise<S3Credentials> {
+    const current = this.exportCredentials;
+    if (current) {
+      const credentials = await current.catch(() => null);
+      if (
+        credentials &&
+        (!credentials.expiration || credentials.expiration.getTime() - Date.now() > EXPORT_CREDENTIALS_REFRESH_MARGIN_MS)
+      ) {
+        return credentials;
+      }
+
+      if (this.exportCredentials !== current) {
+        return this.getExportCredentials(bucketName, path, region);
+      }
+    }
+
+    const next = this.resolveExportCredentials(bucketName, path, region);
+    this.exportCredentials = next;
+
+    return next;
+  }
+
+  protected async resolveExportCredentials(bucketName: string, path: string, region: string): Promise<S3Credentials> {
+    const stsRegion = process.env.AWS_REGION || region;
+
+    // Static env keys win in the SDK default chain too, so only scope when web identity is what it would use.
+    if (process.env.AWS_WEB_IDENTITY_TOKEN_FILE && process.env.AWS_ROLE_ARN && !process.env.AWS_ACCESS_KEY_ID) {
+      return this.resolveWebIdentityCredentials(exportBucketSessionPolicy(bucketName, path), stsRegion);
+    }
+
+    return this.resolveS3Credentials({ region: stsRegion });
+  }
+
+  protected async resolveWebIdentityCredentials(policy: string, region: string): Promise<S3Credentials> {
+    const { fromTokenFile } = await import('@aws-sdk/credential-providers');
+    const { accessKeyId, secretAccessKey, sessionToken, expiration } = await fromTokenFile({
+      policy,
+      clientConfig: { region },
+    })();
+
+    return { accessKeyId, secretAccessKey, sessionToken, expiration };
   }
 
   public capabilities(): DriverCapabilities {

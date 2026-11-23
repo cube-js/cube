@@ -150,6 +150,16 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 
 </Warning>
 
+<Warning>
+
+  These credentials are sent to the ClickHouse server. With OIDC or IRSA
+  (`AWS_WEB_IDENTITY_TOKEN_FILE` and `AWS_ROLE_ARN`), Cube limits them to the
+  export bucket path with an STS session policy. Credentials from any other
+  source, such as an instance profile, are passed as they are, so grant that
+  role access to the export bucket only.
+
+</Warning>
+
 ## SSL
 
 To enable SSL-encrypted connections between Cube and ClickHouse, set the
