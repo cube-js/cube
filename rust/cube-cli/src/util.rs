@@ -258,6 +258,17 @@ pub fn nonempty_filter(s: &str) -> Result<String, String> {
     Ok(s.trim().to_string())
 }
 
+/// [`nonempty_filter`] for a name that goes into a URL path. `.` and `..` are refused: URL
+/// parsing reads them, percent-encoded or not, as a relative path to another route.
+pub fn path_name(s: &str) -> Result<String, String> {
+    let name = nonempty_filter(s)?;
+    if name == "." || name == ".." {
+        return Err(format!("`{name}` names no resource: it is a relative path"));
+    }
+
+    Ok(name)
+}
+
 /// A branch name to PRINT, when the payload might not have carried one.
 ///
 /// Only for prose and suggested commands, never for a JSON document: a gate reading
@@ -409,6 +420,21 @@ pub fn shell_quote(value: &str) -> String {
     {
         format!("'{}'", value.replace('\'', r"'\''"))
     }
+}
+
+/// Percent-encode a value for one URL path segment, so a name with `/`, `?` or `#` in it
+/// cannot address another route. `.` and `..` still can: parse such names with [`path_name`].
+pub fn path_segment(value: &str) -> String {
+    value
+        .bytes()
+        .map(|byte| {
+            if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
+                (byte as char).to_string()
+            } else {
+                format!("%{byte:02X}")
+            }
+        })
+        .collect()
 }
 
 /// Parse a wait duration: a bare number of seconds, or a number with a `s`/`m`/`h`
@@ -683,6 +709,17 @@ mod tests {
             shell_quote(&branch_or_placeholder("  main  ")),
             "'  main  '"
         );
+    }
+
+    #[test]
+    fn a_path_segment_cannot_address_another_route() {
+        assert_eq!(path_segment("default"), "default");
+        assert_eq!(path_segment("my ds/x?y#z"), "my%20ds%2Fx%3Fy%23z");
+        assert_eq!(path_segment("a-b_c.d~"), "a-b_c.d~");
+        assert_eq!(path_name(" default ").unwrap(), "default");
+        assert!(path_name("..").is_err());
+        assert!(path_name(".").is_err());
+        assert!(path_name("").is_err());
     }
 
     #[test]

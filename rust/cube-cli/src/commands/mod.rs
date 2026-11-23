@@ -7,6 +7,7 @@ pub mod completion;
 pub mod context;
 pub mod data_model;
 pub mod dbt;
+pub mod dbx_mv;
 pub mod deploy;
 pub mod deployments;
 pub mod embed;
