@@ -246,7 +246,7 @@ export const driverToolsFixture = (): unknown => ({
   addTimestampInterval: () => 'd',
   intervalAndMinimalTimeUnit: () => ['1', 'day'],
   hllInit: () => 'h',
-  hllMerge: () => 'h',
+  hllMergeOnly: () => 'h',
   hllCardinalityMerge: () => 'h',
   countDistinctApprox: () => 'c',
   supportGeneratedSeriesForCustomTd: () => false,

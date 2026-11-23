@@ -78,7 +78,7 @@ impl SqlNode for FinalPreAggregationMeasureSqlNode {
                     // further aggregation; otherwise take its
                     // cardinality.
                     AggregateWrap::CountDistinctApproxState => {
-                        templates.hll_merge(pre_aggregation_measure)?
+                        templates.hll_merge_only(pre_aggregation_measure)?
                     }
                     AggregateWrap::CountDistinctApprox => {
                         templates.hll_cardinality_merge(pre_aggregation_measure)?

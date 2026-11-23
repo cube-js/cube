@@ -143,8 +143,8 @@ impl PlanSqlTemplates {
         self.driver_tools.hll_init(sql)
     }
 
-    pub fn hll_merge(&self, sql: String) -> Result<String, CubeError> {
-        self.driver_tools.hll_merge(sql)
+    pub fn hll_merge_only(&self, sql: String) -> Result<String, CubeError> {
+        self.driver_tools.hll_merge_only(sql)
     }
 
     pub fn hll_cardinality_merge(&self, sql: String) -> Result<String, CubeError> {

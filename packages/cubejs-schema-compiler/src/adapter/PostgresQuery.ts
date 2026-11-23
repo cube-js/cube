@@ -67,6 +67,10 @@ export class PostgresQuery extends BaseQuery {
     return `round(hll_cardinality(hll_union_agg(${sql})))`;
   }
 
+  public hllMergeOnly(sql: string): string {
+    return `hll_union_agg(${sql})`;
+  }
+
   public countDistinctApprox(sql: string): string {
     return `round(hll_cardinality(hll_add_agg(hll_hash_any(${sql}))))`;
   }

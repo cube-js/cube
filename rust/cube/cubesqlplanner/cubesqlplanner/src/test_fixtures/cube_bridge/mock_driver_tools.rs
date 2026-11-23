@@ -270,7 +270,7 @@ impl DriverTools for MockDriverTools {
         Ok(format!("hll_add_agg(hll_hash_any({}))", sql))
     }
 
-    fn hll_merge(&self, sql: String) -> Result<String, CubeError> {
+    fn hll_merge_only(&self, sql: String) -> Result<String, CubeError> {
         Ok(format!("merge({})", sql))
     }
 
