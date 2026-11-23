@@ -765,6 +765,9 @@ pub trait ConfigObj: DIService {
     /// Most chunks one deferred-build compaction reads at once.
     fn deferred_table_build_max_fanin(&self) -> usize;
 
+    /// Most rows one deferred-build compaction rewrites, so it stays within the job timeout.
+    fn deferred_table_build_max_rows(&self) -> u64;
+
     /// Picks the next job from the oldest table instead of in plain job-id order.
     fn job_order_by_table_enabled(&self) -> bool;
 
@@ -911,6 +914,7 @@ pub struct ConfigObjImpl {
     pub compaction_readiness_chunks_threshold: Option<u64>,
     pub deferred_table_build_enabled: bool,
     pub deferred_table_build_max_fanin: usize,
+    pub deferred_table_build_max_rows: u64,
     pub job_order_by_table_enabled: bool,
     pub max_joined_partitions: usize,
     pub max_joined_partitions_message: String,
@@ -1424,6 +1428,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn deferred_table_build_max_fanin(&self) -> usize {
         self.deferred_table_build_max_fanin
+    }
+
+    fn deferred_table_build_max_rows(&self) -> u64 {
+        self.deferred_table_build_max_rows
     }
 
     fn job_order_by_table_enabled(&self) -> bool {
@@ -2382,6 +2390,10 @@ impl Config {
                     64,
                 )
                 .max(2),
+                deferred_table_build_max_rows: env_parse_positive_lenient(
+                    "CUBESTORE_DEFERRED_TABLE_BUILD_MAX_ROWS",
+                    100_000_000,
+                ) as u64,
                 job_order_by_table_enabled: env_flag("CUBESTORE_JOB_ORDER_BY_TABLE", false),
                 max_joined_partitions: env_parse("CUBESTORE_MAX_JOINED_PARTITIONS", 5),
                 max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),
@@ -2572,6 +2584,7 @@ impl Config {
                 compaction_readiness_chunks_threshold: None,
                 deferred_table_build_enabled: false,
                 deferred_table_build_max_fanin: 64,
+                deferred_table_build_max_rows: 100_000_000,
                 job_order_by_table_enabled: false,
                 max_joined_partitions: 5,
                 max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),

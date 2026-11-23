@@ -570,10 +570,13 @@ impl CompactionService for CompactionServiceImpl {
         // Each merge stream costs memory, so the first build reads at most `max_fanin` chunks and
         // merges the smallest ones into one chunk until it can. While imports run, only chunks no
         // larger than an import chunk are merged, to bound rewrites.
-        let max_fanin = if first_build {
-            self.config.deferred_table_build_max_fanin()
+        let (max_fanin, max_build_rows) = if first_build {
+            (
+                self.config.deferred_table_build_max_fanin(),
+                self.config.deferred_table_build_max_rows(),
+            )
         } else {
-            0
+            (0, 0)
         };
         let tier_merge = first_build && {
             let persistent = all_pending_chunks
@@ -598,15 +601,16 @@ impl CompactionService for CompactionServiceImpl {
             .iter()
             .filter(|c| !c.get_row().in_memory())
             .take_while(|c| {
+                // At least two chunks, so a merge always makes progress.
+                let first_two = taken < 2;
+                taken += 1;
+                size += c.get_row().get_row_count();
                 if tier_merge {
-                    taken += 1;
-                    taken <= max_fanin
-                } else if size == 0 || first_build {
-                    size += c.get_row().get_row_count();
-                    true
+                    taken <= max_fanin && (first_two || size <= max_build_rows)
+                } else if first_build {
+                    first_two || size <= max_build_rows
                 } else {
-                    size += c.get_row().get_row_count();
-                    size <= self.config.compaction_chunks_total_size_threshold()
+                    taken == 1 || size <= self.config.compaction_chunks_total_size_threshold()
                 }
             })
             .map(|c| c.clone())
@@ -635,12 +639,8 @@ impl CompactionService for CompactionServiceImpl {
                 data_loaded_size.clone(),
             )));
             chunks_to_use.push(chunk.clone());
-            // This caps a single compaction by the chunks' on-disk (compressed parquet) byte size.
-            // The threshold (CUBESTORE_COMPACTION_CHUNKS_IN_MEMORY_SIZE_THRESHOLD) is expressed in
-            // uncompressed in-memory bytes, so for a given value this admits more data per merge by
-            // roughly the parquet compression ratio. That is acceptable because chunks are streamed
-            // and memory is not the binding constraint here; the row-count cap above bounds the
-            // merge regardless.
+            // Compressed file bytes against an in-memory threshold admit more per merge, which is
+            // fine for streamed chunks. A first build is bounded by its fan-in and row cap instead.
             chunks_total_file_size += chunk.get_row().file_size().unwrap_or(0);
             if !first_build
                 && chunks_total_file_size > self.config.compaction_chunks_in_memory_size_threshold()

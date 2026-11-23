@@ -2934,6 +2934,17 @@ Larger values use more memory per build; values below `2` are raised to `2`.
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | `64`                   | `64`                  |
 
+## `CUBESTORE_DEFERRED_TABLE_BUILD_MAX_ROWS`
+
+The maximum number of rows a single build rewrites when
+[`CUBESTORE_DEFERRED_TABLE_BUILD`](#cubestore_deferred_table_build) is enabled, so
+that each build finishes within the job timeout. Rows beyond it are moved into the
+built partitions afterwards.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `100000000`            | `100000000`           |
+
 ## `CUBESTORE_JOB_ORDER_BY_TABLE`
 
 If `true`, jobs of tables that are still being created run in the order the tables

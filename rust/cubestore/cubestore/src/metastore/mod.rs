@@ -4432,10 +4432,13 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip_all)]
     async fn delete_job(&self, job_id: u64) -> Result<IdRow<Job>, CubeError> {
-        self.write_operation("delete_job", move |db_ref, batch_pipe| {
-            Ok(JobRocksTable::new(db_ref.clone()).delete(job_id, batch_pipe)?)
-        })
-        .await
+        let job = self
+            .write_operation("delete_job", move |db_ref, batch_pipe| {
+                Ok(JobRocksTable::new(db_ref.clone()).delete(job_id, batch_pipe)?)
+            })
+            .await;
+        self.job_tables.lock().unwrap().remove(&job_id);
+        job
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
@@ -4520,7 +4523,6 @@ impl MetaStore for RocksMetaStore {
                     })
                     .min_by(|a, b| a.0.cmp(&b.0))
                     .map(|(_, j)| j);
-                arrival.forget_unseen();
                 next_job
             } else {
                 //We use min_by instead of the max_by because of min_by returns the first element
@@ -4573,15 +4575,18 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip_all)]
     async fn delete_all_jobs(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
-        self.write_operation("delete_all_jobs", move |db_ref, batch_pipe| {
-            let jobs_table = JobRocksTable::new(db_ref);
-            let all_jobs = jobs_table.all_rows()?;
-            for job in all_jobs.iter() {
-                jobs_table.delete(job.get_id(), batch_pipe)?;
-            }
-            Ok(all_jobs)
-        })
-        .await
+        let jobs = self
+            .write_operation("delete_all_jobs", move |db_ref, batch_pipe| {
+                let jobs_table = JobRocksTable::new(db_ref);
+                let all_jobs = jobs_table.all_rows()?;
+                for job in all_jobs.iter() {
+                    jobs_table.delete(job.get_id(), batch_pipe)?;
+                }
+                Ok(all_jobs)
+            })
+            .await;
+        self.job_tables.lock().unwrap().clear();
+        jobs
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
@@ -5470,7 +5475,6 @@ enum JobTable {
 struct JobArrival<'a, 'c> {
     db_ref: DbTableRef<'a>,
     job_tables: &'c mut HashMap<u64, JobTable>,
-    seen: HashSet<u64>,
     index_tables: HashMap<u64, Option<u64>>,
     partition_tables: HashMap<u64, Option<u64>>,
     not_ready_tables: HashMap<u64, Option<DateTime<Utc>>>,
@@ -5481,7 +5485,6 @@ impl<'a, 'c> JobArrival<'a, 'c> {
         Self {
             db_ref,
             job_tables,
-            seen: HashSet::new(),
             index_tables: HashMap::new(),
             partition_tables: HashMap::new(),
             not_ready_tables: HashMap::new(),
@@ -5489,7 +5492,6 @@ impl<'a, 'c> JobArrival<'a, 'c> {
     }
 
     fn of(&mut self, job: &IdRow<Job>) -> DateTime<Utc> {
-        self.seen.insert(job.get_id());
         let job_table = match self.job_tables.get(&job.get_id()) {
             Some(t) => *t,
             None => {
@@ -5505,11 +5507,6 @@ impl<'a, 'c> JobArrival<'a, 'c> {
             JobTable::Dropped => DateTime::<Utc>::MIN_UTC,
             JobTable::Table(table_id) => self.not_ready_since(table_id).unwrap_or(enqueued),
         }
-    }
-
-    fn forget_unseen(&mut self) {
-        let seen = &self.seen;
-        self.job_tables.retain(|id, _| seen.contains(id));
     }
 
     fn resolve(&mut self, key: &RowKey) -> JobTable {
