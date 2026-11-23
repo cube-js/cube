@@ -5476,14 +5476,22 @@ enum JobTable {
 
 // Queue time used to order jobs by table: jobs of a not-ready table take the table's creation
 // time, but no earlier than `max_table_boost` before their own enqueue time; every other job
-// keeps its own enqueue time. So a job waits for older tables at most `max_table_boost`.
+// keeps its own enqueue time. So a job waits for older tables at most `max_table_boost`, and a
+// streaming table's job, queued `max_table_boost` early, is never passed by a later job.
 struct JobArrival<'a, 'c> {
     db_ref: DbTableRef<'a>,
     job_tables: &'c mut HashMap<u64, JobTable>,
     max_table_boost: chrono::Duration,
     index_tables: HashMap<u64, Option<u64>>,
     partition_tables: HashMap<u64, Option<u64>>,
-    not_ready_tables: HashMap<u64, Option<DateTime<Utc>>>,
+    tables: HashMap<u64, TableOrder>,
+}
+
+#[derive(Clone, Copy)]
+enum TableOrder {
+    Streaming,
+    NotReadySince(DateTime<Utc>),
+    Regular,
 }
 
 impl<'a, 'c> JobArrival<'a, 'c> {
@@ -5498,7 +5506,7 @@ impl<'a, 'c> JobArrival<'a, 'c> {
             max_table_boost,
             index_tables: HashMap::new(),
             partition_tables: HashMap::new(),
-            not_ready_tables: HashMap::new(),
+            tables: HashMap::new(),
         }
     }
 
@@ -5516,9 +5524,10 @@ impl<'a, 'c> JobArrival<'a, 'c> {
             JobTable::None => enqueued,
             // Run it first so it fails fast.
             JobTable::Dropped => DateTime::<Utc>::MIN_UTC,
-            JobTable::Table(table_id) => match self.not_ready_since(table_id) {
-                Some(created) => created.max(enqueued - self.max_table_boost),
-                None => enqueued,
+            JobTable::Table(table_id) => match self.table_order(table_id) {
+                TableOrder::Streaming => enqueued - self.max_table_boost,
+                TableOrder::NotReadySince(created) => created.max(enqueued - self.max_table_boost),
+                TableOrder::Regular => enqueued,
             },
         }
     }
@@ -5562,15 +5571,20 @@ impl<'a, 'c> JobArrival<'a, 'c> {
         })
     }
 
-    fn not_ready_since(&mut self, table_id: u64) -> Option<DateTime<Utc>> {
+    fn table_order(&mut self, table_id: u64) -> TableOrder {
         let db_ref = self.db_ref.clone();
-        *self.not_ready_tables.entry(table_id).or_insert_with(|| {
-            TableRocksTable::new(db_ref)
+        *self.tables.entry(table_id).or_insert_with(|| {
+            let table = TableRocksTable::new(db_ref)
                 .get_row(table_id)
                 .ok()
-                .flatten()
-                .filter(|t| !t.get_row().is_ready())
-                .and_then(|t| t.get_row().created_at().clone())
+                .flatten();
+            match table.as_ref().map(|t| t.get_row()) {
+                Some(t) if t.is_streaming() => TableOrder::Streaming,
+                Some(t) if !t.is_ready() => t
+                    .created_at()
+                    .map_or(TableOrder::Regular, TableOrder::NotReadySince),
+                _ => TableOrder::Regular,
+            }
         })
     }
 }
@@ -8247,14 +8261,14 @@ mod tests {
                     ))
                     .await
             };
-            let create = async |table: &str, is_ready: bool| {
+            let create = async |table: &str, is_ready: bool, locations: Option<Vec<String>>| {
                 tokio::time::sleep(Duration::from_millis(2)).await;
                 meta_store
                     .create_table(
                         "s".to_string(),
                         table.to_string(),
                         vec![Column::new("c".to_string(), ColumnType::Int, 0)],
-                        None,
+                        locations,
                         None,
                         vec![],
                         is_ready,
@@ -8275,9 +8289,10 @@ mod tests {
             meta_store.create_schema("s".to_string(), false).await?;
             names.insert(RowKey::Table(TableId::WALs, 1), "wal_before");
             add(RowKey::Table(TableId::WALs, 1)).await?;
-            let first = create("first", false).await?;
-            let second = create("second", false).await?;
-            let ready = create("ready", true).await?;
+            let stream = create("stream", false, Some(vec!["stream://src/t".to_string()])).await?;
+            let first = create("first", false, None).await?;
+            let second = create("second", false, None).await?;
+            let ready = create("ready", true, None).await?;
             let first_index = meta_store.get_table_indexes(first.get_id()).await?[0].get_id();
             let first_partition = meta_store
                 .get_active_partitions_by_index_id(first_index)
@@ -8286,6 +8301,7 @@ mod tests {
             for (key, name) in [
                 (RowKey::Table(TableId::Tables, second.get_id()), "second"),
                 (RowKey::Table(TableId::Tables, ready.get_id()), "ready"),
+                (RowKey::Table(TableId::Tables, stream.get_id()), "stream"),
                 (RowKey::Table(TableId::Partitions, first_partition), "first"),
                 (RowKey::Table(TableId::WALs, 2), "wal_after"),
                 // Its partition is gone, as after a table drop.
@@ -8314,17 +8330,19 @@ mod tests {
                 "wal_before",
                 "second",
                 "ready",
+                "stream",
                 "first",
                 "wal_after",
                 "dropped"
             ]
         );
         // Jobs of not-ready tables queue as of the table's creation; other jobs keep their own
-        // enqueue time.
+        // enqueue time, and a streaming table's job is never passed by a later one.
         assert_eq!(
             picked_job_order("start_processing_job_order_by_table", true, 600).await?,
             vec![
                 "dropped",
+                "stream",
                 "wal_before",
                 "first",
                 "second",
@@ -8340,6 +8358,7 @@ mod tests {
                 "wal_before",
                 "second",
                 "ready",
+                "stream",
                 "first",
                 "wal_after"
             ]
