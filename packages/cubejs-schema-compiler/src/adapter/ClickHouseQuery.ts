@@ -27,6 +27,10 @@ class ClickHouseFilter extends BaseFilter {
   // date/time type itself, so time values are parsed, keeping offset and microseconds. A value with
   // no offset is UTC, as for date ranges, and pinning it keeps a Date matching off a UTC server.
   public castParameter() {
+    // A predicate evaluates to UInt8, which refuses a 'true' string where `toBool` accepts it
+    if (this.definition().type === 'boolean') {
+      return 'toBool(?)';
+    }
     if (this.measure || this.definition().type === 'number') {
       // TODO here can be measure type of string actually
       return 'toFloat64(?)';
@@ -339,6 +343,7 @@ export class ClickHouseQuery extends BaseQuery {
     templates.types.boolean = 'BOOL';
     templates.expressions.wrap_boolean_dimension = 'toBool({{ expr }})';
     templates.expressions.wrap_segment_select = 'toBool({{ expr }})';
+    templates.tesseract.bool_param_cast = 'toBool({{ expr }})';
     templates.types.timestamp = 'DATETIME';
     delete templates.types.time;
     // ClickHouse intervals have a distinct type for each granularity
