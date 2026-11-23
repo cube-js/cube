@@ -1,3 +1,4 @@
+import { getEnv } from '@cubejs-backend/shared';
 import { PostgresQuery } from '../../../src/adapter';
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
@@ -20,6 +21,10 @@ cubes:
       - name: users
         relationship: many_to_one
         sql: "{CUBE}.user_id = {users.id}"
+      - name: people
+        alias: buyer
+        relationship: many_to_one
+        sql: "{CUBE}.user_id = {buyer.id}"
     dimensions:
       - name: id
         sql: id
@@ -38,6 +43,10 @@ cubes:
             order: { total_amount: desc }
             limit: 2
             filters: [{ member: status, operator: equals, values: [completed] }]
+          - name: by_buyer_city
+            members: [buyer.city, total_amount]
+            order: { total_amount: desc }
+            limit: 2
 
   - name: users
     sql: >
@@ -54,6 +63,22 @@ cubes:
       - name: name
         sql: name
         type: string
+      - name: city
+        sql: city
+        type: string
+
+  - name: people
+    sql: >
+      SELECT * FROM (VALUES
+        (1, 'Berlin'),
+        (2, 'Paris'),
+        (3, 'Rome')
+      ) AS t(id, city)
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
       - name: city
         sql: city
         type: string
@@ -76,6 +101,10 @@ views:
             drill_queries:
               - name: top_customers
                 members: [customer_details.contact, users.city, total_amount]
+                order: { total_amount: desc }
+                limit: 2
+              - name: by_buyer_city
+                members: [orders.buyer.city, total_amount]
                 order: { total_amount: desc }
                 limit: 2
 `);
@@ -109,6 +138,27 @@ views:
     expect(res).toEqual([
       { users__city: 'Berlin', orders__total_amount: '100' },
       { users__city: 'Paris', orders__total_amount: '70' },
+    ]);
+  });
+
+  // Join aliases are resolved by the Tesseract planner only
+  const itWithJoinAliases = getEnv('nativeSqlPlanner') ? it : it.skip;
+
+  itWithJoinAliases('runs a cube drill query through a join alias, named by its alias path', async () => {
+    const res = await runDrillQuery('orders.total_amount', 'by_buyer_city');
+
+    expect(res).toEqual([
+      { orders__buyer__city: 'Berlin', orders__total_amount: '140' },
+      { orders__buyer__city: 'Paris', orders__total_amount: '70' },
+    ]);
+  });
+
+  itWithJoinAliases('runs a view drill query naming an alias path', async () => {
+    const res = await runDrillQuery('orders_overview.total_amount', 'by_buyer_city');
+
+    expect(res).toEqual([
+      { orders__buyer__city: 'Berlin', orders_overview__total_amount: '140' },
+      { orders__buyer__city: 'Paris', orders_overview__total_amount: '70' },
     ]);
   });
 

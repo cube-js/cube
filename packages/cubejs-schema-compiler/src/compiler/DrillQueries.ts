@@ -42,15 +42,15 @@ export interface DrillQueryModel {
 export type DrillTarget = {
   /** What identifies the member in its scope: the join path for a cube, the qualified name for a view */
   key: string;
-  /** The qualified name: `cube.member` or `view.member` */
+  /** The name in the query format: `cube.member`, `view.member`, or an alias path such as `orders.customer.city` */
   name: string;
   kind: 'dimensions' | 'measures';
   type?: string;
-  /**
-   * The join path, when it goes through an aliased join. `name` then names
-   * the joined cube, not the aliased instance.
-   */
-  throughAlias?: string;
+  /** The cube or view that defines the member, and its name there */
+  owner: string;
+  member: string;
+  /** Reached through a join alias, so `name` is an alias path */
+  aliased?: boolean;
 };
 
 type ResolvedFilter =
@@ -200,13 +200,13 @@ function checkOperator(target: DrillTarget, operator: string, values: unknown, w
 
 export type DrillNameResolver = (name: string, allowSets: boolean) => DrillTarget[];
 
-function expandSet(
+function expandSet<T>(
   model: DrillQueryModel,
   cubeName: string,
   setName: string,
   stack: string[],
-  resolveMember: (name: string, stack: string[]) => DrillTarget[]
-): DrillTarget[] | undefined {
+  resolveMember: (name: string, stack: string[]) => T[]
+): T[] | undefined {
   const set = model.memberSets(cubeName).find(s => s.name === setName);
   if (!set) {
     return undefined;
@@ -217,6 +217,81 @@ function expandSet(
   }
   return names(set.members, model, `Member set '${id}' members`)
     .flatMap(name => resolveMember(name, [...stack, id]));
+}
+
+type JoinStep = { from: string; segment: string; aliased: boolean };
+
+type CubeTarget = { steps: JoinStep[]; cube: string; leaf: string; kind: 'dimensions' | 'measures'; type?: string };
+
+function resolveCubeSteps(
+  model: DrillQueryModel,
+  cubeName: string,
+  name: string,
+  allowSets: boolean,
+  stack: string[]
+): CubeTarget[] {
+  let parts = name.split('.');
+  if (parts.length > 1 && (parts[0] === 'CUBE' || parts[0] === cubeName)) {
+    parts = parts.slice(1);
+  }
+
+  let current = cubeName;
+  const steps: JoinStep[] = [];
+
+  for (const segment of parts.slice(0, -1)) {
+    const target = model.joinTarget(current, segment);
+    if (!target) {
+      if (model.isView(segment)) {
+        throw new UserError(`'${name}' names view '${segment}': a cube drill query can only name members of its cube and of the cubes it joins`);
+      }
+      throw new UserError(`'${name}' can't be reached by joins: cube '${current}' has no join '${segment}'`);
+    }
+    steps.push({ from: current, segment, aliased: target.aliased });
+    current = target.cube;
+  }
+
+  const leaf = parts[parts.length - 1];
+  const member = model.member(current, leaf);
+
+  if (member) {
+    if (member.kind === 'segments') {
+      throw new UserError(`'${name}' is a segment: drill queries name dimensions and measures`);
+    }
+    return [{ steps, cube: current, leaf, kind: member.kind, type: member.type }];
+  }
+
+  if (allowSets) {
+    const expanded = expandSet(
+      model,
+      current,
+      leaf,
+      stack,
+      (setMember, setStack) => resolveCubeSteps(model, current, setMember, true, setStack)
+    );
+    if (expanded) {
+      return expanded.map(t => ({ ...t, steps: [...steps, ...t.steps] }));
+    }
+  }
+
+  throw new UserError(`'${name}' is not a ${allowSets ? 'member or member set' : 'member'} of cube '${current}'`);
+}
+
+function cubeDrillTarget({ steps, cube, leaf, kind, type }: CubeTarget): DrillTarget {
+  // Through a join alias the query format names the member from the cube that
+  // declares the alias, as `orders.customer.city`
+  const firstAlias = steps.findIndex(s => s.aliased);
+  const name = firstAlias < 0
+    ? `${cube}.${leaf}`
+    : [steps[firstAlias].from, ...steps.slice(firstAlias).map(s => s.segment), leaf].join('.');
+  return {
+    key: [...steps.map(s => s.segment), leaf].join('.'),
+    name,
+    kind,
+    type,
+    owner: cube,
+    member: leaf,
+    ...(firstAlias >= 0 ? { aliased: true } : {}),
+  };
 }
 
 /**
@@ -230,66 +305,13 @@ export function resolveCubeName(
   allowSets = true,
   stack: string[] = []
 ): DrillTarget[] {
-  let parts = name.split('.');
-  if (parts.length > 1 && (parts[0] === 'CUBE' || parts[0] === cubeName)) {
-    parts = parts.slice(1);
-  }
-
-  let current = cubeName;
-  let throughAlias = false;
-
-  for (const segment of parts.slice(0, -1)) {
-    const target = model.joinTarget(current, segment);
-    if (!target) {
-      if (model.isView(segment)) {
-        throw new UserError(`'${name}' names view '${segment}': a cube drill query can only name members of its cube and of the cubes it joins`);
-      }
-      throw new UserError(`'${name}' can't be reached by joins: cube '${current}' has no join '${segment}'`);
-    }
-    current = target.cube;
-    throughAlias = throughAlias || target.aliased;
-  }
-
-  const joinPath = parts.slice(0, -1);
-  const leaf = parts[parts.length - 1];
-  const member = model.member(current, leaf);
-
-  if (member) {
-    if (member.kind === 'segments') {
-      throw new UserError(`'${name}' is a segment: drill queries name dimensions and measures`);
-    }
-    return [{
-      key: [...joinPath, leaf].join('.'),
-      name: `${current}.${leaf}`,
-      kind: member.kind,
-      type: member.type,
-      ...(throughAlias ? { throughAlias: [...joinPath, leaf].join('.') } : {}),
-    }];
-  }
-
-  if (allowSets) {
-    const expanded = expandSet(
-      model,
-      current,
-      leaf,
-      stack,
-      (setMember, setStack) => resolveCubeName(model, current, setMember, true, setStack)
-    );
-    if (expanded) {
-      return expanded.map(t => ({
-        ...t,
-        key: [...joinPath, t.key].join('.'),
-        ...(throughAlias || t.throughAlias ? { throughAlias: [...joinPath, t.key].join('.') } : {}),
-      }));
-    }
-  }
-
-  throw new UserError(`'${name}' is not a ${allowSets ? 'member or member set' : 'member'} of cube '${current}'`);
+  return resolveCubeSteps(model, cubeName, name, allowSets, stack).map(cubeDrillTarget);
 }
 
 /**
  * Resolves a name in a view drill query or a view member set: a member or
- * member set of the view, or `<view or cube>.<member or member set>`.
+ * member set of the view, `<view or cube>.<member or member set>`, or an alias
+ * path from a cube, as in a query.
  */
 export function resolveViewName(
   model: DrillQueryModel,
@@ -302,38 +324,38 @@ export function resolveViewName(
   if (parts.length > 1 && parts[0] === 'CUBE') {
     parts = parts.slice(1);
   }
-  if (parts.length > 2) {
-    throw new UserError(`'${name}' must be a member of this view or '<view or cube>.<member>'`);
-  }
 
-  const owner = parts.length === 2 ? parts[0] : viewName;
-  const leaf = parts[parts.length - 1];
+  const owner = parts.length >= 2 ? parts[0] : viewName;
   const ownerIsView = model.isView(owner);
 
   if (ownerIsView === undefined) {
     throw new UserError(`'${name}' names '${owner}', which is neither a view nor a cube`);
   }
+  if (parts.length > 2 && ownerIsView) {
+    throw new UserError(`'${name}' must be a member of this view or '<view or cube>.<member>'`);
+  }
 
   if (!ownerIsView) {
-    return resolveCubeName(model, owner, leaf, allowSets, stack).map(t => {
-      // A view names cube members bare and lets the query pick the joins, which
-      // could differ from the join path a cube member set declares
-      if (t.key.includes('.') && !t.throughAlias) {
+    return resolveCubeName(model, owner, parts.slice(1).join('.'), allowSets, stack).map(t => {
+      // A view names a cube member bare and lets the query pick the joins, so
+      // only an alias path pins the join path a name goes through
+      if (t.key.includes('.') && !t.aliased) {
         throw new UserError(
-          `'${name}' reaches '${t.key}' through a join path of cube '${owner}': name the member '${t.name}' or a view member instead`
+          `'${name}' reaches '${t.key}' through a join path of cube '${owner}': name the member '${t.name}', a view member, or a path through a join alias instead`
         );
       }
       return { ...t, key: t.name };
     });
   }
 
+  const leaf = parts[parts.length - 1];
   const member = model.member(owner, leaf);
   if (member) {
     if (member.kind === 'segments') {
       throw new UserError(`'${name}' is a segment: drill queries name dimensions and measures`);
     }
     const qualified = `${owner}.${leaf}`;
-    return [{ key: qualified, name: qualified, kind: member.kind, type: member.type }];
+    return [{ key: qualified, name: qualified, kind: member.kind, type: member.type, owner, member: leaf }];
   }
 
   if (allowSets) {
@@ -451,7 +473,11 @@ export function mapDrillQuery(
 ): ResolvedDrillQuery | undefined {
   const rename = (target: DrillTarget): DrillTarget | undefined => {
     const name = targetName(target);
-    return name === undefined ? undefined : { key: name, name, kind: target.kind, type: target.type };
+    if (name === undefined) {
+      return undefined;
+    }
+    const [owner, member] = name.split('.');
+    return { key: name, name, kind: target.kind, type: target.type, owner, member };
   };
 
   const members = uniqueByKey(query.members.map(rename).filter((t): t is DrillTarget => !!t));

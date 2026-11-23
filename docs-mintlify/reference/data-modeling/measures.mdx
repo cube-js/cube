@@ -1670,7 +1670,10 @@ limit and filters. `drill_members` stays the default drill down.
 
 In a cube, a member name is a member or member set of the cube, or a join path
 from the cube to one, e.g., `users.city` or `line_items.products.name`. A cube
-drill query can't name a view.
+drill query can't name a view. A join path can go through a [join
+alias][ref-join-alias]: if `orders` joins `users` as `customer` and as
+`manager`, `customer.city` and `manager.city` are different members, and meta
+names them by their path in the query format, `orders.customer.city`.
 
 <CodeGroup>
 
@@ -1746,8 +1749,9 @@ while it has a `limit`, or when no members remain.
 A view can also define drill queries on the measures it includes, in the
 include, and on its own measures. One with the name of an inherited drill query
 replaces it. In a view, a member name is a member or member set of the view, or
-`<view or cube>.<member>` for a member or member set of another view or cube.
-Its members must be joinable with the measure.
+`<view or cube>.<member>` for a member or member set of another view or cube,
+or an alias path such as `orders.customer.city`. Its members must be joinable
+with the measure.
 
 ```yaml
 views:
@@ -1768,7 +1772,8 @@ views:
 A drill query runs under the access policies of every view and cube it names.
 `/v1/meta` lists the drill queries of each measure in `drillQueries`, with
 qualified member names, and leaves out those naming members the user can't
-access. As with `drill_members`, a drill query can name members that are not
+access, checking a member reached through a join alias as the joined cube's
+member. As with `drill_members`, a drill query can name members that are not
 `public`, e.g., of a cube that is exposed only through views. Call [`ResultSet.drillDown()`][ref-drilldowns] with a drill query's
 name to build its query.
 
@@ -1802,3 +1807,4 @@ name to build its query.
 [ref-member-sets]: /reference/data-modeling/cube#member_sets
 [ref-order-query]: /reference/core-data-apis/rest-api/query-format#order-format
 [link-tabler-icons]: https://tabler.io/icons
+[ref-join-alias]: /reference/data-modeling/joins#alias

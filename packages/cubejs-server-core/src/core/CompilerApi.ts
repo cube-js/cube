@@ -1430,8 +1430,13 @@ export class CompilerApi {
       if (!item.drillQueries) {
         return item;
       }
+      // A member reached through a join alias (`orders.customer.city`) is checked as the
+      // joined cube's member (`users.city`)
+      const isVisible = (name: string) => isMemberVisibleInContext[
+        name.split('.').length > 2 ? (cubeEvaluator.resolveMemberPath(name)?.targetPath ?? name) : name
+      ] !== false;
       const drillQueries = item.drillQueries.filter(
-        (query: any) => drillQueryNames(query).every((name) => isMemberVisibleInContext[name] !== false)
+        (query: any) => drillQueryNames(query).every(isVisible)
       );
       if (drillQueries.length === item.drillQueries.length) {
         return item;

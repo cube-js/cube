@@ -443,7 +443,7 @@ cubes:
         type: string
 `;
 
-    it('offers a drill query through an alias only in views, mapped through the alias', async () => {
+    it('names members through an alias by their alias path, and maps them through the alias in views', async () => {
       const compilers = prepareYamlCompiler(`${ALIASED}
 views:
   - name: deals
@@ -459,9 +459,16 @@ views:
 `);
       await compilers.compile();
 
-      // The cube can't name the aliased instances in meta
-      expect(measureMeta(compilers, 'orders', 'total_amount').drillQueries.map((q: any) => q.name))
-        .toEqual(['by_id']);
+      // Both are `users.city`, but through different aliases
+      expect(measureMeta(compilers, 'orders', 'total_amount').drillQueries[0]).toEqual({
+        name: 'by_parties',
+        title: 'By Parties',
+        members: ['orders.buyer.city', 'orders.seller.city', 'orders.total_amount'],
+        membersGrouped: {
+          dimensions: ['orders.buyer.city', 'orders.seller.city'],
+          measures: ['orders.total_amount'],
+        },
+      });
       expect(measureMeta(compilers, 'deals', 'total_amount').drillQueries.map((q: any) => [q.name, q.members]))
         .toEqual([
           ['by_parties', ['deals.buyer_city', 'deals.seller_city', 'deals.total_amount']],
@@ -469,7 +476,7 @@ views:
         ]);
     });
 
-    it('fails on a view drill query naming a cube member set through an alias', async () => {
+    it('lets a view name alias paths and cube member sets that go through an alias', async () => {
       const compilers = prepareYamlCompiler(`${ALIASED}
 views:
   - name: deals
@@ -480,8 +487,47 @@ views:
             drill_queries:
               - name: own_parties
                 members: [orders.parties, total_amount]
+              - name: buyer_only
+                members: [orders.buyer.city, total_amount]
+                order: { orders.buyer.city: asc }
 `);
-      await expect(compilers.compile()).rejects.toThrow(/reaches 'buyer.city' through a join alias/);
+      await compilers.compile();
+
+      const own = measureMeta(compilers, 'deals', 'total_amount').drillQueries
+        .filter((q: any) => q.name !== 'by_parties' && q.name !== 'by_id');
+      expect(own).toEqual([
+        {
+          name: 'own_parties',
+          title: 'Own Parties',
+          members: ['orders.buyer.city', 'orders.seller.city', 'deals.total_amount'],
+          membersGrouped: {
+            dimensions: ['orders.buyer.city', 'orders.seller.city'],
+            measures: ['deals.total_amount'],
+          },
+        },
+        {
+          name: 'buyer_only',
+          title: 'Buyer Only',
+          members: ['orders.buyer.city', 'deals.total_amount'],
+          membersGrouped: { dimensions: ['orders.buyer.city'], measures: ['deals.total_amount'] },
+          order: { 'orders.buyer.city': 'asc' },
+        },
+      ]);
+    });
+
+    it('fails on a view name that is a join path without an alias', async () => {
+      const compilers = prepareYamlCompiler(`${CUBES}
+views:
+  - name: orders_overview
+    cubes:
+      - join_path: orders
+        includes:
+          - name: total_amount
+            drill_queries:
+              - name: plain_path
+                members: [orders.users.city, total_amount]
+`);
+      await expect(compilers.compile()).rejects.toThrow(/reaches 'users.city' through a join path of cube 'orders'/);
     });
   });
 

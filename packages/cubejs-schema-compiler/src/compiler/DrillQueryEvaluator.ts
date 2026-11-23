@@ -108,23 +108,10 @@ export class DrillQueryEvaluator implements CompilerInterface {
       } else {
         try {
           const resolved = resolveDrillQuery(model, definition, resolve);
-          const aliased = drillQueryTargets(resolved).find(t => t.throughAlias);
-          // Meta names a member by its cube, which loses the aliased instance.
-          // A view that includes the member through the alias still inherits it.
-          if (aliased && cube.isView) {
-            throw new UserError(
-              `Drill query '${definition.name}' reaches '${aliased.throughAlias}' through a join alias: name the view member included through that alias instead`
-            );
-          } else if (aliased) {
-            reporter.warning({
-              message: `Measure '${measurePath}': drill query '${definition.name}' reaches '${aliased.throughAlias}' through a join alias, so only views that include it through that alias offer it`,
-            });
-          } else {
-            if (cube.isView) {
-              this.checkJoinable(cube.name, measureName, resolved, model);
-            }
-            result.push(resolved);
+          if (cube.isView) {
+            this.checkJoinable(cube.name, measureName, resolved, model);
           }
+          result.push(resolved);
         } catch (e: any) {
           reporter.error(`Measure '${measurePath}': ${e.message}`);
         }
@@ -143,8 +130,13 @@ export class DrillQueryEvaluator implements CompilerInterface {
     const cubes = new Set<string>(this.underlyingCubes(viewName, 'measures', measureName, model));
 
     for (const target of drillQueryTargets(query)) {
-      const [owner, member] = target.name.split('.');
-      this.underlyingCubes(owner, target.kind, member, model).forEach(c => cubes.add(c));
+      if (target.aliased) {
+        // The alias path pins the join from the cube that declares the alias,
+        // and aliased joins aren't in the join graph
+        cubes.add(target.name.split('.')[0]);
+      } else {
+        this.underlyingCubes(target.owner, target.kind, target.member, model).forEach(c => cubes.add(c));
+      }
     }
 
     if (cubes.size < 2) {
