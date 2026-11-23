@@ -1105,20 +1105,19 @@ export class CompilerApi {
     if (q === null || t === null) {
       return false;
     }
-    const order = this.compareFilterNumbers(q, t);
-    // A float column rounds both bounds. Rounding keeps their order but can make two
-    // different bounds equal, so a strict order is only trusted up to 15 digits.
-    const distinct = q.int.length + q.frac.length <= 15 && t.int.length + t.frac.length <= 15;
-
     // An inclusive query bound only fits inside an exclusive policy bound when it is
-    // strictly tighter (`x >= q` implies `x > t` only for q > t). Every other pair
-    // also holds for equal bounds.
-    if (lowerBounds) {
-      const needsStrictlyTighter = qOp === 'gte' && tOp === 'gt';
-      return needsStrictlyTighter ? distinct && order > 0 : order >= 0;
+    // strictly tighter (`x >= q` implies `x > t` only for q > t). The database compares
+    // in the column type, which can round two different bounds to the same value
+    // (`real`, fixed-scale decimal), and that type is unknown here, so such a pair is
+    // never proven.
+    const needsStrictlyTighter = (qOp === 'gte' && tOp === 'gt') || (qOp === 'lte' && tOp === 'lt');
+    if (needsStrictlyTighter) {
+      return false;
     }
-    const needsStrictlyTighter = qOp === 'lte' && tOp === 'lt';
-    return needsStrictlyTighter ? distinct && order < 0 : order <= 0;
+    // Rounding keeps the order of the bounds, so every other pair holds, equal
+    // bounds included.
+    const order = this.compareFilterNumbers(q, t);
+    return lowerBounds ? order >= 0 : order <= 0;
   }
 
   protected filterConditionImplied(
