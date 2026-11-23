@@ -937,12 +937,9 @@ export class CompilerApi {
     // (instead of being fully masked) when the query is already scoped to the
     // filter's rows.
     const targetPath = (member: string) => cubeEvaluator.resolveMemberPath(member)?.targetPath || member;
-    // The query filters prove nothing about rows a member reads outside of them:
-    // a time-shifted measure moves the time filters with it, and a multi-stage
-    // filter directive with exclude / keepOnly drops inherited query filters.
-    // Any such directive keeps the masks, whatever members it lists: the planner
-    // also drops filters on members that only reference a listed one, so comparing
-    // the listed names with the mask filter's members would miss those.
+    // Query filters prove nothing about rows read outside them: time shifts move them,
+    // and any exclude / keepOnly directive drops them — whatever it lists, since filters
+    // on members that only reference a listed member are dropped too.
     const readsRowsOutsideFilters = memberNames.some((member) => {
       const path = targetPath(member);
       if (cubeEvaluator.isMeasure(path)) {
