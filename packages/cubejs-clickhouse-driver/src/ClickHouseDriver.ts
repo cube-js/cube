@@ -786,7 +786,6 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     // ClickHouse writes to S3 itself, so the pod's OIDC identity never reaches it: hand it short-lived credentials.
     const credentials: S3Credentials = staticCredentials ?? await this.getExportCredentials(bucketName, path, region);
     const credentialParams = [credentials.accessKeyId, credentials.secretAccessKey];
-    // s3(url, key, secret, session_token, format) authenticates from ClickHouse 24.3.
     if (credentials.sessionToken) {
       credentialParams.push(credentials.sessionToken);
     }
