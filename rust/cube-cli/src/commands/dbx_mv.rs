@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context as _, Result};
 use clap::Subcommand;
 use reqwest::Method;
 use serde_json::{json, Map, Value};
@@ -265,6 +265,13 @@ fn check_target(settings: &Value, target: &Option<String>) -> Result<()> {
     )
 }
 
+/// Whether `target` names a publication target other than `default`.
+fn is_named(target: &Option<String>) -> bool {
+    target
+        .as_deref()
+        .is_some_and(|name| !name.eq_ignore_ascii_case(DEFAULT_TARGET))
+}
+
 /// The save request: `data` when given, otherwise the saved settings, with the flags on top.
 /// It carries the configuration version read from `saved`, or 0 to create the target.
 fn save_body(saved: Option<&Value>, data: Option<Map<String, Value>>, flags: Settings) -> Value {
@@ -515,8 +522,19 @@ async fn target_command(cmd: TargetCmd, api: &Client, json: bool) -> Result<()> 
             let query = target_query(&target);
             // Not there yet means this save creates it.
             let saved = api.get_optional(&path, &query).await?;
-            if let Some(saved) = &saved {
-                check_target(saved, &target)?;
+            match &saved {
+                Some(saved) => check_target(saved, &target)?,
+                // A tenant from before named targets would create `default` instead, so
+                // creating a named one first needs the targets list, which such a tenant lacks.
+                None if is_named(&target) => {
+                    api.get(&format!("{path}/targets"), &Query::new())
+                        .await
+                        .context(
+                            "this tenant could not confirm it supports named publication \
+                             targets, so saving could create `default` instead",
+                        )?;
+                }
+                None => {}
             }
             let body = save_body(saved.as_ref(), data, settings);
             let res = api.request(Method::PUT, &path, &query, Some(&body)).await?;
@@ -972,6 +990,10 @@ mod tests {
         let err = check_target(&json!({}), &staging).unwrap_err().to_string();
         assert!(err.contains("answered for `default`"), "{err}");
         assert!(check_target(&json!({"targetName": "production"}), &staging).is_err());
+
+        assert!(is_named(&staging));
+        assert!(!is_named(&None));
+        assert!(!is_named(&Some("Default".to_string())));
     }
 
     #[test]
