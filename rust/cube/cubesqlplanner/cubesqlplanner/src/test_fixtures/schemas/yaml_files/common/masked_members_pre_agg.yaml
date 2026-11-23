@@ -70,6 +70,7 @@ cubes:
           - gender_source_mask
           - gender_stored_member_mask
           - gender_unstored_member_mask
+          - created_at
         segments:
           - females
         time_dimension: created_at

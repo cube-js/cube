@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.32](https://github.com/cube-js/cube/compare/v1.8.31...v1.8.32) (2026-11-21)
+
+### Bug Fixes
+
+- **api-gateway:** Don't fail SQL API errors when log redaction fails ([#12889](https://github.com/cube-js/cube/issues/12889)) ([a22816f](https://github.com/cube-js/cube/commit/a22816f0d13277f694c25ae4e8e447a04044905b))
+- **query-orchestrator:** Share every pre-aggregation cache key under the pre-aggregation orchestrator id ([#12871](https://github.com/cube-js/cube/issues/12871)) ([c8c884c](https://github.com/cube-js/cube/commit/c8c884c6d850d8764f6721a5ca2a678f5c72085a)), closes [#12808](https://github.com/cube-js/cube/issues/12808)
+
+### Features
+
+- **api-gateway:** Add force and dry-run options to the pre-aggregation jobs API ([#12882](https://github.com/cube-js/cube/issues/12882)) ([67f452a](https://github.com/cube-js/cube/commit/67f452ae60da39b7f68f2eba0aa56e8c2e02ebbf))
+- **cube-cli:** Add query-history command ([#12890](https://github.com/cube-js/cube/issues/12890)) ([b6188ce](https://github.com/cube-js/cube/commit/b6188ced57682f9ff856df67af535ab119063963))
+- **cubestore:** Process identity, liveness and failure metrics ([#12878](https://github.com/cube-js/cube/issues/12878)) ([59c5594](https://github.com/cube-js/cube/commit/59c559491ec8a1a7f940fa598a7b38400267e2f4))
+
+## [1.8.31](https://github.com/cube-js/cube/compare/v1.8.30...v1.8.31) (2026-11-20)
+
+### Bug Fixes
+
+- **cubestore:** Keep in-memory compaction and chunk GC alive under load ([#12767](https://github.com/cube-js/cube/issues/12767)) ([fd7c40e](https://github.com/cube-js/cube/commit/fd7c40e939ecdc0bef6e799e213a9b106e5442bf))
+- **tesseract:** Match rollups storing a time dimension also as a plain dimension ([#12866](https://github.com/cube-js/cube/issues/12866)) ([fcfde87](https://github.com/cube-js/cube/commit/fcfde87d5eae08c4e7d14a5cc7f0e11d9bc2d4a1)), closes [#12578](https://github.com/cube-js/cube/issues/12578)
+
+## [1.8.30](https://github.com/cube-js/cube/compare/v1.8.29...v1.8.30) (2026-11-19)
+
+### Bug Fixes
+
+- **tesseract:** Build Cube Store LIKE patterns with CONCAT instead of || ([#12858](https://github.com/cube-js/cube/issues/12858)) ([2613f2c](https://github.com/cube-js/cube/commit/2613f2cf0c6fca1374d12b627f73a6f88f691ec6))
+
 ## [1.8.29](https://github.com/cube-js/cube/compare/v1.8.28...v1.8.29) (2026-11-19)
 
 ### Bug Fixes

@@ -13,6 +13,10 @@ type TestQueryBody = OmitKnown<QueryBody, 'preAggregations'> & {
 };
 
 class TestQueryOrchestrator extends QueryOrchestrator {
+  public getPreAggregationsQueryCache() {
+    return this.preAggregationsQueryCache;
+  }
+
   public fetchQuery(queryBody: TestQueryBody) {
     return super.fetchQuery(queryBody as QueryBody);
   }
@@ -1896,6 +1900,272 @@ describe('QueryOrchestrator', () => {
       await mockDriver.delay(200);
     }
     // expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_delay/));
+  });
+
+  describe('shared pre-aggregation orchestrator id', () => {
+    let sharedTestCount = 1;
+
+    const preAggregation = (name: string, refreshKeySql: string = 'SELECT 1'): TestQueryBody['preAggregations'][number] => ({
+      preAggregationsSchema: 'stb_pre_aggregations',
+      tableName: `stb_pre_aggregations.${name}`,
+      loadSql: [`CREATE TABLE stb_pre_aggregations.${name} AS SELECT * FROM public.orders`, []],
+      invalidateKeyQueries: [[refreshKeySql, []]],
+    });
+
+    const query = (name: string, refreshKeySql?: string): TestQueryBody => ({
+      query: `SELECT * FROM stb_pre_aggregations.${name}`,
+      values: [],
+      cacheKeyQueries: {
+        renewalThreshold: 21600,
+        queries: [],
+      },
+      preAggregations: [preAggregation(name, refreshKeySql)],
+      requestId: `shared pre-aggregation orchestrator id ${name}`,
+    });
+
+    // Each app has its own orchestrator id, so its own query cache and queue, and only the
+    // pre-aggregation id is shared, as `contextToPreAggregationOrchestratorId` sets it up
+    const createApp = (orchestratorId: string, preAggregationsRedisPrefix?: string, touchTablePersistTime = 3600) => new TestQueryOrchestrator(
+      orchestratorId,
+      () => asDriver(mockDriver),
+      testLogger,
+      {
+        preAggregationsRedisPrefix,
+        queryCacheOptions: {
+          queueOptions: () => ({ concurrency: 2 }),
+        },
+        preAggregationsOptions: {
+          queueOptions: () => ({ executionTimeout: 2, concurrency: 2 }),
+          dropPreAggregationsWithoutTouch: true,
+          touchTablePersistTime,
+          usedTablePersistTime: 1,
+        },
+      },
+    );
+
+    let apps: TestQueryOrchestrator[] = [];
+
+    const createApps = (shared: boolean) => {
+      const id = sharedTestCount++;
+      const preAggregationsRedisPrefix = shared ? `SHARED_PRE_AGG_${id}` : undefined;
+      apps = [
+        createApp(`APP_A_${id}`, preAggregationsRedisPrefix),
+        createApp(`APP_B_${id}`, preAggregationsRedisPrefix),
+      ];
+      return apps;
+    };
+
+    afterEach(async () => {
+      await Promise.all(apps.map(app => app.cleanup()));
+      apps = [];
+    });
+
+    test('every pre-aggregation key but the refresh end is shared', async () => {
+      const [appA, appB] = createApps(true);
+      const tableName = 'stb_pre_aggregations.orders_shared_keys';
+
+      await appA.getPreAggregations().addTableUsed(tableName);
+      await appA.getPreAggregations().updateLastTouch(tableName);
+      await appA.getPreAggregations().updatePreAggBackoff(tableName, { backoffMultiplier: 2, nextTimestamp: new Date(0) });
+      await appA.getPreAggregations().setPreAggregationBuildStatus(tableName, { status: 'building', startedAt: 1 } as never);
+
+      expect(await appB.getPreAggregations().tablesUsed()).toContain(tableName);
+      expect(await appB.getPreAggregations().tablesTouched()).toContain(tableName);
+      expect(await appB.getPreAggregations().getPreAggBackoff(tableName)).toMatchObject({ backoffMultiplier: 2 });
+      expect(await appB.getPreAggregations().getPreAggregationBuildStatus(tableName)).toMatchObject({ status: 'building' });
+    });
+
+    test('the refresh end stays per orchestrator', async () => {
+      const [appA, appB] = createApps(true);
+
+      // App A's finished refresh says nothing about the tables app B's refresh still has to touch
+      await appA.getPreAggregations().updateRefreshEndReached();
+
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+      expect(await appB.getPreAggregations().getRefreshEndReached()).toBeFalsy();
+    });
+
+    test('the refresh end waits for every orchestrator that refreshes', async () => {
+      const [appA, appB] = createApps(true);
+
+      await appB.markRefreshActive();
+      await appA.markRefreshActive();
+      await appA.updateRefreshEndReached();
+
+      // App B refreshes but hasn't finished, so its tables may not be touched yet
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeFalsy();
+
+      await appB.updateRefreshEndReached();
+
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+      expect(await appB.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+    });
+
+    test('the refresh active mark outlives a touch timeout shorter than its interval', async () => {
+      const sharedId = `SHARED_PRE_AGG_${sharedTestCount++}`;
+      const appA = createApp(`APP_A_${sharedTestCount++}`, sharedId);
+      // A one second touch timeout, so the mark lives one second
+      const appB = createApp(`APP_B_${sharedTestCount++}`, sharedId, 1);
+      apps.push(appA, appB);
+
+      await appA.updateRefreshEndReached();
+
+      for (let i = 0; i < 3; i++) {
+        await appB.markRefreshActive();
+        await mockDriver.delay(600);
+      }
+
+      // App B kept refreshing for longer than its mark lives, without finishing
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeFalsy();
+    });
+
+    test('an orchestrator id with a colon keeps a key Cube Store can list', async () => {
+      const sharedId = `SHARED_PRE_AGG_${sharedTestCount++}`;
+      const appA = createApp(`APP_A_${sharedTestCount++}`, sharedId);
+      const appB = createApp(`tenant:v2_${sharedTestCount++}`, sharedId);
+      apps.push(appA, appB);
+
+      await appB.markRefreshActive();
+      await appA.updateRefreshEndReached();
+
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeFalsy();
+
+      // Cube Store lists a key under the part before its last `:`, which has to be the catalog's
+      const activeKeys = await appB.getPreAggregationsQueryCache().getCacheDriver()
+        .keysStartingWith(`${sharedId}#SQL_PRE_AGGREGATIONS_REFRESH_ACTIVE:`);
+      expect(activeKeys).toHaveLength(1);
+      expect(activeKeys[0].slice(activeKeys[0].lastIndexOf(':'))).toEqual(
+        `:${encodeURIComponent(`tenant:v2_${sharedTestCount - 1}`)}`
+      );
+
+      await appB.updateRefreshEndReached();
+
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+    });
+
+    test('an app whose orchestrator id is the shared id waits for the others too', async () => {
+      const sharedId = `SHARED_PRE_AGG_${sharedTestCount++}`;
+      const appA = createApp(sharedId, sharedId);
+      const appB = createApp(`APP_B_${sharedTestCount++}`, sharedId);
+      apps.push(appA, appB);
+
+      // App A keeps one cache, as its pre-aggregation prefix is its own
+      expect(appA.getPreAggregationsQueryCache()).toBe(appA.getQueryCache());
+
+      await appB.markRefreshActive();
+      await appA.markRefreshActive();
+      await appA.updateRefreshEndReached();
+
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeFalsy();
+
+      await appB.updateRefreshEndReached();
+
+      expect(await appA.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+      expect(await appB.getPreAggregations().getRefreshEndReached()).toBeTruthy();
+    });
+
+    test('cleanup keeps untouched tables until every refreshing app finished its refresh', async () => {
+      const [appA, appB] = createApps(true);
+      const builder = createApp(`APP_BUILDER_${sharedTestCount++}`);
+      apps.push(builder);
+
+      // A table of app B that app B's refresh hasn't touched under the shared id yet
+      await fetchLongPolling(builder, query('orders_of_b'));
+      const tableOfB = mockDriver.tables.find(t => t.includes('orders_of_b'));
+
+      await appB.markRefreshActive();
+      await appA.updateRefreshEndReached();
+      await fetchLongPolling(appA, query('orders_built_by_a'));
+
+      expect(mockDriver.tables).toContain(tableOfB);
+
+      await appB.updateRefreshEndReached();
+      await fetchLongPolling(appA, query('orders_built_by_a_again'));
+
+      expect(mockDriver.tables).not.toContain(tableOfB);
+    });
+
+    test('pre-aggregation keys stay per orchestrator by default', async () => {
+      const [appA, appB] = createApps(false);
+      const tableName = 'stb_pre_aggregations.orders_own_keys';
+
+      const activeMarks = async () => (await appA.getQueryCache().getCacheDriver().keysStartingWith(''))
+        .filter(key => key.includes('#SQL_PRE_AGGREGATIONS_REFRESH_ACTIVE:'));
+      const activeMarksBefore = await activeMarks();
+
+      await appA.getPreAggregations().updateLastTouch(tableName);
+      await appA.markRefreshActive();
+      await appA.getPreAggregations().updateRefreshEndReached();
+
+      expect(await appB.getPreAggregations().tablesTouched()).not.toContain(tableName);
+      expect(await appB.getPreAggregations().getRefreshEndReached()).toBeFalsy();
+      // Nothing shares its cache, so nothing waits for it
+      expect(await activeMarks()).toEqual(activeMarksBefore);
+    });
+
+    test('cleanup keeps a table that another app touched', async () => {
+      const [appA, appB] = createApps(true);
+      // Built by an app outside the shared id, so nothing but app A's touch keeps it
+      const builder = createApp(`APP_BUILDER_${sharedTestCount++}`);
+      apps.push(builder);
+
+      await fetchLongPolling(builder, query('orders_touched_by_a'));
+      await fetchLongPolling(builder, query('orders_touched_by_nobody'));
+
+      const touchedByA = mockDriver.tables.find(t => t.includes('orders_touched_by_a'));
+      expect(touchedByA).toBeDefined();
+      expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_touched_by_nobody/));
+
+      await appA.getPreAggregations().updateLastTouch(touchedByA);
+      await appB.updateRefreshEndReached();
+
+      // App B's build drops the orphaned tables of the shared schema
+      await fetchLongPolling(appB, query('orders_built_by_b'));
+
+      expect(mockDriver.tables).toContain(touchedByA);
+      expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_built_by_b/));
+      expect(mockDriver.tables).not.toContainEqual(expect.stringMatching(/orders_touched_by_nobody/));
+    });
+
+    test('the queues of the pre-aggregation cache are reconciled, cancelled and cleaned up', async () => {
+      const [appA] = createApps(true);
+      const preAggregationsQueryCache = appA.getPreAggregationsQueryCache();
+      expect(preAggregationsQueryCache).not.toBe(appA.getQueryCache());
+
+      const queue = await preAggregationsQueryCache.getQueue('default');
+      const cancelledQuery = { requestId: 'shared-pre-aggregation-request' } as never;
+      const reconcileQueue = jest.spyOn(queue, 'reconcileQueue');
+      jest.spyOn(queue, 'cancelQueryByRequestId').mockResolvedValue([cancelledQuery]);
+      const cleanup = jest.spyOn(preAggregationsQueryCache, 'cleanup');
+
+      await appA.forceReconcile('default');
+      expect(reconcileQueue).toHaveBeenCalled();
+
+      expect(await appA.cancelQueryByRequestId('shared-pre-aggregation-request')).toContain(cancelledQuery);
+
+      await appA.cleanup();
+      expect(cleanup).toHaveBeenCalled();
+    });
+
+    test('pre-aggregations use the query cache without a separate id', async () => {
+      const [appA] = createApps(false);
+
+      expect(appA.getPreAggregationsQueryCache()).toBe(appA.getQueryCache());
+    });
+
+    test('refresh key results are shared', async () => {
+      const [appA, appB] = createApps(true);
+      const refreshKeySql = 'SELECT shared_refresh_key';
+      const refreshKeyRuns = () => mockDriver.executedQueries.filter(q => JSON.stringify(q).includes(refreshKeySql)).length;
+
+      await fetchLongPolling(appA, query('orders_shared_refresh_key', refreshKeySql));
+      const runsAfterA = refreshKeyRuns();
+      expect(runsAfterA).toBeGreaterThan(0);
+
+      await fetchLongPolling(appB, query('orders_shared_refresh_key', refreshKeySql));
+
+      expect(refreshKeyRuns()).toEqual(runsAfterA);
+    });
   });
 
   describe('Data Source Metadata Methods', () => {

@@ -42,7 +42,8 @@ use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
 use crate::telemetry::tracing::{
-    record_result, record_trace_obj, ProcessMemoryWindow, TraceIdAndSpanId, TracingHelper,
+    record_result, record_trace_obj, trace_obj_request_id, ProcessMemoryWindow, TraceIdAndSpanId,
+    TracingHelper,
 };
 use crate::trace::{MainTrace, OpKind, SubprocessTrace, WorkerTrace};
 use crate::util::memory::MemoryHandler;
@@ -504,6 +505,13 @@ impl WorkerProcessing for WorkerProcessor {
 
     fn process_type() -> String {
         "sel-worker".to_string()
+    }
+
+    fn request_label(request: &WorkerMessage) -> Option<String> {
+        match request {
+            WorkerMessage::Select(plan, ..) => trace_obj_request_id(plan.trace_obj().as_deref())
+                .map(|id| format!("request {}", id)),
+        }
     }
 }
 
@@ -1431,6 +1439,11 @@ impl ClusterImpl {
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
         Ok(())
+    }
+
+    /// Cancelled when the processing loops are stopped.
+    pub fn stop_token(&self) -> CancellationToken {
+        self.stop_token.clone()
     }
 
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {

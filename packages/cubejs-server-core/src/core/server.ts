@@ -869,9 +869,10 @@ export class CubejsServerCore {
         // speedup with cache
         contextToExternalDbType: () => externalDbType,
         redisPrefix: orchestratorId,
-        // Left unset when it matches, so `orchestratorOptions.redisPrefix` still keys
-        // the pre-aggregation queues by default
-        preAggregationsRedisPrefix: preAggregationOrchestratorId !== orchestratorId
+        // Set whenever a pre-aggregation id is configured, even one equal to this orchestrator's,
+        // so it waits for the others sharing it. Unset by default, so `orchestratorOptions.redisPrefix`
+        // still keys the pre-aggregation queues and caches
+        preAggregationsRedisPrefix: this.contextToPreAggregationOrchestratorId !== this.contextToOrchestratorId
           ? preAggregationOrchestratorId
           : undefined,
         skipExternalCacheAndQueue: externalDbType === 'cubestore',

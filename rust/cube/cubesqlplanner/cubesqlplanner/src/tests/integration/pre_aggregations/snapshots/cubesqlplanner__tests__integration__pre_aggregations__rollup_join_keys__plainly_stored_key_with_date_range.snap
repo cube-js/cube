@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/rollup_join_keys.rs
+expression: rows
+---
+td_dates__quarter_label | td_facts__day_day        | td_facts__total_amount
+------------------------+--------------------------+-----------------------
+Q1                      | 2026-01-01T00:00:00.000Z | 15                    
+Q1                      | 2026-02-15T00:00:00.000Z | 7

@@ -1,5 +1,8 @@
-use cubestore::config::{env_parse_positive_lenient, validate_config, Config, CubeServices};
+use cubestore::config::{
+    env_parse_positive_lenient, is_router, validate_config, Config, CubeServices,
+};
 use cubestore::http::status::serve_status_probes;
+use cubestore::telemetry::process::start_process_metrics;
 use cubestore::telemetry::{init_agent_sender, track_event};
 use cubestore::util::logger::init_cube_logger;
 use cubestore::util::metrics::init_metrics;
@@ -72,6 +75,13 @@ fn main() {
 
     #[cfg(not(target_os = "windows"))]
     cubestore::util::respawn::init();
+
+    let role = if is_router(config.config_obj().as_ref()) {
+        "router"
+    } else {
+        "worker"
+    };
+    start_process_metrics(role, None);
 
     let mut tokio_builder = Builder::new_multi_thread();
     tokio_builder.enable_all();

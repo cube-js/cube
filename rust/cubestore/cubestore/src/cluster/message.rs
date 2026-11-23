@@ -2,7 +2,8 @@ use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::trace::{MainTrace, WorkerTrace};
-use crate::CubeError;
+use crate::util::metrics;
+use crate::{app_metrics, CubeError};
 use datafusion::arrow::datatypes::SchemaRef;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
@@ -151,6 +152,7 @@ impl NetworkMessage {
         }
         let ver = socket.read_u32().await?;
         if ver != NETWORK_MESSAGE_VERSION {
+            count_decode_error("version_mismatch");
             return Err(CubeError::user(format!("Network protocol version mismatch. Expected {} but received {}. It seems multiple versions of Cube Store images running within the same cluster.", NETWORK_MESSAGE_VERSION, ver)));
         }
         let len = socket.read_u64().await?;
@@ -171,10 +173,101 @@ impl NetworkMessage {
 
         let mut buffer = Vec::with_capacity(len as usize);
         socket.take(len).read_to_end(&mut buffer).await?;
-        let r = flexbuffers::Reader::get_root(&buffer)?;
-        Ok(Some(Self::deserialize(r)?))
+        // A peer that goes away mid-message leaves a short buffer: a dropped connection, not a
+        // message this build cannot decode.
+        if (buffer.len() as u64) < len {
+            return Err(CubeError::internal(format!(
+                "Connection closed after {} of {} message bytes",
+                buffer.len(),
+                len
+            )));
+        }
+        let decoded = flexbuffers::Reader::get_root(&buffer)
+            .map_err(CubeError::from)
+            .and_then(|r| Ok(Self::deserialize(r)?));
+        if decoded.is_err() {
+            count_decode_error("undecodable");
+        }
+        Ok(Some(decoded?))
     }
+}
+
+fn count_decode_error(reason: &'static str) {
+    app_metrics::RPC_DECODE_ERRORS
+        .add_with_tags(1, Some(&vec![metrics::format_tag("reason", reason)]));
 }
 
 // Anything larger is considered to be an invalid message.
 const MAX_NETWORK_MSG_LEN: u64 = 20 * 1024 * 1024 * 1024; // 20GiB
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::net::TcpListener;
+
+    async fn receive_bytes(write: impl FnOnce(&mut Vec<u8>)) -> Result<NetworkMessage, CubeError> {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let mut bytes = Vec::new();
+        write(&mut bytes);
+        let writer = tokio::spawn(async move {
+            let mut socket = TcpStream::connect(addr).await.unwrap();
+            socket.write_all(&bytes).await.unwrap();
+        });
+        let (mut socket, _) = listener.accept().await.unwrap();
+        writer.await.unwrap();
+        NetworkMessage::receive(&mut socket).await
+    }
+
+    fn header(bytes: &mut Vec<u8>, version: u32, len: u64) {
+        bytes.extend_from_slice(&MAGIC.to_be_bytes());
+        bytes.extend_from_slice(&version.to_be_bytes());
+        bytes.extend_from_slice(&len.to_be_bytes());
+    }
+
+    #[tokio::test]
+    async fn message_cut_short_is_a_closed_connection_not_a_decode_error() {
+        crate::util::metrics::test_capture::watch("cs.rpc.decode_errors");
+        let before = decode_errors("undecodable");
+        let err = receive_bytes(|bytes| {
+            header(bytes, NETWORK_MESSAGE_VERSION, 100);
+            bytes.extend_from_slice(&[0; 10]);
+        })
+        .await
+        .unwrap_err();
+        assert!(
+            err.message
+                .contains("Connection closed after 10 of 100 message bytes"),
+            "{}",
+            err.message
+        );
+        assert_eq!(decode_errors("undecodable"), before);
+    }
+
+    fn decode_errors(reason: &str) -> usize {
+        let tags = vec![format!("reason:{}", reason)];
+        crate::util::metrics::test_capture::samples("cs.rpc.decode_errors")
+            .iter()
+            .filter(|(_, t)| *t == tags)
+            .count()
+    }
+
+    #[tokio::test]
+    async fn decode_errors_are_counted_by_reason() {
+        crate::util::metrics::test_capture::watch("cs.rpc.decode_errors");
+
+        let before = decode_errors("undecodable");
+        let err = receive_bytes(|bytes| {
+            header(bytes, NETWORK_MESSAGE_VERSION, 4);
+            bytes.extend_from_slice(&[0xff; 4]);
+        })
+        .await;
+        assert!(err.is_err());
+        assert!(decode_errors("undecodable") > before);
+
+        let before = decode_errors("version_mismatch");
+        let err = receive_bytes(|bytes| header(bytes, NETWORK_MESSAGE_VERSION + 1, 0)).await;
+        assert!(err.unwrap_err().message.contains("version mismatch"));
+        assert!(decode_errors("version_mismatch") > before);
+    }
+}

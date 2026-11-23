@@ -223,6 +223,16 @@ as the 5 biggest customers and an **Other** row. Choose **Top N…** in the
 dimension's menu in the field picker sidebar, or in its column header menu in
 the results.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/a7BMtuhSTAw"
+  title="Top N in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 The panel has these settings:
 
 - **Show** — **Top** or **Bottom**, and N. N starts at 10.
@@ -298,6 +308,16 @@ of every report on the same semantic view, and dashboard
 [filters and field switchers](#using-calculated-fields-on-dashboards) can
 target it.
 
+<iframe
+  width="100%"
+  height="400"
+  src="https://www.youtube-nocookie.com/embed/F5F08ajbucQ"
+  title="Reusable calculated fields in Cube"
+  frameBorder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+/>
+
 To promote a calculated dimension, choose **Promote to workbook field** from its
 column header menu in the results or from its menu in the sidebar. In the
 **Save calculated field** dialog, enter a **Name** and, optionally, a
@@ -348,10 +368,13 @@ Select a query field in the sidebar to open the editor. You can change its
 **SQL expression**, then choose **Update** to apply.
 
 Select a workbook field in the sidebar to open the **Update calculated field**
-dialog. You can change its **Title**, **Description**, **Format** and
-**Expression**. Its **Name** does not change, because reports and dashboards
-find the field by it, and neither does the **Value type** of a dimension,
-because dashboard controls are set up for it.
+dialog. You can change its **Title**, **Description**, **Format**,
+**Expression** and **Value type**. Its **Name** does not change, because
+reports and dashboards find the field by it.
+
+When you change the **Value type** of a dimension, save again each dashboard
+control set up for the previous type before you publish the dashboard. See
+[After a field's type changes][ref-type-change].
 
 When you update the expression of a workbook dimension, every report of the
 workbook on that semantic view that still uses the previous expression gets
@@ -373,6 +396,7 @@ it; publish again to show your edits to viewers.
 [ref-promote]: #promoting-to-a-workbook-field
 [ref-filter]: /docs/explore-analyze/dashboards/widgets/controls#calculated-dimensions
 [ref-field-switcher]: /docs/explore-analyze/dashboards/widgets/controls#choosing-what-it-switches
+[ref-type-change]: /docs/explore-analyze/dashboards/widgets/controls#calculated-dimension-type-change
 [ref-model-agent]: /docs/getting-started/develop-in-ide#ai-assisted-development
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-deployment-permissions]: /admin/users-and-permissions/custom-roles#deployment-permissions

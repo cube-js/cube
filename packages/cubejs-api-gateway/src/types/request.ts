@@ -8,6 +8,7 @@
 import type { Request as ExpressRequest } from 'express';
 import type { DataResult } from '@cubejs-backend/native';
 import { CacheMode } from '@cubejs-backend/shared';
+import type { PreAggregationVersionStatus } from '@cubejs-backend/query-orchestrator';
 import { RequestType, ApiType, ResultType } from './strings';
 import { Query } from './query';
 
@@ -180,6 +181,17 @@ type PreAggsSelector = {
   cubes?: string[],
   preAggregations?: string[],
   dateRange?: [string, string], // We expect only single date Range for rebuilding
+  /**
+   * `true` (the default) rebuilds every selected partition. `false` builds only
+   * the partitions whose current version is not the one their refresh keys call
+   * for; a job for an up-to-date partition reports `done` without a build.
+   */
+  force?: boolean,
+  /**
+   * Builds nothing: the post answers with each partition's version status,
+   * `done`, `outdated` or `missing_partition`, instead of job tokens.
+   */
+  dryRun?: boolean,
 };
 
 /**
@@ -224,6 +236,15 @@ type PreAggJobStatusItemFound = {
 
 type PreAggJobStatusItem = PreAggJobStatusItemNotFound | PreAggJobStatusItemFound;
 
+/**
+ * A dry-run post's answer for one partition: no job is queued, so no token.
+ * `table` is the built table only for `done`; otherwise it is a placeholder
+ * that a later build won't use.
+ */
+type PreAggJobDryRunItem = Omit<PreAggJobStatusItemFound, 'token'> & {
+  status: PreAggregationVersionStatus;
+};
+
 type PreAggJobStatusObject = {
   [token: string]: Omit<PreAggJobStatusItem, 'token'>
 };
@@ -252,6 +273,7 @@ export type {
   PreAggsSelector,
   PreAggJob,
   PreAggJobStatusItem,
+  PreAggJobDryRunItem,
   PreAggJobStatusObject,
   PreAggJobStatusResponse,
 };

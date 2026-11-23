@@ -193,10 +193,9 @@ async fn day_and_month_in_one_query_read_the_day_column() {
     }
 }
 
-// The member's reads resolve to its stored grain columns, which hold no raw
-// value, so the raw dimension falls back to the source.
+// The raw read takes the raw column, the date filter the day column.
 #[tokio::test(flavor = "multi_thread")]
-async fn raw_dimension_beside_its_grains_falls_back() {
+async fn raw_dimension_beside_its_grains_reads_the_raw_column() {
     let query = indoc! {r#"
         measures:
           - activity.amount
@@ -211,7 +210,118 @@ async fn raw_dimension_beside_its_grains_falls_back() {
         order:
           - id: activity.cohort_date
     "#};
-    if let Some((rollup, source)) = fallback_vs_source(query, "raw_and_grains").await {
+    if let Some((rollup, source)) = rollup_vs_source(query, "raw_and_grains").await {
+        assert_eq!(rollup, source);
+    }
+    if let Some(result) = on_cubestore(query, "raw_and_grains").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+fn raw_dimension_query(extra: &str) -> String {
+    let query = indoc! {"
+        measures:
+          - activity.count
+          - activity.amount
+        dimensions:
+          - activity.app_name
+          - activity.cohort_date
+        order:
+          - id: activity.cohort_date
+          - id: activity.app_name
+    "};
+    format!("{query}{extra}")
+}
+
+const DAY_WITH_DATE_RANGE: &str = indoc! {r#"
+    time_dimensions:
+      - dimension: activity.cohort_date
+        granularity: day
+        dateRange:
+          - "2024-12-28"
+          - "2025-01-03"
+"#};
+
+#[tokio::test(flavor = "multi_thread")]
+async fn raw_dimension_listed_beside_its_time_dimension_reads_the_raw_column() {
+    let query = raw_dimension_query("");
+    if let Some((rollup, source)) = rollup_vs_source(&query, "day_with_raw_dimension").await {
+        assert_eq!(rollup, source);
+    }
+    if let Some(result) = on_cubestore(&query, "day_with_raw_dimension").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn raw_dimension_and_its_day_time_dimension_read_their_own_columns() {
+    let query = raw_dimension_query(DAY_WITH_DATE_RANGE);
+    if let Some((rollup, source)) = rollup_vs_source(&query, "day_with_raw_dimension").await {
+        assert_eq!(rollup, source);
+    }
+    if let Some(result) = on_cubestore(&query, "day_with_raw_dimension").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn raw_dimension_and_its_time_dimension_in_a_non_utc_timezone() {
+    for convert_tz in [false, true] {
+        let query = formatdoc! {"
+            {}timezone: Asia/Kamchatka
+            convert_tz_for_raw_time_dimension: {convert_tz}
+        ", raw_dimension_query(DAY_WITH_DATE_RANGE)};
+        if let Some((rollup, source)) = rollup_vs_source(&query, "day_with_raw_dimension").await {
+            assert_eq!(
+                rollup, source,
+                "convert_tz_for_raw_time_dimension: {convert_tz}"
+            );
+        }
+    }
+}
+
+// A coarser grain column must not stand in for the raw value.
+#[tokio::test(flavor = "multi_thread")]
+async fn raw_dimension_beside_a_month_grain_reads_the_raw_column() {
+    let query = raw_dimension_query("");
+    if let Some((rollup, source)) = rollup_vs_source(&query, "month_with_raw_dimension").await {
+        assert_eq!(rollup, source);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn equality_filter_on_the_raw_dimension_reads_the_raw_column() {
+    let query = raw_dimension_query(indoc! {r#"
+        filters:
+          - member: activity.cohort_date
+            operator: equals
+            values:
+              - "2025-01-05T13:00:00.000"
+    "#});
+    for pre_agg in ["day_with_raw_dimension", "month_with_raw_dimension"] {
+        if let Some((rollup, source)) = rollup_vs_source(&query, pre_agg).await {
+            assert_eq!(rollup, source, "{pre_agg}");
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn ungrouped_raw_dimension_reads_the_raw_column() {
+    let query = indoc! {r#"
+        dimensions:
+          - activity.id
+          - activity.cohort_date
+        time_dimensions:
+          - dimension: activity.cohort_date
+            granularity: day
+            dateRange:
+              - "2025-01-04"
+              - "2025-01-06"
+        order:
+          - id: activity.id
+        ungrouped: true
+    "#};
+    if let Some((rollup, source)) = rollup_vs_source(query, "rows_with_raw_dimension").await {
         assert_eq!(rollup, source);
     }
 }
@@ -361,15 +471,17 @@ async fn raw_single_bounds_on_the_grain_read_its_column() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn raw_set_filter_reads_the_grain_column() {
+async fn raw_set_filter_is_served_by_the_rollup() {
     let query = raw_filter("set", &[]);
     if let Some((rollup, source)) = rollup_vs_source(&query, "month_with_raw_dimension").await {
         assert_eq!(rollup, source);
     }
 }
 
+// Bounds off the grain are checked against the raw column, in the database
+// timezone whatever the query's.
 #[tokio::test(flavor = "multi_thread")]
-async fn raw_date_bounds_off_the_grain_fall_back() {
+async fn raw_date_bounds_off_the_grain_read_the_raw_column() {
     for (operator, values) in [
         ("inDateRange", vec!["2025-01-04", "2025-01-06"]),
         ("notInDateRange", vec!["2025-01-04", "2025-01-06"]),
@@ -377,12 +489,46 @@ async fn raw_date_bounds_off_the_grain_fall_back() {
         ("afterOrOnDate", vec!["2025-01-15"]),
         ("beforeOrOnDate", vec!["2025-01-15"]),
         ("afterDate", vec!["2025-01-15"]),
-        ("equals", vec!["2025-01-01T00:00:00.000"]),
+        ("afterDate", vec!["2025-01-15T11:30:00"]),
+    ] {
+        for timezone in ["UTC", "Asia/Kamchatka", "America/Los_Angeles"] {
+            let query = format!("{}timezone: {timezone}\n", raw_filter(operator, &values));
+            if let Some((rollup, source)) =
+                rollup_vs_source(&query, "month_with_raw_dimension").await
+            {
+                assert_eq!(rollup, source, "{operator} {values:?} {timezone}");
+            }
+        }
+    }
+    // Bounds a non-UTC query can't take at all.
+    for (operator, values) in [
+        ("beforeDate", vec!["2025-01-15T00:00:00Z"]),
+        ("beforeDate", vec!["2025-01-15", "2025-01-20"]),
+        ("afterDate", vec!["2025-01-15T00:00:00.000+05:00"]),
     ] {
         let query = raw_filter(operator, &values);
-        if let Some((rollup, source)) = fallback_vs_source(&query, "month_with_raw_dimension").await
-        {
+        if let Some((rollup, source)) = rollup_vs_source(&query, "month_with_raw_dimension").await {
             assert_eq!(rollup, source, "{operator} {values:?}");
+        }
+    }
+    let query = raw_filter("afterDate", &["2025-01-15T11:30:00"]);
+    if let Some(result) = on_cubestore(&query, "month_with_raw_dimension").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The member is stored only raw: its date filter takes database-timezone bounds.
+#[tokio::test(flavor = "multi_thread")]
+async fn date_filter_on_a_raw_only_member_in_a_non_utc_timezone() {
+    for timezone in ["Asia/Kamchatka", "America/Los_Angeles"] {
+        let query = formatdoc! {"
+            {}timezone: {timezone}
+        ", raw_filter("inDateRange", &["2025-01-04", "2025-01-06"])};
+        if let Some((rollup, source)) = rollup_vs_source(&query, "raw_only").await {
+            assert_eq!(rollup, source, "{timezone}");
+        }
+        if let Some(result) = on_cubestore(&query, "raw_only").await {
+            insta::assert_snapshot!(format!("raw_only_{timezone}").replace('/', "_"), result);
         }
     }
 }
@@ -491,17 +637,15 @@ async fn date_range_on_an_hourly_grain_across_dst_falls_back() {
     }
 }
 
-// Non-strict matching covers a time dimension's own date range, not a raw
-// filter the grain column cannot answer.
 #[tokio::test(flavor = "multi_thread")]
-async fn raw_date_bounds_off_the_grain_fall_back_on_a_non_strict_rollup() {
+async fn raw_date_bounds_off_the_grain_read_the_raw_column_on_a_non_strict_rollup() {
     for (operator, values) in [
         ("inDateRange", vec!["2025-01-04", "2025-01-06"]),
         ("beforeDate", vec!["2025-01-15"]),
     ] {
         let query = raw_filter(operator, &values);
         if let Some((rollup, source)) =
-            fallback_vs_source(&query, "non_strict_month_with_raw_dimension").await
+            rollup_vs_source(&query, "non_strict_month_with_raw_dimension").await
         {
             assert_eq!(rollup, source, "{operator} {values:?}");
         }
@@ -515,5 +659,280 @@ async fn raw_date_range_aligned_with_the_grain_reads_it_on_a_non_strict_rollup()
         rollup_vs_source(&query, "non_strict_month_with_raw_dimension").await
     {
         assert_eq!(rollup, source);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn date_filter_on_a_member_built_from_the_raw_dimension_reads_the_raw_column() {
+    let query = indoc! {r#"
+        measures:
+          - activity.amount
+        dimensions:
+          - activity.app_name
+        filters:
+          - member: activity.cohort_date_shifted
+            operator: inDateRange
+            values:
+              - "2025-01-06"
+              - "2025-01-06"
+        order:
+          - id: activity.app_name
+    "#};
+    for timezone in ["UTC", "Asia/Kamchatka"] {
+        let query = format!("{query}timezone: {timezone}\n");
+        if let Some((rollup, source)) = rollup_vs_source(&query, "day_with_raw_dimension").await {
+            assert_eq!(rollup, source, "{timezone}");
+        }
+    }
+}
+
+// Without its raw column the member's date filter has nothing to read.
+#[tokio::test(flavor = "multi_thread")]
+async fn date_filter_on_a_member_built_from_a_grain_only_dimension_falls_back() {
+    let query = indoc! {r#"
+        measures:
+          - activity.amount
+        dimensions:
+          - activity.app_name
+        filters:
+          - member: activity.cohort_date_shifted
+            operator: inDateRange
+            values:
+              - "2025-01-06"
+              - "2025-01-06"
+        order:
+          - id: activity.app_name
+    "#};
+    if let Some((rollup, source)) = fallback_vs_source(query, "all_grains").await {
+        assert_eq!(rollup, source);
+    }
+}
+
+// Bounds on a stored grain are checked against that grain column, in the
+// query timezone, as a time dimension's range would be.
+#[tokio::test(flavor = "multi_thread")]
+async fn date_filter_on_a_grain_only_member_reads_the_grain_column() {
+    for (operator, values) in [
+        ("inDateRange", vec!["2024-12-01", "2025-01-31"]),
+        ("notInDateRange", vec!["2024-12-01", "2025-01-31"]),
+        ("inDateRange", vec!["2025-01-04", "2025-01-06"]),
+        ("notInDateRange", vec!["2025-01-04", "2025-01-06"]),
+        ("beforeDate", vec!["2025-01-01"]),
+        ("afterOrOnDate", vec!["2025-01-01"]),
+        ("beforeOrOnDate", vec!["2024-12-31"]),
+        ("afterDate", vec!["2024-12-31"]),
+    ] {
+        for timezone in ["UTC", "Asia/Kamchatka", "America/Los_Angeles"] {
+            let query = format!("{}timezone: {timezone}\n", raw_filter(operator, &values));
+            if let Some((rollup, source)) = rollup_vs_source(&query, "all_grains").await {
+                assert_eq!(rollup, source, "{operator} {values:?} {timezone}");
+            }
+        }
+    }
+    let query = format!(
+        "{}timezone: Asia/Kamchatka\n",
+        raw_filter("inDateRange", &["2025-01-04", "2025-01-06"])
+    );
+    if let Some(result) = on_cubestore(&query, "all_grains").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn date_filter_off_the_grain_of_a_grain_only_member_falls_back() {
+    for (pre_agg, operator, values) in [
+        (
+            "quarter_only",
+            "inDateRange",
+            vec!["2024-12-01", "2025-01-31"],
+        ),
+        ("all_grains", "afterDate", vec!["2025-01-15T11:30:00"]),
+        (
+            "all_grains",
+            "inDateRange",
+            vec!["2025-01-04T12:00:00", "2025-01-06"],
+        ),
+        ("week_and_month", "beforeDate", vec!["2025-01-15"]),
+    ] {
+        let query = raw_filter(operator, &values);
+        if let Some((rollup, source)) = fallback_vs_source(&query, pre_agg).await {
+            assert_eq!(rollup, source, "{pre_agg} {operator} {values:?}");
+        }
+    }
+}
+
+// The filter and the time dimension read one column, so it is the grain both
+// can be served from.
+#[tokio::test(flavor = "multi_thread")]
+async fn date_filter_and_time_dimension_on_a_grain_only_member_read_one_column() {
+    let with_filter = |granularity: &str, from: &str, to: &str| {
+        formatdoc! {r#"
+            measures:
+              - activity.count
+              - activity.amount
+            time_dimensions:
+              - dimension: activity.cohort_date
+                granularity: {granularity}
+            filters:
+              - member: activity.cohort_date
+                operator: inDateRange
+                values:
+                  - "{from}"
+                  - "{to}"
+            order:
+              - id: activity.cohort_date
+        "#}
+    };
+    let query = with_filter("month", "2025-01-04", "2025-01-06");
+    if let Some((rollup, source)) = rollup_vs_source(&query, "month_then_day").await {
+        assert_eq!(rollup, source);
+    }
+    // Neither the week nor the month column serves both reads.
+    let query = with_filter("week", "2024-12-01", "2025-01-31");
+    if let Some((rollup, source)) = fallback_vs_source(&query, "week_and_month").await {
+        assert_eq!(rollup, source);
+    }
+}
+
+fn filter_clause(pre_agg: &str, query: &str) -> String {
+    let (sql, usages) = ctx_with(&[pre_agg])
+        .build_sql_with_used_pre_aggregations(query)
+        .unwrap();
+    assert!(
+        usages.iter().any(|u| u.name() == pre_agg),
+        "expected the query to be served by `{pre_agg}`; SQL:\n{sql}"
+    );
+    sql.lines()
+        .find(|line| line.starts_with("WHERE"))
+        .unwrap_or_else(|| panic!("no WHERE in:\n{sql}"))
+        .to_string()
+}
+
+fn assert_reads(clause: &str, column: &str) {
+    assert!(
+        clause.contains(&format!("\"{column}\"")),
+        "expected the filter to read {column}: {clause}"
+    );
+}
+
+// The raw column stays out of the way of a filter its grains hold, so storing
+// it adds reads without changing the ones a grain served.
+#[tokio::test(flavor = "multi_thread")]
+async fn date_filter_on_a_grain_reads_it_beside_the_raw_column() {
+    for (operator, values) in [
+        ("inDateRange", vec!["2024-12-01", "2025-01-31"]),
+        ("notInDateRange", vec!["2024-12-01", "2025-01-31"]),
+        ("beforeDate", vec!["2025-01-01"]),
+        ("afterOrOnDate", vec!["2025-01-01"]),
+        ("beforeOrOnDate", vec!["2024-12-31"]),
+        ("afterDate", vec!["2024-12-31"]),
+    ] {
+        for timezone in ["UTC", "Asia/Kamchatka", "America/Los_Angeles"] {
+            let query = format!("{}timezone: {timezone}\n", raw_filter(operator, &values));
+            assert_reads(
+                &filter_clause("raw_week_and_month", &query),
+                "activity__cohort_date_month",
+            );
+            if let Some((rollup, source)) = rollup_vs_source(&query, "raw_week_and_month").await {
+                assert_eq!(rollup, source, "{operator} {values:?} {timezone}");
+            }
+        }
+    }
+    let query = formatdoc! {r#"
+        measures:
+          - activity.count
+        filters:
+          - member: activity.cohort_date
+            operator: inDateRange
+            values:
+              - "2024-12-01"
+              - "2025-01-31"
+    "#};
+    assert_eq!(
+        filter_clause("raw_week_and_month", &query),
+        filter_clause("week_and_month", &query)
+    );
+    let query = format!(
+        "{}timezone: Asia/Kamchatka\n",
+        raw_filter("inDateRange", &["2024-12-01", "2025-01-31"])
+    );
+    if let Some(result) = on_cubestore(&query, "raw_week_and_month").await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn date_filter_off_every_grain_reads_the_raw_column() {
+    for (operator, values) in [
+        ("inDateRange", vec!["2025-01-04", "2025-01-06"]),
+        ("afterDate", vec!["2025-01-15T11:30:00"]),
+    ] {
+        for timezone in ["UTC", "Asia/Kamchatka", "America/Los_Angeles"] {
+            let query = format!("{}timezone: {timezone}\n", raw_filter(operator, &values));
+            assert_reads(
+                &filter_clause("raw_week_and_month", &query),
+                "activity__cohort_date",
+            );
+            if let Some((rollup, source)) = rollup_vs_source(&query, "raw_week_and_month").await {
+                assert_eq!(rollup, source, "{operator} {values:?} {timezone}");
+            }
+        }
+    }
+}
+
+// The month read keeps only the month column, which the week-aligned filter
+// does not fall on.
+#[tokio::test(flavor = "multi_thread")]
+async fn date_filter_on_a_grain_the_time_dimension_drops_reads_the_raw_column() {
+    for timezone in ["UTC", "Asia/Kamchatka", "America/Los_Angeles"] {
+        let query = formatdoc! {r#"
+            measures:
+              - activity.count
+              - activity.amount
+            time_dimensions:
+              - dimension: activity.cohort_date
+                granularity: month
+            filters:
+              - member: activity.cohort_date
+                operator: inDateRange
+                values:
+                  - "2025-01-06"
+                  - "2025-01-19"
+            order:
+              - id: activity.cohort_date
+            timezone: {timezone}
+        "#};
+        assert_reads(
+            &filter_clause("raw_week_and_month", &query),
+            "activity__cohort_date",
+        );
+        if let Some((rollup, source)) = rollup_vs_source(&query, "raw_week_and_month").await {
+            assert_eq!(rollup, source, "{timezone}");
+        }
+    }
+}
+
+// A member computed from the stored one reads its columns, so its range takes
+// the timezone of the column it lands on.
+#[tokio::test(flavor = "multi_thread")]
+async fn date_range_on_a_member_computed_from_the_stored_one() {
+    for pre_agg in ["week_and_month", "raw_week_and_month"] {
+        for timezone in ["UTC", "America/Los_Angeles", "Asia/Kamchatka"] {
+            let query = formatdoc! {r#"
+                measures:
+                  - activity.count
+                  - activity.amount
+                time_dimensions:
+                  - dimension: activity.cohort_date_alias
+                    granularity: month
+                    dateRange:
+                      - "2025-01-01"
+                      - "2025-01-31"
+                timezone: "{timezone}"
+            "#};
+            if let Some((rollup, source)) = rollup_vs_source(&query, pre_agg).await {
+                assert_eq!(rollup, source, "{pre_agg} {timezone}");
+            }
+        }
     }
 }

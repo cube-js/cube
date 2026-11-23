@@ -1,7 +1,7 @@
 use super::operators::{FilterOperationSql, FilterSqlContext};
 use super::ToSql;
 use crate::cube_bridge::member_sql::FilterParamsColumn;
-use crate::physical_plan::sql_nodes::SqlNode;
+use crate::physical_plan::sql_nodes::{PreAggregationColumns, SqlNode};
 use crate::physical_plan::SqlEvaluatorVisitor;
 use crate::planner::filter::typed_filter::{
     resolve_base_symbol, FilterOp, RollingScanBand, TypedFilter,
@@ -9,8 +9,8 @@ use crate::planner::filter::typed_filter::{
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_call::SqlCallFilterParamsItem;
 use crate::planner::sql_templates::PlanSqlTemplates;
-use crate::planner::FiltersContext;
 use crate::planner::SqlInterval;
+use crate::planner::{FiltersContext, MemberSymbol};
 use chrono_tz::Tz;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -35,18 +35,60 @@ impl ToSql for TypedFilter {
         }
 
         let resolved = resolve_base_symbol(self.member_evaluator());
+        let name = resolved.peel_refs().full_name();
+        let columns = &filters_ctx.pre_aggregation_columns;
+        // A filter reads a grain column its bounds fall on, else the raw one, and
+        // its bounds take that column's timezone. The read mode of an enclosing
+        // render, such as the member a mask wraps, does not carry into it.
+        let visitor = visitor.with_default_read();
+        let aligned_grain = || match self.date_bounds() {
+            Some((from, to)) => {
+                columns.grain_column_for_range(&name, &from, &to, query_tools.timezone())
+            }
+            None => Ok(None),
+        };
+        let (visitor, reads_grain) = if !filters_ctx.use_local_tz {
+            (visitor, false)
+        } else if self.member_evaluator().as_time_dimension().is_ok() {
+            let reads_grain = reads_a_grain_column(columns, &resolved);
+            (visitor.with_time_dimension_read(), reads_grain)
+        } else if !columns.has_grain(&name) {
+            (visitor, false)
+        } else if let Some(column) = aligned_grain()? {
+            (
+                visitor.with_stored_column(name.clone(), column.clone()),
+                true,
+            )
+        } else if !columns.has_raw(&name) {
+            (visitor.with_time_dimension_read(), true)
+        } else {
+            (visitor, false)
+        };
         let member_sql = visitor.apply_for_filter(&resolved, node_processor, templates)?;
 
         let ctx = FilterSqlContext::new(
             &member_sql,
             &query_tools,
             templates,
-            !filters_ctx.use_local_tz,
+            !reads_grain,
             self.use_raw_values(),
         );
 
         dispatch_to_sql(self.operation(), &ctx)
     }
+}
+
+// A member computed from stored ones reads a grain column through any of them.
+fn reads_a_grain_column(columns: &PreAggregationColumns, member: &Rc<MemberSymbol>) -> bool {
+    let member = member.peel_refs();
+    let name = member.full_name();
+    if columns.contains_key(&name) {
+        return columns.has_grain(&name);
+    }
+    member
+        .get_dependencies()
+        .iter()
+        .any(|dependency| reads_a_grain_column(columns, dependency))
 }
 
 impl TypedFilter {

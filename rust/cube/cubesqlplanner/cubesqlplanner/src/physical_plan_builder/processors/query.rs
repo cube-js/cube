@@ -108,17 +108,30 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         if let Some(pre_aggregation) = from_source.as_pre_aggregation() {
             // A rollup stores time dimensions already timezone-converted,
             // so every occurrence of them in this select must render
-            // without the conversion.
+            // without the conversion, unless only a raw column holds them.
+            let grain_members = pre_aggregation
+                .time_dimensions_references()
+                .into_iter()
+                .map(|(name, _, _)| name)
+                .collect::<HashSet<_>>();
+            let raw_members = pre_aggregation.all_dimensions_refererences();
+            let read_raw =
+                |name: &String| raw_members.contains_key(name) && !grain_members.contains(name);
             let time_dimension_ids = schema
                 .time_dimensions
                 .iter()
+                .filter(|d| {
+                    d.as_time_dimension().map_or(true, |td| {
+                        !read_raw(&td.base_symbol().peel_refs().full_name())
+                    })
+                })
                 .map(|d| d.id().clone())
                 .collect::<HashSet<_>>();
             let mark_tz_converted =
                 |symbol: &Rc<MemberSymbol>| -> Result<Rc<MemberSymbol>, CubeError> {
                     transforms::mark_tz_converted_at_source(symbol, &time_dimension_ids)
                 };
-            schema = logical_transforms::mark_tz_converted_at_source_in_schema(&schema)?;
+            schema = Rc::new(schema.map_symbols(&mark_tz_converted)?);
             filter = map_filter(filter, &mark_tz_converted)?;
             having = map_filter(having, &mark_tz_converted)?;
             for conditional in conditional_measures.iter_mut() {
@@ -128,6 +141,13 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
 
             for (name, column) in pre_aggregation.all_dimensions_refererences().into_iter() {
                 context_factory.add_pre_aggregation_dimension_reference(name, column);
+            }
+            for (name, column, granularity) in pre_aggregation.time_dimensions_references() {
+                context_factory.add_pre_aggregation_time_dimension_reference(
+                    name,
+                    column,
+                    granularity,
+                );
             }
             for (name, column) in pre_aggregation.all_measures_refererences().into_iter() {
                 context_factory.add_pre_aggregation_measure_reference(name, column);

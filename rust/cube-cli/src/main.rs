@@ -175,6 +175,9 @@ enum Command {
     Reports(commands::reports::Args),
     /// Browse and organize the deployment workspace
     Workspace(commands::workspace::Args),
+    /// Browse a deployment's Query History: API requests and the SQL they ran
+    #[command(name = "query-history", alias = "qh")]
+    QueryHistory(commands::query_history::Args),
     /// Manage scheduled notifications and their recipients
     #[command(alias = "notification")]
     Notifications(commands::notifications::Args),
@@ -260,6 +263,7 @@ impl Command {
             Workbooks(_) => "workbooks",
             Reports(_) => "reports",
             Workspace(_) => "workspace",
+            QueryHistory(_) => "query-history",
             Notifications(_) => "notifications",
             Users(_) => "users",
             Groups(_) => "groups",
@@ -375,6 +379,7 @@ async fn run(global: GlobalArgs, command: Command) -> Result<()> {
         Workbooks(args) => commands::workbooks::command(args, &ctx).await,
         Reports(args) => commands::reports::command(args, &ctx).await,
         Workspace(args) => commands::workspace::command(args, &ctx).await,
+        QueryHistory(args) => commands::query_history::command(args, &ctx).await,
         Notifications(args) => commands::notifications::command(args, &ctx).await,
         Users(args) => commands::users::command(args, &ctx).await,
         Groups(args) => commands::groups::command(args, &ctx).await,

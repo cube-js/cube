@@ -181,6 +181,8 @@ const PRE_AGG_BUILD_STATUS_PERSIST_TIME = 86400;
  */
 const ABANDONED_BUILD_TIMEOUT_FACTOR = 2;
 
+export type PreAggregationVersionStatus = 'done' | 'outdated' | 'missing_partition';
+
 export type LoadPreAggregationResult = {
   targetTableName: string;
   refreshKeyValues: unknown[];
@@ -194,6 +196,12 @@ export type LoadPreAggregationResult = {
    */
   preAggregationId?: string;
   type?: PreAggregationType;
+  /**
+   * Set by a dry-run build job only: whether the partition already has the
+   * version its current refresh keys call for (`done`), only an older version
+   * of the same structure (`outdated`), or nothing built (`missing_partition`).
+   */
+  versionStatus?: PreAggregationVersionStatus;
   lambdaTable?: InlineTable;
   queryKey?: PreAggregationQueryKey;
   rollupLambdaId?: string;
@@ -286,6 +294,9 @@ export const tablesToVersionEntries = (schema: string, tables: TableCacheEntry[]
   }).filter(R.identity)
 );
 
+// The refresh scheduler runs every few seconds, the active mark lives for the touch timeout
+const REFRESH_ACTIVE_MARK_INTERVAL = 60 * 1000;
+
 export type PreAggregationsOptions = {
   maxPartitions?: number;
   maxSourceRowLimit?: number;
@@ -303,6 +314,11 @@ export type PreAggregationsOptions = {
   dropPreAggregationsWithoutTouch?: boolean;
   usedTablePersistTime?: number;
   externalRefresh?: boolean;
+  /**
+   * Set by `QueryOrchestrator` when other orchestrators share this pre-aggregation cache.
+   * Each keeps its own refresh end, and drop without touch waits for every one refreshing.
+   */
+  sharedCacheOrchestratorId?: string;
 };
 
 export class PreAggregations {
@@ -329,6 +345,8 @@ export class PreAggregations {
   private readonly usedCache: LRUCache<string, true>;
 
   private readonly touchCache: LRUCache<string, true>;
+
+  protected refreshActiveMarkedAt: number = 0;
 
   public constructor(
     private readonly redisPrefix: string,
@@ -388,9 +406,14 @@ export class PreAggregations {
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_BACKOFF', tableName);
   }
 
-  protected refreshEndReachedKey() {
+  protected refreshEndReachedKey(orchestratorId: string = this.options.sharedCacheOrchestratorId || '') {
     // TODO add dataSource?
-    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', '');
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', encodeURIComponent(orchestratorId));
+  }
+
+  // Encoded, as Cube Store lists keys by the part before their last `:`
+  protected refreshActiveKey(orchestratorId: string) {
+    return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_ACTIVE', encodeURIComponent(orchestratorId));
   }
 
   protected preAggBuildStatusRedisKey(tableName: string): string {
@@ -419,7 +442,7 @@ export class PreAggregations {
    * that is still marked as running long past that timeout is one whose process
    * is gone and will never report an outcome.
    */
-  private async isBuildAbandoned(dataSource: string, buildStatus: PreAggregationBuildStatus): Promise<boolean> {
+  protected async isBuildAbandoned(dataSource: string, buildStatus: PreAggregationBuildStatus): Promise<boolean> {
     if (!buildStatus.startedAt) {
       return false;
     }
@@ -428,6 +451,19 @@ export class PreAggregations {
     const limit = (executionTimeout || getEnv('dbQueryTimeout')) * 1000 * ABANDONED_BUILD_TIMEOUT_FACTOR;
 
     return new Date().getTime() - buildStatus.startedAt > limit;
+  }
+
+  /**
+   * The table's last build failed or was abandoned, so the table may hold
+   * partial data. A build that is still running doesn't count.
+   */
+  public async isBuildFailed(dataSource: string, tableName: string): Promise<boolean> {
+    const buildStatus = await this.getPreAggregationBuildStatus(tableName);
+    if (buildStatus?.status === 'failure') {
+      return true;
+    }
+
+    return buildStatus?.status === 'building' && this.isBuildAbandoned(dataSource, buildStatus);
   }
 
   public async addTableUsed(tableName: string): Promise<void> {
@@ -526,8 +562,45 @@ export class PreAggregations {
     return this.queryCache.getCacheDriver().set(this.refreshEndReachedKey(), new Date().getTime(), this.touchTablePersistTime);
   }
 
-  public async getRefreshEndReached(): Promise<number> {
-    return this.queryCache.getCacheDriver().get(this.refreshEndReachedKey());
+  /**
+   * Records that this orchestrator refreshes pre-aggregations, so the others that share its
+   * cache wait for its refresh end before they drop tables without touch.
+   */
+  public async markRefreshActive(): Promise<void> {
+    const { sharedCacheOrchestratorId } = this.options;
+
+    // Rewritten before it expires, even with a touch timeout shorter than the interval
+    const markInterval = Math.min(REFRESH_ACTIVE_MARK_INTERVAL, this.touchTablePersistTime * 1000 / 2);
+
+    if (!sharedCacheOrchestratorId || Date.now() - this.refreshActiveMarkedAt < markInterval) {
+      return;
+    }
+
+    await this.queryCache.getCacheDriver().set(
+      this.refreshActiveKey(sharedCacheOrchestratorId),
+      new Date().getTime(),
+      this.touchTablePersistTime
+    );
+    this.refreshActiveMarkedAt = Date.now();
+  }
+
+  public async getRefreshEndReached(): Promise<number | null> {
+    const cacheDriver = this.queryCache.getCacheDriver();
+    const refreshEndReached: number = await cacheDriver.get(this.refreshEndReachedKey());
+
+    if (!refreshEndReached || !this.options.sharedCacheOrchestratorId) {
+      return refreshEndReached;
+    }
+
+    // Tables of an orchestrator whose refresh hasn't ended may not be touched yet
+    const activePrefix = this.refreshActiveKey('');
+    const activeOrchestratorIds = (await cacheDriver.keysStartingWith(activePrefix))
+      .map(key => decodeURIComponent(key.replace(activePrefix, '')));
+    const refreshEnds = await Promise.all(
+      activeOrchestratorIds.map(orchestratorId => cacheDriver.get(this.refreshEndReachedKey(orchestratorId)))
+    );
+
+    return refreshEnds.every(Boolean) ? refreshEndReached : null;
   }
 
   /**
@@ -663,6 +736,9 @@ export class PreAggregations {
             maxPartitions: this.options.maxPartitions,
             maxSourceRowLimit: this.options.maxSourceRowLimit,
             isJob: queryBody.isJob,
+            dryRun: queryBody.dryRun,
+            // Dependencies (rollupJoin, rollupLambda) come first, the job's target last
+            buildsJobTarget: i === preAggregations.length - 1,
             waitForRenew: queryBody.cacheMode === 'must-revalidate',
             // TODO workaround to avoid continuous waiting on building pre-aggregation dependencies
             forceBuild: i === preAggregations.length - 1 ? queryBody.forceBuildPreAggregations : false,
@@ -683,7 +759,8 @@ export class PreAggregations {
             dataSource: p.dataSource || 'default',
             timezone: p.timezone,
           };
-          if (!usedPreAggregation.isMultiTableUnion) {
+          // A dry run touches nothing, and its unbuilt tables are placeholders
+          if (!usedPreAggregation.isMultiTableUnion && !queryBody.dryRun) {
             await this.addTableUsed(usedPreAggregation.targetTableName);
           }
 
