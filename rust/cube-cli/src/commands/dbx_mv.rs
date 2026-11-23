@@ -350,10 +350,13 @@ fn gate_failure(run: &Value) -> Option<String> {
         ));
     }
 
-    let incomplete = run
-        .get("incompleteViewCount")
-        .and_then(Value::as_u64)
-        .unwrap_or(0);
+    // Fail closed: without the count, nothing says every view kept all its measures.
+    let Some(incomplete) = run.get("incompleteViewCount").and_then(Value::as_u64) else {
+        return Some(format!(
+            "publication run {id} completed, but Cube returned no incompleteViewCount to \
+             check its views against"
+        ));
+    };
     if incomplete > 0 {
         return Some(format!(
             "publication run {id} completed, but {incomplete} view(s) published without \
@@ -496,6 +499,7 @@ async fn target_command(cmd: TargetCmd, api: &Client, json: bool) -> Result<()> 
             target,
         } => {
             let res = api.get(&integration.path(), &target_query(&target)).await?;
+            check_target(&res, &target)?;
             output::print_json(&res);
         }
         TargetCmd::Set {
@@ -651,6 +655,9 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let res = api
                 .get(&format!("{}/syncs", integration.path()), &query)
                 .await?;
+            for run in output::items(&res) {
+                check_target(&run, &target)?;
+            }
             output::print_list(
                 ctx.json,
                 &res,
@@ -1004,6 +1011,9 @@ mod tests {
             gate_failure(&json!({"runId": "r-1", "status": "COMPLETED", "incompleteViewCount": 2}))
                 .unwrap();
         assert!(incomplete.contains("2 view(s)"), "{incomplete}");
+        // Without the count, the gate can't tell, so it fails rather than passing.
+        let unknown = gate_failure(&json!({"runId": "r-1", "status": "COMPLETED"})).unwrap();
+        assert!(unknown.contains("no incompleteViewCount"), "{unknown}");
         assert!(finish(&json!({"runId": "r-1", "status": "FAILED"}), true).is_err());
     }
 
