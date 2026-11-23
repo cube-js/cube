@@ -31,6 +31,15 @@ class TestClickHouseDriver extends ClickHouseDriver {
     this.commands.push(query);
   }
 
+  public version = '25.8.1.1';
+
+  public versionQueries = 0;
+
+  public override async query<R = unknown>(): Promise<R[]> {
+    this.versionQueries++;
+    return [{ version: this.version }] as R[];
+  }
+
   public override async queryColumnTypes(): Promise<TableStructure> {
     return [{ name: 'id', type: 'int' }];
   }
@@ -150,6 +159,37 @@ describe('ClickHouseDriver S3 export bucket credentials', () => {
     expect(sql).not.toContain('undefined');
   });
 
+  it.each(['23.12.6.19', '24.2.3.70'])('fails a keyless export with a clear error on ClickHouse %s', async (version) => {
+    process.env.AWS_ACCESS_KEY_ID = 'ASIATEMP';
+    process.env.AWS_SECRET_ACCESS_KEY = 'temp-secret';
+    process.env.AWS_SESSION_TOKEN = 'temp-token';
+
+    const driver = createDriver();
+    driver.version = version;
+
+    await expect(driver.unload('t', unloadOptions)).rejects.toThrow(`needs ClickHouse 24.3 or later`);
+    expect(driver.commands).toEqual([]);
+  });
+
+  it('checks the server version once and only when passing a session token', async () => {
+    process.env.AWS_ACCESS_KEY_ID = 'ASIATEMP';
+    process.env.AWS_SECRET_ACCESS_KEY = 'temp-secret';
+    process.env.AWS_SESSION_TOKEN = 'temp-token';
+
+    const driver = createDriver();
+    driver.version = '24.3.18.7';
+    await driver.unload('t', unloadOptions);
+    await driver.unload('t', unloadOptions);
+    expect(driver.versionQueries).toBe(1);
+    expect(driver.commands).toHaveLength(2);
+
+    delete process.env.AWS_SESSION_TOKEN;
+    const longLived = createDriver();
+    longLived.version = '23.10.1.1';
+    await longLived.unload('t', unloadOptions);
+    expect(longLived.versionQueries).toBe(0);
+  });
+
   it('omits the session token argument when the resolved credentials have none', async () => {
     process.env.AWS_ACCESS_KEY_ID = 'AKIALONGLIVED';
     process.env.AWS_SECRET_ACCESS_KEY = 'long-lived-secret';
@@ -188,18 +228,18 @@ describe('ClickHouseDriver S3 export bucket credentials', () => {
     expect(awsRegionDriver.credentialRequests).toEqual([{ region: 'eu-central-1' }]);
   });
 
-  it('reuses temporary credentials across exports until they near expiry', async () => {
+  it('reuses temporary credentials only while an export could still run for 50 minutes', async () => {
     const driver = createDriver();
     driver.chainCredentials = {
       accessKeyId: 'ASIATEMP',
       secretAccessKey: 'temp-secret',
       sessionToken: 'temp-token',
-      expiration: new Date(Date.now() + 50 * 60 * 1000),
+      expiration: new Date(Date.now() + 55 * 60 * 1000),
     };
     await Promise.all([driver.unload('t', unloadOptions), driver.unload('t', unloadOptions)]);
     expect(driver.credentialRequests).toHaveLength(1);
 
-    driver.setCachedCredentials({ ...driver.chainCredentials, expiration: new Date(Date.now() + 10 * 60 * 1000) });
+    driver.setCachedCredentials({ ...driver.chainCredentials, expiration: new Date(Date.now() + 45 * 60 * 1000) });
     await driver.unload('t', unloadOptions);
     expect(driver.credentialRequests).toHaveLength(2);
   });
@@ -301,6 +341,11 @@ describe('exportBucketSessionPolicy', () => {
           Effect: 'Allow',
           Action: ['s3:ListBucket', 's3:GetBucketLocation'],
           Resource: 'arn:aws:s3:::my-bucket',
+        },
+        {
+          Effect: 'Allow',
+          Action: ['kms:GenerateDataKey', 'kms:Decrypt'],
+          Resource: '*',
         },
       ],
     });

@@ -43,9 +43,9 @@ import { formatError } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
 
-// Cached export credentials are replaced once they have less than this left, so an export never starts on
-// credentials about to lapse. STS web identity sessions last 1h by default.
-const EXPORT_CREDENTIALS_REFRESH_MARGIN_MS = 30 * 60 * 1000;
+// ClickHouse signs every upload part with the export's credentials, so each export must start with at least
+// this long left. Of a default 1h STS session that leaves 10 min of sharing: enough to absorb a build burst.
+const EXPORT_CREDENTIALS_REFRESH_MARGIN_MS = 50 * 60 * 1000;
 
 /**
  * Inline session policy for the credentials handed to ClickHouse: the role's rights, cut down to the
@@ -66,6 +66,12 @@ export function exportBucketSessionPolicy(bucketName: string, path: string, part
         Effect: 'Allow',
         Action: ['s3:ListBucket', 's3:GetBucketLocation'],
         Resource: `arn:${partition}:s3:::${bucketName}`,
+      },
+      {
+        // SSE-KMS buckets: without this the policy would deny the role's own key grants, which still bound it.
+        Effect: 'Allow',
+        Action: ['kms:GenerateDataKey', 'kms:Decrypt'],
+        Resource: '*',
       },
     ],
   });
@@ -187,6 +193,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   protected readonly killQueryTimeout: number = 10 * 1000;
 
   protected exportCredentials: Promise<S3Credentials> | null = null;
+
+  protected serverVersion: Promise<string> | null = null;
 
   /**
    * Class constructor.
@@ -771,8 +779,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     // ClickHouse writes to S3 itself, so the pod's OIDC identity never reaches it: hand it short-lived credentials.
     const credentials: S3Credentials = staticCredentials ?? await this.getExportCredentials(bucketName, path, region);
     const credentialParams = [credentials.accessKeyId, credentials.secretAccessKey];
-    // s3(url, key, secret, session_token, format) needs ClickHouse 23.12+.
     if (credentials.sessionToken) {
+      await this.assertSessionTokenSupported(options.requestId);
       credentialParams.push(credentials.sessionToken);
     }
 
@@ -829,6 +837,34 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     this.exportCredentials = next;
 
     return next;
+  }
+
+  /**
+   * s3(url, key, secret, session_token, format) only authenticates from ClickHouse 24.3; older servers fail
+   * with an opaque S3 error. Verified against 23.12, 24.1 and 24.2 (fail) and 24.3 (works).
+   */
+  protected async assertSessionTokenSupported(requestId?: string): Promise<void> {
+    if (!this.serverVersion) {
+      this.serverVersion = this.query<{ version: string }>('SELECT version() AS version', [], { requestId })
+        .then((rows) => rows[0].version);
+    }
+
+    let serverVersion: string;
+
+    try {
+      serverVersion = await this.serverVersion;
+    } catch (e) {
+      this.serverVersion = null;
+      throw e;
+    }
+
+    const [major, minor] = serverVersion.split('.').map(Number);
+    if (major < 24 || (major === 24 && minor < 3)) {
+      throw new Error(
+        `Export bucket without static keys needs ClickHouse 24.3 or later to accept temporary AWS credentials, ` +
+        `but the server is ${serverVersion}. Upgrade ClickHouse, or set the export bucket AWS key and secret.`
+      );
+    }
   }
 
   protected async resolveExportCredentials(bucketName: string, path: string, region: string): Promise<S3Credentials> {

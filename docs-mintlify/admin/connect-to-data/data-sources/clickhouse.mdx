@@ -146,7 +146,11 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 <Warning>
 
   Temporary credentials carry a session token, which the ClickHouse `s3` table
-  function accepts since ClickHouse 23.12. Older versions need static keys.
+  function accepts since ClickHouse 24.3. Older versions need static keys.
+
+  Each export must finish while its temporary credentials are valid. With the
+  default one-hour STS session, an export that runs longer than about 50
+  minutes can fail.
 
 </Warning>
 
