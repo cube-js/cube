@@ -1035,7 +1035,6 @@ describe('CompilerApi leafFilterImplies', () => {
   test('date conditions only match the policy byte for byte', () => {
     const policy = leaf('inDateRange', ['2025-02-01', '2025-03-31']);
     const notImplied: [string, any[]][] = [
-      // Narrower or equivalent ranges are not proven, so the mask stays.
       ['inDateRange', ['2025-02-10', '2025-02-20']],
       ['inDateRange', ['2025-02-01T00:00:00.000', '2025-03-31T23:59:59.999']],
       ['inDateRange', ['2025-02-01T00:00:00.000Z', '2025-03-31T23:59:59.999Z']],

@@ -679,16 +679,8 @@ describe('Cube RBAC Engine', () => {
     });
   });
 
-  /**
-   * Conditional masking where the row filter is a date range.
-   *
-   * conditional_date_masking_test cube:
-   *   - group "*": everything masked
-   *   - group "conditional_date_mask_group": full access for created_at inDateRange [2018-02-01, 2018-03-31]
-   *   - group "conditional_not_in_date_mask_group": full access for created_at notInDateRange of the same range
-   *
-   * A query filter lifts the mask only when it is the policy's filter value for value.
-   */
+  // A date query filter lifts the mask only when it is the policy's filter value for
+  // value: narrower and equivalent ranges are not proven to sit inside the policy range.
   describe('RBAC conditional masking with date row filters via REST API', () => {
     const CUBE = 'conditional_date_masking_test';
     const POLICY_RANGE = ['2018-02-01', '2018-03-31'];
@@ -755,8 +747,6 @@ describe('Cube RBAC Engine', () => {
       expect(values).toEqual(['4344']);
     });
 
-    // Narrower and equivalent ranges are not proven to sit inside the policy
-    // range, so the measure stays masked rather than risk a wrong match.
     const unprovenFilters: [string, string, string[]][] = [
       ['a narrower range', 'inDateRange', ['2018-02-10', '2018-02-20']],
       ['a wider range', 'inDateRange', ['2018-01-01', '2018-12-31']],

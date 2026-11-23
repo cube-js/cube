@@ -25,7 +25,6 @@ cubes:
         sql: price
         type: sum
 
-      # Reads rows one month before the ones the query filter selects
       - name: total_price_prev_month
         multi_stage: true
         sql: "{total_price}"
