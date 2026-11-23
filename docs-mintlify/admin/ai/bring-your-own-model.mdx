@@ -39,7 +39,8 @@ admin panel:
 2. Click **Add model**
 3. Provide a **name** for the model
 4. Select the **model type** (LLM or Embedding)
-5. Choose a **provider** and **model**
+5. Choose a **provider** and **model**. The custom-endpoint providers have no
+   model list: you enter the model name with the endpoint settings instead
 6. Optionally, pick a [small model](#small-model)
 7. Enter the required credentials for the provider
 
@@ -118,9 +119,11 @@ built-in models.
 ### Extended thinking
 
 Anthropic, AWS Bedrock, and GCP Vertex AI support extended thinking for
-Claude Sonnet 3.7 and all later Claude models. Turn it on or off with the
-**Enable thinking** toggle in the model settings. The toggle is on by default
-when you add a model.
+Claude Sonnet 3.7 and all later Claude models, and so does
+[Custom Anthropic-compatible](#custom-anthropic-compatible). Turn it on or off
+with the **Enable thinking** toggle in the model settings. The toggle is on by
+default when you add a model. With thinking on, the agent's reasoning shows in
+the chat and streams through the Chat API.
 
 ### Anthropic
 
@@ -181,7 +184,19 @@ the main model.
 Unlike the OpenAI-compatible provider, requests go to `<base URL>/v1/messages`,
 so leave out the version segment — use `https://gateway.acme.com`, not
 `https://gateway.acme.com/v1`. The API key, when set, is sent in the
-`x-api-key` header. Extended thinking is not available for this provider.
+`x-api-key` header.
+
+[Extended thinking](#extended-thinking) is available for this provider. Since
+the model name is free text, also pick the **Thinking mode** that matches the
+model behind your endpoint:
+
+- **Adaptive** — Claude Opus 4.7 and later, Sonnet 5 and later, Haiku 5.5, and
+  Fable 5. This is the default
+- **Budgeted** — Claude Sonnet 3.7 through 4.6, Opus 4 through 4.6, and Haiku 4.5
+
+A mode that doesn't match the model makes every request fail: adaptive models
+reject a thinking budget, and older models don't support adaptive thinking.
+Small-model tasks run without thinking.
 
 ## Troubleshooting
 
