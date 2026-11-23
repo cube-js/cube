@@ -2,7 +2,7 @@ import { S3 } from '@aws-sdk/client-s3';
 import { Storage } from '@google-cloud/storage';
 import { DefaultAzureCredential } from '@azure/identity';
 
-import { normalizeS3ClientConfig } from '../../src/storage-fs/aws.fs';
+import { normalizeS3ClientConfig, resolveS3Credentials } from '../../src/storage-fs/aws.fs';
 import { hasGCSCredentials } from '../../src/storage-fs/gcs.fs';
 
 describe('storage-fs credential normalization', () => {
@@ -58,6 +58,52 @@ describe('storage-fs credential normalization', () => {
         credentials: { accessKeyId: '', secretAccessKey: '' },
         region: 'us-east-1',
       }))).not.toThrow();
+    });
+  });
+
+  describe('resolveS3Credentials', () => {
+    const envKeys = ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN'];
+    const saved: Record<string, string | undefined> = {};
+
+    beforeEach(() => {
+      envKeys.forEach((k) => {
+        saved[k] = process.env[k];
+      });
+    });
+
+    afterEach(() => {
+      envKeys.forEach((k) => {
+        if (saved[k] === undefined) {
+          delete process.env[k];
+        } else {
+          process.env[k] = saved[k];
+        }
+      });
+    });
+
+    test('resolves temporary credentials from the default provider chain', async () => {
+      process.env.AWS_ACCESS_KEY_ID = 'ASIATEMP';
+      process.env.AWS_SECRET_ACCESS_KEY = 'temp-secret';
+      process.env.AWS_SESSION_TOKEN = 'temp-token';
+
+      await expect(resolveS3Credentials({ region: 'us-east-1' })).resolves.toEqual({
+        accessKeyId: 'ASIATEMP',
+        secretAccessKey: 'temp-secret',
+        sessionToken: 'temp-token',
+      });
+    });
+
+    test('ignores blank static credentials and still uses the chain', async () => {
+      process.env.AWS_ACCESS_KEY_ID = 'ASIATEMP';
+      process.env.AWS_SECRET_ACCESS_KEY = 'temp-secret';
+      delete process.env.AWS_SESSION_TOKEN;
+
+      const creds = await resolveS3Credentials({
+        credentials: { accessKeyId: '', secretAccessKey: '' },
+        region: 'us-east-1',
+      });
+      expect(creds.accessKeyId).toBe('ASIATEMP');
+      expect(creds.sessionToken).toBeUndefined();
     });
   });
 

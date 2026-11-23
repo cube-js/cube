@@ -128,6 +128,40 @@ CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
 CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
 ```
 
+##### Without static keys (OIDC)
+
+Leave `CUBEJS_DB_EXPORT_BUCKET_AWS_KEY` and `CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET`
+unset to avoid a long-lived IAM key. Cube then resolves temporary credentials
+from the AWS SDK default credential chain — for example, [OIDC][ref-oidc-aws]
+via `AWS_ROLE_ARN` in Cube Cloud — and hands them to ClickHouse for each
+export, so ClickHouse writes to the bucket with short-lived credentials. Set
+both keys or neither; setting only one is a configuration error.
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
+<Warning>
+
+  Each export must finish while its temporary credentials are valid. With OIDC
+  or IRSA (one-hour STS sessions by default), an export that runs longer than
+  about 50 minutes can fail. With other credential sources, the limit is
+  whatever lifetime those credentials have left when the export starts.
+
+</Warning>
+
+<Warning>
+
+  These credentials are sent to the ClickHouse server. With OIDC or IRSA
+  (`AWS_WEB_IDENTITY_TOKEN_FILE` and `AWS_ROLE_ARN`), Cube limits them to the
+  export bucket path with an STS session policy. Credentials from any other
+  source, such as an instance profile, are passed as they are, so grant that
+  role access to the export bucket only.
+
+</Warning>
+
 ## SSL
 
 To enable SSL-encrypted connections between Cube and ClickHouse, set the
@@ -243,6 +277,7 @@ You can connect to a ClickHouse database with compression enabled, by setting
 [ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]: /recipes/configuration/using-ssl-connections-to-data-source
 [ref-caching-large-preaggs]: /docs/pre-aggregations/using-pre-aggregations#export-bucket
+[ref-oidc-aws]: /admin/deployment/oidc/aws#s3-export-bucket
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [ref-dimension-type]: /reference/data-modeling/dimensions#type
 [self-preaggs-batching]: #batching

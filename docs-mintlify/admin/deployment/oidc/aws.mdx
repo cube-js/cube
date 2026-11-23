@@ -313,7 +313,7 @@ stored anywhere.
 ## S3 export bucket
 
 If your data source uses an [export bucket][ref-export-bucket] for
-pre-aggregation unloads (Snowflake, Redshift, Athena, BigQuery, …), Cube
+pre-aggregation unloads (Snowflake, Redshift, Athena, BigQuery, ClickHouse, …), Cube
 needs `s3:PutObject` / `s3:GetObject` / `s3:ListBucket` on the bucket. The
 deployment's default identity is the simplest place to put this.
 
