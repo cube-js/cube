@@ -1528,11 +1528,12 @@ impl SchedulerImpl {
                 .get_active_partitions_by_index_id(index.get_id())
                 .await?
             {
-                if !self
+                if self
                     .meta_store
                     .get_chunks_by_partition(p.get_id(), false)
                     .await?
-                    .is_empty()
+                    .iter()
+                    .any(|c| !c.get_row().in_memory())
                 {
                     self.schedule_partition_to_compact(&p).await?;
                 }
@@ -1559,11 +1560,13 @@ impl SchedulerImpl {
         {
             return Ok(());
         }
-        if !self
+        // Compaction skips in-memory chunks, so rescheduling for them alone would loop.
+        if self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
             .await?
-            .is_empty()
+            .iter()
+            .any(|c| !c.get_row().in_memory())
         {
             self.schedule_partition_to_compact(&partition).await?;
         }
@@ -1973,8 +1976,28 @@ mod tests {
 
     #[tokio::test]
     async fn deferred_build_survives_compaction_racing_last_import() {
+        assert!(
+            compaction_after_racing_last_import(
+                "deferred_build_survives_compaction_racing_last_import",
+                false
+            )
+            .await
+        );
+    }
+
+    // Compaction skips in-memory chunks, so they alone must not keep rescheduling it.
+    #[tokio::test]
+    async fn deferred_build_ignores_in_memory_chunks() {
+        assert!(
+            !compaction_after_racing_last_import("deferred_build_ignores_in_memory_chunks", true)
+                .await
+        );
+    }
+
+    // Whether a compaction is scheduled after the last import ends while a compaction that saw
+    // it running is still in flight.
+    async fn compaction_after_racing_last_import(name: &str, in_memory_chunk: bool) -> bool {
         use crate::metastore::{Column, ColumnType};
-        let name = "deferred_build_survives_compaction_racing_last_import";
         let config = Config::test(name).update_config(|mut c| {
             c.compaction_readiness_chunks_threshold = Some(1);
             c.deferred_table_build_enabled = true;
@@ -2015,7 +2038,7 @@ mod tests {
             .unwrap()[0]
             .get_id();
         let chunk = meta_store
-            .create_chunk(partition, 10, None, None, false)
+            .create_chunk(partition, 10, None, None, in_memory_chunk)
             .await
             .unwrap();
         meta_store.chunk_uploaded(chunk.get_id()).await.unwrap();
@@ -2051,17 +2074,18 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(meta_store
+        let scheduled = meta_store
             .get_job_by_ref(
                 RowKey::Table(TableId::Partitions, partition),
                 JobType::PartitionCompaction,
             )
             .await
             .unwrap()
-            .is_some());
+            .is_some();
         RocksMetaStore::cleanup_test_metastore(name);
         let _ = fs::remove_dir_all(config.local_dir());
         let _ = fs::remove_dir_all(config.remote_dir());
+        scheduled
     }
 
     #[tokio::test]
