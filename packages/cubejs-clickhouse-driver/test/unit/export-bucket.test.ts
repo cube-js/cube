@@ -346,6 +346,15 @@ describe('exportBucketSessionPolicy', () => {
           Effect: 'Allow',
           Action: ['kms:GenerateDataKey', 'kms:Decrypt'],
           Resource: '*',
+          Condition: {
+            StringLike: {
+              'kms:ViaService': 's3.*.amazonaws.com*',
+              'kms:EncryptionContext:aws:s3:arn': [
+                'arn:aws:s3:::my-bucket',
+                'arn:aws:s3:::my-bucket/exports/cube/*',
+              ],
+            },
+          },
         },
       ],
     });

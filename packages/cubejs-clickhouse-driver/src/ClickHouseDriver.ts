@@ -68,10 +68,19 @@ export function exportBucketSessionPolicy(bucketName: string, path: string, part
         Resource: `arn:${partition}:s3:::${bucketName}`,
       },
       {
-        // SSE-KMS buckets: without this the policy would deny the role's own key grants, which still bound it.
+        // SSE-KMS: key use only through S3 for this bucket (bucket ARN too, for S3 Bucket Keys).
         Effect: 'Allow',
         Action: ['kms:GenerateDataKey', 'kms:Decrypt'],
         Resource: '*',
+        Condition: {
+          StringLike: {
+            'kms:ViaService': 's3.*.amazonaws.com*',
+            'kms:EncryptionContext:aws:s3:arn': [
+              `arn:${partition}:s3:::${bucketName}`,
+              `arn:${partition}:s3:::${bucketName}/${prefix}*`,
+            ],
+          },
+        },
       },
     ],
   });
