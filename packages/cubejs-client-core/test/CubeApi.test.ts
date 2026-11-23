@@ -780,6 +780,46 @@ describe('CubeApi cubeSql', () => {
     expect(requestStreamSpy.mock.calls[0]?.[1]?.params?.params).toEqual(sqlParams);
   });
 
+  test('should list the query parameters with cubeSqlParams', async () => {
+    const described = [
+      { name: 'status', type: 'string' },
+      { name: 'since', type: 'time' },
+      { name: 'other', type: 'unknown' },
+    ];
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      status: 200,
+      text: () => Promise.resolve(JSON.stringify({ params: described })),
+    } as any);
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const sql = 'SELECT status FROM users WHERE status = :status AND created_at > :since';
+    const result = await cubeApi.cubeSqlParams(sql);
+
+    expect(result).toEqual(described);
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    // The endpoint only accepts POST, whatever the URL length would pick.
+    expect(url).toBe('http://localhost:4000/cubejs-api/v1/cubesql/params');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ query: sql });
+  });
+
+  test('should reject cubeSqlParams with the server error for an invalid query', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      status: 400,
+      text: () => Promise.resolve(JSON.stringify({ error: 'Error during planning: table "nope" not found' })),
+    } as any);
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    await expect(cubeApi.cubeSqlParams('SELECT * FROM nope WHERE x = :x'))
+      .rejects.toThrow('Error during planning: table "nope" not found');
+  });
+
   test('should parse usedPreAggregations from response', async () => {
     vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
       subscribe: (cb) => Promise.resolve(cb({

@@ -141,6 +141,16 @@ export type CubeSqlParam = {
   type: CubeSqlParamType;
 };
 
+/**
+ * One `:name` placeholder of a SQL API query, with the type its surroundings
+ * expect. `unknown` when nothing around it settles the type; never `expr`,
+ * which is a binding choice rather than something a query implies.
+ */
+export type CubeSqlParamDescription = {
+  name: string;
+  type: Exclude<CubeSqlParamType, 'expr'> | 'unknown';
+};
+
 export type CubeSqlOptions = LoadMethodOptions & {
   /**
    * Query timeout in milliseconds
@@ -837,6 +847,29 @@ class CubeApi {
         baseRequestId: options?.baseRequestId,
       }),
       (response: DryRunResponse) => response,
+      options,
+      callback
+    );
+  }
+
+  public cubeSqlParams(sqlQuery: string, options?: LoadMethodOptions): Promise<CubeSqlParamDescription[]>;
+
+  public cubeSqlParams(sqlQuery: string, options: LoadMethodOptions, callback?: LoadMethodCallback<CubeSqlParamDescription[]>): UnsubscribeObj;
+
+  /**
+   * List the `:name` placeholders of a SQL API query in the order they first
+   * appear, each with the type its surroundings expect. Plans the query without
+   * running it. Needs a server of 1.8.23 or later.
+   */
+  public cubeSqlParams(sqlQuery: string, options?: LoadMethodOptions, callback?: LoadMethodCallback<CubeSqlParamDescription[]>): Promise<CubeSqlParamDescription[]> | UnsubscribeObj {
+    return this.loadMethod(
+      () => this.request('cubesql/params', {
+        query: sqlQuery,
+        method: 'POST',
+        signal: options?.signal,
+        baseRequestId: options?.baseRequestId,
+      }),
+      (response: { params: CubeSqlParamDescription[] }) => response.params,
       options,
       callback
     );
