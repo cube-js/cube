@@ -626,6 +626,11 @@ pub trait ConfigObj: DIService {
     /// Off by default; when disabled, chunks are sent whole and filtered only in the subprocess.
     fn prefilter_in_memory_chunks_enabled(&self) -> bool;
 
+    /// When enabled, the worker merges each partition's in-memory chunks into one sorted run
+    /// before sending them to the select subprocess, so a scan gets one merge input per partition
+    /// instead of one per chunk. Off by default.
+    fn merge_in_memory_chunks_enabled(&self) -> bool;
+
     /// When enabled (default), a merge group's chunk parquets (PerPartition / Range strategies)
     /// are downloaded concurrently before building the merge inputs, instead of one at a time.
     /// The group is already bounded by repartition_merge_max_input_files and the download
@@ -851,6 +856,7 @@ pub struct ConfigObjImpl {
     pub push_partial_aggregate_below_merge_enabled: bool,
     pub compaction_split_by_total_file_size_enabled: bool,
     pub prefilter_in_memory_chunks_enabled: bool,
+    pub merge_in_memory_chunks_enabled: bool,
     pub repartition_concurrent_download: bool,
     pub repartition_strategy: RepartitionStrategy,
     pub repartition_merge_max_input_files: usize,
@@ -1217,6 +1223,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn prefilter_in_memory_chunks_enabled(&self) -> bool {
         self.prefilter_in_memory_chunks_enabled
+    }
+    fn merge_in_memory_chunks_enabled(&self) -> bool {
+        self.merge_in_memory_chunks_enabled
     }
     fn repartition_concurrent_download(&self) -> bool {
         self.repartition_concurrent_download
@@ -2192,6 +2201,7 @@ impl Config {
                     "CUBESTORE_PREFILTER_IN_MEMORY_CHUNKS",
                     false,
                 ),
+                merge_in_memory_chunks_enabled: env_flag("CUBESTORE_MERGE_IN_MEMORY_CHUNKS", false),
                 repartition_concurrent_download: env_flag(
                     "CUBESTORE_REPARTITION_CONCURRENT_DOWNLOAD",
                     true,
@@ -2485,6 +2495,7 @@ impl Config {
                 // Production default is off; kept on in tests so prefilter_chunks_shared_scan
                 // and the rest of the suite keep exercising the worker-side trim path.
                 prefilter_in_memory_chunks_enabled: true,
+                merge_in_memory_chunks_enabled: true,
                 repartition_concurrent_download: true,
                 repartition_strategy: RepartitionStrategy::Range,
                 repartition_merge_max_input_files: 50,

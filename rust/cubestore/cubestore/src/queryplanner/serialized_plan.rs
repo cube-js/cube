@@ -1237,28 +1237,10 @@ impl SerializedPlan {
             return Vec::new();
         }
 
-        let executable = |partition: &PartitionSnapshot| {
-            self.partition_ids_to_execute
-                .binary_search_by_key(&partition.partition.get_id(), |(id, _)| *id)
-                .is_ok()
-        };
-
-        // The subprocess shares in-memory batches by chunk id across scans (a self-join or
-        // self-union of one index yields one snapshot per scan, all pointing at the same
-        // chunks). Trimming a shared chunk in place would corrupt the rows seen by a scan
-        // that re-applies a different predicate, or none at all. So count references across
-        // ALL snapshots (predicate-bearing or not) and only pre-filter chunks referenced by
-        // exactly one scan.
-        let mut chunk_counts: HashMap<u64, usize> = HashMap::new();
-        for index in self.index_snapshots().iter() {
-            for partition in index.partitions().iter().filter(|p| executable(p)) {
-                for chunk in partition.chunks() {
-                    if chunk.get_row().in_memory() {
-                        *chunk_counts.entry(chunk.get_id()).or_default() += 1;
-                    }
-                }
-            }
-        }
+        let executable = |partition: &PartitionSnapshot| self.is_executable(partition);
+        // Trimming a shared chunk in place would corrupt the rows seen by a scan that
+        // re-applies a different predicate, or none at all.
+        let chunk_counts = self.in_memory_chunk_scan_counts();
 
         let mut groups = Vec::new();
         for (idx, index) in self.index_snapshots().iter().enumerate() {
@@ -1279,6 +1261,54 @@ impl SerializedPlan {
             }
         }
         groups
+    }
+
+    /// Per partition, the ids of in-memory chunks to merge into one sorted run, paired with the
+    /// index sort key length. Only chunks referenced by exactly one scan are included, and only
+    /// partitions with two or more of them.
+    pub fn in_memory_chunk_merge_groups(&self) -> Vec<(usize, Vec<u64>)> {
+        let chunk_counts = self.in_memory_chunk_scan_counts();
+        let mut groups = Vec::new();
+        for index in self.index_snapshots().iter() {
+            let key_len = index.index().get_row().sort_key_size() as usize;
+            for partition in index.partitions().iter().filter(|p| self.is_executable(p)) {
+                let chunk_ids = partition
+                    .chunks()
+                    .iter()
+                    .filter(|c| {
+                        c.get_row().in_memory() && chunk_counts.get(&c.get_id()) == Some(&1)
+                    })
+                    .map(|c| c.get_id())
+                    .collect::<Vec<_>>();
+                if chunk_ids.len() >= 2 {
+                    groups.push((key_len, chunk_ids));
+                }
+            }
+        }
+        groups
+    }
+
+    fn is_executable(&self, partition: &PartitionSnapshot) -> bool {
+        self.partition_ids_to_execute
+            .binary_search_by_key(&partition.partition.get_id(), |(id, _)| *id)
+            .is_ok()
+    }
+
+    /// The subprocess shares in-memory batches by chunk id across scans: a self-join or
+    /// self-union of one index yields one snapshot per scan, all pointing at the same chunks.
+    /// Chunks may be rewritten in place only when referenced by exactly one scan.
+    fn in_memory_chunk_scan_counts(&self) -> HashMap<u64, usize> {
+        let mut chunk_counts: HashMap<u64, usize> = HashMap::new();
+        for index in self.index_snapshots().iter() {
+            for partition in index.partitions().iter().filter(|p| self.is_executable(p)) {
+                for chunk in partition.chunks() {
+                    if chunk.get_row().in_memory() {
+                        *chunk_counts.entry(chunk.get_id()).or_default() += 1;
+                    }
+                }
+            }
+        }
+        chunk_counts
     }
 
     pub fn in_memory_chunks_to_load(&self) -> Vec<(IdRow<Chunk>, IdRow<Partition>, IdRow<Index>)> {
