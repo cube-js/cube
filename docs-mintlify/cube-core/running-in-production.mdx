@@ -381,7 +381,7 @@ only allows access from the Cube deployment.
 ### Running as a non-root user
 
 The Cube Store Docker image runs `cubestored` as the `cubestore` user (UID and
-GID `10001`) instead of `root`.
+GID `10001`).
 
 Older images ran as `root`, so existing volumes are owned by `root`. To keep
 upgrades working, a container started as `root` changes the owner of the
