@@ -120,7 +120,7 @@ impl ExecutionPlan for InMemoryChunksExec {
                 partition
             )));
         }
-        let mut streams = self
+        let streams = self
             .chunks
             .iter()
             .map(
@@ -133,9 +133,6 @@ impl ExecutionPlan for InMemoryChunksExec {
                 },
             )
             .collect::<Result<Vec<_>, _>>()?;
-        if streams.len() == 1 {
-            return Ok(streams.remove(0));
-        }
         let reservation = MemoryConsumer::new("InMemoryChunksExec").register(context.memory_pool());
         StreamingMergeBuilder::new()
             .with_streams(streams)
@@ -240,5 +237,27 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(column(&r, 0), vec![5, 10]);
+    }
+
+    #[tokio::test]
+    async fn single_chunk_reports_metrics() {
+        let by_key = LexOrdering::new(vec![PhysicalSortExpr::new(
+            Arc::new(Column::new("key", 0)),
+            SortOptions::default(),
+        )]);
+        let exec = Arc::new(
+            InMemoryChunksExec::try_new(
+                vec![vec![batch(&[(1, 10), (2, 20)])]],
+                schema(),
+                None,
+                by_key,
+            )
+            .unwrap(),
+        );
+        let r = collect(exec.clone(), Arc::new(TaskContext::default()))
+            .await
+            .unwrap();
+        assert_eq!(column(&r, 0), vec![1, 2]);
+        assert_eq!(exec.metrics().unwrap().output_rows(), Some(2));
     }
 }
