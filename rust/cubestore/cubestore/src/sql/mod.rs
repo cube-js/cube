@@ -7336,6 +7336,126 @@ LIMIT 10000"#,
     }
 
     #[test]
+    fn deferred_table_build() {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .thread_stack_size(4 * 1024 * 1024)
+            .build()
+            .unwrap()
+            .block_on(async {
+                Config::test("deferred_table_build")
+                    .update_config(|mut config| {
+                        config.partition_split_threshold = 50;
+                        config.compaction_chunks_count_threshold = 0;
+                        config.compaction_readiness_chunks_threshold = Some(0);
+                        config.deferred_table_build_enabled = true;
+                        // Well below the 20 imported chunks, so chunks are merged in tiers first.
+                        config.deferred_table_build_max_fanin = 3;
+                        config
+                    })
+                    .start_test(async move |services| {
+                        let service = services.sql_service;
+
+                        let total_rows = 200;
+                        let files_count = 20;
+                        let rows_per_file = total_rows / files_count;
+
+                        let paths = {
+                            let dir = env::temp_dir();
+                            let mut paths = Vec::new();
+                            for f in 0..files_count {
+                                let path = dir.clone().join(format!("deferred-build-{}.csv", f));
+                                let mut file = File::create(path.clone()).unwrap();
+                                file.write_all("id,value\n".as_bytes()).unwrap();
+                                let start = f * rows_per_file;
+                                for i in start..start + rows_per_file {
+                                    file.write_all(format!("{},{}\n", i, i * 10).as_bytes())
+                                        .unwrap();
+                                }
+                                paths.push(path);
+                            }
+                            paths
+                        };
+
+                        service
+                            .exec_query("CREATE SCHEMA IF NOT EXISTS test")
+                            .await?
+                            .collect()
+                            .await?;
+                        service
+                            .exec_query(&format!(
+                                "CREATE TABLE test.deferred (`id` int, `value` int) \
+                                 WITH (input_format = 'csv') INDEX by_value (`value`) LOCATION {}",
+                                paths
+                                    .iter()
+                                    .map(|p| format!("'{}'", p.to_string_lossy()))
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            ))
+                            .await?
+                            .collect()
+                            .await?;
+
+                        let result = service
+                            .exec_query("SELECT count(*), sum(value) FROM test.deferred")
+                            .await?
+                            .collect()
+                            .await?;
+                        assert_eq!(
+                            result.get_rows()[0],
+                            Row::new(vec![TableValue::Int(200), TableValue::Int(199000)])
+                        );
+
+                        let indexes = services
+                            .meta_store
+                            .get_table_indexes(
+                                services
+                                    .meta_store
+                                    .get_table("test".to_string(), "deferred".to_string())
+                                    .await?
+                                    .get_id(),
+                            )
+                            .await?;
+                        let partitions = services
+                            .meta_store
+                            .get_active_partitions_and_chunks_by_index_id_for_select(
+                                indexes.iter().map(|i| i.get_id()).collect(),
+                            )
+                            .await?;
+                        assert_eq!(partitions.len(), 2);
+                        // One build splits the root straight into its final partitions: no
+                        // chunks are left and no partition was re-split.
+                        for index_partitions in &partitions {
+                            let root = index_partitions
+                                .iter()
+                                .find(|(p, _)| p.get_row().parent_partition_id().is_none())
+                                .unwrap()
+                                .0
+                                .get_id();
+                            let children = index_partitions
+                                .iter()
+                                .filter(|(p, _)| p.get_id() != root)
+                                .collect::<Vec<_>>();
+                            assert_eq!(children.len(), 4);
+                            for (partition, chunks) in &children {
+                                assert!(chunks.is_empty(), "chunks left: {:?}", chunks);
+                                assert_eq!(partition.get_row().parent_partition_id(), &Some(root));
+                            }
+                            assert_eq!(
+                                children
+                                    .iter()
+                                    .map(|(p, _)| p.get_row().main_table_row_count())
+                                    .sum::<u64>(),
+                                200
+                            );
+                        }
+                        Ok::<(), CubeError>(())
+                    })
+                    .await;
+            });
+    }
+
+    #[test]
     fn compaction_readiness_without_threshold() {
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()

@@ -4489,9 +4489,10 @@ impl MetaStore for RocksMetaStore {
         server_name: String,
         pool: JobRunnerPool,
     ) -> Result<Option<IdRow<Job>>, CubeError> {
+        let order_by_table = self.store.config.job_order_by_table_enabled();
         self.write_operation("start_processing_job", move |db_ref, batch_pipe| {
-            let table = JobRocksTable::new(db_ref);
-            let next_job = table
+            let table = JobRocksTable::new(db_ref.clone());
+            let candidates = table
                 .get_rows_by_index(
                     &JobIndexKey::ScheduledByShard(Some(server_name.to_string())),
                     &JobRocksIndex::ByShard,
@@ -4501,10 +4502,23 @@ impl MetaStore for RocksMetaStore {
                 // worker can't run them. Skip silently here — they are reported and
                 // removed by the scheduler's cleanup_unknown_jobs sweep.
                 .filter(|j| !matches!(j.get_row().job_type(), JobType::Unknown))
-                .filter(|j| j.get_row().matches_pool(pool))
+                .filter(|j| j.get_row().matches_pool(pool));
+            let next_job = if order_by_table {
+                // Finishing the oldest table first lets concurrently created tables become ready
+                // one by one; in job-id order they all advance together and miss deadlines together.
+                let resolver = JobTableResolver::new(db_ref);
+                candidates.min_by_key(|j| {
+                    (
+                        std::cmp::Reverse(j.get_row().priority()),
+                        resolver.table_id(j.get_row().row_reference()),
+                        j.get_id(),
+                    )
+                })
+            } else {
                 //We use min_by instead of the max_by because of min_by returns the first element
                 //if priority is equal while max_by returns the last element
-                .min_by(|a, b| b.get_row().priority().cmp(&a.get_row().priority()));
+                candidates.min_by(|a, b| b.get_row().priority().cmp(&a.get_row().priority()))
+            };
 
             if let Some(job) = next_job {
                 if let JobStatus::ProcessingBy(node) = job.get_row().status() {
@@ -5433,6 +5447,41 @@ fn swap_active_partitions_impl(
     }
 
     Ok(())
+}
+
+/// Resolves a job's row reference to the id of the table the job works on.
+struct JobTableResolver<'a> {
+    db_ref: DbTableRef<'a>,
+}
+
+impl<'a> JobTableResolver<'a> {
+    fn new(db_ref: DbTableRef<'a>) -> Self {
+        Self { db_ref }
+    }
+
+    // A job whose rows are gone belongs to a dropped table; id 0 picks it first so it fails fast.
+    fn table_id(&self, key: &RowKey) -> u64 {
+        let partition_table = |partition_id: u64| -> Option<u64> {
+            let partition = PartitionRocksTable::new(self.db_ref.clone())
+                .get_row(partition_id)
+                .ok()??;
+            let index = IndexRocksTable::new(self.db_ref.clone())
+                .get_row(partition.get_row().get_index_id())
+                .ok()??;
+            Some(index.get_row().table_id())
+        };
+        let id = match key {
+            RowKey::Table(TableId::Tables, id) => Some(*id),
+            RowKey::Table(TableId::Partitions, id) => partition_table(*id),
+            RowKey::Table(TableId::Chunks, id) => ChunkRocksTable::new(self.db_ref.clone())
+                .get_row(*id)
+                .ok()
+                .flatten()
+                .and_then(|c| partition_table(c.get_row().get_partition_id())),
+            _ => Some(u64::MAX),
+        };
+        id.unwrap_or(0)
+    }
 }
 
 #[cfg(test)]
@@ -8071,6 +8120,70 @@ mod tests {
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
+        Ok(())
+    }
+
+    async fn picked_job_order(name: &str, order_by_table: bool) -> Result<Vec<RowKey>, CubeError> {
+        let config = Config::test(name).update_config(|mut c| {
+            c.job_order_by_table_enabled = order_by_table;
+            c
+        });
+        let store_path = env::current_dir()?.join(format!("{}-local", name));
+        let remote_store_path = env::current_dir()?.join(format!("{}-remote", name));
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        let mut picked = Vec::new();
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.clone().join("metastore").as_path(),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )?;
+            for key in [
+                RowKey::Table(TableId::Tables, 2),
+                RowKey::Table(TableId::Tables, 1),
+                // Its partition is gone, as after a table drop.
+                RowKey::Table(TableId::Partitions, 999),
+            ] {
+                meta_store
+                    .add_job(Job::new(
+                        key,
+                        JobType::PartitionCompaction,
+                        "node1".to_string(),
+                    ))
+                    .await?;
+            }
+            while let Some(job) = meta_store
+                .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
+                .await?
+            {
+                picked.push(job.get_row().row_reference().clone());
+            }
+        }
+        let _ = fs::remove_dir_all(store_path);
+        let _ = fs::remove_dir_all(remote_store_path);
+        Ok(picked)
+    }
+
+    #[tokio::test]
+    async fn start_processing_job_order_by_table() -> Result<(), CubeError> {
+        assert_eq!(
+            picked_job_order("start_processing_job_order_by_job_id", false).await?,
+            vec![
+                RowKey::Table(TableId::Tables, 2),
+                RowKey::Table(TableId::Tables, 1),
+                RowKey::Table(TableId::Partitions, 999),
+            ]
+        );
+        assert_eq!(
+            picked_job_order("start_processing_job_order_by_table", true).await?,
+            vec![
+                RowKey::Table(TableId::Partitions, 999),
+                RowKey::Table(TableId::Tables, 1),
+                RowKey::Table(TableId::Tables, 2),
+            ]
+        );
         Ok(())
     }
 

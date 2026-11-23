@@ -758,6 +758,16 @@ pub trait ConfigObj: DIService {
 
     fn compaction_readiness_chunks_threshold(&self) -> Option<u64>;
 
+    /// Defers partition builds of a not-ready table until its imports finish. Takes effect only
+    /// with `compaction_readiness_chunks_threshold` set.
+    fn deferred_table_build_enabled(&self) -> bool;
+
+    /// Most chunks one deferred-build compaction reads at once.
+    fn deferred_table_build_max_fanin(&self) -> usize;
+
+    /// Picks the next job from the oldest table instead of in plain job-id order.
+    fn job_order_by_table_enabled(&self) -> bool;
+
     fn max_joined_partitions(&self) -> usize;
 
     fn max_joined_partitions_message(&self) -> &str;
@@ -899,6 +909,9 @@ pub struct ConfigObjImpl {
     pub remote_files_cleanup_delete_concurrency: usize,
     pub create_table_max_retries: u64,
     pub compaction_readiness_chunks_threshold: Option<u64>,
+    pub deferred_table_build_enabled: bool,
+    pub deferred_table_build_max_fanin: usize,
+    pub job_order_by_table_enabled: bool,
     pub max_joined_partitions: usize,
     pub max_joined_partitions_message: String,
 }
@@ -1403,6 +1416,18 @@ impl ConfigObj for ConfigObjImpl {
 
     fn compaction_readiness_chunks_threshold(&self) -> Option<u64> {
         self.compaction_readiness_chunks_threshold
+    }
+
+    fn deferred_table_build_enabled(&self) -> bool {
+        self.deferred_table_build_enabled
+    }
+
+    fn deferred_table_build_max_fanin(&self) -> usize {
+        self.deferred_table_build_max_fanin
+    }
+
+    fn job_order_by_table_enabled(&self) -> bool {
+        self.job_order_by_table_enabled
     }
 
     fn max_joined_partitions(&self) -> usize {
@@ -2350,6 +2375,14 @@ impl Config {
                 compaction_readiness_chunks_threshold: env_optparse(
                     "CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD",
                 ),
+                deferred_table_build_enabled: env_flag("CUBESTORE_DEFERRED_TABLE_BUILD", false),
+                // A merge of fewer than two chunks makes no progress.
+                deferred_table_build_max_fanin: env_parse_lenient(
+                    "CUBESTORE_DEFERRED_TABLE_BUILD_MAX_FANIN",
+                    64,
+                )
+                .max(2),
+                job_order_by_table_enabled: env_flag("CUBESTORE_JOB_ORDER_BY_TABLE", false),
                 max_joined_partitions: env_parse("CUBESTORE_MAX_JOINED_PARTITIONS", 5),
                 max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),
             }),
@@ -2537,6 +2570,9 @@ impl Config {
                 remote_files_cleanup_delete_concurrency: 1,
                 create_table_max_retries: 3,
                 compaction_readiness_chunks_threshold: None,
+                deferred_table_build_enabled: false,
+                deferred_table_build_max_fanin: 64,
+                job_order_by_table_enabled: false,
                 max_joined_partitions: 5,
                 max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),
             }

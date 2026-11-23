@@ -15,6 +15,7 @@ use crate::metastore::{
 };
 use crate::remotefs::RemoteFs;
 use crate::shared::deadline_queue::DeadlineQueue;
+use crate::store::compaction::{deferred_table_build, table_imports_pending};
 use crate::store::{ChunkStore, WALStore};
 use crate::util::lock::acquire_lock;
 use crate::util::time_span::warn_long_fut;
@@ -922,6 +923,15 @@ impl SchedulerImpl {
                 chunk_queue.push((SystemTime::now(), row_id))
             }
         }
+        if let MetaStoreEvent::DeleteJob(job) = &event {
+            if let (JobType::TableImportCSV(_), RowKey::Table(TableId::Tables, table_id)) =
+                (job.get_row().job_type(), job.get_row().row_reference())
+            {
+                if deferred_table_build(self.config.as_ref()) {
+                    self.schedule_deferred_build(*table_id).await?;
+                }
+            }
+        }
         if let MetaStoreEvent::Insert(TableId::Tables, row_id) = event {
             let table = self.meta_store.get_table_by_id(row_id).await?;
             if let Some(locations) = table.get_row().locations() {
@@ -1490,6 +1500,37 @@ impl SchedulerImpl {
         if job.is_some() {
             // TODO queue failover
             self.cluster.notify_job_runner(node).await?;
+        }
+        Ok(())
+    }
+
+    /// Schedules the first build of a deferred table once its last import is gone.
+    async fn schedule_deferred_build(&self, table_id: u64) -> Result<(), CubeError> {
+        let table = match self.meta_store.get_table_by_id(table_id).await {
+            Ok(t) => t,
+            // Dropped meanwhile.
+            Err(_) => return Ok(()),
+        };
+        if table.get_row().is_streaming()
+            || table_imports_pending(self.meta_store.as_ref(), &table).await?
+        {
+            return Ok(());
+        }
+        for index in self.meta_store.get_table_indexes(table_id).await? {
+            for p in self
+                .meta_store
+                .get_active_partitions_by_index_id(index.get_id())
+                .await?
+            {
+                if !self
+                    .meta_store
+                    .get_chunks_by_partition(p.get_id(), false)
+                    .await?
+                    .is_empty()
+                {
+                    self.schedule_partition_to_compact(&p).await?;
+                }
+            }
         }
         Ok(())
     }
