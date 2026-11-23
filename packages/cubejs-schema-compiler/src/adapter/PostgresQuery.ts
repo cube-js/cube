@@ -1,6 +1,9 @@
 import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
+import { BaseFilter } from './BaseFilter';
 import { ParamAllocator } from './ParamAllocator';
+import { isInt64Literal } from './numericLiteral';
+import type { QueryFilterTreeItem } from './QueryTypes';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
@@ -19,9 +22,29 @@ class PostgresParamAllocator extends ParamAllocator {
   }
 }
 
+// An untyped parameter takes the column's type, so a `real` column rounds the bound to
+// float4 and `x >= 1.0000001` also matches 1. A typed bound is compared at its own precision.
+// Whole numbers are cast to bigint, which keeps an index on an integer column usable.
+class PostgresFilter extends BaseFilter {
+  public castParameter(param?: unknown) {
+    if (this.measure || this.definition().type === 'number') {
+      return isInt64Literal(param) ? '?::bigint' : '?::numeric';
+    }
+    return '?';
+  }
+
+  public allocateCastParam(param: unknown): string {
+    return this.query.paramAllocator.allocateParamsForQuestionString(this.castParameter(param), [param]);
+  }
+}
+
 export class PostgresQuery extends BaseQuery {
   public newParamAllocator(expressionParams?: unknown[]) {
     return new PostgresParamAllocator(expressionParams);
+  }
+
+  public newFilter(filter: QueryFilterTreeItem): BaseFilter {
+    return new PostgresFilter(this, filter);
   }
 
   public convertTz(field: string): string {
@@ -79,6 +102,7 @@ export class PostgresQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     // eslint-disable-next-line no-template-curly-in-string
     templates.params.param = '${{ param_index + 1 }}';
+    templates.tesseract.number_param_cast = '{{ expr }}::{% if is_integer %}bigint{% else %}numeric{% endif %}';
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.CONCAT = 'CONCAT({% for arg in args %}CAST({{arg}} AS TEXT){% if not loop.last %},{% endif %}{% endfor %})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';

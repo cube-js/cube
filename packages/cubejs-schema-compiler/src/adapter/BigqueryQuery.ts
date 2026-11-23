@@ -4,6 +4,7 @@ import { BaseFilter } from './BaseFilter';
 import type { QueryFilterTreeItem } from './QueryTypes';
 import type { EvaluatedPreAggregationDefinition } from './PreAggregations';
 import { BaseTimeDimension } from './BaseTimeDimension';
+import { isInt64Literal } from './numericLiteral';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'DAY',
@@ -15,18 +16,6 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   quarter: 'QUARTER',
   year: 'YEAR'
 };
-
-const INT64_MIN = BigInt('-9223372036854775808');
-const INT64_MAX = BigInt('9223372036854775807');
-
-function isInt64Literal(value: unknown): boolean {
-  const str = String(value);
-  if (!/^-?\d+$/.test(str)) {
-    return false;
-  }
-  const n = BigInt(str);
-  return n >= INT64_MIN && n <= INT64_MAX;
-}
 
 class BigqueryFilter extends BaseFilter {
   public likeIgnoreCase(column: string, not: boolean, param: unknown, type: string) {
