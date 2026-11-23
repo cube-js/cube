@@ -576,7 +576,9 @@ impl WriteBatchContainer {
         let serialized = flexbuffers::to_vec(self)?;
 
         let mut file = File::create(file_name).await?;
-        Ok(tokio::io::AsyncWriteExt::write_all(&mut file, &serialized).await?)
+        tokio::io::AsyncWriteExt::write_all(&mut file, &serialized).await?;
+        // tokio finishes the write in the background; the file is read back by path for upload.
+        Ok(tokio::io::AsyncWriteExt::flush(&mut file).await?)
     }
 
     pub async fn read_from_file(file_name: &str) -> Result<Self, CubeError> {
