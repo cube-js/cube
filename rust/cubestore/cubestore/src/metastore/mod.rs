@@ -5507,10 +5507,8 @@ enum JobTable {
     Table(u64),
 }
 
-// Queue time used to order jobs by table: jobs of a not-ready table take the table's creation
-// time, but no earlier than `max_table_boost` before their own enqueue time; every other job
-// keeps its own enqueue time. So a job waits for older tables at most `max_table_boost`, and a
-// streaming table's job, queued `max_table_boost` early, is never passed by a later job.
+// Queue time for ordering jobs by table: a not-ready table's job takes the table's creation time,
+// but no earlier than `max_table_boost` before its own enqueue time; other jobs keep their own.
 struct JobArrival<'a, 'c> {
     db_ref: DbTableRef<'a>,
     job_tables: &'c mut HashMap<u64, JobTable>,
