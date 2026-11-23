@@ -77,7 +77,7 @@ enum Cmd {
         #[command(flatten)]
         integration: Integration,
         /// Run id, as returned by `sync`
-        #[arg(value_parser = util::nonempty_filter)]
+        #[arg(value_parser = util::path_name)]
         run_id: String,
         /// Wait for the run, and exit non-zero unless it completes with no measures withheld
         #[arg(long)]
@@ -94,7 +94,7 @@ enum Cmd {
         #[command(flatten)]
         integration: Integration,
         /// Run id, as returned by `sync`
-        #[arg(value_parser = util::nonempty_filter)]
+        #[arg(value_parser = util::path_name)]
         run_id: String,
     },
 }
@@ -146,7 +146,7 @@ struct Integration {
     /// Deployment id
     deployment: i64,
     /// Data source name, such as `default`
-    #[arg(value_parser = util::nonempty_filter)]
+    #[arg(value_parser = util::path_name)]
     data_source: String,
 }
 
@@ -235,11 +235,34 @@ impl Settings {
 // Everything else, including a status this build has never heard of, means still running.
 const COMPLETED: &str = "COMPLETED";
 const TERMINAL: [&str; 4] = [COMPLETED, "PARTIAL", "FAILED", "CANCELLED"];
+const DEFAULT_TARGET: &str = "default";
 
 fn target_query(target: &Option<String>) -> Query {
     let mut query = Query::new();
     util::push(&mut query, "target", target);
     query
+}
+
+/// Fail unless `settings` belong to the requested target. A tenant from before named
+/// targets ignores `?target=` and answers for `default`, without a `targetName`.
+fn check_target(settings: &Value, target: &Option<String>) -> Result<()> {
+    let requested = target.as_deref().unwrap_or(DEFAULT_TARGET);
+    let returned = output::field(settings, "targetName");
+    let returned = if util::is_blank(&returned) {
+        DEFAULT_TARGET
+    } else {
+        returned.as_str()
+    };
+    // Cube lower-cases target names.
+    if returned.eq_ignore_ascii_case(requested) {
+        return Ok(());
+    }
+
+    bail!(
+        "asked for publication target `{requested}`, but Cube answered for `{}`; this tenant \
+         may not support named publication targets yet",
+        util::one_cell(returned)
+    )
 }
 
 /// The save request: `data` when given, otherwise the saved settings, with the flags on top.
@@ -347,8 +370,9 @@ fn progress_label(run: &Value) -> String {
         util::status_of(run, "status"),
         output::field(run, "progress.stage"),
     ];
+    // Planning sets the total; before it, `0/0` would say nothing.
     let total = output::field(run, "progress.total");
-    if !util::is_blank(&total) {
+    if !util::is_blank(&total) && total != "0" {
         parts.push(format!(
             "{}/{total}",
             output::field(run, "progress.published")
@@ -487,8 +511,12 @@ async fn target_command(cmd: TargetCmd, api: &Client, json: bool) -> Result<()> 
             let query = target_query(&target);
             // Not there yet means this save creates it.
             let saved = api.get_optional(&path, &query).await?;
+            if let Some(saved) = &saved {
+                check_target(saved, &target)?;
+            }
             let body = save_body(saved.as_ref(), data, settings);
             let res = api.request(Method::PUT, &path, &query, Some(&body)).await?;
+            check_target(&res, &target)?;
             if json {
                 output::print_json(&res);
             } else {
@@ -505,8 +533,10 @@ async fn target_command(cmd: TargetCmd, api: &Client, json: bool) -> Result<()> 
             target,
         } => {
             let path = integration.path();
-            let mut query = target_query(&Some(target));
+            let target = Some(target);
+            let mut query = target_query(&target);
             let saved = api.get(&path, &query).await?;
+            check_target(&saved, &target)?;
             query.push((
                 "expectedConfigurationVersion".to_string(),
                 configuration_version(&saved)?.to_string(),
@@ -572,6 +602,7 @@ pub async fn command(args: Args, ctx: &Ctx) -> Result<()> {
             let path = integration.path();
             let query = target_query(&target);
             let settings = api.get(&path, &query).await?;
+            check_target(&settings, &target)?;
             let body = sync_body(
                 configuration_version(&settings)?,
                 &promote_from,
@@ -730,6 +761,9 @@ mod tests {
         assert!(parse(&["sync", "1", "default", "--target", ""]).is_err());
         assert!(parse(&["sync", "1", "default", "--promote-from", " "]).is_err());
         assert!(parse(&["targets", "1", ""]).is_err());
+        // A dot name would be read as a relative path, which encoding can't prevent.
+        assert!(parse(&["targets", "1", ".."]).is_err());
+        assert!(parse(&["run", "1", "default", "."]).is_err());
     }
 
     #[test]
@@ -917,6 +951,23 @@ mod tests {
     }
 
     #[test]
+    fn settings_must_belong_to_the_requested_target() {
+        let staging = Some("staging".to_string());
+        assert!(check_target(&json!({"targetName": "staging"}), &staging).is_ok());
+        assert!(check_target(
+            &json!({"targetName": "staging"}),
+            &Some("Staging".to_string())
+        )
+        .is_ok());
+        assert!(check_target(&json!({"targetName": "default"}), &None).is_ok());
+        // A tenant from before named targets answers for `default` with no targetName.
+        assert!(check_target(&json!({}), &None).is_ok());
+        let err = check_target(&json!({}), &staging).unwrap_err().to_string();
+        assert!(err.contains("answered for `default`"), "{err}");
+        assert!(check_target(&json!({"targetName": "production"}), &staging).is_err());
+    }
+
+    #[test]
     fn a_started_run_needs_a_printable_id() {
         assert_eq!(started_run_id(&json!({"runId": "r-1"})).unwrap(), "r-1");
         assert!(started_run_id(&json!({"runId": " "})).is_err());
@@ -971,6 +1022,13 @@ mod tests {
                 &json!({"progress": {"stage": "publishing", "published": 1, "total": 2}})
             ),
             "publishing 1/2"
+        );
+        assert_eq!(
+            progress_label(&json!({
+                "status": "RUNNING",
+                "progress": {"stage": "CONVERTING", "published": 0, "total": 0}
+            })),
+            "RUNNING CONVERTING"
         );
         assert_eq!(progress_label(&json!({})), "waiting");
     }
