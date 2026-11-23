@@ -4496,6 +4496,10 @@ impl MetaStore for RocksMetaStore {
     ) -> Result<Option<IdRow<Job>>, CubeError> {
         let order_by_table = self.store.config.job_order_by_table_enabled();
         let job_tables = self.job_tables.clone();
+        // Past the create-table deadline a table can no longer become ready, so boosting its jobs
+        // further would only delay everyone else.
+        let max_table_boost =
+            chrono::Duration::seconds(self.store.config.import_job_timeout() as i64 * 2);
         self.write_operation("start_processing_job", move |db_ref, batch_pipe| {
             let table = JobRocksTable::new(db_ref.clone());
             let candidates = table
@@ -4511,7 +4515,7 @@ impl MetaStore for RocksMetaStore {
                 .filter(|j| j.get_row().matches_pool(pool));
             let next_job = if order_by_table {
                 let mut job_tables = job_tables.lock().unwrap();
-                let mut arrival = JobArrival::new(db_ref, &mut job_tables);
+                let mut arrival = JobArrival::new(db_ref, &mut job_tables, max_table_boost);
                 let next_job = candidates
                     .map(|j| {
                         let key = (
@@ -5471,20 +5475,27 @@ enum JobTable {
 }
 
 // Queue time used to order jobs by table: jobs of a not-ready table take the table's creation
-// time; every other job keeps its own enqueue time, so a later table never passes it.
+// time, but no earlier than `max_table_boost` before their own enqueue time; every other job
+// keeps its own enqueue time. So a job waits for older tables at most `max_table_boost`.
 struct JobArrival<'a, 'c> {
     db_ref: DbTableRef<'a>,
     job_tables: &'c mut HashMap<u64, JobTable>,
+    max_table_boost: chrono::Duration,
     index_tables: HashMap<u64, Option<u64>>,
     partition_tables: HashMap<u64, Option<u64>>,
     not_ready_tables: HashMap<u64, Option<DateTime<Utc>>>,
 }
 
 impl<'a, 'c> JobArrival<'a, 'c> {
-    fn new(db_ref: DbTableRef<'a>, job_tables: &'c mut HashMap<u64, JobTable>) -> Self {
+    fn new(
+        db_ref: DbTableRef<'a>,
+        job_tables: &'c mut HashMap<u64, JobTable>,
+        max_table_boost: chrono::Duration,
+    ) -> Self {
         Self {
             db_ref,
             job_tables,
+            max_table_boost,
             index_tables: HashMap::new(),
             partition_tables: HashMap::new(),
             not_ready_tables: HashMap::new(),
@@ -5505,7 +5516,10 @@ impl<'a, 'c> JobArrival<'a, 'c> {
             JobTable::None => enqueued,
             // Run it first so it fails fast.
             JobTable::Dropped => DateTime::<Utc>::MIN_UTC,
-            JobTable::Table(table_id) => self.not_ready_since(table_id).unwrap_or(enqueued),
+            JobTable::Table(table_id) => match self.not_ready_since(table_id) {
+                Some(created) => created.max(enqueued - self.max_table_boost),
+                None => enqueued,
+            },
         }
     }
 
@@ -8200,9 +8214,14 @@ mod tests {
         Ok(())
     }
 
-    async fn picked_job_order(name: &str, order_by_table: bool) -> Result<Vec<String>, CubeError> {
+    async fn picked_job_order(
+        name: &str,
+        order_by_table: bool,
+        import_job_timeout: u64,
+    ) -> Result<Vec<String>, CubeError> {
         let config = Config::test(name).update_config(|mut c| {
             c.job_order_by_table_enabled = order_by_table;
+            c.import_job_timeout = import_job_timeout;
             c
         });
         let store_path = env::current_dir()?.join(format!("{}-local", name));
@@ -8290,7 +8309,7 @@ mod tests {
     #[tokio::test]
     async fn start_processing_job_order_by_table() -> Result<(), CubeError> {
         assert_eq!(
-            picked_job_order("start_processing_job_order_by_job_id", false).await?,
+            picked_job_order("start_processing_job_order_by_job_id", false, 600).await?,
             vec![
                 "wal_before",
                 "second",
@@ -8303,13 +8322,25 @@ mod tests {
         // Jobs of not-ready tables queue as of the table's creation; other jobs keep their own
         // enqueue time.
         assert_eq!(
-            picked_job_order("start_processing_job_order_by_table", true).await?,
+            picked_job_order("start_processing_job_order_by_table", true, 600).await?,
             vec![
                 "dropped",
                 "wal_before",
                 "first",
                 "second",
                 "ready",
+                "wal_after"
+            ]
+        );
+        // With no time left before the create-table deadline, tables get no boost.
+        assert_eq!(
+            picked_job_order("start_processing_job_order_by_table_no_boost", true, 0).await?,
+            vec![
+                "dropped",
+                "wal_before",
+                "second",
+                "ready",
+                "first",
                 "wal_after"
             ]
         );

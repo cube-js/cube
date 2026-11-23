@@ -549,10 +549,9 @@ enum DeferredMerge {
     Build(usize),
 }
 
-// Each merge stream costs memory, so a first build reads at most `max_fanin` chunks; until it
-// can, the smallest chunks are merged into one. A tier merge never exceeds `max_rows`, so merged
-// chunks stay bounded however large the table is. While imports run, only chunks no larger than
-// an import chunk are merged, to bound rewrites.
+// Merge streams cost memory per input, so a first build reads at most `max_fanin` chunks and
+// tier-merges the smallest ones until it can. While imports run, only import-sized chunks are
+// merged, to bound rewrites.
 fn deferred_merge(
     rows: &[u64],
     imports_pending: bool,

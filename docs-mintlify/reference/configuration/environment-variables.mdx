@@ -2949,7 +2949,8 @@ beyond it are moved into the built partitions afterwards.
 
 If `true`, jobs of tables that are still being created run in the order the tables
 were created. Tables created at the same time then become ready one after another
-instead of all at once.
+instead of all at once. Other jobs can wait for such tables, but no longer than the
+create-table timeout (twice `CUBESTORE_IMPORT_JOB_TIMEOUT`).
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
