@@ -749,11 +749,11 @@ the next sync creates it again without them.
 
 Cube drops a Metric View only when all of these hold:
 
-- Cube created it and still records it as its own, in the catalog and schema the data source
-  publishes to now, in the same Unity Catalog metastore. After you change the target catalog or
-  schema, the Metric Views in the old location stay in Databricks and every sync labels them
-  **Obsolete, kept** without a `detail`, so CI still passes. Drop them in Databricks yourself;
-  run history keeps listing them.
+- Cube created it and still records it as its own, in the catalog and schema its publication
+  target publishes to now, in the same Unity Catalog metastore. After you change the target
+  catalog or schema, the Metric Views in the old location stay in Databricks and every sync
+  labels them **Obsolete, kept** without a `detail`, so CI still passes. Drop them in Databricks
+  yourself; run history keeps listing them.
 - It is obsolete: its Cube view left the scope, or the view now publishes to another target
   name. A view still in scope whose conversion or write failed keeps its Metric View.
 - The object at that name is still a view, owned by the Databricks principal Cube publishes with.
@@ -784,6 +784,6 @@ needs the same Databricks privileges on the target schema as replacing a view.
 
 After you point the data source at a workspace on another Unity Catalog metastore, the next sync
 creates its Metric Views there, or labels a view **Blocked** with `unmanaged-target` when an object
-there already holds its name; if that object should belong to this data source,
+there already holds its name; if that object should belong to this publication target,
 [take it over](#take-over-an-existing-metric-view). The Metric Views in the old metastore stay, and
 syncs no longer list them: drop them in Databricks yourself.
