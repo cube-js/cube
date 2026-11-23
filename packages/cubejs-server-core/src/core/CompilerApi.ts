@@ -1040,17 +1040,18 @@ export class CompilerApi {
       if (!Number.isNaN(q) && !Number.isNaN(t)) {
         // Lower bounds: x > / >= value.
         if ((qOp === 'gt' || qOp === 'gte') && (tOp === 'gt' || tOp === 'gte')) {
-          // target `x > t`: a `gt q` query needs q >= t, a `gte q` query needs q > t.
-          // target `x >= t`: q >= t for both query operators.
-          if (tOp === 'gt') {
-            return qOp === 'gt' ? q >= t : q > t;
+          // A `gte q` query never implies a `gt t` target: the database may round both
+          // bounds to the column's type (`real` keeps ~7 digits), so `x >= 1.0000001`
+          // can run as `x >= 1` and let `x = 1` through.
+          if (tOp === 'gt' && qOp === 'gte') {
+            return false;
           }
           return q >= t;
         }
         // Upper bounds: x < / <= value.
         if ((qOp === 'lt' || qOp === 'lte') && (tOp === 'lt' || tOp === 'lte')) {
-          if (tOp === 'lt') {
-            return qOp === 'lt' ? q <= t : q < t;
+          if (tOp === 'lt' && qOp === 'lte') {
+            return false;
           }
           return q <= t;
         }

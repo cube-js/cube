@@ -13,9 +13,49 @@ class CompilerApiTestable extends CompilerApi {
   public getQueryFactoryProperty(): QueryFactory | any {
     return this.queryFactory;
   }
+
+  public leafFilterImplies(queryLeaf: any, targetLeaf: any): boolean {
+    return super.leafFilterImplies(queryLeaf, targetLeaf);
+  }
 }
 
 describe('CompilerApi', () => {
+  describe('leafFilterImplies', () => {
+    const compilerApi = new CompilerApiTestable(
+      { localPath: () => '/mock/path', dataSchemaFiles: () => Promise.resolve([]) },
+      async () => 'postgres',
+      { logger: jest.fn() }
+    );
+
+    afterAll(() => compilerApi.dispose());
+
+    const leaf = (operator: string, value: string) => ({ member: 'orders.amount', operator, values: [value] });
+    const implies = (query: [string, string], target: [string, string]) => compilerApi.leafFilterImplies(leaf(...query), leaf(...target));
+
+    it.each<[[string, string], [string, string], boolean]>([
+      // The database may round both bounds to the column's type, so an inclusive
+      // bound never proves an exclusive one, however far apart they read.
+      [['gte', '1.0000001'], ['gt', '1'], false],
+      [['gte', '2'], ['gt', '1'], false],
+      [['lte', '0.9999999'], ['lt', '1'], false],
+      [['lte', '0'], ['lt', '1'], false],
+      [['gt', '1'], ['gt', '1'], true],
+      [['gt', '1.0000001'], ['gt', '1'], true],
+      [['gt', '0.5'], ['gt', '1'], false],
+      [['gt', '1'], ['gte', '1'], true],
+      [['gte', '1.0000001'], ['gte', '1'], true],
+      [['gte', '0.5'], ['gte', '1'], false],
+      [['lt', '1'], ['lt', '1'], true],
+      [['lt', '0.9999999'], ['lt', '1'], true],
+      [['lt', '1.5'], ['lt', '1'], false],
+      [['lt', '1'], ['lte', '1'], true],
+      [['lte', '0.9999999'], ['lte', '1'], true],
+      [['lte', '1.5'], ['lte', '1'], false],
+    ])('%j against policy %j is %s', (query, target, expected) => {
+      expect(implies(query, target)).toBe(expected);
+    });
+  });
+
   describe('dispose', () => {
     let compilerApi: CompilerApiTestable;
 
