@@ -251,10 +251,10 @@ cubes:
     const TS = '(created_at + interval \'1 day\')';
 
     const cases: Array<[string, any, string]> = [
-      ['gt', { member: 'orders.amount_plus', operator: 'gt', values: ['10'] }, `WHERE (${NUM} > $1::bigint)`],
-      ['gte', { member: 'orders.amount_plus', operator: 'gte', values: ['10'] }, `WHERE (${NUM} >= $1::bigint)`],
-      ['lt', { member: 'orders.amount_plus', operator: 'lt', values: ['10'] }, `WHERE (${NUM} < $1::bigint)`],
-      ['lte', { member: 'orders.amount_plus', operator: 'lte', values: ['10'] }, `WHERE (${NUM} <= $1::bigint)`],
+      ['gt', { member: 'orders.amount_plus', operator: 'gt', values: ['10'] }, `WHERE (${NUM} > $1)`],
+      ['gte', { member: 'orders.amount_plus', operator: 'gte', values: ['10'] }, `WHERE (${NUM} >= $1)`],
+      ['lt', { member: 'orders.amount_plus', operator: 'lt', values: ['10'] }, `WHERE (${NUM} < $1)`],
+      ['lte', { member: 'orders.amount_plus', operator: 'lte', values: ['10'] }, `WHERE (${NUM} <= $1)`],
       ['contains', { member: 'orders.note_tagged', operator: 'contains', values: ['alpha'] },
         `WHERE ((${STR} ILIKE '%' || $1|| '%'))`],
       ['notContains', { member: 'orders.note_tagged', operator: 'notContains', values: ['alpha'] },

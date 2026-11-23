@@ -437,7 +437,7 @@ describe('SQL Generation', () => {
           'FROM  card_tbl  AS "cards"\n' +
           'WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL))\n' +
           'GROUP BY 1\n' +
-          'HAVING (count("cards".id) = $3::bigint)\n' +
+          'HAVING (count("cards".id) = $3)\n' +
           'ORDER BY  2  DESC';
       expect(queryAndParams[0]).toEqual(expected);
       const expectedParams = ['type_value', 'not_type_value', '3'];

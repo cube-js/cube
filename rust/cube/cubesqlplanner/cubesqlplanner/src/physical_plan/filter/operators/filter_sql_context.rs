@@ -82,14 +82,9 @@ impl<'a> FilterSqlContext<'a> {
     ) -> Result<String, CubeError> {
         match member_type.as_deref() {
             Some("boolean") => self.plan_templates.bool_param_cast(placeholder),
-            Some("number") => {
-                self.plan_templates
-                    .number_param_cast(placeholder, is_int64_literal(value), true)
-            }
-            Some("min_max") => {
-                self.plan_templates
-                    .number_param_cast(placeholder, is_int64_literal(value), false)
-            }
+            Some("number") => self
+                .plan_templates
+                .number_param_cast(placeholder, is_int64_literal(value)),
             Some("time") => self.plan_templates.time_param_cast(placeholder),
             _ => Ok(placeholder.to_string()),
         }

@@ -1,9 +1,6 @@
 import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
-import { BaseFilter } from './BaseFilter';
 import { ParamAllocator } from './ParamAllocator';
-import { isInt64Literal } from './numericLiteral';
-import type { QueryFilterTreeItem } from './QueryTypes';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'day',
@@ -22,34 +19,9 @@ class PostgresParamAllocator extends ParamAllocator {
   }
 }
 
-// An untyped parameter takes the column's type, so a `real` column rounds the bound to
-// float4 and `x >= 1.0000001` also matches 1. A numeric bound on an integer column
-// would make its index unusable, hence bigint for whole numbers.
-class PostgresFilter extends BaseFilter {
-  public castParameter(param?: unknown) {
-    const { type } = this.definition();
-
-    // min/max measures take the type of their operand, which may be text or a timestamp.
-    const isNumber = type === 'number' || (this.measure && !['string', 'time', 'boolean', 'min', 'max'].includes(type));
-    if (isNumber) {
-      return isInt64Literal(param) ? '?::bigint' : `?::${(this.query as PostgresQuery).fractionalParamType()}`;
-    }
-
-    return '?';
-  }
-}
-
 export class PostgresQuery extends BaseQuery {
   public newParamAllocator(expressionParams?: unknown[]) {
     return new PostgresParamAllocator(expressionParams);
-  }
-
-  public newFilter(filter: QueryFilterTreeItem): BaseFilter {
-    return new PostgresFilter(this, filter);
-  }
-
-  public fractionalParamType(): string {
-    return 'numeric';
   }
 
   public convertTz(field: string): string {
@@ -107,7 +79,6 @@ export class PostgresQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     // eslint-disable-next-line no-template-curly-in-string
     templates.params.param = '${{ param_index + 1 }}';
-    templates.tesseract.number_param_cast = `{{ expr }}{% if typed_operand %}::{% if is_integer %}bigint{% else %}${this.fractionalParamType()}{% endif %}{% endif %}`;
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.CONCAT = 'CONCAT({% for arg in args %}CAST({{arg}} AS TEXT){% if not loop.last %},{% endif %}{% endfor %})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
