@@ -524,9 +524,10 @@ async fn target_command(cmd: TargetCmd, api: &Client, json: bool) -> Result<()> 
             let saved = api.get_optional(&path, &query).await?;
             match &saved {
                 Some(saved) => check_target(saved, &target)?,
-                // A tenant from before named targets would create `default` instead, so
-                // creating a named one first needs the targets list, which such a tenant lacks.
-                // The list answers 404 for a data source with no target yet.
+                // A tenant from before named targets would create `default` instead, so a
+                // first named target needs the targets list. Such a tenant answers that route
+                // with its web app, which `request` refuses; a current one answers 404 while
+                // the data source has no target.
                 None if is_named(&target) => {
                     api.get_optional(&format!("{path}/targets"), &Query::new())
                         .await
