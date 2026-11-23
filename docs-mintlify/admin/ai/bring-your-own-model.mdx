@@ -124,7 +124,7 @@ Claude Sonnet 3.7 and all later Claude models, and so does
 [Custom Anthropic-compatible](#custom-anthropic-compatible). Turn it on or off
 with the **Enable thinking** toggle in the model settings. The toggle is on by
 default when you add a model. With thinking on, the agent's reasoning shows in
-the chat and streams through the Chat API.
+the chat. For the Chat API, see its [`thinking` field][ref-chat-api-thinking].
 
 ### Anthropic
 
@@ -197,7 +197,8 @@ model behind your endpoint:
 
 A mode that doesn't match the model makes every request fail: adaptive models
 reject a thinking budget, and older models don't support adaptive thinking.
-Small-model tasks run without thinking.
+If the model doesn't support extended thinking at all, turn **Enable thinking**
+off. Small-model tasks run without thinking.
 
 ## Troubleshooting
 
@@ -218,3 +219,4 @@ provider. Model availability may vary by region.
 
 [ref-ai-tokens]: /admin/account-billing/ai-tokens
 [ref-usage-analytics]: /admin/monitoring/usage-analytics
+[ref-chat-api-thinking]: /reference/embed-apis/chat-api#response-fields
