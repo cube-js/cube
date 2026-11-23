@@ -2706,4 +2706,118 @@ mod tests {
         assert_eq!(arrow_to_column_type(DataType::Float64)?, ColumnType::Float);
         Ok(())
     }
+
+    fn plan_scan_over_in_memory_chunks(merge: bool) -> Result<String, CubeError> {
+        use crate::metastore::table::TablePath;
+        use crate::metastore::{Chunk, IndexType, Schema as MetaSchema};
+        use crate::queryplanner::pretty_printers::pp_phys_plan;
+        use crate::queryplanner::serialized_plan::{PartitionSnapshot, RowRange};
+        use datafusion::prelude::{SessionConfig, SessionContext};
+
+        let table_columns = vec![
+            Column::new("k".to_string(), ColumnType::Int, 0),
+            Column::new("val".to_string(), ColumnType::Int, 1),
+            Column::new("__seq".to_string(), ColumnType::Int, 2),
+        ];
+        let table = Table::new(
+            "t".to_string(),
+            1,
+            table_columns,
+            None,
+            None,
+            true,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(vec![0]),
+            Vec::new(),
+            Some(2),
+            None,
+            None,
+        );
+        let index_columns = vec![
+            Column::new("k".to_string(), ColumnType::Int, 0),
+            Column::new("__seq".to_string(), ColumnType::Int, 1),
+            Column::new("val".to_string(), ColumnType::Int, 2),
+        ];
+        let index = Index::try_new(
+            "default".to_string(),
+            1,
+            index_columns,
+            2,
+            None,
+            None,
+            IndexType::Regular,
+        )?;
+        let chunk = |id: u64| IdRow::new(id, Chunk::new(1, 1, None, None, true));
+        let snapshot = IndexSnapshot {
+            table_path: TablePath::new(
+                Arc::new(IdRow::new(1, MetaSchema::new("s".to_string()))),
+                IdRow::new(1, table),
+            ),
+            index: IdRow::new(1, index),
+            partitions: vec![PartitionSnapshot {
+                partition: IdRow::new(1, Partition::new(1, None, None, None)),
+                chunks: vec![chunk(10), chunk(11)],
+            }],
+            sort_on: None,
+        };
+        let worker_partition_ids = vec![(
+            1,
+            RowFilter {
+                or_filters: vec![RowRange::default()],
+            },
+        )];
+        let index_schema = Arc::new(Schema::new(vec![
+            Field::new("k", DataType::Int64, true),
+            Field::new("__seq", DataType::Int64, true),
+            Field::new("val", DataType::Int64, true),
+        ]));
+        let batch = |k: i64, seq: i64| {
+            RecordBatch::try_new(
+                index_schema.clone(),
+                vec![
+                    Arc::new(Int64Array::from(vec![k])),
+                    Arc::new(Int64Array::from(vec![seq])),
+                    Arc::new(Int64Array::from(vec![k * 10])),
+                ],
+            )
+            .unwrap()
+        };
+        let chunks = HashMap::from([(10, vec![batch(1, 1)]), (11, vec![batch(2, 2)])]);
+        let table = CubeTable::try_new(
+            snapshot,
+            HashMap::new(),
+            worker_partition_ids.clone(),
+            NoopParquetMetadataCache::new(),
+        )?
+        .to_worker_table(
+            HashMap::new(),
+            worker_partition_ids,
+            chunks,
+            NoopParquetMetadataCache::new(),
+        );
+
+        let ctx = SessionContext::new_with_config(
+            SessionConfig::new().with_extension(Arc::new(MergeInMemoryChunks(merge))),
+        );
+        let plan = table.async_scan(&ctx.state(), None, &[])?;
+        Ok(pp_phys_plan(plan.as_ref()))
+    }
+
+    #[test]
+    fn in_memory_chunks_of_a_partition_scan_through_one_node() -> Result<(), CubeError> {
+        let merged = plan_scan_over_in_memory_chunks(true)?;
+        assert!(
+            merged.contains("InMemoryChunks, chunks: 2") && !merged.contains("MemoryScan"),
+            "{}",
+            merged
+        );
+
+        let separate = plan_scan_over_in_memory_chunks(false)?;
+        assert_eq!(separate.matches("MemoryScan").count(), 2, "{}", separate);
+        Ok(())
+    }
 }
