@@ -713,11 +713,16 @@ impl CompactionService for CompactionServiceImpl {
         let mut new_partitions = Vec::new();
         if new_chunk.is_none() {
             let max_new_partitions = if first_build { usize::MAX } else { 16 };
-            let pending_rows = all_pending_chunks
-                .iter()
-                .map(|c| c.get_row().get_row_count())
-                .sum::<u64>()
-                + partition.get_row().main_table_row_count();
+            // A capped first build splits only the rows it took: sizing for all pending rows would
+            // leave its partitions underfilled for good if the rest lands outside their ranges.
+            let pending_rows = if first_build {
+                chunks_row_count
+            } else {
+                all_pending_chunks
+                    .iter()
+                    .map(|c| c.get_row().get_row_count())
+                    .sum::<u64>()
+            } + partition.get_row().main_table_row_count();
             // Split partitions ahead for more than actual compaction size. The trade off here is partition accuracy vs write amplification
             let new_partitions_count_by_rows = (div_ceil(
                 pending_rows,

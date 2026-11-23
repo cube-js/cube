@@ -2392,7 +2392,7 @@ impl Config {
                 .max(2),
                 deferred_table_build_max_rows: env_parse_positive_lenient(
                     "CUBESTORE_DEFERRED_TABLE_BUILD_MAX_ROWS",
-                    100_000_000,
+                    250_000_000,
                 ) as u64,
                 job_order_by_table_enabled: env_flag("CUBESTORE_JOB_ORDER_BY_TABLE", false),
                 max_joined_partitions: env_parse("CUBESTORE_MAX_JOINED_PARTITIONS", 5),
@@ -2584,7 +2584,7 @@ impl Config {
                 compaction_readiness_chunks_threshold: None,
                 deferred_table_build_enabled: false,
                 deferred_table_build_max_fanin: 64,
-                deferred_table_build_max_rows: 100_000_000,
+                deferred_table_build_max_rows: 250_000_000,
                 job_order_by_table_enabled: false,
                 max_joined_partitions: 5,
                 max_joined_partitions_message: "Please consider reducing right hand side join partition count and dataset size.".to_string(),

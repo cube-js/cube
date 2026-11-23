@@ -7337,7 +7337,7 @@ LIMIT 10000"#,
 
     #[test]
     fn deferred_table_build() {
-        deferred_table_build_case("deferred_table_build", 100_000_000);
+        deferred_table_build_case("deferred_table_build", 250_000_000);
     }
 
     // A capped first build splits the root from its first chunks and moves the rest down.
