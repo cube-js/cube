@@ -28,11 +28,13 @@ class PostgresParamAllocator extends ParamAllocator {
 class PostgresFilter extends BaseFilter {
   public castParameter(param?: unknown) {
     const { type } = this.definition();
+
     const isNumber = type === 'number' || (this.measure && !['string', 'time', 'boolean'].includes(type));
     // min/max measures take the type of their operand, which may be text or a timestamp.
     if (isNumber && isNumberLiteral(param)) {
       return isInt64Literal(param) ? '?::bigint' : `?::${(this.query as PostgresQuery).fractionalParamType()}`;
     }
+
     return '?';
   }
 
