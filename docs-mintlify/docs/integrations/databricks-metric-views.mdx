@@ -377,6 +377,8 @@ runs, and Metric Views holds for each publication target. Give each one its own 
 a Metric View belongs to one publication target, so another that publishes to the same name is
 blocked with `ownership-conflict`.
 
+{/* TODO: video — publication targets: add staging and production, promote a staging run (GTM-324) */}
+
 Every data source has the `default` publication target. In the **Databricks Metric View sync** card,
 pick one under **Publication target**: the settings, **Preview**, **Test access**, and run history
 below it are that target's own. To create one, select **Add target**, enter its name, then save its
@@ -388,6 +390,13 @@ or [listing runs](/api-reference/databricks-metric-view-integration/list-databri
 and pass `target` in a [preview](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview)
 request body. Without it, a request uses `default`. Reading or cancelling a run by its `runId`
 needs no `target`.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/integrations/databricks-metric-views/publication-target-picker-v2.png"
+    alt="Databricks Metric View sync card with the Publication target picker open, listing default, production and staging, next to the Add target and Delete target buttons"
+  />
+</Frame>
 
 - **Names:** a name starts with a letter and has up to 63 letters, digits, `_`, and `-`; Cube
   lower-cases it.
@@ -425,10 +434,19 @@ To publish to production the build you tested in staging:
    doesn't know whether they passed.
 4. Promote the staging run: in staging's run history, select **Promote run to…** on that run,
    choose `production`, and confirm, which switches the card to production. The menu lists only
-   the other publication targets with **Publish to Databricks** on. Through the API, start a
-   production run with production's `configurationVersion` and `promoteFromRunId` set to the
-   staging run's `runId`, here `STAGING_RUN_ID`. Set `PROMOTION_IDEMPOTENCY_KEY` to a UUID unique
-   to this promotion, so that retrying the step doesn't start a second run:
+   the other publication targets with **Publish to Databricks** on.
+
+   <Frame>
+     <img
+       src="https://static.cube.dev/docs/integrations/databricks-metric-views/promote-run-v2.png"
+       alt="Run history of the staging publication target with a completed run expanded and its Promote run to… menu open, listing production"
+     />
+   </Frame>
+
+   Through the API, start a production run with production's `configurationVersion` and
+   `promoteFromRunId` set to the staging run's `runId`, here `STAGING_RUN_ID`. Set
+   `PROMOTION_IDEMPOTENCY_KEY` to a UUID unique to this promotion, so that retrying the step
+   doesn't start a second run:
 
 ```bash
 set -euo pipefail
