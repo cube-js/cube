@@ -376,16 +376,6 @@ Cube's download of the unloaded objects from the bucket.
 
 </Warning>
 
-<Note>
-
-**ClickHouse is the exception:** OIDC covers the write too. Cube resolves
-short-lived credentials from the deployment role and passes them to
-ClickHouse for each export, so no static key is needed. This requires
-ClickHouse 23.12 or later. See the [ClickHouse export
-bucket][ref-clickhouse-export-bucket] docs.
-
-</Note>
-
 ## Cube Store CSPS bucket
 
 Cube Store CSPS lets you store pre-aggregations in your own S3 bucket.
@@ -718,7 +708,6 @@ authenticating against which roles.
 [ref-sub-editor]: /admin/deployment/oidc#subject-claim-format
 [ref-cube-cloud-region]: /admin/deployment/infrastructure#what-is-a-cube-cloud-region
 [ref-export-bucket]: /admin/connect-to-data#export-bucket
-[ref-clickhouse-export-bucket]: /admin/connect-to-data/data-sources/clickhouse#export-bucket
 [ref-monitoring-integrations]: /admin/monitoring/monitoring-integrations
 [ref-cloudwatch]: /admin/monitoring/monitoring-integrations/cloudwatch
 [ref-s3]: /admin/monitoring/monitoring-integrations/s3
