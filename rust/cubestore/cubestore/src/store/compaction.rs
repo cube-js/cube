@@ -525,6 +525,56 @@ pub async fn table_imports_pending(
     Ok(false)
 }
 
+// How many of the smallest-first chunks one compaction merges: the first one always, then more
+// while their rows stay within `max_rows` and their count within `max_chunks`.
+fn chunks_to_merge(rows: &[u64], max_chunks: usize, max_rows: u64) -> usize {
+    let mut total = 0;
+    let mut n = 0;
+    for r in rows.iter().take(max_chunks) {
+        total += r;
+        if n > 0 && total > max_rows {
+            break;
+        }
+        n += 1;
+    }
+    n
+}
+
+#[derive(Debug, PartialEq)]
+enum DeferredMerge {
+    Wait,
+    // Merge this many smallest chunks into one chunk.
+    Tier(usize),
+    // Build final partitions from this many smallest chunks.
+    Build(usize),
+}
+
+// Each merge stream costs memory, so a first build reads at most `max_fanin` chunks; until it
+// can, the smallest chunks are merged into one. A tier merge never exceeds `max_rows`, so merged
+// chunks stay bounded however large the table is. While imports run, only chunks no larger than
+// an import chunk are merged, to bound rewrites.
+fn deferred_merge(
+    rows: &[u64],
+    imports_pending: bool,
+    import_chunk_rows: u64,
+    max_fanin: usize,
+    max_rows: u64,
+) -> DeferredMerge {
+    let tier = chunks_to_merge(rows, max_fanin, max_rows);
+    let too_many = if imports_pending {
+        rows.iter().filter(|r| **r <= import_chunk_rows).count() >= max_fanin
+    } else {
+        rows.len() > max_fanin
+    };
+    if tier >= 2 && too_many {
+        DeferredMerge::Tier(tier)
+    } else if imports_pending {
+        DeferredMerge::Wait
+    } else {
+        DeferredMerge::Build(tier)
+    }
+}
+
 #[async_trait]
 impl CompactionService for CompactionServiceImpl {
     async fn compact(
@@ -567,53 +617,36 @@ impl CompactionService for CompactionServiceImpl {
             .get_chunks_by_partition(partition_id, false)
             .await?;
         all_pending_chunks.sort_by_key(|c| c.get_row().get_row_count());
-        // Each merge stream costs memory, so the first build reads at most `max_fanin` chunks and
-        // merges the smallest ones into one chunk until it can. While imports run, only chunks no
-        // larger than an import chunk are merged, to bound rewrites.
-        let (max_fanin, max_build_rows) = if first_build {
-            (
-                self.config.deferred_table_build_max_fanin(),
-                self.config.deferred_table_build_max_rows(),
-            )
-        } else {
-            (0, 0)
-        };
-        let tier_merge = first_build && {
-            let persistent = all_pending_chunks
-                .iter()
-                .filter(|c| !c.get_row().in_memory());
-            if imports_pending {
-                let fresh = self.config.wal_split_threshold();
-                persistent
-                    .filter(|c| c.get_row().get_row_count() <= fresh)
-                    .count()
-                    >= max_fanin
-            } else {
-                persistent.count() > max_fanin
-            }
-        };
-        if imports_pending && !tier_merge {
-            return Ok(());
-        }
-        let mut size = 0;
-        let mut taken = 0;
-        let chunks = all_pending_chunks
+        let persistent_chunks = all_pending_chunks
             .iter()
             .filter(|c| !c.get_row().in_memory())
-            .take_while(|c| {
-                // At least two chunks, so a merge always makes progress.
-                let first_two = taken < 2;
-                taken += 1;
-                size += c.get_row().get_row_count();
-                if tier_merge {
-                    taken <= max_fanin && (first_two || size <= max_build_rows)
-                } else if first_build {
-                    first_two || size <= max_build_rows
-                } else {
-                    taken == 1 || size <= self.config.compaction_chunks_total_size_threshold()
-                }
-            })
-            .map(|c| c.clone())
+            .collect::<Vec<_>>();
+        let rows = persistent_chunks
+            .iter()
+            .map(|c| c.get_row().get_row_count())
+            .collect::<Vec<_>>();
+        let (tier_merge, take) = if first_build {
+            match deferred_merge(
+                &rows,
+                imports_pending,
+                self.config.wal_split_threshold(),
+                self.config.deferred_table_build_max_fanin(),
+                self.config.deferred_table_build_max_rows(),
+            ) {
+                DeferredMerge::Wait => return Ok(()),
+                DeferredMerge::Tier(n) => (true, n),
+                DeferredMerge::Build(n) => (false, n),
+            }
+        } else if imports_pending {
+            return Ok(());
+        } else {
+            let max_rows = self.config.compaction_chunks_total_size_threshold();
+            (false, chunks_to_merge(&rows, usize::MAX, max_rows))
+        };
+        let chunks = persistent_chunks
+            .into_iter()
+            .take(take)
+            .cloned()
             .collect::<Vec<_>>();
 
         if chunks.is_empty() {
@@ -1872,6 +1905,58 @@ pub async fn merge_replay_handles(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chunks_to_merge_limits() {
+        assert_eq!(chunks_to_merge(&[1, 2, 3], usize::MAX, 3), 2);
+        assert_eq!(chunks_to_merge(&[10, 10, 10], 3, 25), 2);
+        // The first chunk is taken even above the limit, so a merge always makes progress.
+        assert_eq!(chunks_to_merge(&[30, 30], 64, 25), 1);
+        assert_eq!(chunks_to_merge(&[5; 100], 64, 1000), 64);
+        assert_eq!(chunks_to_merge(&[], 64, 1000), 0);
+    }
+
+    #[test]
+    fn deferred_merge_keeps_chunks_within_max_rows() {
+        for (chunk_rows, chunks, max_fanin, max_rows) in
+            [(10, 200, 3, 25), (90, 100, 64, 100), (1, 5000, 4, 7)]
+        {
+            let mut rows = vec![chunk_rows; chunks];
+            let build = loop {
+                match deferred_merge(&rows, false, chunk_rows, max_fanin, max_rows) {
+                    DeferredMerge::Tier(n) => {
+                        assert!(n >= 2);
+                        let merged = rows.drain(..n).sum::<u64>();
+                        assert!(merged <= max_rows, "merged {} > {}", merged, max_rows);
+                        rows.push(merged);
+                        rows.sort();
+                    }
+                    DeferredMerge::Build(n) => break n,
+                    DeferredMerge::Wait => unreachable!(),
+                }
+            };
+            assert!((1..=max_fanin).contains(&build));
+            let built = rows[..build].iter().sum::<u64>();
+            assert!(build == 1 || built <= max_rows);
+        }
+    }
+
+    #[test]
+    fn deferred_merge_waits_for_imports() {
+        // Fewer fresh import chunks than the fan-in: nothing to do until imports end.
+        assert_eq!(
+            deferred_merge(&[10, 10, 500], true, 10, 3, 1000),
+            DeferredMerge::Wait
+        );
+        assert_eq!(
+            deferred_merge(&[10, 10, 10, 500], true, 10, 3, 1000),
+            DeferredMerge::Tier(3)
+        );
+        assert_eq!(
+            deferred_merge(&[10, 10, 500], false, 10, 3, 1000),
+            DeferredMerge::Build(3)
+        );
+    }
     use crate::cluster::MockCluster;
     use crate::config::Config;
     use crate::config::MockConfigObj;

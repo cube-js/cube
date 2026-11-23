@@ -2936,10 +2936,10 @@ Larger values use more memory per build; values below `2` are raised to `2`.
 
 ## `CUBESTORE_DEFERRED_TABLE_BUILD_MAX_ROWS`
 
-The maximum number of rows a single build rewrites when
+The maximum number of rows a single build or chunk merge rewrites when
 [`CUBESTORE_DEFERRED_TABLE_BUILD`](#cubestore_deferred_table_build) is enabled, so
-that each build finishes within the job timeout. Rows beyond it are moved into the
-built partitions afterwards.
+that each job finishes within the job timeout and merged chunks stay bounded. Rows
+beyond it are moved into the built partitions afterwards.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
