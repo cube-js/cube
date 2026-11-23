@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.33](https://github.com/cube-js/cube/compare/v1.8.32...v1.8.33) (2026-11-23)
+
+### Bug Fixes
+
+- **cubesql:** Discard Bind after a failed Parse until Sync ([#12844](https://github.com/cube-js/cube/issues/12844)) ([fce3161](https://github.com/cube-js/cube/commit/fce3161a389957a5d63ef4ad0b8cd7cfd32342b1)), closes [#10962](https://github.com/cube-js/cube/issues/10962) [#10013](https://github.com/cube-js/cube/issues/10013)
+- **cubesql:** Fix NULL handling in CASE, aggregates, subqueries and outer joins ([#12846](https://github.com/cube-js/cube/issues/12846)) ([c887494](https://github.com/cube-js/cube/commit/c88749447491deed3be6b80a9282b4696932fdcd))
+- **cubesql:** Keep JS event loop delays out of SQL API planning time ([#12845](https://github.com/cube-js/cube/issues/12845)) ([f694d9c](https://github.com/cube-js/cube/commit/f694d9ca0ace8dcb7ade474e9e93508c87e21f9f))
+- **cubesql:** Support pg_catalog.pg_opclass for SQLAlchemy 2.x index reflection ([#12843](https://github.com/cube-js/cube/issues/12843)) ([0838523](https://github.com/cube-js/cube/commit/0838523c699539b8900b146b511a53aba233ec07)), closes [#12725](https://github.com/cube-js/cube/issues/12725)
+- **server-core:** Keep conditional masks for reversed date ranges and time-shifted measures ([#12711](https://github.com/cube-js/cube/issues/12711)) ([c01233a](https://github.com/cube-js/cube/commit/c01233a4bf646f077a918762e2b265c25d1c7d8e))
+
+### Features
+
+- **clickhouse-driver:** Support OIDC / temporary AWS credentials for the S3 export bucket ([#12924](https://github.com/cube-js/cube/issues/12924)) ([a4aa688](https://github.com/cube-js/cube/commit/a4aa688ce7ed8a335112a3d17a85a38aae149c5c)), closes [#11143](https://github.com/cube-js/cube/issues/11143) [#11143](https://github.com/cube-js/cube/issues/11143)
+- **cube-cli:** Add `cube dbx-mv` to manage Databricks Metric View targets, sync and promote ([#12912](https://github.com/cube-js/cube/issues/12912)) ([a53e66c](https://github.com/cube-js/cube/commit/a53e66c271eea00747152c1fc565a1804b404e5b)), closes [cube-js/cube#12876](https://github.com/cube-js/cube/issues/12876)
+- **cubestore:** Run Docker image as non-root cubestore user ([#12915](https://github.com/cube-js/cube/issues/12915)) ([789a8bf](https://github.com/cube-js/cube/commit/789a8bfe16201ce32b0654fc7e321070814a3522))
+
 ## [1.8.32](https://github.com/cube-js/cube/compare/v1.8.31...v1.8.32) (2026-11-21)
 
 ### Bug Fixes

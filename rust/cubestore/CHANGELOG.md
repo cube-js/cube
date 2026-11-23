@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.33](https://github.com/cube-js/cube/compare/v1.8.32...v1.8.33) (2026-11-23)
+
+### Features
+
+- **cubestore:** Run Docker image as non-root cubestore user ([#12915](https://github.com/cube-js/cube/issues/12915)) ([789a8bf](https://github.com/cube-js/cube/commit/789a8bfe16201ce32b0654fc7e321070814a3522))
+
 ## [1.8.32](https://github.com/cube-js/cube/compare/v1.8.31...v1.8.32) (2026-11-21)
 
 ### Features

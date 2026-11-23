@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.33](https://github.com/cube-js/cube/compare/v1.8.32...v1.8.33) (2026-11-23)
+
+### Bug Fixes
+
+- **server-core:** Keep conditional masks for reversed date ranges and time-shifted measures ([#12711](https://github.com/cube-js/cube/issues/12711)) ([c01233a](https://github.com/cube-js/cube/commit/c01233a4bf646f077a918762e2b265c25d1c7d8e))
+
 ## [1.8.32](https://github.com/cube-js/cube/compare/v1.8.31...v1.8.32) (2026-11-21)
 
 ### Features
