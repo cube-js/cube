@@ -22,9 +22,10 @@ class PostgresParamAllocator extends ParamAllocator {
   }
 }
 
-// An untyped parameter takes the column's type, so a `real` column rounds the bound to
-// float4 and `x >= 1.0000001` also matches 1. A numeric bound on an integer column
-// would make its index unusable, hence bigint for whole numbers.
+// An untyped parameter takes the column's type, so a `real` column rounds a fractional
+// bound to float4 and `x >= 1.0000001` also matches 1. Whole numbers stay untyped: a
+// typed bound has no operator against `money` or a text column declared as a number,
+// and a numeric bound would make an index on an integer column unusable.
 class PostgresFilter extends BaseFilter {
   public castParameter(param?: unknown) {
     const { type } = this.definition();
@@ -32,7 +33,7 @@ class PostgresFilter extends BaseFilter {
     // min/max measures take the type of their operand, which may be text or a timestamp.
     const isNumber = type === 'number' || (this.measure && !['string', 'time', 'boolean', 'min', 'max'].includes(type));
     if (isNumber) {
-      return isInt64Literal(param) ? '?::bigint' : `?::${(this.query as PostgresQuery).fractionalParamType()}`;
+      return isInt64Literal(param) ? '?' : `?::${(this.query as PostgresQuery).fractionalParamType()}`;
     }
 
     return '?';
@@ -107,7 +108,7 @@ export class PostgresQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     // eslint-disable-next-line no-template-curly-in-string
     templates.params.param = '${{ param_index + 1 }}';
-    templates.tesseract.number_param_cast = `{{ expr }}{% if typed_operand %}::{% if is_integer %}bigint{% else %}${this.fractionalParamType()}{% endif %}{% endif %}`;
+    templates.tesseract.number_param_cast = `{{ expr }}{% if typed_operand and not is_integer %}::${this.fractionalParamType()}{% endif %}`;
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.CONCAT = 'CONCAT({% for arg in args %}CAST({{arg}} AS TEXT){% if not loop.last %},{% endif %}{% endfor %})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';

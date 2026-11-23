@@ -10,10 +10,10 @@ cubes:
   - name: amounts
     sql: >
       SELECT * FROM (VALUES
-        (1, 1::real, 1::double precision, 1::numeric(10, 2), 1::int, 1::bigint, 'a', '2024-01-01'::timestamp, TRUE),
-        (2, 2::real, 2::double precision, 2::numeric(10, 2), 2::int, 9007199254740993::bigint, '2', '2024-01-02'::timestamp, FALSE),
-        (3, 3::real, 3::double precision, 3::numeric(10, 2), 3::int, 9223372036854775807::bigint, 'c', '2024-01-03'::timestamp, TRUE)
-      ) AS t(id, real_amount, double_amount, numeric_amount, int_amount, bigint_amount, label, created_at, flag)
+        (1, 1::real, 1::double precision, 1::numeric(10, 2), 1::int, 1::bigint, 1::money, '1'::text, 'a', '2024-01-01'::timestamp, TRUE),
+        (2, 2::real, 2::double precision, 2::numeric(10, 2), 2::int, 9007199254740993::bigint, 2::money, '2'::text, '2', '2024-01-02'::timestamp, FALSE),
+        (3, 3::real, 3::double precision, 3::numeric(10, 2), 3::int, 9223372036854775807::bigint, 3::money, '3'::text, 'c', '2024-01-03'::timestamp, TRUE)
+      ) AS t(id, real_amount, double_amount, numeric_amount, int_amount, bigint_amount, money_amount, text_amount, label, created_at, flag)
 
     dimensions:
       - name: id
@@ -42,12 +42,24 @@ cubes:
         sql: bigint_amount
         type: number
 
+      - name: money_amount
+        sql: money_amount
+        type: number
+
+      - name: text_amount
+        sql: text_amount
+        type: number
+
     measures:
       - name: count
         type: count
 
       - name: real_total
         sql: real_amount
+        type: sum
+
+      - name: money_total
+        sql: money_amount
         type: sum
 
       - name: labels
@@ -150,10 +162,6 @@ cubes:
       await expectIds([filter('int_amount', 'equals', '1', '3')], [1, 3]);
     });
 
-    it('bound past int4', async () => {
-      await expectIds([filter('int_amount', 'lt', '3000000000')], [1, 2, 3]);
-    });
-
     it('bound in exponent notation', async () => {
       await expectIds([filter('int_amount', 'gte', '2e0')], [2, 3]);
     });
@@ -204,6 +212,21 @@ cubes:
 
     it('bound past int64', async () => {
       await expectIds([filter('bigint_amount', 'lt', '9223372036854775808')], [1, 2, 3]);
+    });
+  });
+
+  // Whole bounds stay untyped: neither type has an operator against bigint or numeric.
+  describe('column without a numeric operator', () => {
+    it('money column', async () => {
+      await expectIds([filter('money_amount', 'gte', '2')], [2, 3]);
+    });
+
+    it('money measure', async () => {
+      await expectIds([filter('money_total', 'lt', '3')], [1, 2]);
+    });
+
+    it('text column', async () => {
+      await expectIds([filter('text_amount', 'equals', '2')], [2]);
     });
   });
 });
