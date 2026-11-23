@@ -1049,10 +1049,8 @@ export class CompilerApi {
       return qVals.length > 0 && qVals.every(v => tVals.includes(v));
     }
 
-    // A narrower bound (`gt 100` against the policy `gt 20`) proves nothing: the
-    // database compares the bounds in the column type, which is unknown here. A text
-    // column orders '1000' below '20', and a `real` column rounds distinct bounds to
-    // one value.
+    // A narrower bound proves nothing: the database compares in the column type, unknown
+    // here, so a text column orders '1000' below '20' and `real` merges distinct bounds.
     return false;
   }
 
