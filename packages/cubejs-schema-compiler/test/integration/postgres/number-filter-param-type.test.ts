@@ -2,9 +2,6 @@ import { PostgresQuery } from '../../../src/adapter';
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
-// Postgres gives an untyped parameter the type of the column it is compared with. A `real`
-// column then rounds the bound to float4, so `x >= 1.0000001` runs as `x >= 1`, and an
-// integer column rejects a fractional bound outright.
 describe('Number filter parameter type', () => {
   jest.setTimeout(200000);
 
@@ -135,6 +132,14 @@ cubes:
 
     it('bound past int4', async () => {
       await expectIds([filter('int_amount', 'lt', '3000000000')], [1, 2, 3]);
+    });
+
+    it('bound in exponent notation', async () => {
+      await expectIds([filter('int_amount', 'gte', '2e0')], [2, 3]);
+    });
+
+    it('whole bound with leading zeros', async () => {
+      await expectIds([filter('int_amount', 'equals', '03')], [3]);
     });
   });
 

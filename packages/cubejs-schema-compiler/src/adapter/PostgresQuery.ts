@@ -23,12 +23,12 @@ class PostgresParamAllocator extends ParamAllocator {
 }
 
 // An untyped parameter takes the column's type, so a `real` column rounds the bound to
-// float4 and `x >= 1.0000001` also matches 1. A typed bound is compared at its own precision.
-// Whole numbers are cast to bigint, which keeps an index on an integer column usable.
+// float4 and `x >= 1.0000001` also matches 1. A numeric bound on an integer column
+// would make its index unusable, hence bigint for whole numbers.
 class PostgresFilter extends BaseFilter {
   public castParameter(param?: unknown) {
     if (this.measure || this.definition().type === 'number') {
-      return isInt64Literal(param) ? '?::bigint' : '?::numeric';
+      return isInt64Literal(param) ? '?::bigint' : `?::${(this.query as PostgresQuery).fractionalParamType()}`;
     }
     return '?';
   }
@@ -45,6 +45,10 @@ export class PostgresQuery extends BaseQuery {
 
   public newFilter(filter: QueryFilterTreeItem): BaseFilter {
     return new PostgresFilter(this, filter);
+  }
+
+  public fractionalParamType(): string {
+    return 'numeric';
   }
 
   public convertTz(field: string): string {
@@ -102,7 +106,7 @@ export class PostgresQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     // eslint-disable-next-line no-template-curly-in-string
     templates.params.param = '${{ param_index + 1 }}';
-    templates.tesseract.number_param_cast = '{{ expr }}::{% if is_integer %}bigint{% else %}numeric{% endif %}';
+    templates.tesseract.number_param_cast = `{{ expr }}::{% if is_integer %}bigint{% else %}${this.fractionalParamType()}{% endif %}`;
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     templates.functions.CONCAT = 'CONCAT({% for arg in args %}CAST({{arg}} AS TEXT){% if not loop.last %},{% endif %}{% endfor %})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';

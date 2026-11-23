@@ -1,15 +1,8 @@
 import { parseSqlInterval } from '@cubejs-backend/shared';
 import { PostgresQuery } from './PostgresQuery';
-import { BaseFilter } from './BaseFilter';
 import type { BaseTimeDimension } from './BaseTimeDimension';
-import type { QueryFilterTreeItem } from './QueryTypes';
 
 export class RedshiftQuery extends PostgresQuery {
-  // A bare NUMERIC is DECIMAL(18,0) here, so the Postgres cast would round the bound.
-  public newFilter(filter: QueryFilterTreeItem): BaseFilter {
-    return new BaseFilter(this, filter);
-  }
-
   public seriesSql(timeDimension: BaseTimeDimension): string {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
@@ -19,6 +12,11 @@ export class RedshiftQuery extends PostgresQuery {
 
   public nowTimestampSql() {
     return 'GETDATE()';
+  }
+
+  // A bare NUMERIC is DECIMAL(18,0) here and would round the bound.
+  public override fractionalParamType(): string {
+    return 'double precision';
   }
 
   /**
@@ -91,7 +89,6 @@ export class RedshiftQuery extends PostgresQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
-    templates.tesseract.number_param_cast = '{{ expr }}';
     templates.functions.DLOG10 = 'LOG(10, {{ args_concat }})';
     templates.functions.APPROXDISTINCT = 'APPROXIMATE COUNT(DISTINCT {{ args_concat }})';
     // Redshift clusters always run in UTC and GETDATE() is supported on compute
