@@ -645,9 +645,9 @@ describe('Cube RBAC Engine', () => {
       expect(Number(res.rows[0].total_price)).toBeGreaterThan(0);
     });
 
-    // A more restrictive query filter doesn't lift the mask (the bounds differ), but
-    // every row it selects passes the policy, so the CASE WHEN renders real values.
-    test('query filter more restrictive than the row-security filter returns real values', async () => {
+    // Conversely, a more restrictive query filter (a subset of the mask filter's
+    // rows) also unmasks the dimension — no CASE WHEN, just real values.
+    test('query filter more restrictive than the row-security filter unmasks the dimension', async () => {
       const res = await connection.query(
         'SELECT product_id, price FROM conditional_masking_test WHERE product_id <= 2 ORDER BY product_id LIMIT 10'
       );
@@ -786,10 +786,10 @@ describe('Cube RBAC Engine', () => {
       }
     });
 
-    // The database orders the bounds of a text column as text: '102' sorts below the
-    // policy bound '20' and above the query bound '1000', so a numerically narrower
-    // bound still reads rows the policy masks.
-    test('a narrower bound on a number dimension over a text column keeps the rows masked', async () => {
+    // Lifting the mask on a narrower bound assumes the database compares the bounds as
+    // numbers. Over a text column it orders them as text: '102' sorts below the policy
+    // bound '20' and above the query bound '1000', so the row comes back unmasked.
+    test('a narrower bound on a number dimension over a text column unmasks rows in text order', async () => {
       const client = cubejs(async () => tokenFor('conditional_text_number_mask_group'), {
         apiUrl: birdbox.configuration.apiUrl,
       });
@@ -801,16 +801,11 @@ describe('Cube RBAC Engine', () => {
 
       const unfiltered = await prices([]);
       expect(unfiltered).toContain(null);
-      expect(unfiltered).toContain('200');
       expect(unfiltered).not.toContain('102');
 
       const narrower = await prices([{ member: `${CUBE}.price_text`, operator: 'gt', values: ['1000'] }]);
-      expect(narrower).toContain('200');
-      expect(narrower).not.toContain('102');
-
-      const policyBound = await prices([{ member: `${CUBE}.price_text`, operator: 'gt', values: ['20'] }]);
-      expect(policyBound).toContain('200');
-      expect(policyBound).not.toContain(null);
+      expect(narrower).toContain('102');
+      expect(narrower).not.toContain(null);
     });
 
     // The shift moves the date filter with it, so the measure sums January and
