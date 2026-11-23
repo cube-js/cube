@@ -86,14 +86,13 @@ model and run short tasks on Claude Haiku 5.5 through Anthropic.
 
 Add a small LLM the same way as any other model: in **Admin > Models**, click
 **Add model**, select the **Small LLM** model type, and choose a provider,
-model and credentials. A small LLM has its own credentials, so it can use a
-different provider or account than the agent's LLM.
+model and credentials.
 
 ### Assigning a small LLM to an agent
 
 Pick the agent's small LLM in the **Small LLM** field of the agent's settings,
 or with the `small_llm` property in the agents YAML configuration. It accepts
-`auto`, a Cube-hosted model (`claude-haiku-5-5` or `gpt-6-luna`), or a BYOM
+`auto`, a built-in model (`claude-haiku-5-5` or `gpt-6-luna`), or a BYOM
 reference to a model of type **Small LLM**:
 
 ```yaml
@@ -107,11 +106,14 @@ agents:
         name: "anthropic-haiku"
 ```
 
-With `auto`, the default, an agent on a built-in LLM uses a Cube-hosted small
-model. An agent on a BYOM LLM uses a small model from the same provider, region
+Built-in small LLM ids use hyphens, unlike the [`llm`](/admin/ai#llm) names:
+write `claude-haiku-5-5`, not `claude_5_5_haiku`.
+
+With `auto`, the default, an agent on a built-in LLM uses a built-in small
+LLM. An agent on a BYOM LLM uses a small LLM from the same provider, region
 and credentials as its LLM:
 
-| Provider | Small model with `auto` |
+| Provider | Small LLM with `auto` |
 | --- | --- |
 | **Anthropic**, **AWS Bedrock**, **GCP Vertex AI** | Claude Haiku 5.5 |
 | **OpenAI** | `gpt-6-luna` |
@@ -119,17 +121,19 @@ and credentials as its LLM:
 
 <Tip>
 
-If the agent's LLM is a BYOM model, keep its small LLM on BYOM too. A
-Cube-hosted small LLM sends short tasks to Cube's provider and consumes
-[Cube AI tokens][ref-ai-tokens].
+If the agent's LLM is a BYOM model, keep its small LLM on BYOM too. A built-in
+small LLM consumes Cube AI tokens (see [Billing](#billing)).
 
 </Tip>
 
-If your account cannot use the small LLM (for example, it is not enabled in
-your region), the agent runs these tasks on its LLM instead.
+If the provider refuses a BYOM small LLM (for example, the model is not enabled
+for your account or region), the agent falls back to `auto`. If the provider
+refuses the `auto` small LLM of a BYOM LLM too, the agent runs these tasks on
+the LLM itself.
 
-On AWS Bedrock, a small LLM is called on demand in the configured region; the
-LLM's inference profile does not apply to it.
+On AWS Bedrock with `auto`, the small LLM is called on demand in the LLM's
+region; the LLM's inference profile does not apply to it. A Bedrock model of
+type **Small LLM** uses its own region and inference profile.
 
 ## Network configuration
 
@@ -142,7 +146,9 @@ region's own egress IPs.
 ## Billing
 
 When using a BYOM model, **Cube AI tokens are not consumed**. You are billed
-directly by your model provider based on their pricing.
+directly by your model provider based on their pricing. The exception is an
+agent with a built-in [small LLM](#small-llm): its short tasks consume Cube AI
+tokens.
 
 This means:
 
