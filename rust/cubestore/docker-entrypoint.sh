@@ -18,8 +18,11 @@ if [ "$(id -u)" = "0" ]; then
     # migration and later starts skip walking a possibly large tree.
     if [ "$(stat -c %u "$dir")" != "$(id -u cubestore)" ]; then
       echo "Changing ownership of $dir to cubestore"
-      if ! { find "$dir" -mindepth 1 ! -user cubestore -exec chown -h cubestore:cubestore {} + \
-             && chown cubestore:cubestore "$dir"; }; then
+      # Nodes sharing a directory migrate it concurrently, so entries can vanish
+      # mid-walk. The walk's status is ignored and leftovers decide the outcome.
+      find "$dir" -mindepth 1 ! -user cubestore -exec chown -h cubestore:cubestore {} + || true
+      if ! chown cubestore:cubestore "$dir" \
+         || [ -n "$(find "$dir" ! -user cubestore -print -quit 2>/dev/null)" ]; then
         echo "Warning: unable to change ownership of $dir" >&2
         migrated=0
       fi
