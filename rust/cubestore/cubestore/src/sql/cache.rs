@@ -20,6 +20,8 @@ pub struct SqlResultCacheKey {
     inline_tables: InlineTables,
     partition_ids: Vec<u64>,
     chunk_ids: Vec<u64>,
+    // A result is only checked against the limit it was built under.
+    max_result_size: Option<usize>,
 }
 
 impl SqlResultCacheKey {
@@ -27,7 +29,7 @@ impl SqlResultCacheKey {
         &self.query
     }
 
-    pub fn from_plan(query: &str, inline_tables: &InlineTables, plan: &SerializedPlan) -> Self {
+    pub fn from_plan(query: &str, context: &SqlQueryContext, plan: &SerializedPlan) -> Self {
         let mut partition_ids = HashSet::new();
         let mut chunk_ids = HashSet::new();
         for index in plan.index_snapshots().iter() {
@@ -44,9 +46,10 @@ impl SqlResultCacheKey {
         chunk_ids.sort();
         Self {
             query: query.to_string(),
-            inline_tables: (*inline_tables).clone(),
+            inline_tables: context.inline_tables.clone(),
             partition_ids,
             chunk_ids,
+            max_result_size: context.max_result_size,
         }
     }
 }
@@ -223,7 +226,7 @@ impl SqlResultCache {
         F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
     {
         Box::pin(async move {
-            let result_key = SqlResultCacheKey::from_plan(&query, &context.inline_tables, &plan);
+            let result_key = SqlResultCacheKey::from_plan(&query, &context, &plan);
 
             if let Some(result) = self.result_cache.get(&result_key) {
                 app_metrics::DATA_QUERIES_CACHE_HIT.increment();
@@ -521,7 +524,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn callers_with_different_result_size_limits_do_not_share_an_execution(
+    async fn callers_with_different_result_size_limits_do_not_share_results(
     ) -> Result<(), CubeError> {
         let cache = Arc::new(SqlResultCache::new(1 << 20, Some(120), 1000, None));
         let plan = SerializedPlan::try_new(
@@ -557,8 +560,13 @@ mod tests {
                 exec.clone(),
             ),
             cache.get("SELECT 1", limited.clone(), plan.clone(), exec.clone()),
-            cache.get("SELECT 1", limited, plan.clone(), exec.clone()),
-            cache.get("SELECT 1", SqlQueryContext::default(), plan, exec),
+            cache.get("SELECT 1", limited.clone(), plan.clone(), exec.clone()),
+            cache.get(
+                "SELECT 1",
+                SqlQueryContext::default(),
+                plan.clone(),
+                exec.clone(),
+            ),
         ];
 
         let res = join_all(futures)
@@ -575,6 +583,21 @@ mod tests {
                 TableValue::Int(1),
             ]
         );
+
+        // Nor a cached result: a new query, cached for an unlimited caller, is built again
+        // for a limited one.
+        let unlimited = cache
+            .get(
+                "SELECT 2",
+                SqlQueryContext::default(),
+                plan.clone(),
+                exec.clone(),
+            )
+            .await?;
+        assert_eq!(unlimited.get_rows()[0].values()[0], TableValue::Int(3));
+        let res =
+            cache.get("SELECT 2", limited, plan, exec).await?.get_rows()[0].values()[0].clone();
+        assert_eq!(res, TableValue::Int(4));
         Ok(())
     }
 
