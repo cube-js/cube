@@ -1,0 +1,21 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/granularities.rs
+expression: result
+---
+orders__category | orders__status | orders__created_at_month | orders__amount_grain_and_filter_exclude_status | orders__total_amount
+-----------------+----------------+--------------------------+------------------------------------------------+---------------------
+books            | completed      | 2024-01-01 00:00:00      | 230.00                                         | 200.00              
+books            | pending        | 2024-01-01 00:00:00      | 230.00                                         | 30.00               
+clothing         | pending        | 2024-01-01 00:00:00      | 120.00                                         | 120.00              
+electronics      | cancelled      | 2024-01-01 00:00:00      | 150.00                                         | 50.00               
+electronics      | completed      | 2024-01-01 00:00:00      | 150.00                                         | 100.00              
+books            | pending        | 2024-02-01 00:00:00      | 150.00                                         | 150.00              
+clothing         | cancelled      | 2024-02-01 00:00:00      | 350.00                                         | 50.00               
+clothing         | completed      | 2024-02-01 00:00:00      | 350.00                                         | 300.00              
+electronics      | completed      | 2024-02-01 00:00:00      | 250.00                                         | 200.00              
+electronics      | pending        | 2024-02-01 00:00:00      | 250.00                                         | 50.00               
+books            | cancelled      | 2024-03-01 00:00:00      | 500.00                                         | 100.00              
+books            | completed      | 2024-03-01 00:00:00      | 500.00                                         | 400.00              
+clothing         | pending        | 2024-03-01 00:00:00      | 250.00                                         | 250.00              
+electronics      | completed      | 2024-03-01 00:00:00      | 250.00                                         | 200.00              
+electronics      | pending        | 2024-03-01 00:00:00      | 250.00                                         | 50.00

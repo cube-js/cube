@@ -65,6 +65,8 @@ impl QueryPropertiesCompiler {
 
         // FIXME may be this filter should be applied on other place
         let time_dimensions = Self::filter_time_dimensions_with_granularity(time_dimensions_raw);
+        let dimensions =
+            Self::drop_dimensions_selected_as_time_dimensions(dimensions, &time_dimensions);
 
         let order_by = self.compile_order_by(
             &mut evaluator_compiler,
@@ -569,6 +571,22 @@ impl QueryPropertiesCompiler {
             filter_compiler.add_item(&native_filter)?;
         }
         Ok(())
+    }
+
+    // `ts.month` among the dimensions compiles to the same member as `ts` at
+    // granularity month; keeping both would project one column under one alias twice.
+    fn drop_dimensions_selected_as_time_dimensions(
+        dimensions: Vec<Rc<MemberSymbol>>,
+        time_dimensions: &[Rc<MemberSymbol>],
+    ) -> Vec<Rc<MemberSymbol>> {
+        dimensions
+            .into_iter()
+            .filter(|dim| {
+                !time_dimensions
+                    .iter()
+                    .any(|td| td.id() == dim.id() && td.alias() == dim.alias())
+            })
+            .collect_vec()
     }
 
     // Drop time-dimension symbols that have no granularity. Non-time-
