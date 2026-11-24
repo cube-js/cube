@@ -559,6 +559,16 @@ cubes:
             group_by:
                 - orders.status
 
+          - name: unique_customers_no_grain
+            type: sum
+            sql: "{CUBE.unique_customers}"
+            multi_stage: true
+
+          - name: total_amount_no_grain
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+
           - name: unique_customers_fixed
             type: number
             sql: "{CUBE.unique_customers}"

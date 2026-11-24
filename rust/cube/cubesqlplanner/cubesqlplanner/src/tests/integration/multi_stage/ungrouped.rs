@@ -111,6 +111,48 @@ async fn test_ungrouped_reduce_by_aggregate_with_dimension() {
     }
 }
 
+// Without a grain the stage groups by every query dimension, so the ungrouped
+// query must report what the grouped one does.
+async fn assert_ungrouped_matches_grouped_without_grain(measure: &str) {
+    let ctx = create_context();
+
+    let query = format!(
+        indoc! {r#"
+            measures:
+              - {}
+            dimensions:
+              - orders.status
+              - orders.category
+            ungrouped: true
+            order:
+              - id: orders.status
+              - id: orders.category
+        "#},
+        measure
+    );
+    let grouped_query = query.replace("ungrouped: true\n", "");
+
+    ctx.build_sql(&query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(&query, SEED).await {
+        let grouped = ctx.try_execute_pg(&grouped_query, SEED).await.unwrap();
+        assert_eq!(result, grouped);
+    }
+}
+
+// Sum over count_distinct takes the JOIN model.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_join_model_aggregate_without_grain() {
+    assert_ungrouped_matches_grouped_without_grain("orders.unique_customers_no_grain").await;
+}
+
+// Sum over sum is window-path eligible, but a partition covering every
+// dimension renders as a plain aggregate.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_ungrouped_window_eligible_aggregate_without_grain() {
+    assert_ungrouped_matches_grouped_without_grain("orders.total_amount_no_grain").await;
+}
+
 // A `mode: fixed` input restarts from the query's state, yet it still feeds an
 // aggregate stage that needs its values grouped.
 #[tokio::test(flavor = "multi_thread")]
