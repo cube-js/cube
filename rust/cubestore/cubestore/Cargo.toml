@@ -69,7 +69,6 @@ deadqueue = "0.2.4"
 reqwest = { version = "0.12.5", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
 nanoid = "0.3.0"
 rand = "0.8.0"
-parquet-format = "=2.6.1"
 hex = "0.4.2"
 cloud-storage = "0.7.0"
 tokio-util = { version = "0.7.10", features = ["compat"] }
