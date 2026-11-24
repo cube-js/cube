@@ -628,12 +628,36 @@ Preview **blocks** a view when it finds any of these conditions:
   only Cube can fill them in, so remove them from the cube's `sql` or keep that view in Cube.
 - Unsupported expressions or types, or multi-stage, window, or ranking calculations: simplify
   the model or keep that view in Cube.
+- An aggregate measure, such as `count_distinct` or `max`, that reads a measure which itself
+  aggregates: SQL can't nest aggregates, so reference a dimension instead.
 
 An unsafe joined measure can be **withheld while the rest of its view is published**. That view
 may show **Created**, **Updated**, or **Unchanged**, and the run may show **Completed**, even
 though some measures are missing in Databricks. Check **Measures not published** in Preview and
 beside each view in run history before treating a run as complete. There is no opt-in gate for
 incomplete publication yet.
+
+### References and subqueries in SQL
+
+Preview publishes these as Cube compiles them, within the limits each one lists:
+
+- A cube `sql` that reads another cube's SQL, such as `SELECT * FROM {orders_base.sql()}`,
+  publishes with that SQL expanded, so the Metric View `source` is plain SQL. Preview blocks a
+  reference that forms a cycle, names a cube outside the YAML model, goes through a join path
+  (`{orders.users.sql()}`), or reads a cube whose own `sql` holds any other Cube reference, such
+  as `{CUBE}` or a member.
+- A member reference through a join path from the cube that holds the reference, such as
+  `{CUBE.users.tier}` in an `orders` member, publishes as `users.tier`, joined along that path.
+  Preview blocks the view if its own `join_path` entries reach that cube another way, since a
+  Metric View joins each cube once.
+  A plain `{users.tier}` names no path, so `users` needs exactly one join path from the view's
+  root, or a view `join_path` entry that picks one (`includes: []` is enough).
+- A measure's `sql` or `filters` can contain a subquery, such as this filter:
+  `{CUBE}.account_id IN (SELECT account_id FROM raw.usage WHERE metric_ts = {CUBE}.metric_ts)`.
+  Databricks doesn't resolve `source` columns inside a subquery, so each outer column it reads is
+  added to the Metric View `source` under a generated name, such as `__cube_outer_0__`. Preview
+  blocks a subquery that reads a joined cube, a measure, or a dimension whose SQL has a column
+  without a `{CUBE}.` prefix. A subquery in dimension or join SQL is blocked too.
 
 ### Jinja templates
 
