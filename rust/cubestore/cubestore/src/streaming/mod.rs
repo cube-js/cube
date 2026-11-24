@@ -29,6 +29,7 @@ use datafusion::arrow::array::ArrayRef;
 use datafusion::cube_ext;
 use futures::future::join_all;
 use futures::stream::StreamExt;
+use futures::FutureExt;
 use futures::Stream;
 use futures_util::stream;
 use itertools::Itertools;
@@ -37,7 +38,9 @@ use log::debug;
 use rand::Rng;
 use reqwest::{Response, Url};
 use serde::{Deserialize, Serialize};
+use std::future::Future;
 use std::io::{Cursor, Write};
+use std::panic::AssertUnwindSafe;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -235,11 +238,11 @@ impl StreamingServiceImpl {
 impl StreamingService for StreamingServiceImpl {
     async fn stream_table(&self, table: IdRow<Table>, location: &str) -> Result<(), CubeError> {
         let lag_reset = LagGaugesReset::new(vec![format!("location:{}", location)]);
-        let res = self.stream_table_impl(table, location, &lag_reset).await;
-        if res.is_err() {
-            lag_reset.mark_failed();
-        }
-        res
+        run_with_lag_reset(
+            &lag_reset,
+            self.stream_table_impl(table, location, &lag_reset),
+        )
+        .await
     }
 
     async fn validate_table_location(
@@ -504,6 +507,26 @@ fn spawn_lag_reporter(
             tokio::time::sleep(interval).await;
         }
     }))
+}
+
+// Marks the stream failed on an error or a panic. A panic must be caught here: the runtime drops
+// the panicked future only after unwinding, when `Drop` can no longer tell it from a clean stop.
+async fn run_with_lag_reset(
+    lag_reset: &LagGaugesReset,
+    stream: impl Future<Output = Result<(), CubeError>>,
+) -> Result<(), CubeError> {
+    match AssertUnwindSafe(stream).catch_unwind().await {
+        Ok(res) => {
+            if res.is_err() {
+                lag_reset.mark_failed();
+            }
+            res
+        }
+        Err(panic) => {
+            lag_reset.mark_failed();
+            std::panic::resume_unwind(panic)
+        }
+    }
 }
 
 // Zeroes the lag gauges when a stream stops cleanly on this node (sealed, table dropped, stream
@@ -1207,6 +1230,28 @@ mod tests {
             }),
             (vec![0], vec![0])
         );
+    }
+
+    #[tokio::test]
+    async fn stream_panic_marks_lag_failed() {
+        use crate::util::metrics::test_capture;
+        test_capture::watch("cs.streaming.lag.age.ms");
+        let tags = vec!["location:stream_panic_marks_lag_failed".to_string()];
+        let reset = LagGaugesReset::new(tags.clone());
+        reset.arm();
+        let panicked = AssertUnwindSafe(run_with_lag_reset(&reset, async {
+            panic!("ingest panic");
+        }))
+        .catch_unwind()
+        .await;
+        assert!(panicked.is_err());
+        drop(reset);
+        let ages = test_capture::samples("cs.streaming.lag.age.ms")
+            .into_iter()
+            .filter(|(_, t)| *t == tags)
+            .map(|(v, _)| v)
+            .collect::<Vec<_>>();
+        assert_eq!(ages, vec![STALE_LAG_AGE_MS]);
     }
 
     pub struct MockKsqlClient;

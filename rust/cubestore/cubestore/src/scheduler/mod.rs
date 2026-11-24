@@ -89,11 +89,19 @@ impl EventsPendingReporter {
     }
 
     fn observe(&mut self, pending: usize) {
-        let drained = pending == 0 && self.last_value != 0;
-        if drained || self.last_report.elapsed() >= EVENTS_PENDING_REPORT_INTERVAL {
+        if self.should_report(pending, Instant::now()) {
             app_metrics::SCHEDULER_EVENTS_PENDING.report(pending as i64);
-            self.last_report = Instant::now();
+        }
+    }
+
+    fn should_report(&mut self, pending: usize, now: Instant) -> bool {
+        let drained = pending == 0 && self.last_value != 0;
+        if drained || now.duration_since(self.last_report) >= EVENTS_PENDING_REPORT_INTERVAL {
+            self.last_report = now;
             self.last_value = pending;
+            true
+        } else {
+            false
         }
     }
 }
@@ -1626,6 +1634,21 @@ pub enum GCTask {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn events_pending_reported_throttled_and_on_drain() {
+        let start = Instant::now();
+        let mut reporter = EventsPendingReporter {
+            last_report: start,
+            last_value: 0,
+        };
+        let at = |ms| start + Duration::from_millis(ms);
+        assert!(!reporter.should_report(5, at(100)), "throttled");
+        assert!(reporter.should_report(5, at(1000)), "interval elapsed");
+        assert!(!reporter.should_report(7, at(1500)), "throttled");
+        assert!(reporter.should_report(0, at(1600)), "drained");
+        assert!(!reporter.should_report(0, at(1700)), "already drained");
+    }
+
     use super::*;
     use crate::config::Config;
     use crate::metastore::RocksMetaStore;
