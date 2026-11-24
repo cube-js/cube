@@ -46,8 +46,11 @@ Audit Log uses heuristics to detect sensitive values (e.g., passwords and tokens
 and sanitize them, i.e., replace them with `[HIDDEN]` in event-specific
 attributes. You can see that a password was sanitized on the screenshot above.
 
-If you'd like your custom environment variable to be sanitized, include one of
-the following substrings in its name: `PASS`, `SECRET`, `TOKEN`, `KEY`.
+Values of environment variables and encryption keys are never stored in Audit Log,
+whatever their names. They are always shown as `[REDACTED]` or `[HIDDEN]`.
+
+For other event-specific attributes, a value is sanitized when the attribute's name
+includes one of the following substrings: `PASS`, `SECRET`, `TOKEN`, `KEY`.
 
 ### Filters
 
@@ -71,16 +74,22 @@ with external log aggregation or SIEM tools.
 
 ## Event types
 
-Audit Log collects the following types of events:
+Audit Log collects the following types of events. Changes to users, custom roles,
+account settings, OIDC token configs, OAuth integrations, and deployment environment
+variables made through the [Control Plane API][ref-control-plane-api] with an API key
+are recorded under the same event types as changes made in the UI.
 
 | Category | Event type |
 | --- | --- |
-| Users | `Created user`<br/>`Deleted user`<br/>`Invited user`<br/>`Updated user profile`<br/>`Requested password reset`<br/>`Changed password` |
+| Users | `Created user`<br/>`Deleted user`<br/>`Invited user`<br/>`Updated user profile`<br/>`Requested password reset`<br/>`Changed password`<br/>`Applied bulk user action` |
 | SCIM provisioning | `Created user via SCIM`<br/>`Updated user via SCIM`<br/>`Deleted user via SCIM`<br/>`Created group via SCIM`<br/>`Updated group via SCIM`<br/>`Deleted group via SCIM` |
 | [Custom roles](/admin/users-and-permissions/custom-roles) | `Created role`<br/>`Deleted role`<br/>`Updated role`<br/>`Assigned role to user`<br/>`Assigned roles to user`<br/>`Removed role from user` |
 | Authentication | `Logged in`<br/>`Logged out`<br/>`Redirected to SAML provider for login`<br/>`Logged in via SAML` |
 | Account and [single sign-on](/admin/sso) | `Updated account settings`<br/>`Updated account authentication configuration`<br/>`Updated account SAML configuration`<br/>`Uploaded identity provider metadata file` |
-| [Deployments](/admin/deployment) | `Created deployment`<br/>`Deleted deployment`<br/>`Updated deployment configuration`<br/>`Enabled SQL API for deployment`<br/>`Generated data model` |
+| [Deployments](/admin/deployment) | `Created deployment`<br/>`Deleted deployment`<br/>`Updated deployment configuration`<br/>`Enabled SQL API for deployment`<br/>`Generated data model`<br/>`Updated deployment environment variables` |
+| [Encryption keys](/admin/deployment/encryption-keys) | `Created encryption key`<br/>`Deleted encryption key` |
+| [OIDC](/admin/deployment/oidc) | `Created OIDC token config`<br/>`Updated OIDC token config`<br/>`Deleted OIDC token config`<br/>`Issued OIDC token` |
+| [OAuth integrations](/admin/connect-to-data/oauth-authentication) | `Created OAuth integration`<br/>`Updated OAuth integration`<br/>`Deleted OAuth integration` |
 | Branches and [dev mode](/docs/data-modeling/dev-mode) | `Created Git branch`<br/>`Deleted Git branch`<br/>`Entered dev mode`<br/>`Exited dev mode`<br/>`Pulled changes to data model`<br/>`Committed and merged changes to data model`<br/>`Merged changes to data model`<br/>`Reverted changes to data model in branch` |
 | [Continuous deployment](/admin/deployment/continuous-deployment) | `Requested connection of GitHub account`<br/>`Connected deployment to GitHub repository`<br/>`Generated SSH key for deployment`<br/>`Connected deployment to Git upstream`<br/>`Generated Git credentials for Cube Cloud repository`<br/>`Generated webhook token for Git repository`<br/>`Received a Git hook`<br/>`Started uploading files`<br/>`Finished uploading files`<br/>`Triggered new build` |
 | [Budgets](/admin/account-billing/budgets) | `Created budget`<br/>`Deleted budget`<br/>`Updated budget` |
