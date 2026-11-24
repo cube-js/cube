@@ -3163,6 +3163,23 @@ from
       expect(res.rows).toMatchSnapshot('metabase_count_cast_to_float32_from_push_down');
     });
 
+    // A cast inside an aggregate becomes a member expression, which no rollup serves,
+    // so the casts reach the data source
+    executePg('SQL API: cast to decimal from push down', async (connection) => {
+      const res = await connection.query(`
+        SELECT
+          SUM(CAST("quantity" AS DOUBLE PRECISION)) AS "plain",
+          SUM(CAST("quantity" AS DECIMAL(18,2))) AS "a0",
+          SUM(CAST("quantity" AS NUMERIC)) AS "a1"
+        FROM "ECommerce"
+      `);
+
+      expect(res.rows).toHaveLength(1);
+      const { plain, a0, a1 } = res.rows[0];
+      expect(Number(plain)).toBeGreaterThan(0);
+      expect([Number(a0), Number(a1)]).toEqual([Number(plain), Number(plain)]);
+    });
+
     executePg('SQL API: NULLS FIRST/LAST SQL push down', async (connection) => {
       const res = await connection.query(`
         SELECT CASE WHEN "category" > 'G' THEN "category" ELSE NULL END AS "category"
