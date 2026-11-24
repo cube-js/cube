@@ -621,7 +621,7 @@ Preview **blocks** a view when it finds any of these conditions:
 - Cyclic or one-to-many joins, or a join condition that reads a measure or a cube other than the
   two it joins, including a `table.column` whose table is neither of them: simplify the join. For
   `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube.
-- A dimension that reads a cube behind a one-to-many join, which the error names: a Metric View
+- A dimension that reads a cube behind a one-to-many join (Preview names that join): a Metric View
   dimension needs one value per source row, so root the view at the many-side cube.
 - A cube `sql` that reads [context variables](/reference/data-modeling/context-variables), such
   as `{FILTER_PARAMS…}`, `{SECURITY_CONTEXT…}`, or `{COMPILE_CONTEXT…}` (`CUBE_CONTEXT_IN_SQL`):
