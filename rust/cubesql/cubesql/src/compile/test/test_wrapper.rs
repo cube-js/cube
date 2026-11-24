@@ -7790,6 +7790,37 @@ async fn test_wrapper_cube_store_pre_aggregation_stream_mode() {
     }
 }
 
+/// A `LIMIT` below a join doesn't bound the rows the join returns, so in stream mode such a
+/// push down reads the data source unless the `LIMIT` is above the join
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_stream_mode_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query = "WITH o AS (SELECT gender, total, ROW_NUMBER() OVER (ORDER BY total) rn FROM (SELECT customer_gender AS gender, SUM(sumPrice) AS total FROM KibanaSampleDataEcommerce GROUP BY 1) x ORDER BY rn LIMIT 10), l AS (SELECT content AS gender, MEASURE(agentCount) AS agents FROM Logs GROUP BY 1) SELECT o.gender, o.total, l.agents FROM o INNER JOIN l ON o.gender = l.gender";
+    for (limit, external) in [("", false), (" LIMIT 5000", true)] {
+        let mut config = ConfigObjImpl::default();
+        config.sql_push_down_pre_aggregations = true;
+        config.stream_mode = true;
+        let context = TestContext::with_config_and_meta(
+            DatabaseProtocol::PostgreSQL,
+            Arc::new(config),
+            get_test_tenant_ctx_with_cube_store_templates(vec![], vec![]),
+        )
+        .await;
+        context
+            .add_cube_store_pre_aggregation_mock_for_any_query(pre_aggregation_description())
+            .await;
+        let query = format!("{query}{limit}");
+        let wrapped_sql = wrapped_sql(&context, &query).await;
+
+        assert_eq!(wrapped_sql.external, external, "{}", query);
+        assert!(wrapped_sql.sql.contains("JOIN"), "{}", query);
+    }
+}
+
 /// Push-to-Cube selects over one scan are matched one by one: a select no rollup can serve
 /// does not keep its sibling from reading the rollup
 #[tokio::test]
