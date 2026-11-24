@@ -1906,13 +1906,13 @@ impl Config {
                     .ok()
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
-                location_allow_local_fs: env_flag("CUBESTORE_LOCATION_ALLOW_LOCAL_FS"),
+                location_allow_local_fs: env_bool("CUBESTORE_LOCATION_ALLOW_LOCAL_FS", false),
                 location_allow_hosts: env_parse_list(
                     "CUBESTORE_LOCATION_ALLOW_HOSTS",
                     vec!["*".to_string()],
                     |h| LocationHostFilter::validate_entry(h).map_err(|e| e.message),
                 ),
-                location_deny_private_ips: env_flag("CUBESTORE_LOCATION_DENY_PRIVATE_IPS"),
+                location_deny_private_ips: env_bool("CUBESTORE_LOCATION_DENY_PRIVATE_IPS", false),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 load_aware_import_placement_enabled: env_bool(
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
