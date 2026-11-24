@@ -7791,7 +7791,7 @@ async fn test_wrapper_cube_store_pre_aggregation_stream_mode() {
 }
 
 /// A `LIMIT` below a join doesn't bound the rows the join returns, so in stream mode such a
-/// push down reads the data source unless the `LIMIT` is above the join
+/// push down reads the data source unless a `LIMIT` is above the join
 #[tokio::test]
 async fn test_wrapper_cube_store_pre_aggregation_stream_mode_join() {
     if !Rewriter::sql_push_down_enabled() {
@@ -7799,8 +7799,16 @@ async fn test_wrapper_cube_store_pre_aggregation_stream_mode_join() {
     }
     init_testing_logger();
 
-    let query = "WITH o AS (SELECT gender, total, ROW_NUMBER() OVER (ORDER BY total) rn FROM (SELECT customer_gender AS gender, SUM(sumPrice) AS total FROM KibanaSampleDataEcommerce GROUP BY 1) x ORDER BY rn LIMIT 10), l AS (SELECT content AS gender, MEASURE(agentCount) AS agents FROM Logs GROUP BY 1) SELECT o.gender, o.total, l.agents FROM o INNER JOIN l ON o.gender = l.gender";
-    for (limit, external) in [("", false), (" LIMIT 5000", true)] {
+    // One side limited, and both
+    let queries = [
+        "WITH o AS (SELECT gender, total, ROW_NUMBER() OVER (ORDER BY total) rn FROM (SELECT customer_gender AS gender, SUM(sumPrice) AS total FROM KibanaSampleDataEcommerce GROUP BY 1) x ORDER BY rn LIMIT 10), l AS (SELECT content AS gender, MEASURE(agentCount) AS agents FROM Logs GROUP BY 1) SELECT o.gender, o.total, l.agents FROM o INNER JOIN l ON o.gender = l.gender",
+        "WITH a AS (SELECT customer_gender AS gender, SUM(sumPrice) AS total FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 5000), b AS (SELECT content AS gender, MEASURE(agentCount) AS agents FROM Logs GROUP BY 1 LIMIT 5000) SELECT a.gender, a.total, b.agents FROM a INNER JOIN b ON a.gender = b.gender",
+    ];
+    let limits = [("", false), (" LIMIT 5000", true)];
+    for (query, (limit, external)) in queries
+        .iter()
+        .flat_map(|query| limits.iter().map(move |limit| (query, limit)))
+    {
         let mut config = ConfigObjImpl::default();
         config.sql_push_down_pre_aggregations = true;
         config.stream_mode = true;
@@ -7814,10 +7822,19 @@ async fn test_wrapper_cube_store_pre_aggregation_stream_mode_join() {
             .add_cube_store_pre_aggregation_mock_for_any_query(pre_aggregation_description())
             .await;
         let query = format!("{query}{limit}");
-        let wrapped_sql = wrapped_sql(&context, &query).await;
+        let wrapped_sqls = context
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sqls_deep();
 
-        assert_eq!(wrapped_sql.external, external, "{}", query);
-        assert!(wrapped_sql.sql.contains("JOIN"), "{}", query);
+        assert_eq!(
+            wrapped_sqls.iter().any(|node| node.wrapped_sql.external),
+            *external,
+            "{}",
+            query
+        );
     }
 }
 

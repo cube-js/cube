@@ -999,13 +999,18 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         _partition: usize,
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
+        // TODO: move envs to config
+        let stream_mode = self.config_obj.stream_mode();
         let query_limit = self.config_obj.non_streaming_query_max_row_limit();
         let max_batch_rows = self.config_obj.cube_scan_max_batch_rows();
 
         // Cube Store serves a query over a pre-aggregation, and its driver does not stream
         let streamable = !self.wrapped_sql.as_ref().is_some_and(|sql| sql.external);
-        let stream_mode =
-            streamable && is_streamed_request(self.config_obj.as_ref(), self.request.limit);
+        let stream_mode = match (stream_mode && streamable, self.request.limit) {
+            (true, None) => true,
+            (true, Some(limit)) if limit > query_limit => true,
+            (_, _) => false,
+        };
 
         let mut load_request = self.request.clone();
         if !self.options.order_measures.is_empty() {
@@ -1495,12 +1500,6 @@ fn load_to_stream_sync(one_shot_stream: &mut CubeScanOneShotStream) -> Result<()
     one_shot_stream.data = Some(response.cloned().unwrap());
 
     Ok(())
-}
-
-/// Whether a Cube query with this `limit` is streamed rather than loaded in one response
-pub fn is_streamed_request(config_obj: &dyn ConfigObj, limit: Option<i32>) -> bool {
-    config_obj.stream_mode()
-        && limit.is_none_or(|limit| limit > config_obj.non_streaming_query_max_row_limit())
 }
 
 pub fn transform_response<C: ColumnarValueObject>(

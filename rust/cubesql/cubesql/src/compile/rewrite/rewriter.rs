@@ -1,9 +1,6 @@
 use crate::{
     compile::{
-        engine::df::{
-            scan::{is_streamed_request, CubeScanNode},
-            wrapper::WrappedSelectNode,
-        },
+        engine::df::{scan::CubeScanNode, wrapper::WrappedSelectNode},
         qtrace::{Qtrace, QtraceEclass, QtraceEgraphIteration},
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -14,9 +11,9 @@ use crate::{
                 flatten::FlattenRules, members::MemberRules, old_split::OldSplitRules,
                 order::OrderRules, split::SplitRules, wrapper::WrapperRules,
             },
-            CubeScanWrapped, LiteralExprValue, LogicalPlanLanguage, QueryParamIndex, ScanWrapping,
-            WrappedSelectLimit, WrappedSelectPushToCube, WRAPPED_SELECT_FROM, WRAPPED_SELECT_JOINS,
-            WRAPPED_SELECT_LIMIT, WRAPPED_SELECT_PUSH_TO_CUBE,
+            CubeScanLimit, CubeScanWrapped, LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
+            ScanWrapping, WrappedSelectLimit, WrappedSelectPushToCube, WRAPPED_SELECT_FROM,
+            WRAPPED_SELECT_JOINS, WRAPPED_SELECT_LIMIT, WRAPPED_SELECT_PUSH_TO_CUBE,
         },
         CubeContext,
     },
@@ -476,16 +473,14 @@ impl Rewriter {
             let mut asked = vec![];
             let mut asked_positions = vec![];
             for (position, (index, node)) in scans.iter().enumerate() {
+                // Cube Store returns a whole result at once and isn't streamed, so in stream
+                // mode only SQL with a bounded result may read it
+                if config_obj.stream_mode() && !bounded.contains(index) {
+                    continue;
+                }
                 if let Some(request) =
                     Self::pre_aggregation_request(&cube_context, &load_request_meta, node).await
                 {
-                    // Cube Store returns a whole result at once, so a streamed query is
-                    // served by the data source
-                    if !bounded.contains(index)
-                        && is_streamed_request(config_obj.as_ref(), request.limit)
-                    {
-                        continue;
-                    }
                     asked.push(request);
                     asked_positions.push(position);
                 }
@@ -647,16 +642,24 @@ impl Rewriter {
     }
 
     /// Nodes of `best` under a push down whose SQL returns at most `max_row_limit` rows: a
-    /// select on its chain of `FROM`s has a `LIMIT` within it, and no select above that one
-    /// joins anything that could multiply its rows
+    /// select or scan on its chain of `FROM`s has a `LIMIT` within it, and no select above
+    /// that one joins anything that could multiply its rows
     fn bounded_push_down_nodes(
         best: &RecExpr<LogicalPlanLanguage>,
         max_row_limit: usize,
     ) -> HashSet<usize> {
         let nodes = best.as_ref();
         let is_bounded = |mut index: usize| loop {
-            let LogicalPlanLanguage::WrappedSelect(select) = &nodes[index] else {
-                return false;
+            let select = match &nodes[index] {
+                LogicalPlanLanguage::WrappedSelect(select) => select,
+                LogicalPlanLanguage::CubeScan(params) => {
+                    return matches!(
+                        &nodes[usize::from(params[4])],
+                        LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(limit))
+                            if !is_limitless(limit, max_row_limit)
+                    );
+                }
+                _ => return false,
             };
             if let LogicalPlanLanguage::WrappedSelectLimit(WrappedSelectLimit(limit)) =
                 &nodes[usize::from(select[WRAPPED_SELECT_LIMIT])]
