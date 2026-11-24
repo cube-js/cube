@@ -39,7 +39,10 @@ pub trait DriverTools {
     fn add_timestamp_interval(&self, date: String, interval: String) -> Result<String, CubeError>;
     fn interval_and_minimal_time_unit(&self, interval: String) -> Result<Vec<String>, CubeError>;
     fn hll_init(&self, sql: String) -> Result<String, CubeError>;
-    fn hll_merge(&self, sql: String) -> Result<String, CubeError>;
+    /// Merges HLL states into a state, for a further merge to finalize.
+    /// Bridged to `hllMergeOnly`: on most dialects `hllMerge` returns the
+    /// cardinality.
+    fn hll_merge_only(&self, sql: String) -> Result<String, CubeError>;
     fn hll_cardinality_merge(&self, sql: String) -> Result<String, CubeError>;
     fn count_distinct_approx(&self, sql: String) -> Result<String, CubeError>;
     fn support_generated_series_for_custom_td(&self) -> Result<bool, CubeError>;
