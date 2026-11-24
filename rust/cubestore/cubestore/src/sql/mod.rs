@@ -1385,10 +1385,11 @@ impl SqlServiceImpl {
 
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
-                        let max_result_size = MaxResultSize::new(
-                            self.config_obj.max_query_result_size(),
-                            context.max_result_size,
-                        );
+                        let bound = self.config_obj.max_query_result_size();
+                        // A client limit at or above the bound changes nothing, so it must not
+                        // split the cache keys either.
+                        context.max_result_size = context.max_result_size.filter(|l| *l < bound);
+                        let max_result_size = MaxResultSize::new(bound, context.max_result_size);
                         let serialized_plan_time_start = SystemTime::now();
                         let serialized_plan = serialized.to_serialized_plan()?;
                         app_metrics::DATA_QUERY_TO_SERIALIZED_PLAN_TIME_US
