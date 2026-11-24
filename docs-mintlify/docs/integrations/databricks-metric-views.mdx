@@ -37,10 +37,12 @@ Databricks definitions into Cube. You start it from Console or the public REST A
   [Data sources served by `driver_factory`](#data-sources-served-by-driver_factory).
 - If a Cube source uses a two-part `schema.table` name, set
   [`CUBEJS_DB_DATABRICKS_CATALOG`](/reference/configuration/environment-variables#cubejs_db_databricks_catalog)
-  for that data source so Preview can resolve its catalog. Without it, those views are blocked.
+  for that data source so Preview can resolve its catalog, or the **Default catalog** of a
+  [publication target with its own connection](#publish-to-another-workspace). Without it, those
+  views are blocked.
 - Ask your Databricks administrator for a **dedicated target catalog and schema** for the
   published Metric Views.
-  The Databricks identity Cube publishes with (the data source's, or the integration's own
+  The Databricks identity Cube publishes with (the data source's, or a publication target's own
   service principal) needs `CAN USE` on its SQL warehouse,
   `USE CATALOG` and `USE SCHEMA` on the target and source namespaces, `SELECT` on source
   relations, and `CREATE TABLE` on the target schema. The same identity must own any existing
@@ -133,8 +135,10 @@ A save that omits it stores `retain`, even when `delete-managed` was stored befo
 
 Publication can't use a connection that
 [`driver_factory`](/reference/configuration/config#driver_factory) creates: Preview, Test access,
-and sync run without a user for the factory to act for. Give the integration its own Databricks
-service principal instead. Your users' queries keep going through `driver_factory`.
+and sync run without a user for the factory to act for. So every
+[publication target](#publish-to-staging-then-production) of such a data source needs a Databricks
+service principal connection of its own: the card requires its fields, with no
+**Use a separate connection** switch. Your users' queries keep going through `driver_factory`.
 
 <Warning>
 
@@ -154,8 +158,8 @@ Databricks driver prefers a data source's OAuth client variables over the per-us
 3. In **Databricks Metric View sync**, under **Databricks connection**, enter the SQL warehouse's
    **Server hostname** and **HTTP path** and the service principal's **OAuth client ID** and
    **OAuth client secret**. If a cube uses a two-part `schema.table` name, also enter the
-   **Default catalog** it resolves in; it replaces `CUBEJS_DB_DATABRICKS_CATALOG` for this data
-   source.
+   **Default catalog** it resolves in; it replaces `CUBEJS_DB_DATABRICKS_CATALOG` for this
+   publication target.
 4. Configure and run publication as in [Publish a view](#publish-a-view). Preview is available
    once the credential is saved.
 
@@ -197,8 +201,8 @@ the run retries for about 30 minutes. If a newer build succeeds first, only the 
 publishes.
 
 A run that can't start leaves no entry in run history. This happens when no user can render the
-model's Jinja templates, when the data source has no Databricks connection, or when the retry runs
-out. Databricks then keeps the Metric Views of an earlier build, and the card
+model's Jinja templates, when the publication target has no Databricks connection to use, or when
+the retry runs out. Databricks then keeps the Metric Views of an earlier build, and the card
 [warns that Databricks is behind](#databricks-behind-the-deployed-model).
 
 A run that completes sends no notification. A run that fails, ends **Partial**, or withholds a
@@ -367,11 +371,11 @@ body on HTTP errors.
 
 A data source can have several publication targets, such as `staging` and `production`. Each has
 its own settings (target catalog and schema, scope, target-name overrides, `deletionPolicy`,
-`syncOnDeploy`, and the `connection` of a data source
-[served by `driver_factory`](#data-sources-served-by-driver_factory)), its own run history, and its
-own Metric Views. What this page says about a data source's settings, runs, and Metric Views holds
-for each publication target. Give each one its own catalog or schema: a Metric View belongs to one
-publication target, so another that publishes to the same name is blocked with `ownership-conflict`.
+`syncOnDeploy`, and a [Databricks connection](#publish-to-another-workspace) of its own, if any),
+its own run history, and its own Metric Views. What this page says about a data source's settings,
+runs, and Metric Views holds for each publication target. Give each one its own catalog or schema:
+a Metric View belongs to one publication target, so another that publishes to the same name is
+blocked with `ownership-conflict`.
 
 Every data source has the `default` publication target. In the **Databricks Metric View sync** card,
 pick one under **Publication target**: the settings, **Preview**, **Test access**, and run history
@@ -461,6 +465,25 @@ refusal, so read it before you retry.
 A run returns its `targetName` and, when promoted, `promotedFromRunId`, which run history shows as
 **Promoted from run**. Its `sourceSha256` hashes the model files it converted, and `runtime` names
 the converter version it used.
+
+### Publish to another workspace {#publish-to-another-workspace}
+
+On a data source with a Databricks connection in its environment variables, a publication target
+uses that connection unless it has one of its own, so one data source can publish to several
+workspaces, such as staging to one and production to another. Create a
+[service principal with an OAuth secret](https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m)
+for the other workspace and grant it the privileges listed in [Before you start](#before-you-start).
+Then pick the target in the card, turn on **Use a separate connection** under
+**Databricks connection**, enter the connection as in
+[Data sources served by `driver_factory`](#data-sources-served-by-driver_factory), and save. That
+target's Preview, Test access, and runs use this connection; targets without one, and your users'
+queries, keep using the data source's.
+
+A target with its own connection doesn't read `CUBEJS_DB_DATABRICKS_CATALOG`: if a cube uses a
+two-part `schema.table` name, enter its **Default catalog**. To go back to the data source's
+connection, turn **Use a separate connection** off and save, which removes the target's connection
+and deletes its secret. Through the API, send `connection` as for a data source
+[served by `driver_factory`](#data-sources-served-by-driver_factory).
 
 ## Check a pull request before it merges
 
@@ -589,9 +612,9 @@ Preview **blocks** a view when it finds any of these conditions:
   `extends`: keep that governed view in Cube; the policy cannot be transferred to a Databricks
   Metric View.
 - Mixed data sources or an ambiguous root dataset: use one data source and a clear root.
-- A two-part `schema.table` source without `CUBEJS_DB_DATABRICKS_CATALOG`: set that variable for
-  the selected Databricks data source, or the credential's **Default catalog** for a data source
-  served by `driver_factory`, and preview again.
+- A two-part `schema.table` source without a default catalog: set `CUBEJS_DB_DATABRICKS_CATALOG`
+  for the selected Databricks data source, or the **Default catalog** of a publication target with
+  its own connection, and preview again.
 - Cyclic or one-to-many joins, or a join condition that reads a measure or a cube other than the
   two it joins, including a `table.column` whose table is neither of them: simplify the join. For
   `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube.
@@ -785,8 +808,9 @@ needs the same Databricks privileges on the target schema as replacing a view.
 
 ### Move to another metastore
 
-After you point the data source at a workspace on another Unity Catalog metastore, the next sync
-creates its Metric Views there, or labels a view **Blocked** with `unmanaged-target` when an object
-there already holds its name; if that object should belong to this publication target,
-[take it over](#take-over-an-existing-metric-view). The Metric Views in the old metastore stay, and
-syncs no longer list them: drop them in Databricks yourself.
+After you point the data source, or a publication target's own connection, at a workspace on
+another Unity Catalog metastore, the next sync creates its Metric Views there, or labels a view
+**Blocked** with `unmanaged-target` when an object there already holds its name; if that object
+should belong to this publication target, [take it over](#take-over-an-existing-metric-view). The
+Metric Views in the old metastore stay, and syncs no longer list them: drop them in Databricks
+yourself.
