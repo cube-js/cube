@@ -507,3 +507,82 @@ async fn test_view_own_time_shifted_measure() {
         insta::assert_snapshot!(result);
     }
 }
+
+// One masked dimension included twice in a view, only one copy masked, next to
+// a measure whose grain drops it: each copy keeps its own column through the
+// multi-stage join, so only the masked copy reads the mask.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_aliased_copy_of_masked_dimension_multi_stage() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders_alias_view.total_amount_excl_masked_status
+          - orders_alias_view.total_amount
+        dimensions:
+          - orders_alias_view.masked_status_copy
+          - orders_alias_view.masked_status
+        order:
+          - id: orders_alias_view.masked_status_copy
+        maskedMembers:
+          - member: orders_alias_view.masked_status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// A time dimension included twice in a view, both copies at one granularity,
+// in a multi-stage join on the query's keys.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_aliased_copy_of_time_dimension_multi_stage() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - orders_alias_view.total_amount_excl_masked_status
+          - orders_alias_view.total_amount
+        dimensions:
+          - orders_alias_view.masked_status
+        time_dimensions:
+          - dimension: orders_alias_view.created_at_copy
+            granularity: month
+          - dimension: orders_alias_view.created_at
+            granularity: month
+        order:
+          - id: orders_alias_view.created_at
+          - id: orders_alias_view.masked_status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// A dimension of the joined side included twice, grouping a measure the join
+// multiplies: the keys subquery and the join back must keep both copies.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_aliased_copy_of_dimension_multiplied_measure() {
+    let ctx = create_context();
+
+    let query = indoc! {"
+        measures:
+          - customers_alias_view.count
+        dimensions:
+          - customers_alias_view.status_copy
+          - customers_alias_view.status
+        order:
+          - id: customers_alias_view.status
+    "};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

@@ -50,15 +50,15 @@ impl Schema {
         }
     }
 
-    /// The column carrying `member` itself, else the first one whose member
-    /// resolves to the same base member.
+    /// The column carrying `member` itself (same id, in any symbol form, e.g. a
+    /// `Ref` to it), else the first one whose member resolves to the same base.
     pub fn find_column_for_member(&self, member: &Rc<MemberSymbol>) -> Option<&SchemaColumn> {
         // Two view members can resolve to one cube member (a dimension included
         // plain and under an alias); each must still find its own column.
         let own_column = self.columns.iter().find(|col| {
             col.origin_member()
                 .as_ref()
-                .is_some_and(|origin| origin == member)
+                .is_some_and(|origin| origin.id() == member.id())
         });
         own_column.or_else(|| self.find_column_by_resolved_member(member))
     }
