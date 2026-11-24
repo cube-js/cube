@@ -2494,7 +2494,7 @@ impl Config {
                 // Production default is off; kept on in tests so prefilter_chunks_shared_scan
                 // and the rest of the suite keep exercising the worker-side trim path.
                 prefilter_in_memory_chunks_enabled: true,
-                merge_in_memory_chunks_enabled: true,
+                merge_in_memory_chunks_enabled: false,
                 repartition_concurrent_download: true,
                 repartition_strategy: RepartitionStrategy::Range,
                 repartition_merge_max_input_files: 50,
