@@ -449,6 +449,7 @@ impl TransportService for NodeBridgeTransport {
                     .collect::<Result<Vec<_>, _>>()?,
                 external: false,
                 pre_aggregations: vec![],
+                data_source: None,
             },
         })
     }

@@ -3915,6 +3915,55 @@ async fn test_wrapper_union_different_data_sources_not_pushed_down() {
     );
 }
 
+/// `EXPLAIN` names the data source each pushed-down query runs in, on the line that
+/// introduces its SQL
+#[tokio::test]
+async fn test_wrapper_explain_names_data_source_of_each_scan() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let meta = get_test_tenant_ctx_with_cube_data_sources(vec![("Logs", "other")]);
+    let session = get_test_session_with_config(
+        DatabaseProtocol::PostgreSQL,
+        Arc::new(ConfigObjImpl::default()),
+        meta.clone(),
+    )
+    .await;
+
+    let query_plan = convert_sql_to_cube_query(
+        // `ROW_NUMBER` makes each query push down, to its own data source
+        &"SELECT customer_gender AS market, ROW_NUMBER() OVER (ORDER BY customer_gender) AS rn \
+          FROM (SELECT customer_gender FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 10) a \
+          UNION ALL \
+          SELECT content AS market, ROW_NUMBER() OVER (ORDER BY content) AS rn \
+          FROM (SELECT content FROM Logs GROUP BY 1 LIMIT 10) b"
+            .to_string(),
+        meta,
+        session,
+    )
+    .await
+    .expect("union of two data sources should compile");
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
+    for data_source in ["default", "other"] {
+        let prefix = format!(
+            r#"CubeScanExecutionPlan, SQL: {{"dataSource":"{data_source}","external":false,"preAggregations":[]}}"#
+        );
+        assert_eq!(
+            plan.lines()
+                .filter(|line| line.trim_start() == prefix)
+                .count(),
+            1,
+            "one scan runs in {}, its SQL on the next line:\n{}",
+            data_source,
+            plan
+        );
+    }
+}
+
 /// A data source with no union template cannot render a set operation. The rule has to
 /// know that before the plan is chosen, because SQL generation has no way back to post
 /// processing.
@@ -7458,6 +7507,40 @@ async fn test_wrapper_cube_store_pre_aggregation() {
     let wrapped_sql = self::wrapped_sql(&context, PRE_AGGREGATION_QUERY).await;
     assert!(wrapped_sql.external);
     assert_eq!(context.pre_aggregation_match_calls().await.len(), 1);
+}
+
+/// A query over a Cube Store pre-aggregation is named as one in `EXPLAIN`, with the
+/// pre-aggregations it reads
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_explain() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context(true, vec![cube_store_row_number_template()]).await;
+    let cube_query = pre_aggregation_cube_query(&context).await;
+    let mut description = pre_aggregation_description();
+    description["preAggregationId"] = json!("KibanaSampleDataEcommerce.main");
+    context
+        .add_cube_store_pre_aggregation_mock(cube_query, description)
+        .await;
+
+    let physical_plan = context
+        .convert_sql_to_cube_query(PRE_AGGREGATION_QUERY)
+        .await
+        .unwrap()
+        .as_physical_plan()
+        .await
+        .unwrap();
+    let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
+    assert!(
+        plan.contains(
+            r#"CubeScanExecutionPlan, SQL: {"dataSource":null,"external":true,"preAggregations":["KibanaSampleDataEcommerce.main"]}"#
+        ),
+        "the scan runs in Cube Store over the rollup:\n{}",
+        plan
+    );
 }
 
 #[tokio::test]

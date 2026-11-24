@@ -114,6 +114,10 @@ pub struct SqlQuery {
     /// them and swap their table names in. Set with `external`
     #[serde(default)]
     pub pre_aggregations: Vec<serde_json::Value>,
+    /// The data source whose SQL dialect the query is rendered in, Cube Store included.
+    /// Set on the finalized query of a wrapper only
+    #[serde(default)]
+    pub data_source: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -216,6 +220,7 @@ impl SqlQuery {
             values,
             external: false,
             pre_aggregations: vec![],
+            data_source: None,
         }
     }
 
@@ -1083,6 +1088,7 @@ impl CubeScanWrapperNode {
             sql.finalize_query(sql_templates)?;
             sql.external = data_source == CUBE_STORE_DATA_SOURCE;
             sql.pre_aggregations = pre_aggregations;
+            sql.data_source = Some(data_source);
             Ok((sql, request, member_fields))
         })?;
         Ok(CubeScanWrappedSqlNode::new(
