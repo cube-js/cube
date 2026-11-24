@@ -1407,11 +1407,7 @@ impl SqlServiceImpl {
                                         // Pick one of the workers to run as main for the request.
                                         let i = thread_rng().sample(Uniform::new(0, workers.len()));
                                         let rs = cluster.route_select(&workers[i], plan).await?.1;
-                                        records = rs
-                                            .into_iter()
-                                            .map(|r| r.read())
-                                            .collect::<Result<Vec<_>, _>>()?;
-                                        max_result_size.check_batches(&records)?;
+                                        records = max_result_size.read_batches(rs)?;
                                     }
                                     Ok(cube_ext::spawn_blocking(
                                         move || -> Result<DataFrame, CubeError> {

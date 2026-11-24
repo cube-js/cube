@@ -2276,8 +2276,21 @@ impl MaxResultSize {
         )))
     }
 
-    pub fn check_batches(&self, batches: &[RecordBatch]) -> Result<(), CubeError> {
-        self.check(batches.iter().map(record_batch_size).sum())
+    /// Decodes a worker's result, failing at the first batch that takes it past the limit.
+    pub fn read_batches(
+        &self,
+        streams: Vec<SerializedRecordBatchStream>,
+    ) -> Result<Vec<RecordBatch>, CubeError> {
+        let mut size = 0;
+        streams
+            .into_iter()
+            .map(|s| {
+                let batch = s.read()?;
+                size += record_batch_size(&batch);
+                self.check(size)?;
+                Ok(batch)
+            })
+            .collect()
     }
 }
 
@@ -3044,6 +3057,22 @@ mod tests {
             "Query result exceeds the maximum result size of 100 MB. Reduce the amount of data \
              the query returns, e.g. by adding filters or a limit."
         );
+    }
+
+    #[test]
+    fn worker_result_fails_at_the_first_batch_over_the_limit() -> Result<(), CubeError> {
+        let (schema, batches) = int_batches(4, 1000);
+
+        let streams = SerializedRecordBatchStream::write(&schema, batches.clone())?;
+        let read = MaxResultSize::new(32_000, None).read_batches(streams)?;
+        assert_eq!(read.len(), 4);
+
+        let streams = SerializedRecordBatchStream::write(&schema, batches)?;
+        let err = MaxResultSize::new(1 << 20, Some(20_000))
+            .read_batches(streams)
+            .unwrap_err();
+        assert!(err.message.contains("maximum result size of 19.5 KB"));
+        Ok(())
     }
 
     #[test]
