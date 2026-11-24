@@ -895,15 +895,34 @@ impl ChunkDataStore for ChunkStore {
         Ok(())
     }
 
+    async fn report_memory_chunk_states(&self) -> Result<(), CubeError> {
+        let states = self.memory_chunk_states().await?;
+        app_metrics::IN_MEMORY_CHUNKS_ACTIVE.report(states.active);
+        app_metrics::IN_MEMORY_CHUNKS_INACTIVE.report(states.inactive);
+        app_metrics::IN_MEMORY_CHUNKS_ORPHANS.report(states.orphans);
+        self.report_in_memory_metrics().await
+    }
+}
+
+#[derive(Debug, Default, PartialEq)]
+struct MemoryChunkStates {
+    active: i64,
+    inactive: i64,
+    orphans: i64,
+}
+
+impl ChunkStore {
     // A held chunk always has a metastore row: the row is created before the data is added and
     // ids are never reused. So a missing row means the chunk was deleted and its release was
     // lost, e.g. with a deletion event the scheduler dropped while lagging.
-    async fn report_memory_chunk_states(&self) -> Result<(), CubeError> {
+    async fn memory_chunk_states(&self) -> Result<MemoryChunkStates, CubeError> {
+        // Only a name that parses can be looked up, and so judged deleted.
         let held = self
             .memory_chunks
             .read()
             .await
             .keys()
+            .filter(|name| chunk_id_from_file_name(name).is_some())
             .cloned()
             .collect::<Vec<_>>();
         let ids = held
@@ -911,7 +930,7 @@ impl ChunkDataStore for ChunkStore {
             .filter_map(|name| chunk_id_from_file_name(name))
             .collect::<Vec<_>>();
         let mut rows = HashMap::with_capacity(ids.len());
-        for ids in ids.chunks(RECONCILE_MEMORY_CHUNKS_BATCH) {
+        for ids in ids.chunks(MEMORY_CHUNK_LOOKUP_BATCH) {
             for chunk in self
                 .meta_store
                 .get_chunks_out_of_queue(ids.to_vec())
@@ -921,28 +940,21 @@ impl ChunkDataStore for ChunkStore {
             }
         }
 
-        let (mut active, mut inactive, mut orphans) = (0, 0, 0);
+        let mut states = MemoryChunkStates::default();
         for name in held {
-            // Only a name that was looked up can be judged deleted.
-            if chunk_id_from_file_name(&name).is_none() {
-                continue;
-            }
             match rows.get(&name) {
-                Some(c) if c.get_row().active() => active += 1,
+                Some(c) if c.get_row().active() => states.active += 1,
                 // Not uploaded means not activated yet, e.g. a compaction output before its swap.
-                Some(c) if c.get_row().uploaded() => inactive += 1,
+                Some(c) if c.get_row().uploaded() => states.inactive += 1,
                 Some(_) => {}
-                None => orphans += 1,
+                None => states.orphans += 1,
             }
         }
-        app_metrics::IN_MEMORY_CHUNKS_ACTIVE.report(active);
-        app_metrics::IN_MEMORY_CHUNKS_INACTIVE.report(inactive);
-        app_metrics::IN_MEMORY_CHUNKS_ORPHANS.report(orphans);
-        self.report_in_memory_metrics().await
+        Ok(states)
     }
 }
 
-const RECONCILE_MEMORY_CHUNKS_BATCH: usize = 1000;
+const MEMORY_CHUNK_LOOKUP_BATCH: usize = 1000;
 
 fn chunk_id_from_file_name(name: &str) -> Option<u64> {
     name.split(|c| c == '-' || c == '.').next()?.parse().ok()
@@ -1560,21 +1572,15 @@ mod tests {
             .await
             .unwrap();
 
-        use crate::util::metrics::test_capture;
-        for metric in [
-            "cs.workers.in_memory_chunks.active",
-            "cs.workers.in_memory_chunks.inactive",
-            "cs.workers.in_memory_chunks.orphans",
-        ] {
-            test_capture::watch(metric);
-        }
-        chunk_store.report_memory_chunk_states().await.unwrap();
-
-        let last = |metric| test_capture::samples(metric).last().map(|(v, _)| *v);
-        assert_eq!(last("cs.workers.in_memory_chunks.active"), Some(1));
-        assert_eq!(last("cs.workers.in_memory_chunks.inactive"), Some(1));
-        // The deleted chunk and the stale-suffix copy of a live one.
-        assert_eq!(last("cs.workers.in_memory_chunks.orphans"), Some(2));
+        assert_eq!(
+            chunk_store.memory_chunk_states().await.unwrap(),
+            MemoryChunkStates {
+                active: 1,
+                inactive: 1,
+                // The deleted chunk and the stale-suffix copy of a live one.
+                orphans: 2,
+            }
+        );
         assert_eq!(
             chunk_store.memory_chunks.read().await.len(),
             5,
