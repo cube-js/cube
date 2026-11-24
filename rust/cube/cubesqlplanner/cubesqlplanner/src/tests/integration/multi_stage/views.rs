@@ -518,7 +518,13 @@ async fn test_view_aliased_duplicate_dimension_with_grain_exclude() {
           - id: orders_ms_alias_view.status
     "#};
 
-    ctx.build_sql(query).unwrap();
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(
+        sql.contains(
+            r#""fk_aggregate_keys"."orders_ms_alias_view__status" "orders_ms_alias_view__status""#
+        ),
+        "expected `status` to be read from its own keys column, got SQL:\n{sql}"
+    );
 
     if let Some(result) = ctx.try_execute_pg(query, SEED).await {
         insta::assert_snapshot!(result);
