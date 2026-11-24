@@ -652,7 +652,7 @@ Preview publishes these as Cube compiles them, within the limits each one lists:
   Metric View joins each cube once.
   A plain `{users.tier}` names no path, so `users` needs exactly one join path from the view's
   root, or a view `join_path` entry that picks one (`includes: []` is enough).
-- A measure's SQL can contain a subquery, such as
+- A measure's `sql` or `filters` can contain a subquery, such as this filter:
   `{CUBE}.account_id IN (SELECT account_id FROM raw.usage WHERE metric_ts = {CUBE}.metric_ts)`.
   Databricks doesn't resolve `source` columns inside a subquery, so each outer column it reads is
   added to the Metric View `source` under a generated name, such as `__cube_outer_0__`. Preview
