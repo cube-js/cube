@@ -937,14 +937,23 @@ export class CompilerApi {
     // (instead of being fully masked) when the query is already scoped to the
     // filter's rows.
     const targetPath = (member: string) => cubeEvaluator.resolveMemberPath(member)?.targetPath || member;
-    // A time-shifted measure moves the time filters with it, so the query also reads
-    // rows its own filters exclude and the filters prove nothing about those.
-    const readsShiftedRows = memberNames.some((member) => {
+    // Query filters prove nothing about rows read outside them: time shifts move them,
+    // and any exclude / keepOnly directive drops them — whatever it lists, since filters
+    // on members that only reference a listed member are dropped too.
+    const readsRowsOutsideFilters = memberNames.some((member) => {
       const path = targetPath(member);
-      return cubeEvaluator.isMeasure(path) && !!cubeEvaluator.measureByPath(path).timeShift?.length;
+      if (cubeEvaluator.isMeasure(path)) {
+        const measure = cubeEvaluator.measureByPath(path);
+        return !!measure.timeShift?.length || !!measure.filter?.exclude || !!measure.filter?.keepOnly;
+      }
+      if (cubeEvaluator.isDimension(path)) {
+        const dimension = cubeEvaluator.dimensionByPath(path);
+        return !!dimension.filter?.exclude || !!dimension.filter?.keepOnly;
+      }
+      return false;
     });
 
-    if (!readsShiftedRows) {
+    if (!readsRowsOutsideFilters) {
       for (const member of Array.from(maskedMembersSet)) {
         const maskFilter = memberMaskFiltersMap[member];
         if (maskFilter && this.queryFiltersImplyFilter(query.filters || [], maskFilter)) {
