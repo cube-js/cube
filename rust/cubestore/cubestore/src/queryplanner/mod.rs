@@ -23,6 +23,7 @@ pub mod trace_data_loaded;
 use serialized_plan::PreSerializedPlan;
 pub use topk::MIN_TOPK_STREAM_ROWS;
 mod filter_by_key_range;
+mod in_memory_chunks;
 pub mod info_schema;
 mod inline_aggregate;
 #[cfg(test)]

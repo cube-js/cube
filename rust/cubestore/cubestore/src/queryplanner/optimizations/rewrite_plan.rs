@@ -1,7 +1,7 @@
 use datafusion::common::tree_node::{Transformed, TreeNode};
 use datafusion::error::DataFusionError;
 use datafusion::logical_expr::{Join, LogicalPlan};
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::{with_new_children_if_necessary, ExecutionPlan};
 use std::sync::Arc;
 
 /// Recursively applies a transformation on each node and rewrites the plan. The plan is traversed
@@ -86,6 +86,8 @@ where
         .into_iter()
         .map(|c| rewrite_physical_plan(c.clone(), rewriter))
         .collect::<Result<_, DataFusionError>>()?;
-    let new_plan = p.with_new_children(new_children)?;
+    // Rebuilding a node recomputes its properties (statistics, equivalences), which dominates
+    // planning for scans over hundreds of chunks; most passes leave most subtrees untouched.
+    let new_plan = with_new_children_if_necessary(p, new_children)?;
     rewriter(new_plan)
 }

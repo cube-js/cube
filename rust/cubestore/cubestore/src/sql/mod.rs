@@ -5476,6 +5476,65 @@ LIMIT 10000"#,
         Ok(())
     }
 
+    /// `cubestore-sql-tests` run with the production default (flag off); this covers the flag on.
+    #[tokio::test]
+    async fn merged_in_memory_chunks_dedup() -> Result<(), CubeError> {
+        Config::test("merged_in_memory_chunks_dedup")
+            .update_config(|mut c| {
+                c.merge_in_memory_chunks_enabled = true;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                service
+                    .exec_query("CREATE SCHEMA s")
+                    .await?
+                    .collect()
+                    .await?;
+                service
+                    .exec_query("CREATE TABLE s.Events (k int, ts int, val text) unique key (k)")
+                    .await?
+                    .collect()
+                    .await?;
+                // Each insert is a separate in-memory chunk of the same partition; newer
+                // versions land in later chunks, some with a smaller `ts` than the one replaced.
+                for insert in [
+                    "INSERT INTO s.Events (k, ts, val, __seq) VALUES (1, 100, 'a1', 1), (2, 200, 'b1', 2), (3, 300, 'c1', 3)",
+                    "INSERT INTO s.Events (k, ts, val, __seq) VALUES (2, 50, 'b2', 4), (4, 400, 'd1', 5)",
+                    "INSERT INTO s.Events (k, ts, val, __seq) VALUES (1, 500, 'a2', 6), (3, 10, 'c2', 7), (5, 250, 'e1', 8)",
+                ] {
+                    service.exec_query(insert).await?.collect().await?;
+                }
+
+                let r = service
+                    .exec_query("SELECT count(*), sum(ts) FROM s.Events")
+                    .await?
+                    .collect()
+                    .await?;
+                assert_eq!(
+                    r.get_rows(),
+                    &vec![Row::new(vec![TableValue::Int(5), TableValue::Int(1210)])]
+                );
+
+                // Stale versions (3, 300, 'c1') and (2, 200, 'b1') would win this top-k.
+                let r = service
+                    .exec_query("SELECT k, val FROM s.Events WHERE ts > 40 ORDER BY ts DESC LIMIT 3")
+                    .await?
+                    .collect()
+                    .await?;
+                let row = |k: i64, v: &str| {
+                    Row::new(vec![TableValue::Int(k), TableValue::String(v.to_string())])
+                };
+                assert_eq!(
+                    r.get_rows(),
+                    &vec![row(1, "a2"), row(4, "d1"), row(5, "e1")]
+                );
+                Ok::<(), CubeError>(())
+            })
+            .await;
+        Ok(())
+    }
+
     #[tokio::test]
     async fn in_memory_compaction() -> Result<(), CubeError> {
         Config::test("inmemory_compaction")
