@@ -473,14 +473,14 @@ fn spawn_lag_reporter(
     AbortingJoinHandle::new(cube_ext::spawn(async move {
         tokio::time::sleep(phase).await;
         let mut last_computed: Option<Instant> = None;
+        let mut last_lag: Option<i64> = None;
         loop {
             let seq = last_seq.load(Ordering::Relaxed);
-            let mut lag = None;
             if seq != NO_SEQ {
                 // A fetch that never succeeds still shows up as an age growing from the first offset.
                 last_computed.get_or_insert_with(Instant::now);
-                lag = source.calulate_lag(seq).await;
-                if lag.is_some() {
+                if let Some(lag) = source.calulate_lag(seq).await {
+                    last_lag = Some(lag);
                     last_computed = Some(Instant::now());
                 }
             }
@@ -491,7 +491,9 @@ fn spawn_lag_reporter(
                 if *stopped {
                     return;
                 }
-                if let Some(lag) = lag {
+                // Re-sent while the fetch fails, so an exporter ttl does not drop it; the age tells
+                // that it is stale.
+                if let Some(lag) = last_lag {
                     app_metrics::STREAMING_LAG.report_with_tags(lag, Some(&tags));
                 }
                 if let Some(t) = last_computed {

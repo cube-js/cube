@@ -274,7 +274,11 @@ impl SchedulerImpl {
                         let persistent = inactive.len() - in_memory;
                         let ids = inactive.iter().map(|c| c.get_id()).collect::<Vec<_>>();
 
-                        if let Err(e) = self.meta_store.delete_chunks_without_checks(ids).await {
+                        if ids.is_empty() {
+                            // Every chunk of the task was reactivated or is already gone.
+                        } else if let Err(e) =
+                            self.meta_store.delete_chunks_without_checks(ids).await
+                        {
                             log::error!(
                                 "Could not delete chunks. Get error {} when deleting chunks",
                                 e

@@ -114,7 +114,7 @@ pub fn job_error_class(message: &str, is_panic: bool) -> &'static str {
         "partition_not_active"
     } else if message.contains("Stale stream timeout") {
         "stale_stream"
-    } else if message.contains("timed out") {
+    } else if message == "timed out" {
         "timeout"
     } else if message.contains("shutting down") {
         "shutdown"
@@ -337,6 +337,7 @@ mod tests {
                 "partition_not_active",
             ),
             ("timed out", false, "timeout"),
+            ("S3 request: operation timed out", false, "other"),
             (
                 "Stale stream timeout: deadline has elapsed",
                 false,
