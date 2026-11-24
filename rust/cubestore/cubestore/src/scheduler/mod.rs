@@ -282,23 +282,25 @@ impl SchedulerImpl {
                         let persistent = inactive.len() - in_memory;
                         let ids = inactive.iter().map(|c| c.get_id()).collect::<Vec<_>>();
 
-                        if ids.is_empty() {
-                            // Every chunk of the task was reactivated or is already gone.
-                        } else if let Err(e) =
-                            self.meta_store.delete_chunks_without_checks(ids).await
-                        {
-                            log::error!(
-                                "Could not delete chunks. Get error {} when deleting chunks",
-                                e
-                            );
-                        } else {
-                            app_metrics::GC_CHUNK_DELETE_BATCHES.increment();
-                            for (in_memory, count) in [(true, in_memory), (false, persistent)] {
-                                if count > 0 {
-                                    app_metrics::GC_CHUNKS_DELETED.add_with_tags(
-                                        count as i64,
-                                        Some(&vec![format!("in_memory:{}", in_memory)]),
-                                    );
+                        // Empty when every chunk of the task was reactivated or is already gone.
+                        if !ids.is_empty() {
+                            match self.meta_store.delete_chunks_without_checks(ids).await {
+                                Err(e) => log::error!(
+                                    "Could not delete chunks. Get error {} when deleting chunks",
+                                    e
+                                ),
+                                Ok(()) => {
+                                    app_metrics::GC_CHUNK_DELETE_BATCHES.increment();
+                                    for (in_memory, count) in
+                                        [(true, in_memory), (false, persistent)]
+                                    {
+                                        if count > 0 {
+                                            app_metrics::GC_CHUNKS_DELETED.add_with_tags(
+                                                count as i64,
+                                                Some(&vec![format!("in_memory:{}", in_memory)]),
+                                            );
+                                        }
+                                    }
                                 }
                             }
                         }

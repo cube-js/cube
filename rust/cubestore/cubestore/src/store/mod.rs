@@ -1536,7 +1536,7 @@ mod tests {
         let empty_batch = || RecordBatch::new_empty(Arc::new(arrow_schema(index.get_row())));
 
         let mut chunks = Vec::new();
-        for _ in 0..3 {
+        for _ in 0..4 {
             let chunk = metastore
                 .create_chunk(partition.get_id(), 1, None, None, true)
                 .await
@@ -1550,7 +1550,9 @@ mod tests {
                 .unwrap();
             chunks.push(chunk);
         }
-        let (kept, deactivated, deleted) = (&chunks[0], &chunks[1], &chunks[2]);
+        // `pending` is never uploaded, like a compaction output before its swap.
+        let (kept, deactivated, deleted, pending) =
+            (&chunks[0], &chunks[1], &chunks[2], &chunks[3]);
         metastore.chunk_uploaded(kept.get_id()).await.unwrap();
         metastore
             .chunk_uploaded(deactivated.get_id())
@@ -1585,6 +1587,7 @@ mod tests {
             HashSet::from([
                 chunk_file_name(kept.get_id(), kept.get_row().suffix()),
                 chunk_file_name(deactivated.get_id(), deactivated.get_row().suffix()),
+                chunk_file_name(pending.get_id(), pending.get_row().suffix()),
             ])
         );
 
