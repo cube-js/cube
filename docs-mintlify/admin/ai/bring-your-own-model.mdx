@@ -107,8 +107,9 @@ model and credentials.
 ### Assigning a small LLM to an agent
 
 Set the agent's small LLM with the `small_llm` property in the agents YAML
-configuration. It accepts `auto`, a built-in model (`claude-haiku-5-5` or
-`gpt-6-luna`), or a BYOM reference to a model of type **Small LLM**:
+configuration. It accepts `auto`, a built-in model (`claude-haiku-5-5`,
+`gpt-6-luna`, `kimi_k3` or `glm_5_3`), or a BYOM reference to a model of type
+**Small LLM**:
 
 ```yaml
 agents:
@@ -121,12 +122,24 @@ agents:
         name: "anthropic-haiku"
 ```
 
-Built-in small LLM ids use hyphens, unlike the [`llm`](/admin/ai#llm) names:
-write `claude-haiku-5-5`, not `claude_5_5_haiku`.
+The built-in Claude and GPT small LLM ids use hyphens, unlike the
+[`llm`](/admin/ai#llm) names: write `claude-haiku-5-5`, not
+`claude_5_5_haiku`. `kimi_k3` and `glm_5_3` are the same names as in `llm`.
 
-With `auto`, the default, an agent on a built-in LLM uses a built-in small
-LLM. An agent on a BYOM LLM uses a small LLM from the same provider, region
-and credentials as its LLM:
+With `auto`, the default, an agent on a built-in LLM runs short tasks on
+`gpt-6-luna` if its LLM is an OpenAI GPT model, and on `claude-haiku-5-5`
+otherwise, including on `glm_5_3` and `kimi_k3`. To keep every call on GLM 5.3
+or Kimi K3, set the small LLM to the same model:
+
+```yaml
+agents:
+  - name: sales-analyst
+    llm: glm_5_3
+    small_llm: glm_5_3
+```
+
+An agent on a BYOM LLM uses a small LLM from the same provider, region and
+credentials as its LLM:
 
 | Provider | Small LLM with `auto` |
 | --- | --- |
