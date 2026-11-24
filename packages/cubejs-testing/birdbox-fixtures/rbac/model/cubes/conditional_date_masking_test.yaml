@@ -34,6 +34,22 @@ cubes:
             interval: 1 month
             type: prior
 
+      - name: total_price_all_time
+        multi_stage: true
+        sql: "{total_price}"
+        type: sum
+        filter:
+          exclude:
+            - conditional_date_masking_test.created_at
+
+      - name: total_price_keep_only_id
+        multi_stage: true
+        sql: "{total_price}"
+        type: sum
+        filter:
+          keep_only:
+            - conditional_date_masking_test.id
+
     access_policy:
       - group: "*"
         member_level:

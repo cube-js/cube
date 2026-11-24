@@ -767,6 +767,16 @@ describe('Cube RBAC Engine', () => {
       expect(values.length).toBeGreaterThan(0);
       expectMasked(values);
     });
+
+    // exclude / keepOnly drop the date filter from the inner stage, so the
+    // measure sums every row: the query filter doesn't keep it inside the policy.
+    ['total_price_all_time', 'total_price_keep_only_id'].forEach((measure) => {
+      test(`${measure} drops the query filter and stays masked under the policy date range`, async () => {
+        const values = await measureValues(inRangeClient, measure, dateFilter('inDateRange', POLICY_RANGE));
+        expect(values.length).toBeGreaterThan(0);
+        expectMasked(values);
+      });
+    });
   });
 
   /**

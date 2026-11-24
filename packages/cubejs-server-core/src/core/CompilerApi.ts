@@ -811,13 +811,22 @@ export class CompilerApi {
     // also lets a conditionally-masked aggregate measure render its real value
     // (instead of being fully masked) when the query is already scoped to the
     // filter's rows.
-    // A time-shifted measure moves the time filters with it, so the query also reads
-    // rows its own filters exclude and the filters prove nothing about those.
-    const readsShiftedRows = sql.memberNames.some(
-      (member) => cubeEvaluator.isMeasure(member) && !!cubeEvaluator.measureByPath(member).timeShift?.length
-    );
+    // Query filters prove nothing about rows read outside them: time shifts move them,
+    // and any exclude / keepOnly directive drops them — whatever it lists, since filters
+    // on members that only reference a listed member are dropped too.
+    const readsRowsOutsideFilters = sql.memberNames.some((member) => {
+      if (cubeEvaluator.isMeasure(member)) {
+        const measure = cubeEvaluator.measureByPath(member);
+        return !!measure.timeShift?.length || !!measure.filter?.exclude || !!measure.filter?.keepOnly;
+      }
+      if (cubeEvaluator.isDimension(member)) {
+        const dimension = cubeEvaluator.dimensionByPath(member);
+        return !!dimension.filter?.exclude || !!dimension.filter?.keepOnly;
+      }
+      return false;
+    });
 
-    if (!readsShiftedRows) {
+    if (!readsRowsOutsideFilters) {
       for (const member of Array.from(maskedMembersSet)) {
         const maskFilter = memberMaskFiltersMap[member];
         if (maskFilter && this.queryFiltersImplyFilter(query.filters || [], maskFilter)) {
