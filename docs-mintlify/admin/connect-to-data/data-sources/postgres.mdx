@@ -116,6 +116,21 @@ module.exports = {
 }
 ```
 
+### Prisma Postgres
+
+[Prisma Postgres][prisma-postgres] only accepts SSL-encrypted connections, so
+set [`CUBEJS_DB_SSL`](/reference/configuration/environment-variables#cubejs_db_ssl) to `true`. Without it, the connection
+fails with a `read ECONNRESET` error. The server certificate is signed by a
+public certificate authority, so all other SSL-related environment variables
+can be left unset.
+
+Both the direct host (`db.prisma.io`) and the [pooled
+host][prisma-postgres-pooling] (`pooled.db.prisma.io`) work for queries and for
+building pre-aggregations. Connections to the direct host count against the
+connection limit of your database, so use the pooled host if you raise
+[`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) and
+[`CUBEJS_DB_MAX_POOL`](/reference/configuration/environment-variables#cubejs_db_max_pool) close to that limit.
+
 [aws-docs-rds-ssl]:
   https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html
 [aws-rds-pem]: https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem
@@ -124,6 +139,9 @@ module.exports = {
 [heroku-postgres-issue]:
   https://help.heroku.com/3DELT3RK/why-can-t-my-third-party-utility-connect-to-heroku-postgres-with-ssl
 [postgres]: https://www.postgresql.org/
+[prisma-postgres]: https://www.prisma.io/postgres
+[prisma-postgres-pooling]:
+  https://www.prisma.io/docs/postgres/database/connection-pooling
 [ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]: /recipes/configuration/using-ssl-connections-to-data-source
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
