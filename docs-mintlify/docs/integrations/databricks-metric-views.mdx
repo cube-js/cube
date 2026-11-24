@@ -635,6 +635,29 @@ though some measures are missing in Databricks. Check **Measures not published**
 beside each view in run history before treating a run as complete. There is no opt-in gate for
 incomplete publication yet.
 
+### References and subqueries in SQL
+
+Preview converts these as Cube compiles them:
+
+- A cube `sql` that reads another cube's SQL, such as `SELECT * FROM {orders_base.sql()}`,
+  publishes with that SQL expanded, so the Metric View `source` is plain SQL. Preview blocks a
+  reference that forms a cycle, names a cube outside the YAML model, goes through a join path
+  (`{orders.users.sql()}`), or leads to SQL with any other Cube reference, such as `{CUBE}` or a
+  member.
+- A member reference through a join path from the member's own cube, such as `{CUBE.users.tier}`
+  on `orders`, publishes as `users.tier`, joined along that path. Preview blocks the view if its
+  own `join_path` entries reach that cube another way, since a Metric View joins each cube once.
+  A plain `{users.tier}` names no path, so `users` needs exactly one join path from the view's
+  root, or a view `join_path` entry that picks one (`includes: []` is enough).
+- A measure's SQL can contain a subquery, such as
+  `{CUBE}.account_id IN (SELECT account_id FROM raw.usage WHERE metric_ts = {CUBE}.metric_ts)`.
+  Databricks doesn't resolve `source` columns inside a subquery, so each outer column it reads is
+  added to the Metric View `source` under a generated name, such as `__cube_outer_0__`. Preview
+  blocks a subquery that reads a joined cube, a measure, or a dimension whose SQL names a column
+  without `{CUBE}.`, and a subquery in dimension or join SQL.
+- An aggregate measure, such as `count_distinct` or `max`, that reads a measure which itself
+  aggregates is blocked, since SQL can't nest aggregates: reference a dimension instead.
+
 ### Jinja templates
 
 Preview and sync render [Jinja-templated](/docs/data-modeling/dynamic/jinja) YAML
