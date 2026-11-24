@@ -305,8 +305,8 @@ pub trait ChunkDataStore: DIService + Send + Sync {
     ) -> Result<(), CubeError>;
     async fn free_memory_chunk(&self, chunk_name: String) -> Result<(), CubeError>;
     async fn free_deleted_memory_chunks(&self, chunk_names: Vec<String>) -> Result<(), CubeError>;
-    /// Frees held in-memory chunks whose metastore rows are gone and reports what is held.
-    async fn reconcile_memory_chunks(&self) -> Result<(), CubeError>;
+    /// Reports held in-memory chunks by their metastore state.
+    async fn report_memory_chunk_states(&self) -> Result<(), CubeError>;
     async fn add_persistent_chunk(
         &self,
         index: IdRow<Index>,
@@ -898,7 +898,7 @@ impl ChunkDataStore for ChunkStore {
     // A held chunk always has a metastore row: the row is created before the data is added and
     // ids are never reused. So a missing row means the chunk was deleted and its release was
     // lost, e.g. with a deletion event the scheduler dropped while lagging.
-    async fn reconcile_memory_chunks(&self) -> Result<(), CubeError> {
+    async fn report_memory_chunk_states(&self) -> Result<(), CubeError> {
         let held = self
             .memory_chunks
             .read()
@@ -921,8 +921,7 @@ impl ChunkDataStore for ChunkStore {
             }
         }
 
-        let (mut active, mut inactive) = (0, 0);
-        let mut orphans = Vec::new();
+        let (mut active, mut inactive, mut orphans) = (0, 0, 0);
         for name in held {
             // Only a name that was looked up can be judged deleted.
             if chunk_id_from_file_name(&name).is_none() {
@@ -933,23 +932,12 @@ impl ChunkDataStore for ChunkStore {
                 // Not uploaded means not activated yet, e.g. a compaction output before its swap.
                 Some(c) if c.get_row().uploaded() => inactive += 1,
                 Some(_) => {}
-                None => orphans.push(name),
+                None => orphans += 1,
             }
-        }
-        if !orphans.is_empty() {
-            log::warn!(
-                "Releasing {} in-memory chunks deleted from the metastore",
-                orphans.len()
-            );
-            app_metrics::IN_MEMORY_CHUNKS_ORPHANS_FREED.add(orphans.len() as i64);
-            let orphans = orphans.into_iter().collect::<HashSet<_>>();
-            self.memory_chunks
-                .write()
-                .await
-                .retain(|name, _| !orphans.contains(name));
         }
         app_metrics::IN_MEMORY_CHUNKS_ACTIVE.report(active);
         app_metrics::IN_MEMORY_CHUNKS_INACTIVE.report(inactive);
+        app_metrics::IN_MEMORY_CHUNKS_ORPHANS.report(orphans);
         self.report_in_memory_metrics().await
     }
 }
@@ -1488,8 +1476,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn reconcile_memory_chunks_frees_deleted_chunks() {
-        let name = "reconcile_memory_chunks_frees_deleted_chunks";
+    async fn memory_chunk_states_count_orphans() {
+        let name = "memory_chunk_states_count_orphans";
         let (remote_fs, metastore) = RocksMetaStore::prepare_test_metastore(name);
         let config = Config::test(name);
         let chunk_store = ChunkStore::new(
@@ -1550,9 +1538,8 @@ mod tests {
                 .unwrap();
             chunks.push(chunk);
         }
-        // `pending` is never uploaded, like a compaction output before its swap.
-        let (kept, deactivated, deleted, pending) =
-            (&chunks[0], &chunks[1], &chunks[2], &chunks[3]);
+        // chunks[3] is never uploaded, like a compaction output before its swap: in no gauge.
+        let (kept, deactivated, deleted) = (&chunks[0], &chunks[1], &chunks[2]);
         metastore.chunk_uploaded(kept.get_id()).await.unwrap();
         metastore
             .chunk_uploaded(deactivated.get_id())
@@ -1573,22 +1560,25 @@ mod tests {
             .await
             .unwrap();
 
-        chunk_store.reconcile_memory_chunks().await.unwrap();
+        use crate::util::metrics::test_capture;
+        for metric in [
+            "cs.workers.in_memory_chunks.active",
+            "cs.workers.in_memory_chunks.inactive",
+            "cs.workers.in_memory_chunks.orphans",
+        ] {
+            test_capture::watch(metric);
+        }
+        chunk_store.report_memory_chunk_states().await.unwrap();
 
-        let held = chunk_store
-            .memory_chunks
-            .read()
-            .await
-            .keys()
-            .cloned()
-            .collect::<HashSet<_>>();
+        let last = |metric| test_capture::samples(metric).last().map(|(v, _)| *v);
+        assert_eq!(last("cs.workers.in_memory_chunks.active"), Some(1));
+        assert_eq!(last("cs.workers.in_memory_chunks.inactive"), Some(1));
+        // The deleted chunk and the stale-suffix copy of a live one.
+        assert_eq!(last("cs.workers.in_memory_chunks.orphans"), Some(2));
         assert_eq!(
-            held,
-            HashSet::from([
-                chunk_file_name(kept.get_id(), kept.get_row().suffix()),
-                chunk_file_name(deactivated.get_id(), deactivated.get_row().suffix()),
-                chunk_file_name(pending.get_id(), pending.get_row().suffix()),
-            ])
+            chunk_store.memory_chunks.read().await.len(),
+            5,
+            "nothing is released"
         );
 
         RocksMetaStore::cleanup_test_metastore(name);

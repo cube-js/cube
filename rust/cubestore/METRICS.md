@@ -58,7 +58,7 @@ the OSS `cubestored` passes none. Tags listed below are the ones set per metric.
 ## In-memory chunks held by a process
 
 Reported by every node that holds in-memory chunks (the workers owning streaming partitions).
-Refreshed on every add/release and by a reconcile pass every 60 s (±20% jitter), which also runs right after
+Refreshed on every add/release and by a state pass every 60 s (±20% jitter), which also runs right after
 startup, so a restarted process overwrites the previous incarnation's value within a minute.
 
 | Metric | Type | Unit | Semantics |
@@ -67,14 +67,13 @@ startup, so a restarted process overwrites the previous incarnation's value with
 | `cs.workers.in_memory_chunks.rows` / `.memory` | gauge | rows / bytes | Same set |
 | `cs.workers.in_memory_chunks.active` | gauge | chunks | Held chunks the metastore lists as active; compare with `cs.metastore.chunks.in_memory_active_by_node` of this node |
 | `cs.workers.in_memory_chunks.inactive` | gauge | chunks | Held chunks already deactivated, waiting for GC (≈ `in_memory_not_used_timeout`, 30 s). Chunks not activated yet (e.g. a compaction output before its swap) are in neither gauge |
-| `cs.workers.in_memory_chunks.orphans_freed` | counter | chunks | Held chunks whose metastore row was already deleted, released by the reconcile pass |
+| `cs.workers.in_memory_chunks.orphans` | gauge | chunks | Held chunks whose metastore row was already deleted: their release was lost and they stay in memory until the process restarts |
 
 A held chunk is released when the scheduler on the main processes its deletion event. Events are
 dropped when the scheduler's event channel overflows (`cs.scheduler.events_dropped`), and those
-chunks used to stay in worker memory for the life of the process, which made
-`cs.workers.in_memory_chunks` far exceed the metastore's count. The reconcile pass releases them;
-`orphans_freed` is the exact count of lost deletions. `held − active − inactive` is only an upper
-bound: it also counts chunks added since the last pass and chunks not activated yet.
+chunks stay in worker memory for the life of the process, which makes `cs.workers.in_memory_chunks`
+far exceed the metastore's count. `orphans` counts them exactly. `held − active − inactive` is
+only an upper bound: it also counts chunks added since the last pass and chunks not activated yet.
 
 ## Metastore chunk truth (main)
 
@@ -151,7 +150,7 @@ In-memory chunk backlog, metastore view vs what workers hold:
 sum by (tenant) (cs_metastore_chunks{in_memory="true", active="true"})
 sum by (tenant) (cs_workers_in_memory_chunks_active)
 sum by (tenant) (cs_workers_in_memory_chunks)          # includes chunks awaiting GC
-sum by (tenant) (rate(cs_workers_in_memory_chunks_orphans_freed[10m]))  # lost releases
+sum by (tenant) (cs_workers_in_memory_chunks_orphans)  # held after their release was lost
 max by (tenant) (cs_metastore_chunks_in_memory_oldest_active_age_secs)
 ```
 

@@ -127,9 +127,8 @@ pub static IN_MEMORY_CHUNKS_ACTIVE: Gauge = metrics::gauge("cs.workers.in_memory
 /// Held in-memory chunks the metastore lists as deactivated, i.e. waiting for GC.
 pub static IN_MEMORY_CHUNKS_INACTIVE: Gauge =
     metrics::gauge("cs.workers.in_memory_chunks.inactive");
-/// Held in-memory chunks whose metastore row was already deleted, released by the reconcile pass.
-pub static IN_MEMORY_CHUNKS_ORPHANS_FREED: Counter =
-    metrics::counter("cs.workers.in_memory_chunks.orphans_freed");
+/// Held in-memory chunks whose metastore row was already deleted, i.e. whose release was lost.
+pub static IN_MEMORY_CHUNKS_ORPHANS: Gauge = metrics::gauge("cs.workers.in_memory_chunks.orphans");
 pub static STREAMING_IMPORT_TIME: Histogram = metrics::histogram("cs.streaming.import_time.ms");
 pub static STREAMING_PARTITION_TIME: Histogram =
     metrics::histogram("cs.streaming.partition_time.ms");
