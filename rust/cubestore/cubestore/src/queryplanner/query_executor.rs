@@ -1133,25 +1133,15 @@ impl CubeTable {
         }
 
         let schema = table_projected_schema;
-        let partition_num = partition_execs.len();
 
         let table_ordering = lex_ordering_for_index(self.index_snapshot.index.get_row(), &schema)?;
 
-        let read_data: Arc<dyn ExecutionPlan> = Arc::new(CubeTableExec {
-            schema: schema.clone(),
+        let read_data: Arc<dyn ExecutionPlan> = Arc::new(CubeTableExec::try_new(
+            schema.clone(),
             partition_execs,
-            index_snapshot: self.index_snapshot.clone(),
-            filter: predicate,
-            properties: PlanProperties::new(
-                EquivalenceProperties::new_with_orderings(
-                    schema.clone(),
-                    &[LexOrdering::new(table_ordering.clone())],
-                ),
-                Partitioning::UnknownPartitioning(partition_num),
-                EmissionType::Incremental,
-                Boundedness::Bounded,
-            ),
-        });
+            self.index_snapshot.clone(),
+            predicate,
+        )?);
         let plan: Arc<dyn ExecutionPlan> = if let Some(key_columns) = unique_key_columns {
             let sort_columns = self
                 .index_snapshot()
@@ -1280,6 +1270,38 @@ pub struct CubeTableExec {
     pub(crate) filter: Option<Expr>,
 }
 
+impl CubeTableExec {
+    /// Outputs the partitions of all inputs, in input order.
+    pub fn try_new(
+        schema: SchemaRef,
+        partition_execs: Vec<Arc<dyn ExecutionPlan>>,
+        index_snapshot: IndexSnapshot,
+        filter: Option<Expr>,
+    ) -> Result<Self, DataFusionError> {
+        // Must match `execute`, which maps a partition onto the inputs by their partition counts.
+        let partition_count = partition_execs
+            .iter()
+            .map(|c| c.properties().partitioning.partition_count())
+            .sum();
+        let ordering = lex_ordering_for_index(index_snapshot.index.get_row(), &schema)?;
+        Ok(CubeTableExec {
+            properties: PlanProperties::new(
+                EquivalenceProperties::new_with_orderings(
+                    schema.clone(),
+                    &[LexOrdering::new(ordering)],
+                ),
+                Partitioning::UnknownPartitioning(partition_count),
+                EmissionType::Incremental,
+                Boundedness::Bounded,
+            ),
+            schema,
+            partition_execs,
+            index_snapshot,
+            filter,
+        })
+    }
+}
+
 impl Debug for CubeTableExec {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CubeTableExec")
@@ -1313,28 +1335,12 @@ impl ExecutionPlan for CubeTableExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        let partition_count = children
-            .iter()
-            .map(|c| c.properties().partitioning.partition_count())
-            .sum();
-        Ok(Arc::new(CubeTableExec {
-            schema: self.schema.clone(),
-            partition_execs: children,
-            index_snapshot: self.index_snapshot.clone(),
-            filter: self.filter.clone(),
-            properties: PlanProperties::new(
-                EquivalenceProperties::new_with_orderings(
-                    self.schema.clone(),
-                    &[LexOrdering::new(lex_ordering_for_index(
-                        self.index_snapshot.index.get_row(),
-                        &(&self.schema),
-                    )?)],
-                ),
-                Partitioning::UnknownPartitioning(partition_count),
-                EmissionType::Incremental,
-                Boundedness::Bounded,
-            ),
-        }))
+        Ok(Arc::new(CubeTableExec::try_new(
+            self.schema.clone(),
+            children,
+            self.index_snapshot.clone(),
+            self.filter.clone(),
+        )?))
     }
 
     fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
@@ -2702,12 +2708,11 @@ mod tests {
         Ok(())
     }
 
-    fn plan_scan_over_in_memory_chunks(merge: bool) -> Result<String, CubeError> {
+    /// Unique-key table `t(k, val, __seq)`, one partition with in-memory chunks 10 and 11.
+    fn unique_key_index_snapshot() -> Result<IndexSnapshot, CubeError> {
         use crate::metastore::table::TablePath;
         use crate::metastore::{Chunk, IndexType, Schema as MetaSchema};
-        use crate::queryplanner::pretty_printers::pp_phys_plan;
-        use crate::queryplanner::serialized_plan::{PartitionSnapshot, RowRange};
-        use datafusion::prelude::{SessionConfig, SessionContext};
+        use crate::queryplanner::serialized_plan::PartitionSnapshot;
 
         let table_columns = vec![
             Column::new("k".to_string(), ColumnType::Int, 0),
@@ -2747,7 +2752,7 @@ mod tests {
             IndexType::Regular,
         )?;
         let chunk = |id: u64| IdRow::new(id, Chunk::new(1, 1, None, None, true));
-        let snapshot = IndexSnapshot {
+        Ok(IndexSnapshot {
             table_path: TablePath::new(
                 Arc::new(IdRow::new(1, MetaSchema::new("s".to_string()))),
                 IdRow::new(1, table),
@@ -2758,7 +2763,15 @@ mod tests {
                 chunks: vec![chunk(10), chunk(11)],
             }],
             sort_on: None,
-        };
+        })
+    }
+
+    fn plan_scan_over_in_memory_chunks(merge: bool) -> Result<String, CubeError> {
+        use crate::queryplanner::pretty_printers::pp_phys_plan;
+        use crate::queryplanner::serialized_plan::RowRange;
+        use datafusion::prelude::{SessionConfig, SessionContext};
+
+        let snapshot = unique_key_index_snapshot()?;
         let worker_partition_ids = vec![(
             1,
             RowFilter {
@@ -2813,6 +2826,52 @@ mod tests {
 
         let separate = plan_scan_over_in_memory_chunks(false)?;
         assert_eq!(separate.matches("MemoryScan").count(), 2, "{}", separate);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn cube_table_exec_outputs_every_input_partition() -> Result<(), CubeError> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("k", DataType::Int64, true),
+            Field::new("val", DataType::Int64, true),
+            Field::new("__seq", DataType::Int64, true),
+        ]));
+        let batch = |k: i64| {
+            RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(Int64Array::from(vec![k])),
+                    Arc::new(Int64Array::from(vec![k * 10])),
+                    Arc::new(Int64Array::from(vec![k])),
+                ],
+            )
+            .unwrap()
+        };
+        let input = |partitions: Vec<Vec<RecordBatch>>| -> Arc<dyn ExecutionPlan> {
+            Arc::new(DataSourceExec::new(Arc::new(
+                MemorySourceConfig::try_new(&partitions, schema.clone(), None).unwrap(),
+            )))
+        };
+        let exec = Arc::new(CubeTableExec::try_new(
+            schema.clone(),
+            vec![
+                input(vec![vec![batch(1)], vec![batch(2)]]),
+                input(vec![vec![batch(3)]]),
+            ],
+            unique_key_index_snapshot()?,
+            None,
+        )?);
+        assert_eq!(exec.properties().partitioning.partition_count(), 3);
+
+        let ctx = Arc::new(TaskContext::default());
+        let mut rows = 0;
+        for partition in 0..3 {
+            let batches =
+                datafusion::physical_plan::common::collect(exec.execute(partition, ctx.clone())?)
+                    .await?;
+            rows += batches.iter().map(|b| b.num_rows()).sum::<usize>();
+        }
+        assert_eq!(rows, 3);
         Ok(())
     }
 }
