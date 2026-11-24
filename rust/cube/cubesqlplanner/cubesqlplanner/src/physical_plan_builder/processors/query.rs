@@ -95,6 +95,10 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
                 }),
             }
         }
+        let joined_calc_groups: Vec<_> = calc_groups_to_join
+            .iter()
+            .map(|item| item.symbol.clone())
+            .collect();
         let from = if calc_groups_to_join.is_empty() {
             from
         } else {
@@ -104,6 +108,16 @@ impl<'a> LogicalNodeProcessor<'a, Query> for QueryProcessor<'a> {
         let mut schema = logical_plan.schema().clone();
         let references_builder = ReferencesBuilder::new(from.clone());
         let mut substitutions = calc_group_literals;
+        // A joined calc group is read from its values subquery wherever this
+        // select mentions it, filters included: its bare name can clash with a
+        // same-named column of the source tables.
+        for calc_group in joined_calc_groups {
+            references_builder.collect_substitutions_for_member(
+                calc_group,
+                &None,
+                &mut substitutions,
+            )?;
+        }
 
         if let Some(pre_aggregation) = from_source.as_pre_aggregation() {
             // A rollup stores time dimensions already timezone-converted,
