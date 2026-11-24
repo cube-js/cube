@@ -25,8 +25,8 @@ the OSS `cubestored` passes none. Tags listed below are the ones set per metric.
   series is sent again. When the exporter runs per node (DaemonSet), a pod moved to another node
   leaves its old series behind on the old exporter, and summing a gauge over all series counts that
   pod twice. The periodically refreshed gauges (`cs.metastore.chunks*`, `cs.workers.in_memory_chunks*`,
-  `cs.streaming.lag*`, `cs.jobs`) are re-sent at least once a minute, so a `ttl` of a few minutes
-  on mappings matching them safely drops dead series. Do not set it as a global default: gauges
+  `cs.streaming.lag*`, `cs.jobs`) are re-sent every 30–75 s, so a `ttl` of 5 minutes or more on
+  mappings matching them safely drops dead series. Do not set it as a global default: gauges
   sent only on change (`cs.sql.query.data.cache.*`, `planning.throttle.*`,
   `cs.streaming.lastoffset`, `cs.remote_fs.files_to_remove.*`, `cs.scheduler.events_pending`,
   `in_memory_compaction.discovery.age.ms`) would vanish from a quiet but live process.

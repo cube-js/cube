@@ -113,10 +113,11 @@ pub const JOB_SHUTTING_DOWN_MESSAGE: &str = "shutting down";
 pub fn job_error_class(message: &str, is_panic: bool) -> &'static str {
     if message.contains("offset overflow") {
         "offset_overflow"
+    } else if message.contains("partition is not active") {
+        // Checked first: the message prints the partition's bounds, which may contain "chunk".
+        "partition_not_active"
     } else if message.contains("chunk") && message.contains("is not active") {
         "source_chunk_not_active"
-    } else if message.contains("partition is not active") {
-        "partition_not_active"
     } else if message.contains("Stale stream timeout") {
         "stale_stream"
     } else if message == JOB_TIMED_OUT_MESSAGE {
@@ -338,6 +339,11 @@ mod tests {
             ),
             (
                 "Current partition is not active: 5",
+                false,
+                "partition_not_active",
+            ),
+            (
+                "Current partition is not active: Partition { min_value: Some(Row { values: [String(\"chunk\")] }) }",
                 false,
                 "partition_not_active",
             ),
