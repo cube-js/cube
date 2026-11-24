@@ -172,7 +172,7 @@ export class OracleQuery extends BaseQuery {
     }
 
     if (totalMonths !== 0) {
-      res = `ADD_MONTHS(${res}, -${totalMonths})`;
+      res = `ADD_MONTHS(${res}, ${-totalMonths})`;
     }
 
     // Handle day/hour/minute/second using NUMTODSINTERVAL with subtraction

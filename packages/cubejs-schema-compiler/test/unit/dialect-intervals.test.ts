@@ -1,5 +1,6 @@
 import { splitSqlInterval } from '@cubejs-backend/shared';
 import { allDialects, dialect } from './allDialects';
+import { prepareJsCompiler } from './PrepareCompiler';
 
 // A custom granularity whose origin sits off its unit's boundary is rendered as
 // `DATE_TRUNC(unit, x - offset) + offset`, and that offset can carry several units at once —
@@ -131,6 +132,26 @@ describe('interval rendering across dialects', () => {
     });
   });
 
+  // A granularity offset such as `-1 day` reaches the helpers as is. Negating it by prefixing
+  // `-` gives `--1`, which most SQL dialects read as a line comment swallowing the rest of it.
+  it.each(allDialects())('%s renders a negative interval without a `--`', (_name, QueryClass) => {
+    const q = query(QueryClass);
+
+    for (const interval of ['-1 day', '-3 month', '-1 year', '-3 month -14 day']) {
+      for (const rendered of [q.subtractInterval('x', interval), q.addInterval('x', interval)]) {
+        expect({ interval, rendered: String(rendered).includes('--') ? rendered : null })
+          .toEqual({ interval, rendered: null });
+      }
+    }
+  });
+
+  it.each([
+    ['RedshiftQuery', '-1 day', 'DATEADD(day, 1, x)'],
+    ['OracleQuery', '-3 month', 'ADD_MONTHS(x, 3)'],
+  ])('%s subtracts %s by adding its magnitude', (name, interval, sql) => {
+    expect(query(dialect(name)).subtractInterval('x', interval)).toEqual(sql);
+  });
+
   // Trino and Athena take their interval handling from Presto, so the fix has to reach them too.
   it.each(['TrinoQuery', 'AthenaQuery'])('%s inherits the Presto spelling', name => {
     expect(query(dialect(name)).subtractInterval('x', '3 month 14 day'))
@@ -175,5 +196,45 @@ describe('splitSqlInterval', () => {
   it('keeps a unit outside the known set', () => {
     expect(splitSqlInterval('5 millisecond')).toEqual(['5 millisecond']);
     expect(splitSqlInterval('1 day 5 millisecond')).toEqual(['1 day', '5 millisecond']);
+  });
+});
+
+describe('custom granularity with a negative offset', () => {
+  const compilers = prepareJsCompiler(`
+cube('orders', {
+  sql: \`SELECT 1 AS id, DATE '2026-01-07' AS event_ts, 100 AS amount\`,
+  dimensions: {
+    id: { sql: 'id', type: 'number', primaryKey: true },
+    event_ts: {
+      sql: \`\${CUBE}.event_ts\`,
+      type: 'time',
+      granularities: {
+        sunday_week: { interval: '1 week', offset: '-1 day' },
+      },
+    },
+  },
+  measures: {
+    total: { sql: \`\${CUBE}.amount\`, type: 'sum' },
+  },
+});
+`);
+
+  it('renders a Redshift query with no `--` in it', async () => {
+    await compilers.compiler.compile();
+    const RedshiftQuery = dialect('RedshiftQuery');
+
+    const redshiftQuery = new RedshiftQuery(compilers, {
+      measures: ['orders.total'],
+      timeDimensions: [{
+        dimension: 'orders.event_ts',
+        granularity: 'sunday_week',
+        dateRange: ['2026-01-01', '2026-02-01'],
+      }],
+      timezone: 'UTC',
+    });
+    const [sql] = redshiftQuery.buildSqlAndParams();
+
+    expect(sql).toContain('DATEADD(day, 1,');
+    expect(sql).not.toContain('--');
   });
 });
