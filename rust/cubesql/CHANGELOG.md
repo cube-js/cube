@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.78](https://github.com/cube-js/cube/compare/v1.6.77...v1.6.78) (2026-11-24)
+
+### Bug Fixes
+
+- **cubesql:** Escape PatchMeasure filters for member expression evaluation ([#11329](https://github.com/cube-js/cube/issues/11329)) ([95e84d2](https://github.com/cube-js/cube/commit/95e84d29589d83b460ba6eda56580acd7c1f3134))
+- **cubesql:** Fix generate_series overflow, non-finite float and NULL edges ([#12821](https://github.com/cube-js/cube/issues/12821)) ([67d8635](https://github.com/cube-js/cube/commit/67d86357009d9a785648639af941a3b0e217ac60))
+- **cubesql:** Hide other users' query text in pg_stat_activity ([#12720](https://github.com/cube-js/cube/issues/12720)) ([43038fe](https://github.com/cube-js/cube/commit/43038fe24208dba4d2445557db31628db35cca12))
+- **cubesql:** Reject malformed Bind parameters instead of panicking ([#12770](https://github.com/cube-js/cube/issues/12770)) ([48d610c](https://github.com/cube-js/cube/commit/48d610c2b702789a379b79ac237f84a2a1339779))
+
 ## [1.6.77](https://github.com/cube-js/cube/compare/v1.6.76...v1.6.77) (2026-11-06)
 
 ### Bug Fixes

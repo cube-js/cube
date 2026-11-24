@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.78](https://github.com/cube-js/cube/compare/v1.6.77...v1.6.78) (2026-11-24)
+
+### Bug Fixes
+
+- **playground:** Generate valid GraphQL for a repeated member in an AND/OR group ([#12824](https://github.com/cube-js/cube/issues/12824)) ([7f641d4](https://github.com/cube-js/cube/commit/7f641d49830170d9d72718d1789284381169c36c)), closes [#12823](https://github.com/cube-js/cube/issues/12823)
+
 ## [1.6.77](https://github.com/cube-js/cube/compare/v1.6.76...v1.6.77) (2026-11-06)
 
 **Note:** Version bump only for package @cubejs-client/playground

@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.78](https://github.com/cube-js/cube/compare/v1.6.77...v1.6.78) (2026-11-24)
+
+### Bug Fixes
+
+- **api-gateway:** Build the GraphQL schema from members visible to the caller ([#12833](https://github.com/cube-js/cube/issues/12833)) ([93bdf17](https://github.com/cube-js/cube/commit/93bdf172a33076232a0d49ef4193c55d17c0d930)), closes [#10590](https://github.com/cube-js/cube/issues/10590)
+- **api-gateway:** Bump graphql to 15.11 to bound fragment validation ([#12823](https://github.com/cube-js/cube/issues/12823)) ([c15acd6](https://github.com/cube-js/cube/commit/c15acd6d76480ac051dc3e578a3fc93236e0d2a8))
+- **server-core:** Keep conditional masks for multi-stage filter directives ([#12929](https://github.com/cube-js/cube/issues/12929)) ([d19620e](https://github.com/cube-js/cube/commit/d19620e24dfd0465a633fc3163384247ef6ee128)), closes [#12711](https://github.com/cube-js/cube/issues/12711)
+- **server-core:** Keep conditional masks for reversed date ranges and time-shifted measures ([#12711](https://github.com/cube-js/cube/issues/12711)) ([5011f56](https://github.com/cube-js/cube/commit/5011f5659afd726eca7babd7e8e904e7ccfc1e78))
+
 ## [1.6.77](https://github.com/cube-js/cube/compare/v1.6.76...v1.6.77) (2026-11-06)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

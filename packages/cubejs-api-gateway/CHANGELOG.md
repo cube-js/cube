@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.78](https://github.com/cube-js/cube/compare/v1.6.77...v1.6.78) (2026-11-24)
+
+### Bug Fixes
+
+- **api-gateway:** Allow only one WS authorization at a time per connection ([#12748](https://github.com/cube-js/cube/issues/12748)) ([4d9b9a1](https://github.com/cube-js/cube/commit/4d9b9a177240500fb326ac115eef9bfd9c045137))
+- **api-gateway:** Build the GraphQL schema from members visible to the caller ([#12833](https://github.com/cube-js/cube/issues/12833)) ([93bdf17](https://github.com/cube-js/cube/commit/93bdf172a33076232a0d49ef4193c55d17c0d930)), closes [#10590](https://github.com/cube-js/cube/issues/10590)
+- **api-gateway:** Bump graphql to 15.11 to bound fragment validation ([#12823](https://github.com/cube-js/cube/issues/12823)) ([c15acd6](https://github.com/cube-js/cube/commit/c15acd6d76480ac051dc3e578a3fc93236e0d2a8))
+- **api-gateway:** Correct GraphQL request normalization ([#12822](https://github.com/cube-js/cube/issues/12822)) ([a074bbc](https://github.com/cube-js/cube/commit/a074bbc8beba4b5d2392f6bce0c215de89183fc1))
+- **api-gateway:** enforce meta scope on /v1/graphql-to-json ([#11939](https://github.com/cube-js/cube/issues/11939)) ([751bc78](https://github.com/cube-js/cube/commit/751bc784769ad3d275abf4d22b6c56c5835f759f))
+- **api-gateway:** Improve WS message validation ([#12712](https://github.com/cube-js/cube/issues/12712)) ([828628f](https://github.com/cube-js/cube/commit/828628fbe05e92a2239a645bbf3185c602bcc705))
+
 ## [1.6.77](https://github.com/cube-js/cube/compare/v1.6.76...v1.6.77) (2026-11-06)
 
 ### Bug Fixes

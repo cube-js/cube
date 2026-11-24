@@ -3,6 +3,42 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.78](https://github.com/cube-js/cube/compare/v1.6.77...v1.6.78) (2026-11-24)
+
+### Bug Fixes
+
+- **api-gateway:** Allow only one WS authorization at a time per connection ([#12748](https://github.com/cube-js/cube/issues/12748)) ([4d9b9a1](https://github.com/cube-js/cube/commit/4d9b9a177240500fb326ac115eef9bfd9c045137))
+- **api-gateway:** Build the GraphQL schema from members visible to the caller ([#12833](https://github.com/cube-js/cube/issues/12833)) ([93bdf17](https://github.com/cube-js/cube/commit/93bdf172a33076232a0d49ef4193c55d17c0d930)), closes [#10590](https://github.com/cube-js/cube/issues/10590)
+- **api-gateway:** Bump graphql to 15.11 to bound fragment validation ([#12823](https://github.com/cube-js/cube/issues/12823)) ([c15acd6](https://github.com/cube-js/cube/commit/c15acd6d76480ac051dc3e578a3fc93236e0d2a8))
+- **api-gateway:** Correct GraphQL request normalization ([#12822](https://github.com/cube-js/cube/issues/12822)) ([a074bbc](https://github.com/cube-js/cube/commit/a074bbc8beba4b5d2392f6bce0c215de89183fc1))
+- **api-gateway:** enforce meta scope on /v1/graphql-to-json ([#11939](https://github.com/cube-js/cube/issues/11939)) ([751bc78](https://github.com/cube-js/cube/commit/751bc784769ad3d275abf4d22b6c56c5835f759f))
+- **api-gateway:** Improve WS message validation ([#12712](https://github.com/cube-js/cube/issues/12712)) ([828628f](https://github.com/cube-js/cube/commit/828628fbe05e92a2239a645bbf3185c602bcc705))
+- **backend-shared:** Harden SQL parameter interpolation ([#11576](https://github.com/cube-js/cube/issues/11576)) ([4005c8e](https://github.com/cube-js/cube/commit/4005c8eb1406c0ab12347cdeaaab5c2580ac295f))
+- **cubesql:** Escape PatchMeasure filters for member expression evaluation ([#11329](https://github.com/cube-js/cube/issues/11329)) ([95e84d2](https://github.com/cube-js/cube/commit/95e84d29589d83b460ba6eda56580acd7c1f3134))
+- **cubesql:** Fix generate_series overflow, non-finite float and NULL edges ([#12821](https://github.com/cube-js/cube/issues/12821)) ([67d8635](https://github.com/cube-js/cube/commit/67d86357009d9a785648639af941a3b0e217ac60))
+- **cubesql:** Hide other users' query text in pg_stat_activity ([#12720](https://github.com/cube-js/cube/issues/12720)) ([43038fe](https://github.com/cube-js/cube/commit/43038fe24208dba4d2445557db31628db35cca12))
+- **cubesql:** Reject malformed Bind parameters instead of panicking ([#12770](https://github.com/cube-js/cube/issues/12770)) ([48d610c](https://github.com/cube-js/cube/commit/48d610c2b702789a379b79ac237f84a2a1339779))
+- **cubestore:** Disable local filesystem imports by default ([#12779](https://github.com/cube-js/cube/issues/12779)) ([fa5c72d](https://github.com/cube-js/cube/commit/fa5c72d53bffa651192874afb917848a83eef9b6))
+- **cubestore:** Reject path traversal in temp uploads and remote fs paths ([#12773](https://github.com/cube-js/cube/issues/12773)) ([3151f73](https://github.com/cube-js/cube/commit/3151f736694bb4d8057bfc292eff7cf8b644b4cf))
+- **cubestore:** Reject unknown values for CUBESTORE*LOCATION*\* security flags ([#12945](https://github.com/cube-js/cube/issues/12945)) ([af4f51b](https://github.com/cube-js/cube/commit/af4f51b9e933fbf290bd65a176bbb4eed38bf93a))
+- **playground:** Generate valid GraphQL for a repeated member in an AND/OR group ([#12824](https://github.com/cube-js/cube/issues/12824)) ([7f641d4](https://github.com/cube-js/cube/commit/7f641d49830170d9d72718d1789284381169c36c)), closes [#12823](https://github.com/cube-js/cube/issues/12823)
+- **server-core:** Keep conditional masks for multi-stage filter directives ([#12929](https://github.com/cube-js/cube/issues/12929)) ([d19620e](https://github.com/cube-js/cube/commit/d19620e24dfd0465a633fc3163384247ef6ee128)), closes [#12711](https://github.com/cube-js/cube/issues/12711)
+- **server-core:** Keep conditional masks for reversed date ranges and time-shifted measures ([#12711](https://github.com/cube-js/cube/issues/12711)) ([5011f56](https://github.com/cube-js/cube/commit/5011f5659afd726eca7babd7e8e904e7ccfc1e78))
+- **snowflake-driver:** Hide connection details on connection error ([#12774](https://github.com/cube-js/cube/issues/12774)) ([ba5d763](https://github.com/cube-js/cube/commit/ba5d763fddcd3cff0267942657207b6d68d0f3db))
+
+### Features
+
+- **cubestore:** Allowlist hosts for http(s) import locations ([#12820](https://github.com/cube-js/cube/issues/12820)) ([20c8fcc](https://github.com/cube-js/cube/commit/20c8fcc9b2c39f5e1dad1d0b75ae5b5d2dd1df8e))
+- **docker:** Security upgrade Node.js from 22.23.4 to 22.23.5 ([5c40fba](https://github.com/cube-js/cube/commit/5c40fbad0374c6656be5852cb57541e083203f53)), closes [#12745](https://github.com/cube-js/cube/issues/12745)
+
+### BREAKING CHANGES
+
+- **backend-shared:** a `?` in code position that is not a placeholder throws
+  when values are bound (on ClickHouse use `if(cond, a, b)` instead of the
+  ternary operator). A placeholder inside a comment is no longer substituted,
+  so a commented-out FILTER_PARAMS fails with a parameter count mismatch. A
+  plain object bound as a parameter throws.
+
 ## [1.6.77](https://github.com/cube-js/cube/compare/v1.6.76...v1.6.77) (2026-11-06)
 
 ### Bug Fixes

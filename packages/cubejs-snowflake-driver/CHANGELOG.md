@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.78](https://github.com/cube-js/cube/compare/v1.6.77...v1.6.78) (2026-11-24)
+
+### Bug Fixes
+
+- **snowflake-driver:** Hide connection details on connection error ([#12774](https://github.com/cube-js/cube/issues/12774)) ([ba5d763](https://github.com/cube-js/cube/commit/ba5d763fddcd3cff0267942657207b6d68d0f3db))
+
 ## [1.6.77](https://github.com/cube-js/cube/compare/v1.6.76...v1.6.77) (2026-11-06)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver

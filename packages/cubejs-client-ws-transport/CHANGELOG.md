@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.78](https://github.com/cube-js/cube/compare/v1.6.77...v1.6.78) (2026-11-24)
+
+### Bug Fixes
+
+- **api-gateway:** Improve WS message validation ([#12712](https://github.com/cube-js/cube/issues/12712)) ([828628f](https://github.com/cube-js/cube/commit/828628fbe05e92a2239a645bbf3185c602bcc705))
+
 ## [1.6.77](https://github.com/cube-js/cube/compare/v1.6.76...v1.6.77) (2026-11-06)
 
 **Note:** Version bump only for package @cubejs-client/ws-transport

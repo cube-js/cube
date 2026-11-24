@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.78](https://github.com/cube-js/cube/compare/v1.6.77...v1.6.78) (2026-11-24)
+
+### Bug Fixes
+
+- **cubestore:** Disable local filesystem imports by default ([#12779](https://github.com/cube-js/cube/issues/12779)) ([fa5c72d](https://github.com/cube-js/cube/commit/fa5c72d53bffa651192874afb917848a83eef9b6))
+- **cubestore:** Reject path traversal in temp uploads and remote fs paths ([#12773](https://github.com/cube-js/cube/issues/12773)) ([3151f73](https://github.com/cube-js/cube/commit/3151f736694bb4d8057bfc292eff7cf8b644b4cf))
+- **cubestore:** Reject unknown values for CUBESTORE*LOCATION*\* security flags ([#12945](https://github.com/cube-js/cube/issues/12945)) ([af4f51b](https://github.com/cube-js/cube/commit/af4f51b9e933fbf290bd65a176bbb4eed38bf93a))
+
+### Features
+
+- **cubestore:** Allowlist hosts for http(s) import locations ([#12820](https://github.com/cube-js/cube/issues/12820)) ([20c8fcc](https://github.com/cube-js/cube/commit/20c8fcc9b2c39f5e1dad1d0b75ae5b5d2dd1df8e))
+
 ## [1.6.77](https://github.com/cube-js/cube/compare/v1.6.76...v1.6.77) (2026-11-06)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

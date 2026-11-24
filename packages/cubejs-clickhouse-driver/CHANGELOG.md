@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.78](https://github.com/cube-js/cube/compare/v1.6.77...v1.6.78) (2026-11-24)
+
+### Bug Fixes
+
+- **backend-shared:** Harden SQL parameter interpolation ([#11576](https://github.com/cube-js/cube/issues/11576)) ([4005c8e](https://github.com/cube-js/cube/commit/4005c8eb1406c0ab12347cdeaaab5c2580ac295f))
+
+### BREAKING CHANGES
+
+- **backend-shared:** a `?` in code position that is not a placeholder throws
+  when values are bound (on ClickHouse use `if(cond, a, b)` instead of the
+  ternary operator). A placeholder inside a comment is no longer substituted,
+  so a commented-out FILTER_PARAMS fails with a parameter count mismatch. A
+  plain object bound as a parameter throws.
+
 ## [1.6.77](https://github.com/cube-js/cube/compare/v1.6.76...v1.6.77) (2026-11-06)
 
 **Note:** Version bump only for package @cubejs-backend/clickhouse-driver

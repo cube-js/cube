@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.78](https://github.com/cube-js/cube/compare/v1.6.77...v1.6.78) (2026-11-24)
+
+### Bug Fixes
+
+- **cubesql:** Hide other users' query text in pg_stat_activity ([#12720](https://github.com/cube-js/cube/issues/12720)) ([43038fe](https://github.com/cube-js/cube/commit/43038fe24208dba4d2445557db31628db35cca12))
+
 ## [1.6.77](https://github.com/cube-js/cube/compare/v1.6.76...v1.6.77) (2026-11-06)
 
 **Note:** Version bump only for package @cubejs-backend/native
