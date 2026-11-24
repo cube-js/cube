@@ -162,3 +162,32 @@ async fn test_granularity_dimension_and_time_dimension_with_keys_subquery() {
         insta::assert_snapshot!(result);
     }
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_granularity_dimension_and_time_dimension_with_time_shift_and_rolling() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_prev_month
+          - orders.rolling_amount_exclude_status
+        dimensions:
+          - orders.created_at.month
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.created_at.month
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_unique_columns(&result);
+        insta::assert_snapshot!(result);
+    }
+}
