@@ -7752,8 +7752,16 @@ async fn test_wrapper_cube_store_pre_aggregation_stream_mode() {
     }
     init_testing_logger();
 
-    let query = "SELECT customer_gender, SUM(sumPrice) FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY customer_gender ORDER BY 2 DESC";
-    for (limit, external) in [("", false), (" LIMIT 50001", false), (" LIMIT 5000", true)] {
+    // Pushed to Cube with the limit, and SQL over a grouped scan the limit stays outside of
+    let queries = [
+        "SELECT customer_gender, SUM(sumPrice) FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY customer_gender ORDER BY 2 DESC",
+        "SELECT customer_gender, s, ROW_NUMBER() OVER (ORDER BY s) rn FROM (SELECT customer_gender, SUM(sumPrice) s FROM KibanaSampleDataEcommerce GROUP BY 1) a ORDER BY rn",
+    ];
+    let limits = [("", false), (" LIMIT 50001", false), (" LIMIT 5000", true)];
+    for (query, (limit, external)) in queries
+        .iter()
+        .flat_map(|query| limits.iter().map(move |limit| (query, limit)))
+    {
         let mut config = ConfigObjImpl::default();
         config.stream_mode = true;
         let context = pre_aggregation_test_context_with_rollup_and_config(
@@ -7764,18 +7772,18 @@ async fn test_wrapper_cube_store_pre_aggregation_stream_mode() {
         let query = format!("{query}{limit}");
         let wrapped_sql = wrapped_sql(&context, &query).await;
 
-        assert_eq!(wrapped_sql.external, external, "{}", query);
+        assert_eq!(wrapped_sql.external, *external, "{}", query);
         assert_eq!(
             wrapped_sql
                 .sql
                 .contains("dev_pre_aggregations.kibana_sample_data_ecommerce_main"),
-            external,
+            *external,
             "{}",
             query
         );
         assert_eq!(
             !context.pre_aggregation_match_calls().await.is_empty(),
-            external,
+            *external,
             "{}",
             query
         );

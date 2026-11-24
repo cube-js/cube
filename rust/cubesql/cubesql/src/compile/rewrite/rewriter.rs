@@ -8,14 +8,15 @@ use crate::{
         rewrite::{
             analysis::LogicalPlanAnalysis,
             converter::LanguageToLogicalPlanConverter,
-            cost::{BestCubePlan, CubePlanTopDownState, TopDownExtractor},
+            cost::{is_limitless, BestCubePlan, CubePlanTopDownState, TopDownExtractor},
             rules::{
                 case::CaseRules, common::CommonRules, dates::DateRules, filters::FilterRules,
                 flatten::FlattenRules, members::MemberRules, old_split::OldSplitRules,
                 order::OrderRules, split::SplitRules, wrapper::WrapperRules,
             },
             CubeScanWrapped, LiteralExprValue, LogicalPlanLanguage, QueryParamIndex, ScanWrapping,
-            WrappedSelectPushToCube, WRAPPED_SELECT_FROM, WRAPPED_SELECT_PUSH_TO_CUBE,
+            WrappedSelectLimit, WrappedSelectPushToCube, WRAPPED_SELECT_FROM, WRAPPED_SELECT_JOINS,
+            WRAPPED_SELECT_LIMIT, WRAPPED_SELECT_PUSH_TO_CUBE,
         },
         CubeContext,
     },
@@ -465,17 +466,24 @@ impl Rewriter {
                     continue;
                 }
             };
+            let bounded = if config_obj.stream_mode() {
+                Self::bounded_push_down_nodes(&best, max_row_limit)
+            } else {
+                HashSet::new()
+            };
             // What can't be asked is not matched
             let mut matched = vec![false; scans.len()];
             let mut asked = vec![];
             let mut asked_positions = vec![];
-            for (position, (_, node)) in scans.iter().enumerate() {
+            for (position, (index, node)) in scans.iter().enumerate() {
                 if let Some(request) =
                     Self::pre_aggregation_request(&cube_context, &load_request_meta, node).await
                 {
                     // Cube Store returns a whole result at once, so a streamed query is
                     // served by the data source
-                    if is_streamed_request(config_obj.as_ref(), request.limit) {
+                    if !bounded.contains(index)
+                        && is_streamed_request(config_obj.as_ref(), request.limit)
+                    {
                         continue;
                     }
                     asked.push(request);
@@ -636,6 +644,57 @@ impl Rewriter {
                 log::debug!("No pre-aggregation request for a push-to-Cube select: {err}");
                 None
             })
+    }
+
+    /// Nodes of `best` under a push down whose SQL returns at most `max_row_limit` rows: a
+    /// select on its chain of `FROM`s has a `LIMIT` within it, and no select above that one
+    /// joins anything that could multiply its rows
+    fn bounded_push_down_nodes(
+        best: &RecExpr<LogicalPlanLanguage>,
+        max_row_limit: usize,
+    ) -> HashSet<usize> {
+        let nodes = best.as_ref();
+        let is_bounded = |mut index: usize| loop {
+            let LogicalPlanLanguage::WrappedSelect(select) = &nodes[index] else {
+                return false;
+            };
+            if let LogicalPlanLanguage::WrappedSelectLimit(WrappedSelectLimit(limit)) =
+                &nodes[usize::from(select[WRAPPED_SELECT_LIMIT])]
+            {
+                if !is_limitless(limit, max_row_limit) {
+                    return true;
+                }
+            }
+            if !nodes[usize::from(select[WRAPPED_SELECT_JOINS])]
+                .children()
+                .is_empty()
+            {
+                return false;
+            }
+            index = usize::from(select[WRAPPED_SELECT_FROM]);
+        };
+        let mut bounded = HashSet::new();
+        for node in nodes {
+            let LogicalPlanLanguage::CubeScanWrapper(params) = node else {
+                continue;
+            };
+            let input = usize::from(params[0]);
+            if !is_bounded(input) {
+                continue;
+            }
+            let mut stack = vec![input];
+            while let Some(index) = stack.pop() {
+                if bounded.insert(index) {
+                    stack.extend(
+                        nodes[index]
+                            .children()
+                            .iter()
+                            .map(|child| usize::from(*child)),
+                    );
+                }
+            }
+        }
+        bounded
     }
 
     /// The nodes of `best` Cube is asked about, with their indexes in `best`: each scan

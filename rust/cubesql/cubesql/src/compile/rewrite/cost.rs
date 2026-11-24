@@ -26,7 +26,7 @@ use indexmap::IndexSet;
 /// No limit is capped at `max_row_limit`, and so is any limit above it, since
 /// [`CubeScanExecutionPlan::execute`] clamps the request back down to the cap before
 /// sending it.
-fn is_limitless(limit: &Option<usize>, max_row_limit: usize) -> bool {
+pub fn is_limitless(limit: &Option<usize>, max_row_limit: usize) -> bool {
     limit.is_none_or(|limit| limit > max_row_limit)
 }
 
