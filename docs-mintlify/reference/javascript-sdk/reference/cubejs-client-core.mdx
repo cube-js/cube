@@ -164,6 +164,22 @@ Name | Type | Description |
 sqlQuery | string | The SQL query to run |
 options? | [CubeSqlOptions](#cubesqloptions) | - |
 
+### `cubeSqlParams`
+
+>  **cubeSqlParams**(**sqlQuery**: string, **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹`{ name: string, type: string }[]`›*
+
+List the `:name` parameters of a SQL query via the
+[`/v1/cubesql/params`][ref-cubesql-params-endpoint] endpoint, in the order they first
+appear, each with its expected `type`: `number`, `string`, `time`, `boolean`, or
+`unknown`. The query is planned, not run.
+
+```js
+const params = await cubeApi.cubeSqlParams(
+  'SELECT MEASURE(count) FROM orders WHERE status = :status'
+);
+// [{ name: 'status', type: 'string' }]
+```
+
 ### `dryRun`
 
 > **dryRun**(**query**: [Query](#query-2) | [Query](#query-2)[], **options?**: [LoadMethodOptions](#loadmethodoptions)): *Promise‹[TDryRunResponse](#tdryrunresponse)›*
@@ -916,6 +932,7 @@ Name | Type | Optional? | Description |
 ------ | ------ | ------ | --- |
 `timeout` | `number` | ✅ Yes | Query timeout in milliseconds. |
 `timezone` | `string` | ✅ Yes | The [time zone][ref-time-zone] for this query in the [TZ Database Name][link-tzdb] format, e.g., `America/Los_Angeles` — same as `query.timezone` in the REST (JSON) API's [`/v1/load`][ref-query-format]. When omitted, the query runs in the deployment's default time zone. |
+`params` | `{ name: string, value: string \| number \| boolean \| null, type: 'number' \| 'string' \| 'time' \| 'boolean' \| 'expr' }[]` | ✅ Yes | Values of the `:name` parameters in the query, e.g. `[{ name: 'status', value: 'shipped', type: 'string' }]`. See [`/v1/cubesql`][ref-cubesql-endpoint] for how each `type` is bound. |
 
 ### `CubeSqlResult`
 
@@ -1269,5 +1286,6 @@ values? | never |
 [ref-cache-control]: /reference/core-data-apis/rest-api#cache-control
 [ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-cubesql-endpoint]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql
+[ref-cubesql-params-endpoint]: /reference/core-data-apis/rest-api/reference#base_path/v1/cubesql/params
 [ref-time-zone]: /reference/core-data-apis/queries#time-zone
 [link-tzdb]: https://en.wikipedia.org/wiki/Tz_database
