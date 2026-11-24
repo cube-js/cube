@@ -1341,3 +1341,15 @@ views:
                 - amount_filtered_hidden
                 - category_label
                 - status_case_label_multi_stage
+
+    # `status` is included twice: plain and under an alias.
+    - name: orders_ms_alias_view
+      cubes:
+          - join_path: orders
+            includes:
+                - category
+                - status
+                - name: status
+                  alias: status_copy
+                - total_amount
+                - amount_grain_and_filter_exclude_status

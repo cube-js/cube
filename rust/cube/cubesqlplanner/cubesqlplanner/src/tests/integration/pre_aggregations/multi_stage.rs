@@ -773,3 +773,43 @@ fn test_multi_stage_union_combine_switches_are_independent() {
         .unwrap();
     assert!(!sql.contains("JOIN"), "{sql}");
 }
+
+// A view dimension included twice (plain and aliased) next to a measure whose
+// grain drops it, served from a rollup: the keys side of the multi-stage join
+// must keep the two view members as separate columns.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_pre_agg_view_aliased_duplicate_dimension() {
+    let schema = MockSchema::from_yaml_file("common/integration_view_aliased_include_pre_agg.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    let query = indoc! {r#"
+        measures:
+          - orders_alias_view.amount_by_category
+          - orders_alias_view.total_amount
+        dimensions:
+          - orders_alias_view.category
+          - orders_alias_view.status_copy
+          - orders_alias_view.status
+        order:
+          - id: orders_alias_view.category
+          - id: orders_alias_view.status
+    "#};
+
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query).unwrap();
+    assert!(
+        pre_aggrs.iter().all(|u| u.name() == "by_category_status") && !pre_aggrs.is_empty(),
+        "expected every leaf to read `by_category_status`"
+    );
+    // Some engines accept a projection repeating one name, so the result alone
+    // does not show the two view members collapsing into one column.
+    assert!(
+        sql.contains(
+            r#""fk_aggregate_keys"."orders_alias_view__status" "orders_alias_view__status""#
+        ),
+        "expected `status` to be read from its own keys column, got SQL:\n{sql}"
+    );
+
+    if let Some(result) = ctx.try_execute(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
