@@ -1,5 +1,6 @@
 use super::planners::multi_stage::{check_multi_stage_depth, PlanningScope};
 use super::planners::QueryPlanner;
+use super::shared_dimensions::{bind_shared_dimensions, SharedDimensionBinding};
 use super::state::State;
 use super::QueryProperties;
 use crate::logical_plan::FilteredLeafMergeOptimizer;
@@ -35,7 +36,16 @@ impl TopLevelPlanner {
             options.max_multi_stage_depth(),
         )?;
 
-        let query_planner = QueryPlanner::new(self.request.clone(), self.query_tools.clone());
+        // A query reading shared view dimensions through one path each is
+        // planned, and matched against pre-aggregations, with them bound. One
+        // reading them through several is split into legs instead, which
+        // pre-aggregations are not matched against.
+        let (request, split) = match bind_shared_dimensions(&self.request)? {
+            SharedDimensionBinding::None => (self.request.clone(), false),
+            SharedDimensionBinding::Single(request) => (request, false),
+            SharedDimensionBinding::Split(_) => (self.request.clone(), true),
+        };
+        let query_planner = QueryPlanner::new(request.clone(), self.query_tools.clone());
         let mut scope = PlanningScope::new();
         let query = query_planner.plan(&mut scope)?;
         let logical_plan = Rc::new(
@@ -46,7 +56,11 @@ impl TopLevelPlanner {
         );
         logical_plan.check_integrity()?;
 
-        let (optimized_plan, usages) = self.try_pre_aggregations(logical_plan.clone())?;
+        let (optimized_plan, usages) = if split {
+            (logical_plan.clone(), Vec::new())
+        } else {
+            self.try_pre_aggregations(logical_plan.clone(), &request)?
+        };
         optimized_plan.check_integrity()?;
 
         // Match-only mode (refresh/metadata path): the caller only needs the matched
@@ -138,12 +152,13 @@ impl TopLevelPlanner {
     fn try_pre_aggregations(
         &self,
         plan: Rc<RootQuery>,
+        request: &QueryProperties,
     ) -> Result<(Rc<RootQuery>, Vec<PreAggregationUsage>), CubeError> {
         let options = self.query_tools.request_options();
-        let result = if !self.request.is_pre_aggregation_query() {
+        let result = if !request.is_pre_aggregation_query() {
             let mut pre_aggregation_optimizer = PreAggregationOptimizer::new(
                 self.query_tools.clone(),
-                self.request.query_join_hints().clone(),
+                request.query_join_hints().clone(),
                 options.cubestore_support_multistage(),
             );
             let disable_external_pre_aggregations = options.disable_external_pre_aggregations();

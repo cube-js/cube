@@ -4,7 +4,7 @@ exports[`the generated manifest marks the same places where it differs from Core
 Object {
   "converts-string": 44,
   "custom": 268,
-  "function": 507,
+  "function": 508,
   "function-condition": 78,
   "list-of-either": 2,
 }
@@ -967,6 +967,23 @@ Object {
     },
     "cube_join_path": Object {
       "description": "The path to the cube, including any joins. Use cube name for direct access (e.g., 'Events') or dot notation for joined cubes (e.g., 'Events.Users')",
+      "items": Object {
+        "type": Array [
+          "string",
+          "number",
+          "boolean",
+        ],
+      },
+      "type": Array [
+        "string",
+        "number",
+        "boolean",
+        "array",
+        "object",
+      ],
+    },
+    "cube_join_paths": Object {
+      "description": "Paths to one cube, one from each fact cube of the view (e.g. [orders.event_day, refunds.event_day]). Its dimensions are shared: each fact reads them through its own path",
       "items": Object {
         "type": Array [
           "string",
@@ -12184,20 +12201,6 @@ Object {
       "additionalProperties": false,
       "allOf": Array [
         Object {
-          "anyOf": Array [
-            Object {
-              "required": Array [
-                "join_path",
-              ],
-            },
-            Object {
-              "required": Array [
-                "joinPath",
-              ],
-            },
-          ],
-        },
-        Object {
           "not": Object {
             "allOf": Array [
               Object {
@@ -12217,12 +12220,139 @@ Object {
             ],
           },
         },
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "not": Object {
+                  "anyOf": Array [
+                    Object {
+                      "not": Object {
+                        "properties": Object {
+                          "join_path": false,
+                        },
+                      },
+                    },
+                    Object {
+                      "not": Object {
+                        "patternProperties": Object {
+                          "^joinPath$": false,
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+              Object {
+                "not": Object {
+                  "anyOf": Array [
+                    Object {
+                      "not": Object {
+                        "properties": Object {
+                          "join_paths": false,
+                        },
+                      },
+                    },
+                    Object {
+                      "not": Object {
+                        "patternProperties": Object {
+                          "^joinPaths$": false,
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "anyOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "join_path": false,
+                      },
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "patternProperties": Object {
+                        "^joinPath$": false,
+                      },
+                    },
+                  },
+                ],
+              },
+              Object {
+                "anyOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "join_paths": false,
+                      },
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "patternProperties": Object {
+                        "^joinPaths$": false,
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        Object {
+          "not": Object {
+            "allOf": Array [
+              Object {
+                "anyOf": Array [
+                  Object {
+                    "not": Object {
+                      "properties": Object {
+                        "join_paths": false,
+                      },
+                    },
+                  },
+                  Object {
+                    "not": Object {
+                      "patternProperties": Object {
+                        "^joinPaths$": false,
+                      },
+                    },
+                  },
+                ],
+              },
+              Object {
+                "not": Object {
+                  "properties": Object {
+                    "split": false,
+                  },
+                },
+              },
+            ],
+          },
+        },
       ],
       "patternProperties": Object {
         "^joinPath$": Object {
           "allOf": Array [
             Object {
               "$ref": "#/definitions/cube_join_path",
+            },
+          ],
+          "deprecated": true,
+        },
+        "^joinPaths$": Object {
+          "allOf": Array [
+            Object {
+              "$ref": "#/definitions/cube_join_paths",
             },
           ],
           "deprecated": true,
@@ -12312,6 +12442,9 @@ Object {
         },
         "join_path": Object {
           "$ref": "#/definitions/cube_join_path",
+        },
+        "join_paths": Object {
+          "$ref": "#/definitions/cube_join_paths",
         },
         "prefix": Object {
           "description": "Whether to prefix the included members with the cube name",

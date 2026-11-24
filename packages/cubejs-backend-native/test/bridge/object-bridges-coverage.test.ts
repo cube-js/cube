@@ -148,6 +148,7 @@ const BRIDGES: BridgeSpec[] = [
       'owned_by_cube',
       'primary_key',
       'propagate_filters_to_sub_query',
+      'shared_paths',
       'sql',
       'sub_query',
       'time_shift',

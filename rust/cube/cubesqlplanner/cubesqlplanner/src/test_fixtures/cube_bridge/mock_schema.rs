@@ -337,6 +337,7 @@ impl MockSchemaBuilder {
             schema_builder: self,
             view_name: name.into(),
             view_cubes: Vec::new(),
+            shared_cubes: Vec::new(),
             measures: HashMap::new(),
             dimensions: HashMap::new(),
             segments: HashMap::new(),
@@ -464,10 +465,20 @@ pub struct ViewCube {
     pub prefix: bool,
 }
 
+/// A view entry with `join_paths`: dimensions every path reaches, which a
+/// query reads through the path its facts join on.
+pub struct SharedViewCube {
+    pub join_paths: Vec<String>,
+    pub includes: Vec<String>,
+    pub alias: Option<String>,
+    pub prefix: bool,
+}
+
 pub struct MockViewBuilder {
     schema_builder: MockSchemaBuilder,
     view_name: String,
     view_cubes: Vec<ViewCube>,
+    shared_cubes: Vec<SharedViewCube>,
     measures: HashMap<String, Rc<MockMeasureDefinition>>,
     dimensions: HashMap<String, Rc<MockDimensionDefinition>>,
     segments: HashMap<String, Rc<MockSegmentDefinition>>,
@@ -548,6 +559,22 @@ impl MockViewBuilder {
     ) -> Self {
         self.pre_aggregations
             .push((name.into(), Rc::new(definition)));
+        self
+    }
+
+    pub fn include_shared_cube(
+        mut self,
+        join_paths: Vec<String>,
+        includes: Vec<String>,
+        alias: Option<String>,
+        prefix: bool,
+    ) -> Self {
+        self.shared_cubes.push(SharedViewCube {
+            join_paths,
+            includes,
+            alias,
+            prefix,
+        });
         self
     }
 
@@ -700,6 +727,66 @@ impl MockViewBuilder {
                         );
                     }
                 }
+            }
+        }
+
+        // Like the schema compiler, a shared entry re-exports the dimensions of
+        // the cube its paths reach, each reading the first path and listing all of
+        // them; it stays out of the join map.
+        for shared in &self.shared_cubes {
+            let first = shared
+                .join_paths
+                .first()
+                .expect("join_paths must not be empty");
+            let first_parts: Vec<&str> = first.split('.').collect();
+            let source_cube = Self::join_path_target(&self.schema_builder.cubes, &first_parts)
+                .and_then(|name| self.schema_builder.cubes.get(&name))
+                .unwrap_or_else(|| panic!("Join path '{}' reaches no cube", first));
+            let entry_name = shared
+                .alias
+                .clone()
+                .unwrap_or_else(|| first_parts.last().unwrap().to_string());
+            let members_to_include: Vec<String> = if shared.includes.is_empty() {
+                source_cube.dimensions.keys().cloned().collect()
+            } else {
+                shared.includes.clone()
+            };
+            for member_name in &members_to_include {
+                let dimension = source_cube.dimensions.get(member_name).unwrap_or_else(|| {
+                    panic!("'{}' is not a dimension of '{}'", member_name, first)
+                });
+                let view_name = if shared.prefix {
+                    format!("{}_{}", entry_name, member_name)
+                } else {
+                    member_name.clone()
+                };
+                if all_dimensions.contains_key(&view_name) {
+                    panic!(
+                        "Duplicate member '{}' in view '{}'. Members must be unique.",
+                        view_name, self.view_name
+                    );
+                }
+                if let Some(granularities) = source_cube.granularities.get(member_name) {
+                    all_granularities.insert(view_name.clone(), granularities.clone());
+                }
+                all_dimensions.insert(
+                    view_name,
+                    Rc::new(
+                        MockDimensionDefinition::builder()
+                            .dimension_type(dimension.static_data().dimension_type.clone())
+                            .sql(format!("{{{}.{}}}", first, member_name))
+                            .resolved_mask_sql_opt(dimension.raw_mask_sql())
+                            .included(Some(true))
+                            .shared_paths(Some(
+                                shared
+                                    .join_paths
+                                    .iter()
+                                    .map(|path| format!("{}.{}", path, member_name))
+                                    .collect(),
+                            ))
+                            .build(),
+                    ),
+                );
             }
         }
 

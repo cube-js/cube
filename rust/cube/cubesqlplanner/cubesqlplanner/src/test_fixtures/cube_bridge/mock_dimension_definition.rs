@@ -50,6 +50,8 @@ pub struct MockDimensionDefinition {
     resolved_mask_sql: Option<String>,
     #[builder(default)]
     included: Option<bool>,
+    #[builder(default)]
+    shared_paths: Option<Vec<String>>,
 }
 
 impl_static_data!(
@@ -64,7 +66,8 @@ impl_static_data!(
     values,
     primary_key,
     field_type,
-    included
+    included,
+    shared_paths
 );
 
 impl MockDimensionDefinition {

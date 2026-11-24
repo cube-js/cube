@@ -6,7 +6,7 @@ use super::dimension_kinds::{
     CaseDimension, DimensionKind, GeoDimension, RegularDimension, SwitchDimension,
 };
 use super::SymbolPath;
-use super::{DimensionType, MemberSymbol, RefSymbol, SymbolFactory};
+use super::{DimensionType, MemberSymbol, RefSymbol, SharedTarget, SymbolFactory};
 use crate::cube_bridge::case_variant::CaseVariant;
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -373,6 +373,7 @@ impl SymbolFactory for DimensionSymbolFactory {
             .and_then(|s| s.resolve_direct_reference())
             .map(|dep| dep.cube_id())
             .unwrap_or_else(|| path.cube_id().clone());
+        let raw_mask_sql = mask_sql.clone();
         let mask_sql = if let Some(mask_sql) = mask_sql {
             Some(compiler.compile_sql_call(&mask_sql_cube_name, mask_sql)?)
         } else {
@@ -413,7 +414,12 @@ impl SymbolFactory for DimensionSymbolFactory {
                 canonical_alias,
                 path.path().clone(),
             );
-            let symbol = MemberSymbol::new_ref(RefSymbol::try_new(compiled_path, sql, mask_sql)?);
+            let mut ref_symbol = RefSymbol::try_new(compiled_path, sql, mask_sql)?;
+            if let Some(shared_paths) = definition.static_data().shared_paths.clone() {
+                let targets = shared_targets(&ref_symbol, &shared_paths, &raw_mask_sql, compiler)?;
+                ref_symbol = ref_symbol.with_shared_targets(targets);
+            }
+            let symbol = MemberSymbol::new_ref(ref_symbol);
             return with_granularity(symbol, &path, cube_evaluator, compiler);
         }
 
@@ -575,6 +581,39 @@ impl SymbolFactory for DimensionSymbolFactory {
 
         with_granularity(symbol, &path, cube_evaluator, compiler)
     }
+}
+
+/// The members a view dimension included through `join_paths` stands for, one
+/// per path. The first is the reference's own target, which `sql` names.
+fn shared_targets(
+    reference: &RefSymbol,
+    shared_paths: &[String],
+    raw_mask_sql: &Option<Rc<dyn MemberSql>>,
+    compiler: &mut Compiler,
+) -> Result<Vec<SharedTarget>, CubeError> {
+    let mut targets = Vec::with_capacity(shared_paths.len());
+    for (index, member_path) in shared_paths.iter().enumerate() {
+        let target = if index == 0 {
+            reference.referenced_member().clone()
+        } else {
+            compiler.add_dimension_evaluator(member_path.clone())?
+        };
+        let (join_path, _) = member_path.rsplit_once('.').ok_or_else(|| {
+            CubeError::internal(format!("Shared path '{}' names no member", member_path))
+        })?;
+        let root = join_path.split('.').next().unwrap_or(join_path).to_string();
+        let mask_sql = match raw_mask_sql {
+            Some(mask_sql) => Some(compiler.compile_sql_call(&target.cube_id(), mask_sql.clone())?),
+            None => None,
+        };
+        targets.push(SharedTarget {
+            path: join_path.to_string(),
+            root,
+            target,
+            mask_sql,
+        });
+    }
+    Ok(targets)
 }
 
 /// Wraps the dimension in a `TimeDimensionSymbol` when the requested path

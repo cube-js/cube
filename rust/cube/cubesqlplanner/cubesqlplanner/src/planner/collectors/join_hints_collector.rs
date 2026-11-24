@@ -26,6 +26,12 @@ impl TraversalVisitor for JoinHintsCollector {
         _: &Self::State,
     ) -> Result<Option<Self::State>, CubeError> {
         if let MemberSymbol::Ref(ref_symbol) = node.as_ref() {
+            // A view dimension shared through `join_paths` joins through the
+            // path a query binds it to (`shared_dimensions`), not through any
+            // one of them.
+            if ref_symbol.is_shared() {
+                return Ok(None);
+            }
             if !node.is_multi_stage() {
                 return Ok(Some(()));
             }

@@ -240,7 +240,11 @@ export type ViewCubeIncludeMember = {
 };
 
 export type ViewCubeInclude = {
-  joinPath: () => ToString;
+  // Exactly one of `joinPath` and `joinPaths` is set
+  joinPath?: () => ToString;
+  // Several paths to one cube, one per fact cube of the view: its dimensions
+  // are shared, each fact reading them through its own path
+  joinPaths?: () => Array<ToString>;
   prefix?: boolean;
   split?: boolean;
   alias?: string;
@@ -309,6 +313,15 @@ type ViewResolvedMember = {
   // The cube the member is defined on, which the join path reaches
   cube: string;
   name: string;
+  // For a member of a `join_paths` entry: the member along each path, the
+  // first being `member`
+  sharedPaths?: string[];
+};
+
+// A view's cube entry with its join paths evaluated: one for `join_path`,
+// one per path of `join_paths`
+type ResolvedViewCubeInclude = ViewCubeInclude & {
+  paths: string[];
 };
 
 type ViewExcludedMember = {
@@ -841,7 +854,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   }
 
   protected prepareIncludes(cube: CubeDefinitionExtended, errorReporter: ErrorReporter, splitViews: SplitViews) {
-    const includedCubes = cube.rawCubes();
+    const includedCubes = this.resolveViewCubeIncludes(cube, errorReporter);
     if (!includedCubes.length) {
       return;
     }
@@ -867,14 +880,15 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       // If the hierarchy is included all members from it should be included as well
       // Extend `includes` with members from hierarchies that should be auto-included
       const cubes = type === 'dimensions' ? includedCubes.map((it) => {
-        const fullPath = this.evaluateReferences(null, it.joinPath, { collectJoinHints: true });
+        const fullPath = it.paths[0];
         const split = fullPath.split('.');
         const cubeRef = this.resolveJoinPathTarget(split);
 
         // No need to keep a simple direct cube joins in join map. Hints are
-        // extended with cube names only, so the path is kept up to its first alias
+        // extended with cube names only, so the path is kept up to its first alias.
+        // A shared entry stays out: a query binds its members to one of its paths
         const plainPath = this.joinPathBeforeAlias(split);
-        if (plainPath.length > 1) {
+        if (plainPath.length > 1 && it.paths.length === 1) {
           joinMap.push(plainPath);
         }
 
@@ -964,6 +978,99 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     });
   }
 
+  /**
+   * The join paths of a view's cube entry, in declared order: its `join_path`,
+   * or each of its `join_paths`.
+   */
+  public viewCubeJoinPaths(include: ViewCubeInclude): string[] {
+    if (include.joinPaths) {
+      const paths = this.evaluateReferences(null, include.joinPaths, { collectJoinHints: true, originalSorting: true });
+      return Array.isArray(paths) ? paths : [paths];
+    }
+    return include.joinPath ? [this.evaluateReferences(null, include.joinPath, { collectJoinHints: true })] : [];
+  }
+
+  /**
+   * The view's cube entries with their join paths evaluated. A `join_paths`
+   * entry must reach one cube, from a different cube along each path, and be
+   * named by `alias` unless its paths end alike. Entries that are not are
+   * reported and left out.
+   */
+  protected resolveViewCubeIncludes(cube: CubeDefinitionExtended, errorReporter: ErrorReporter): ResolvedViewCubeInclude[] {
+    const result: ResolvedViewCubeInclude[] = [];
+
+    for (const include of cube.rawCubes()) {
+      const paths = this.viewCubeJoinPaths(include);
+      if (!paths.length) {
+        errorReporter.error(`A cube entry of view '${cube.name}' has an empty join_paths. List the join path to the cube from each fact cube`);
+      } else if (paths.length === 1 || this.validSharedPaths(cube.name, include, paths, errorReporter)) {
+        result.push({ ...include, paths });
+      }
+    }
+
+    return result;
+  }
+
+  protected validSharedPaths(viewName: string, include: ViewCubeInclude, paths: string[], errorReporter: ErrorReporter): boolean {
+    const list = paths.map(path => `'${path}'`).join(', ');
+    const targets = R.uniq(paths.map(path => this.resolveJoinPathTarget(path.split('.'))));
+    if (targets.length > 1) {
+      errorReporter.error(
+        `View '${viewName}' has join_paths ${list} reaching different cubes (${targets.map(t => `'${t}'`).join(', ')}). Every path of a join_paths entry must reach the same cube`
+      );
+      return false;
+    }
+    const roots = paths.map(path => path.split('.')[0]);
+    const repeatedRoot = roots.find((root, i) => roots.indexOf(root) !== i);
+    if (repeatedRoot) {
+      errorReporter.error(
+        `View '${viewName}' has join_paths ${list} with more than one path from '${repeatedRoot}'. A join_paths entry takes one path from each cube, so a query knows which one to read`
+      );
+      return false;
+    }
+    const ends = R.uniq(paths.map(path => path.split('.').pop()));
+    if (!include.alias && ends.length > 1) {
+      errorReporter.error(
+        `View '${viewName}' has join_paths ${list} ending in different names. Add an alias to name the entry`
+      );
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Reports members other than dimensions that a `join_paths` entry includes:
+   * a measure, segment or hierarchy of a cube several facts join has no single
+   * fact to be read over.
+   */
+  protected rejectSharedIncludes(
+    view: CubeDefinition,
+    include: ResolvedViewCubeInclude,
+    type: string,
+    errorReporter: ErrorReporter,
+    memberSets: MemberSets
+  ) {
+    if (include.includes === '*') {
+      return;
+    }
+
+    const split = include.paths[0].split('.');
+    const cubeReference = this.resolveJoinPathTarget(split);
+    const cubeName = include.alias || split[split.length - 1];
+    const fullMemberName = (memberName: string) => (include.prefix ? `${cubeName}_${memberName}` : memberName);
+
+    for (const item of include.includes) {
+      const memberName = typeof item === 'object' ? item.name : item;
+      if (this.getResolvedMember(type, cubeReference, memberName)) {
+        // Named as the dimensions pass names it, which found no such dimension
+        memberSets.resolvedMembers.add(fullMemberName((typeof item === 'object' && item.alias) || memberName));
+        errorReporter.error(
+          `View '${view.name}' includes '${memberName}' of '${cubeReference}' through join_paths (${include.paths.map(path => `'${path}'`).join(', ')}). A join_paths entry includes dimensions only: include ${type} from the fact cubes`
+        );
+      }
+    }
+  }
+
   // `type` is any member collection key; the collections are written without knowing their member shape.
   protected applyIncludeMembers(includeMembers: any[], cube: CubeDefinition, type: string, errorReporter: ErrorReporter) {
     for (const [memberName, memberDefinition] of includeMembers) {
@@ -986,12 +1093,17 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     const result: ViewResolvedMember[] = [];
     const seen = new Set<string>();
 
-    for (const cubeInclude of cubes) {
-      const fullPath = this.evaluateReferences(
-        null,
-        cubeInclude.joinPath as () => ToString,
-        { collectJoinHints: true }
-      );
+    const resolvedCubes = cubes as ResolvedViewCubeInclude[];
+    // A shared entry includes dimensions only
+    if (type !== 'dimensions') {
+      resolvedCubes
+        .filter(it => it.paths.length > 1)
+        .forEach(it => this.rejectSharedIncludes(parentCube, it, type, errorReporter, memberSets));
+    }
+
+    for (const cubeInclude of resolvedCubes.filter(it => type === 'dimensions' || it.paths.length === 1)) {
+      const fullPath = cubeInclude.paths[0];
+      const shared = cubeInclude.paths.length > 1;
 
       const split = fullPath.split('.');
       // The cube the path reaches, while its last segment, which may be a join
@@ -1000,6 +1112,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       const cubeName = cubeInclude.alias || split[split.length - 1];
 
       const fullMemberName = (memberName: string) => (cubeInclude.prefix ? `${cubeName}_${memberName}` : memberName);
+      const sharedPaths = (memberName: string) => (
+        shared ? { sharedPaths: cubeInclude.paths.map(path => `${path}.${memberName}`) } : {}
+      );
 
       let includes: any[];
 
@@ -1009,6 +1124,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           member: `${fullPath}.${memberName}`,
           cube: cubeReference,
           name: fullMemberName(memberName),
+          ...sharedPaths(memberName),
         }));
       } else {
         includes = cubeInclude.includes.map((include: any) => {
@@ -1051,6 +1167,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
             member: `${fullPath}.${includedMemberName}`,
             cube: cubeReference,
             name,
+            ...sharedPaths(includedMemberName),
             ...(override ? { override } : {}),
           };
         });
@@ -1067,7 +1184,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           const resolved = this.getResolvedMember(type, cubeReference, exclude);
           return resolved ? { member: `${fullPath}.${exclude}` } : undefined;
         })
-        .filter(Boolean);
+        .filter(Boolean) as ViewExcludedMember[];
 
       const finalIncludes = this.diffByMember(
         includes.filter(Boolean),
@@ -1221,6 +1338,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
           ...(resolvedMember.links ? { links: resolvedMember.links } : {}),
           ...(resolvedMember.synthetic ? { synthetic: true } : {}),
+          ...(memberRef.sharedPaths ? { sharedPaths: memberRef.sharedPaths } : {}),
         };
       } else if (type === 'segments') {
         memberDefinition = {
