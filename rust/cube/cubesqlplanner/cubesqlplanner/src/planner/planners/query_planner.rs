@@ -55,6 +55,13 @@ impl QueryPlanner {
                 MultipliedMeasuresQueryPlanner::new(self.query_tools.clone(), analysis.clone());
             refs.extend(multiplied_measures_query_planner.plan_queries(scope)?);
 
+            // Without legs the merge reads only the multi-stage dimension
+            // subquery, which has no base rows to apply such filters to.
+            if refs.is_empty() && analysis.filters_need_base_rows()? {
+                let planner = SimpleQueryPlanner::new(self.query_tools.clone(), analysis);
+                return planner.plan(scope);
+            }
+
             let merge_planner = MergeQueryPlanner::new(analysis);
             let result = merge_planner.plan_logical_plan(refs, scope)?;
 

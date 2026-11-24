@@ -333,6 +333,11 @@ impl PreAggregationOptimizer {
         root: &Rc<RootQuery>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
     ) -> Result<Option<Rc<RootQuery>>, CubeError> {
+        // Its subqueries served by rollups would mix stored values with live
+        // rows of the source tables, so such a root is served from source only.
+        if Self::reads_source_tables(root.query()) {
+            return Ok(None);
+        }
         match self.match_subqueries(root, compiled_pre_aggregations)? {
             SubqueryMatch::Matched(rewritten) => return Ok(Some(rewritten)),
             SubqueryMatch::UnmatchedSubquery => return Ok(None),
@@ -369,6 +374,14 @@ impl PreAggregationOptimizer {
         }
 
         Ok(None)
+    }
+
+    fn reads_source_tables(query: &Query) -> bool {
+        let from = query.from();
+        from.root()
+            .into_iter()
+            .chain(from.joins().iter().map(|join| join.relation()))
+            .any(|relation| matches!(relation, Relation::Cube { .. } | Relation::RawSql { .. }))
     }
 
     fn match_subqueries(
