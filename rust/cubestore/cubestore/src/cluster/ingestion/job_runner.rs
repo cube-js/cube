@@ -3,7 +3,10 @@ use crate::cluster::ingestion::job_processor::{JobProcessResult, JobProcessor};
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::config::ConfigObj;
 use crate::import::ImportService;
-use crate::metastore::job::{job_error_class, Job, JobRunnerPool, JobStatus, JobType};
+use crate::metastore::job::{
+    job_error_class, Job, JobRunnerPool, JobStatus, JobType, JOB_SHUTTING_DOWN_MESSAGE,
+    JOB_TIMED_OUT_MESSAGE,
+};
 use crate::metastore::table::Table;
 use crate::metastore::{IdRow, MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
@@ -143,17 +146,17 @@ impl JobRunner {
             // TODO duplicate
             tokio::select! {
                 _ = self.stop_token.cancelled() => {
-                    Err(CubeError::user("shutting down".to_string()))
+                    Err(CubeError::user(JOB_SHUTTING_DOWN_MESSAGE.to_string()))
                 }
                 res = future => {
-                    res.map_err(|_| CubeError::user("timed out".to_string()))
+                    res.map_err(|_| CubeError::user(JOB_TIMED_OUT_MESSAGE.to_string()))
                 }
             }
         } else {
             // TODO duplicate
             tokio::select! {
                 _ = self.stop_token.cancelled() => {
-                    Err(CubeError::user("shutting down".to_string()))
+                    Err(CubeError::user(JOB_SHUTTING_DOWN_MESSAGE.to_string()))
                 }
                 res = handle => {
                     Ok(res)

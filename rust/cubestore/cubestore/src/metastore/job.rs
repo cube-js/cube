@@ -105,6 +105,11 @@ impl JobStatus {
 }
 
 /// A bounded label for a job failure message, for metrics.
+/// Error message of a job that exceeded its timeout.
+pub const JOB_TIMED_OUT_MESSAGE: &str = "timed out";
+/// Error message of a job interrupted by the process shutting down.
+pub const JOB_SHUTTING_DOWN_MESSAGE: &str = "shutting down";
+
 pub fn job_error_class(message: &str, is_panic: bool) -> &'static str {
     if message.contains("offset overflow") {
         "offset_overflow"
@@ -114,9 +119,9 @@ pub fn job_error_class(message: &str, is_panic: bool) -> &'static str {
         "partition_not_active"
     } else if message.contains("Stale stream timeout") {
         "stale_stream"
-    } else if message == "timed out" {
+    } else if message == JOB_TIMED_OUT_MESSAGE {
         "timeout"
-    } else if message.contains("shutting down") {
+    } else if message == JOB_SHUTTING_DOWN_MESSAGE {
         "shutdown"
     } else if is_panic {
         "panic"
@@ -336,14 +341,14 @@ mod tests {
                 false,
                 "partition_not_active",
             ),
-            ("timed out", false, "timeout"),
+            (JOB_TIMED_OUT_MESSAGE, false, "timeout"),
             ("S3 request: operation timed out", false, "other"),
             (
                 "Stale stream timeout: deadline has elapsed",
                 false,
                 "stale_stream",
             ),
-            ("shutting down", false, "shutdown"),
+            (JOB_SHUTTING_DOWN_MESSAGE, false, "shutdown"),
             ("Reason: index out of bounds", true, "panic"),
             ("Panic in a message is not a panic", false, "other"),
             ("No such file", false, "other"),

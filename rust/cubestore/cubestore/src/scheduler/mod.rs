@@ -1634,6 +1634,11 @@ pub enum GCTask {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::metastore::RocksMetaStore;
+    use std::fs;
+
     #[test]
     fn events_pending_reported_throttled_and_on_drain() {
         let start = Instant::now();
@@ -1648,11 +1653,6 @@ mod tests {
         assert!(reporter.should_report(0, at(1600)), "drained");
         assert!(!reporter.should_report(0, at(1700)), "already drained");
     }
-
-    use super::*;
-    use crate::config::Config;
-    use crate::metastore::RocksMetaStore;
-    use std::fs;
 
     #[tokio::test]
     async fn test_remove_jobs_on_non_exists_nodes() {
