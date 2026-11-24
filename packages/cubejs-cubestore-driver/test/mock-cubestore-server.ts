@@ -16,6 +16,7 @@ export interface ReceivedMessage {
   connectionIndex: number;
   messageId: number;
   query: string;
+  maxResultSize: bigint;
 }
 
 export interface MockConnection {
@@ -95,10 +96,12 @@ export class MockCubeStoreServer {
 
       ws.on('message', (raw: Buffer) => {
         const httpMessage = HttpMessage.getRootAsHttpMessage(new flatbuffers.ByteBuffer(raw));
+        const httpQuery: HttpQuery | null = httpMessage.command(new HttpQuery());
         const message: ReceivedMessage = {
           connectionIndex: connection.index,
           messageId: httpMessage.messageId(),
-          query: httpMessage.command(new HttpQuery())?.query() || '',
+          query: httpQuery?.query() || '',
+          maxResultSize: httpQuery?.maxResultSize() ?? BigInt(0),
         };
         this.received.push(message);
         this.handler(message, connection);

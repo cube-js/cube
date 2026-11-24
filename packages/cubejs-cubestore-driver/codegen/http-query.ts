@@ -66,8 +66,13 @@ responseFormat():QueryResultFormat {
   return offset ? this.bb!.readUint8(this.bb_pos + offset) : QueryResultFormat.Legacy;
 }
 
+maxResultSize():bigint {
+  const offset = this.bb!.__offset(this.bb_pos, 14);
+  return offset ? this.bb!.readUint64(this.bb_pos + offset) : BigInt('0');
+}
+
 static startHttpQuery(builder:flatbuffers.Builder) {
-  builder.startObject(5);
+  builder.startObject(6);
 }
 
 static addQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset) {
@@ -114,18 +119,23 @@ static addResponseFormat(builder:flatbuffers.Builder, responseFormat:QueryResult
   builder.addFieldInt8(4, responseFormat, QueryResultFormat.Legacy);
 }
 
+static addMaxResultSize(builder:flatbuffers.Builder, maxResultSize:bigint) {
+  builder.addFieldInt64(5, maxResultSize, BigInt('0'));
+}
+
 static endHttpQuery(builder:flatbuffers.Builder):flatbuffers.Offset {
   const offset = builder.endObject();
   return offset;
 }
 
-static createHttpQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset, traceObjOffset:flatbuffers.Offset, inlineTablesOffset:flatbuffers.Offset, parametersOffset:flatbuffers.Offset, responseFormat:QueryResultFormat):flatbuffers.Offset {
+static createHttpQuery(builder:flatbuffers.Builder, queryOffset:flatbuffers.Offset, traceObjOffset:flatbuffers.Offset, inlineTablesOffset:flatbuffers.Offset, parametersOffset:flatbuffers.Offset, responseFormat:QueryResultFormat, maxResultSize:bigint):flatbuffers.Offset {
   HttpQuery.startHttpQuery(builder);
   HttpQuery.addQuery(builder, queryOffset);
   HttpQuery.addTraceObj(builder, traceObjOffset);
   HttpQuery.addInlineTables(builder, inlineTablesOffset);
   HttpQuery.addParameters(builder, parametersOffset);
   HttpQuery.addResponseFormat(builder, responseFormat);
+  HttpQuery.addMaxResultSize(builder, maxResultSize);
   return HttpQuery.endHttpQuery(builder);
 }
 }

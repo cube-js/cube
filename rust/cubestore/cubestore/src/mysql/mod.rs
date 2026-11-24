@@ -65,6 +65,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for Backend {
                     trace_obj: None,
                     process_id: None,
                     parameters: None,
+                    max_result_size: None,
                 },
                 query,
             )

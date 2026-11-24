@@ -35,6 +35,8 @@ table HttpQuery {
     inline_tables: [HttpTable];
     parameters: [HttpParameter];
     response_format: QueryResultFormat = Legacy;
+    // Largest result, in bytes, the client accepts; 0 means no client limit.
+    max_result_size: ulong = 0;
 }
 
 table HttpTable {

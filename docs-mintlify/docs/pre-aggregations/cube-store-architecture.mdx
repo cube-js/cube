@@ -1048,6 +1048,14 @@ A result too large for Cube's own limit is reported the same way, as
 limit is [`CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE`](/reference/configuration/environment-variables#cubejs_cubestore_max_message_size),
 which is independent of the Cube Store side and defaults to 100 MB.
 
+Cube sends that limit with each query, so Cube Store fails a result that
+outgrows it while the result is still being collected, instead of building it
+in full first. Cube Store caps it with its own
+[`CUBESTORE_MAX_QUERY_RESULT_SIZE`](/reference/configuration/environment-variables#cubestore_max_query_result_size)
+(256 MiB by default): raising `CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE` above it has
+no effect. Such a query fails with `Query result exceeds the maximum result
+size of <limit>`.
+
 If a query hits this limit, reduce the size of its result set — add filters
 or a lower `limit`, drop dimensions, or split it into several queries.
 Self-hosted deployments can raise the ceiling instead, but

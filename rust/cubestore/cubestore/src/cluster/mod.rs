@@ -37,7 +37,9 @@ use crate::metastore::{
     MetaStoreRpcClientTransport, MetaStoreRpcMethodCall, MetaStoreRpcMethodResult,
     MetaStoreRpcServer,
 };
-use crate::queryplanner::query_executor::{QueryExecutor, SerializedRecordBatchStream};
+use crate::queryplanner::query_executor::{
+    MaxResultSize, QueryExecutor, SerializedRecordBatchStream,
+};
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
@@ -857,7 +859,11 @@ impl Cluster for ClusterImpl {
             NetworkMessage::RouterSelect(plan) => {
                 let res = self
                     .query_executor
-                    .execute_router_plan(plan, self.this.upgrade().unwrap())
+                    .execute_router_plan(
+                        plan,
+                        self.this.upgrade().unwrap(),
+                        MaxResultSize::new(self.config_obj.max_query_result_size(), None),
+                    )
                     .await
                     .and_then(|(schema, records)| {
                         let records = SerializedRecordBatchStream::write(&schema, records)?;

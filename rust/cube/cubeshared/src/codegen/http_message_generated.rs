@@ -1718,6 +1718,7 @@ impl<'a> HttpQuery<'a> {
     pub const VT_INLINE_TABLES: ::flatbuffers::VOffsetT = 8;
     pub const VT_PARAMETERS: ::flatbuffers::VOffsetT = 10;
     pub const VT_RESPONSE_FORMAT: ::flatbuffers::VOffsetT = 12;
+    pub const VT_MAX_RESULT_SIZE: ::flatbuffers::VOffsetT = 14;
 
     #[inline]
     pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
@@ -1734,6 +1735,7 @@ impl<'a> HttpQuery<'a> {
         args: &'args HttpQueryArgs<'args>,
     ) -> ::flatbuffers::WIPOffset<HttpQuery<'bldr>> {
         let mut builder = HttpQueryBuilder::new(_fbb);
+        builder.add_max_result_size(args.max_result_size);
         if let Some(x) = args.parameters {
             builder.add_parameters(x);
         }
@@ -1810,6 +1812,17 @@ impl<'a> HttpQuery<'a> {
                 .unwrap()
         }
     }
+    #[inline]
+    pub fn max_result_size(&self) -> u64 {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<u64>(HttpQuery::VT_MAX_RESULT_SIZE, Some(0))
+                .unwrap()
+        }
+    }
 }
 
 impl ::flatbuffers::Verifiable for HttpQuery<'_> {
@@ -1832,6 +1845,7 @@ impl ::flatbuffers::Verifiable for HttpQuery<'_> {
                 ::flatbuffers::Vector<'_, ::flatbuffers::ForwardsUOffset<HttpParameter>>,
             >>("parameters", Self::VT_PARAMETERS, false)?
             .visit_field::<QueryResultFormat>("response_format", Self::VT_RESPONSE_FORMAT, false)?
+            .visit_field::<u64>("max_result_size", Self::VT_MAX_RESULT_SIZE, false)?
             .finish();
         Ok(())
     }
@@ -1850,6 +1864,7 @@ pub struct HttpQueryArgs<'a> {
         >,
     >,
     pub response_format: QueryResultFormat,
+    pub max_result_size: u64,
 }
 impl<'a> Default for HttpQueryArgs<'a> {
     #[inline]
@@ -1860,6 +1875,7 @@ impl<'a> Default for HttpQueryArgs<'a> {
             inline_tables: None,
             parameters: None,
             response_format: QueryResultFormat::Legacy,
+            max_result_size: 0,
         }
     }
 }
@@ -1910,6 +1926,11 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> HttpQueryBuilder<'a, 'b, A> {
         );
     }
     #[inline]
+    pub fn add_max_result_size(&mut self, max_result_size: u64) {
+        self.fbb_
+            .push_slot::<u64>(HttpQuery::VT_MAX_RESULT_SIZE, max_result_size, 0);
+    }
+    #[inline]
     pub fn new(
         _fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
     ) -> HttpQueryBuilder<'a, 'b, A> {
@@ -1934,6 +1955,7 @@ impl ::core::fmt::Debug for HttpQuery<'_> {
         ds.field("inline_tables", &self.inline_tables());
         ds.field("parameters", &self.parameters());
         ds.field("response_format", &self.response_format());
+        ds.field("max_result_size", &self.max_result_size());
         ds.finish()
     }
 }

@@ -56,7 +56,7 @@ use crate::queryplanner::info_schema::timestamp_nanos_or_panic;
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::query_executor::{
-    batches_to_dataframe, find_topmost_cluster_send_exec, QueryExecutor,
+    batches_to_dataframe, find_topmost_cluster_send_exec, MaxResultSize, QueryExecutor,
 };
 use crate::queryplanner::serialized_plan::{PreSerializedPlan, RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
@@ -310,6 +310,8 @@ pub struct SqlQueryContext {
     pub trace_obj: Option<String>,
     pub process_id: Option<String>,
     pub parameters: Option<QueryParameters>,
+    /// Largest result, in bytes, the client accepts.
+    pub max_result_size: Option<usize>,
 }
 
 impl SqlQueryContext {
@@ -340,6 +342,12 @@ impl SqlQueryContext {
     pub fn with_parameters(&self, parameters: &Option<QueryParameters>) -> Self {
         let mut res = self.clone();
         res.parameters = parameters.clone();
+        res
+    }
+
+    pub fn with_max_result_size(&self, max_result_size: Option<usize>) -> Self {
+        let mut res = self.clone();
+        res.max_result_size = max_result_size;
         res
     }
 }
@@ -870,9 +878,11 @@ impl SqlServiceImpl {
                     .await?;
                     if workers.len() == 0 {
                         let executor = self.query_executor.clone();
-                        match async_try_with_catch_unwind(
-                            executor.execute_router_plan(plan, cluster),
-                        )
+                        match async_try_with_catch_unwind(executor.execute_router_plan(
+                            plan,
+                            cluster,
+                            MaxResultSize::new(self.config_obj.max_query_result_size(), None),
+                        ))
                         .await
                         {
                             Ok(result) => result,
@@ -1375,6 +1385,10 @@ impl SqlServiceImpl {
 
                         let cluster = self.cluster.clone();
                         let executor = self.query_executor.clone();
+                        let max_result_size = MaxResultSize::new(
+                            self.config_obj.max_query_result_size(),
+                            context.max_result_size,
+                        );
                         let serialized_plan_time_start = SystemTime::now();
                         let serialized_plan = serialized.to_serialized_plan()?;
                         app_metrics::DATA_QUERY_TO_SERIALIZED_PLAN_TIME_US
@@ -1385,8 +1399,10 @@ impl SqlServiceImpl {
                                 .get(query, context, serialized_plan, async move |plan| {
                                     let records;
                                     if workers.len() == 0 {
-                                        records =
-                                            executor.execute_router_plan(plan, cluster).await?.1;
+                                        records = executor
+                                            .execute_router_plan(plan, cluster, max_result_size)
+                                            .await?
+                                            .1;
                                     } else {
                                         // Pick one of the workers to run as main for the request.
                                         let i = thread_rng().sample(Uniform::new(0, workers.len()));
@@ -1395,6 +1411,7 @@ impl SqlServiceImpl {
                                             .into_iter()
                                             .map(|r| r.read())
                                             .collect::<Result<Vec<_>, _>>()?;
+                                        max_result_size.check_batches(&records)?;
                                     }
                                     Ok(cube_ext::spawn_blocking(
                                         move || -> Result<DataFrame, CubeError> {
@@ -3539,6 +3556,82 @@ mod tests {
             assert_eq!(result.get_rows()[1], Row::new(vec![TableValue::Boolean(true), TableValue::Int(3823)]));
             Ok::<(), CubeError>(())
         }).await;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn oversized_query_result_fails() -> Result<(), CubeError> {
+        Config::test("oversized_query_result_fails")
+            .update_config(|mut c| {
+                c.max_query_result_size = 64 << 10;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                service.exec_query("CREATE SCHEMA foo").await?;
+                service
+                    .exec_query("CREATE TABLE foo.wide (id int, payload text)")
+                    .await?;
+                // ~200 KB of payload.
+                let values = (0..2000)
+                    .map(|i| format!("({}, '{}')", i, "x".repeat(100)))
+                    .join(", ");
+                service
+                    .exec_query(&format!(
+                        "INSERT INTO foo.wide (id, payload) VALUES {}",
+                        values
+                    ))
+                    .await?;
+
+                let select_all = "SELECT id, payload FROM foo.wide";
+                let err = service.exec_query(select_all).await.unwrap_err();
+                assert!(
+                    err.message
+                        .starts_with("Query result exceeds the maximum result size of 64 KB."),
+                    "{}",
+                    err.message
+                );
+                assert!(
+                    err.message.ends_with("adding filters or a limit."),
+                    "{}",
+                    err.message
+                );
+
+                // A client limit above Cube Store's bound doesn't raise it.
+                let err = service
+                    .exec_query_with_context(
+                        SqlQueryContext::default().with_max_result_size(Some(1 << 30)),
+                        select_all,
+                    )
+                    .await
+                    .unwrap_err();
+                assert!(
+                    err.message.contains("maximum result size of 64 KB"),
+                    "{}",
+                    err.message
+                );
+
+                // A client limit below the bound applies.
+                let limited = "SELECT id, payload FROM foo.wide ORDER BY id LIMIT 100";
+                let err = service
+                    .exec_query_with_context(
+                        SqlQueryContext::default().with_max_result_size(Some(4 << 10)),
+                        limited,
+                    )
+                    .await
+                    .unwrap_err();
+                assert!(
+                    err.message
+                        .ends_with("or raise CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE."),
+                    "{}",
+                    err.message
+                );
+
+                let result = service.exec_query(limited).await?.collect().await?;
+                assert_eq!(result.get_rows().len(), 100);
+                Ok::<(), CubeError>(())
+            })
+            .await;
         Ok(())
     }
 

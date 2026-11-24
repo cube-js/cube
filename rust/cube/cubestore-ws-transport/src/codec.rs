@@ -25,6 +25,7 @@ pub fn encode_query(message_id: u32, connection_id: &str, sql: &str) -> Bytes {
             inline_tables: None,
             parameters: None,
             response_format: QueryResultFormat::Arrow,
+            max_result_size: 0,
         },
     );
 
