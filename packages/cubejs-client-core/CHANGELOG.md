@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.34](https://github.com/cube-js/cube/compare/v1.8.33...v1.8.34) (2026-11-24)
+
+### Features
+
+- **client-core:** Send SQL parameters from cubeSql and add cubeSqlParams (CUB-8806) ([#12914](https://github.com/cube-js/cube/issues/12914)) ([f74471a](https://github.com/cube-js/cube/commit/f74471a62d08446ce4638213ca7b3ec604080747))
+
 ## [1.8.33](https://github.com/cube-js/cube/compare/v1.8.32...v1.8.33) (2026-11-23)
 
 **Note:** Version bump only for package @cubejs-client/core
