@@ -1,3 +1,4 @@
+use crate::app_metrics;
 use crate::cluster::{pick_import_worker, pick_worker_by_ids, Cluster};
 use crate::config::{ConfigObj, RepartitionStrategy};
 use crate::metastore::chunks::chunk_file_name;
@@ -69,6 +70,42 @@ const GC_DELETE_CHUNKS_BATCH: usize = 1000;
 const CHUNK_SWEEP_INTERVAL: Duration = Duration::from_secs(30);
 // Lagging can last for a while, so it wakes the sweep no more often than this.
 const CHUNK_SWEEP_MIN_INTERVAL: Duration = Duration::from_secs(5);
+
+const EVENTS_PENDING_REPORT_INTERVAL: Duration = Duration::from_secs(1);
+
+// Reports the event channel backlog at most once per interval, and at once when it drains, so
+// an idle channel never keeps a stale non-zero value.
+struct EventsPendingReporter {
+    last_report: Instant,
+    last_value: usize,
+}
+
+impl EventsPendingReporter {
+    fn new() -> Self {
+        app_metrics::SCHEDULER_EVENTS_PENDING.report(0);
+        Self {
+            last_report: Instant::now(),
+            last_value: 0,
+        }
+    }
+
+    fn observe(&mut self, pending: usize) {
+        if self.should_report(pending, Instant::now()) {
+            app_metrics::SCHEDULER_EVENTS_PENDING.report(pending as i64);
+        }
+    }
+
+    fn should_report(&mut self, pending: usize, now: Instant) -> bool {
+        let drained = pending == 0 && self.last_value != 0;
+        if drained || now.duration_since(self.last_report) >= EVENTS_PENDING_REPORT_INTERVAL {
+            self.last_report = now;
+            self.last_value = pending;
+            true
+        } else {
+            false
+        }
+    }
+}
 
 struct LastNodeActionTimes {
     in_memory_compaction: SystemTime,
@@ -238,22 +275,35 @@ impl SchedulerImpl {
             GCTask::DeleteChunks(chunk_ids) => {
                 match self.meta_store.get_chunks_out_of_queue(chunk_ids).await {
                     Ok(chunks) => {
-                        let ids = chunks
+                        let inactive = chunks
                             .iter()
-                            .filter_map(|c| {
-                                if c.get_row().active() {
-                                    None
-                                } else {
-                                    Some(c.get_id())
-                                }
-                            })
+                            .filter(|c| !c.get_row().active())
                             .collect::<Vec<_>>();
+                        let in_memory = inactive.iter().filter(|c| c.get_row().in_memory()).count();
+                        let persistent = inactive.len() - in_memory;
+                        let ids = inactive.iter().map(|c| c.get_id()).collect::<Vec<_>>();
 
-                        if let Err(e) = self.meta_store.delete_chunks_without_checks(ids).await {
-                            log::error!(
-                                "Could not delete chunks. Get error {} when deleting chunks",
-                                e
-                            );
+                        // Empty when every chunk of the task was reactivated or is already gone.
+                        if !ids.is_empty() {
+                            match self.meta_store.delete_chunks_without_checks(ids).await {
+                                Err(e) => log::error!(
+                                    "Could not delete chunks. Get error {} when deleting chunks",
+                                    e
+                                ),
+                                Ok(()) => {
+                                    app_metrics::GC_CHUNK_DELETE_BATCHES.increment();
+                                    for (in_memory, count) in
+                                        [(true, in_memory), (false, persistent)]
+                                    {
+                                        if count > 0 {
+                                            app_metrics::GC_CHUNKS_DELETED.add_with_tags(
+                                                count as i64,
+                                                Some(&vec![format!("in_memory:{}", in_memory)]),
+                                            );
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     Err(e) => {
@@ -306,8 +356,10 @@ impl SchedulerImpl {
     }
 
     async fn run_meta_event_processor(self: Arc<Self>) {
+        let mut pending_reporter = EventsPendingReporter::new();
         loop {
             let mut event_receiver = self.event_receiver.lock().await;
+            pending_reporter.observe(event_receiver.len());
             let event = tokio::select! {
                 _ = self.cancel_token.cancelled() => {
                     return;
@@ -315,6 +367,7 @@ impl SchedulerImpl {
                 event = event_receiver.recv() => {
                     match event {
                         Err(broadcast::error::RecvError::Lagged(messages)) => {
+                            app_metrics::SCHEDULER_EVENTS_DROPPED.add(messages as i64);
                             error!("Scheduler is lagging on meta store event processing for {} messages", messages);
                             // notify_one keeps a permit, so a sweep already running is
                             // followed by another one that sees the dropped events' effects.
@@ -1666,6 +1719,21 @@ mod tests {
     use crate::config::Config;
     use crate::metastore::RocksMetaStore;
     use std::fs;
+
+    #[test]
+    fn events_pending_reported_throttled_and_on_drain() {
+        let start = Instant::now();
+        let mut reporter = EventsPendingReporter {
+            last_report: start,
+            last_value: 0,
+        };
+        let at = |ms| start + Duration::from_millis(ms);
+        assert!(!reporter.should_report(5, at(100)), "throttled");
+        assert!(reporter.should_report(5, at(1000)), "interval elapsed");
+        assert!(!reporter.should_report(7, at(1500)), "throttled");
+        assert!(reporter.should_report(0, at(1600)), "drained");
+        assert!(!reporter.should_report(0, at(1700)), "already drained");
+    }
 
     #[tokio::test]
     async fn test_remove_jobs_on_non_exists_nodes() {

@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/clickhouse-driver",
   "description": "Cube ClickHouse database driver",
   "author": "Cube Dev, Inc.",
-  "version": "1.8.32",
+  "version": "1.8.34",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -36,16 +36,17 @@
     "integration:clickhouse": "NODE_OPTIONS=--experimental-vm-modules jest dist/test/integration"
   },
   "dependencies": {
+    "@aws-sdk/credential-provider-web-identity": "^3.972.77",
     "@clickhouse/client": "^1.23.1",
-    "@cubejs-backend/base-driver": "1.8.32",
-    "@cubejs-backend/shared": "1.8.32",
+    "@cubejs-backend/base-driver": "1.8.34",
+    "@cubejs-backend/shared": "1.8.34",
     "moment": "^2.30.1",
     "uuid": "^11.1.1"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "1.8.32",
-    "@cubejs-backend/testing-shared": "1.8.32",
+    "@cubejs-backend/linter": "1.8.34",
+    "@cubejs-backend/testing-shared": "1.8.34",
     "@types/jest": "^29",
     "@types/node": "^22",
     "jest": "^29",

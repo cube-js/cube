@@ -39,6 +39,28 @@ export function normalizeS3ClientConfig(clientOptions: S3StorageClientConfig): S
   return config;
 }
 
+export type S3Credentials = {
+  accessKeyId: string,
+  secretAccessKey: string,
+  sessionToken?: string,
+  expiration?: Date,
+};
+
+/**
+ * Resolves credentials from the AWS SDK default chain (env, web identity token, IRSA, ...)
+ * for a database that writes to S3 itself. A caller that caches the result must honour `expiration`.
+ */
+export async function resolveS3Credentials(clientOptions: S3StorageClientConfig): Promise<S3Credentials> {
+  const storage = new S3(normalizeS3ClientConfig(clientOptions));
+
+  try {
+    const { accessKeyId, secretAccessKey, sessionToken, expiration } = await storage.config.credentials();
+    return { accessKeyId, secretAccessKey, sessionToken, expiration };
+  } finally {
+    storage.destroy();
+  }
+}
+
 /**
  * Returns an array of signed AWS S3 URLs of the unloaded csv files.
  */

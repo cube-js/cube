@@ -305,6 +305,8 @@ pub trait ChunkDataStore: DIService + Send + Sync {
     ) -> Result<(), CubeError>;
     async fn free_memory_chunk(&self, chunk_name: String) -> Result<(), CubeError>;
     async fn free_deleted_memory_chunks(&self, chunk_names: Vec<String>) -> Result<(), CubeError>;
+    /// Reports held in-memory chunks by their metastore state.
+    async fn report_memory_chunk_states(&self) -> Result<(), CubeError>;
     async fn add_persistent_chunk(
         &self,
         index: IdRow<Index>,
@@ -850,9 +852,8 @@ impl ChunkDataStore for ChunkStore {
         chunk_name: String,
         batch: RecordBatch,
     ) -> Result<(), CubeError> {
+        self.memory_chunks.write().await.insert(chunk_name, batch);
         self.report_in_memory_metrics().await?;
-        let mut memory_chunks = self.memory_chunks.write().await;
-        memory_chunks.insert(chunk_name, batch);
         Ok(())
     }
     async fn add_persistent_chunk(
@@ -877,9 +878,8 @@ impl ChunkDataStore for ChunkStore {
     }
 
     async fn free_memory_chunk(&self, chunk_name: String) -> Result<(), CubeError> {
+        self.memory_chunks.write().await.remove(&chunk_name);
         self.report_in_memory_metrics().await?;
-        let mut memory_chunks = self.memory_chunks.write().await;
-        memory_chunks.remove(&chunk_name);
         Ok(())
     }
 
@@ -894,6 +894,70 @@ impl ChunkDataStore for ChunkStore {
         self.report_in_memory_metrics().await?;
         Ok(())
     }
+
+    async fn report_memory_chunk_states(&self) -> Result<(), CubeError> {
+        let states = self.memory_chunk_states().await?;
+        app_metrics::IN_MEMORY_CHUNKS_ACTIVE.report(states.active);
+        app_metrics::IN_MEMORY_CHUNKS_INACTIVE.report(states.inactive);
+        app_metrics::IN_MEMORY_CHUNKS_ORPHANS.report(states.orphans);
+        self.report_in_memory_metrics().await
+    }
+}
+
+#[derive(Debug, Default, PartialEq)]
+struct MemoryChunkStates {
+    active: i64,
+    inactive: i64,
+    orphans: i64,
+}
+
+impl ChunkStore {
+    // A held chunk always has a metastore row: the row is created before the data is added and
+    // ids are never reused. So a missing row means the chunk was deleted and its release was
+    // lost, e.g. with a deletion event the scheduler dropped while lagging.
+    async fn memory_chunk_states(&self) -> Result<MemoryChunkStates, CubeError> {
+        // Only a name that parses can be looked up, and so judged deleted.
+        let held = self
+            .memory_chunks
+            .read()
+            .await
+            .keys()
+            .filter(|name| chunk_id_from_file_name(name).is_some())
+            .cloned()
+            .collect::<Vec<_>>();
+        let ids = held
+            .iter()
+            .filter_map(|name| chunk_id_from_file_name(name))
+            .collect::<Vec<_>>();
+        let mut rows = HashMap::with_capacity(ids.len());
+        for ids in ids.chunks(MEMORY_CHUNK_LOOKUP_BATCH) {
+            for chunk in self
+                .meta_store
+                .get_chunks_out_of_queue(ids.to_vec())
+                .await?
+            {
+                rows.insert(chunk.get_row().get_full_name(chunk.get_id()), chunk);
+            }
+        }
+
+        let mut states = MemoryChunkStates::default();
+        for name in held {
+            match rows.get(&name) {
+                Some(c) if c.get_row().active() => states.active += 1,
+                // Not uploaded means not activated yet, e.g. a compaction output before its swap.
+                Some(c) if c.get_row().uploaded() => states.inactive += 1,
+                Some(_) => {}
+                None => states.orphans += 1,
+            }
+        }
+        Ok(states)
+    }
+}
+
+const MEMORY_CHUNK_LOOKUP_BATCH: usize = 1000;
+
+fn chunk_id_from_file_name(name: &str) -> Option<u64> {
+    name.split(|c| c == '-' || c == '.').next()?.parse().ok()
 }
 
 impl ChunkStore {
@@ -1411,6 +1475,119 @@ mod tests {
         )] {
             assert_eq!(v.deep_size_of(), expected_size, "size for {:?}", v);
         }
+    }
+
+    #[test]
+    fn chunk_id_from_file_names() {
+        assert_eq!(
+            chunk_id_from_file_name("42-abcd1234.chunk.parquet"),
+            Some(42)
+        );
+        assert_eq!(chunk_id_from_file_name("7.chunk.parquet"), Some(7));
+        assert_eq!(chunk_id_from_file_name("garbage"), None);
+    }
+
+    #[tokio::test]
+    async fn memory_chunk_states_count_orphans() {
+        let name = "memory_chunk_states_count_orphans";
+        let (remote_fs, metastore) = RocksMetaStore::prepare_test_metastore(name);
+        let config = Config::test(name);
+        let chunk_store = ChunkStore::new(
+            metastore.clone(),
+            remote_fs,
+            Arc::new(MockCluster::new()),
+            config.config_obj(),
+            CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
+            10,
+        );
+        metastore
+            .create_schema("foo".to_string(), false)
+            .await
+            .unwrap();
+        let cols = vec![Column::new("name".to_string(), ColumnType::String, 0)];
+        metastore
+            .create_table(
+                "foo".to_string(),
+                "bar".to_string(),
+                cols,
+                None,
+                None,
+                vec![],
+                true,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(vec!["name".to_string()]),
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+            .await
+            .unwrap();
+        let partition = metastore.get_partition(1).await.unwrap();
+        let index = metastore
+            .get_index(partition.get_row().get_index_id())
+            .await
+            .unwrap();
+        let empty_batch = || RecordBatch::new_empty(Arc::new(arrow_schema(index.get_row())));
+
+        let mut chunks = Vec::new();
+        for _ in 0..4 {
+            let chunk = metastore
+                .create_chunk(partition.get_id(), 1, None, None, true)
+                .await
+                .unwrap();
+            chunk_store
+                .add_memory_chunk(
+                    chunk_file_name(chunk.get_id(), chunk.get_row().suffix()),
+                    empty_batch(),
+                )
+                .await
+                .unwrap();
+            chunks.push(chunk);
+        }
+        // chunks[3] is never uploaded, like a compaction output before its swap: in no gauge.
+        let (kept, deactivated, deleted) = (&chunks[0], &chunks[1], &chunks[2]);
+        metastore.chunk_uploaded(kept.get_id()).await.unwrap();
+        metastore
+            .chunk_uploaded(deactivated.get_id())
+            .await
+            .unwrap();
+        metastore
+            .deactivate_chunks_without_check(vec![deactivated.get_id()])
+            .await
+            .unwrap();
+        metastore
+            .delete_chunks_without_checks(vec![deleted.get_id()])
+            .await
+            .unwrap();
+        // Same id as a live chunk but another suffix, so it is not that chunk.
+        let stale_suffix = chunk_file_name(kept.get_id(), &Some("stale000".to_string()));
+        chunk_store
+            .add_memory_chunk(stale_suffix.clone(), empty_batch())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            chunk_store.memory_chunk_states().await.unwrap(),
+            MemoryChunkStates {
+                active: 1,
+                inactive: 1,
+                // The deleted chunk and the stale-suffix copy of a live one.
+                orphans: 2,
+            }
+        );
+        assert_eq!(
+            chunk_store.memory_chunks.read().await.len(),
+            5,
+            "nothing is released"
+        );
+
+        RocksMetaStore::cleanup_test_metastore(name);
     }
 
     #[tokio::test]

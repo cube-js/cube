@@ -7,7 +7,7 @@
 /* eslint-disable import/first */
 import { vi } from 'vitest';
 
-import { CubeApi as CubeApiOriginal, Query } from '../src/index.js';
+import { CubeApi as CubeApiOriginal, CubeSqlParam, Query } from '../src/index.js';
 import HttpTransport from '../src/HttpTransport.js';
 import RequestError from '../src/RequestError.js';
 import {
@@ -694,6 +694,130 @@ describe('CubeApi cubeSql', () => {
     // `undefined` is dropped both by JSON.stringify (POST body) and by
     // requestStream's query-string builder, so it never reaches the wire.
     expect(requestStreamSpy.mock.calls[0]?.[1]?.params?.timezone).toBeUndefined();
+  });
+
+  const sqlParams: CubeSqlParam[] = [
+    { name: 'status', value: 'completed', type: 'string' },
+    { name: 'minAmount', value: 10, type: 'number' },
+    { name: 'since', value: null, type: 'time' },
+  ];
+
+  test('should forward the params option to the request body', async () => {
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBodyNoRefreshTime })),
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    await cubeApi.cubeSql('SELECT status FROM users WHERE status = :status', { params: sqlParams });
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[0]).toBe('cubesql');
+    expect(requestSpy.mock.calls[0]?.[1]?.params).toEqual(sqlParams);
+  });
+
+  // A server predating parameter support rejects an unknown `params` key, so a
+  // query without parameters must not send one.
+  test('should omit params from the request body when not set', async () => {
+    const requestSpy = vi.spyOn(HttpTransport.prototype, 'request').mockImplementation(() => ({
+      subscribe: (cb) => Promise.resolve(cb({
+        status: 200,
+        text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBodyNoRefreshTime })),
+      } as any,
+      async () => undefined as any))
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    await cubeApi.cubeSql('SELECT status FROM users');
+    expect(requestSpy).toHaveBeenCalled();
+    expect(requestSpy.mock.calls[0]?.[1]).not.toHaveProperty('params');
+  });
+
+  test('should send params in the POST body as an array', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      status: 200,
+      text: () => Promise.resolve(JSON.stringify({ error: cubeSqlResponseBodyNoRefreshTime })),
+    } as any);
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    await cubeApi.cubeSql('SELECT status FROM users WHERE status = :status', { params: sqlParams });
+    expect(fetchSpy).toHaveBeenCalled();
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://localhost:4000/cubejs-api/v1/cubesql');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string).params).toEqual(sqlParams);
+  });
+
+  test('should forward the params option to the stream request params', async () => {
+    const requestStreamSpy = vi.spyOn(HttpTransport.prototype, 'requestStream').mockImplementation(() => ({
+      stream: async () => (async function* generate() {
+        yield new TextEncoder().encode(`${cubeSqlResponseBodyNoRefreshTime}\n`);
+      }()),
+    }));
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    for await (const chunk of cubeApi.cubeSqlStream('SELECT status FROM users WHERE status = :status', { params: sqlParams })) {
+      // drain the stream
+    }
+
+    expect(requestStreamSpy).toHaveBeenCalled();
+    expect(requestStreamSpy.mock.calls[0]?.[0]).toBe('cubesql');
+    expect(requestStreamSpy.mock.calls[0]?.[1]?.params?.params).toEqual(sqlParams);
+  });
+
+  test('should list the query parameters with cubeSqlParams', async () => {
+    const described = [
+      { name: 'status', type: 'string' },
+      { name: 'since', type: 'time' },
+      { name: 'other', type: 'unknown' },
+    ];
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      status: 200,
+      text: () => Promise.resolve(JSON.stringify({ params: described })),
+    } as any);
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    const sql = 'SELECT status FROM users WHERE status = :status AND created_at > :since';
+    const result = await cubeApi.cubeSqlParams(sql);
+
+    expect(result).toEqual(described);
+    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+    // The endpoint only accepts POST, whatever the URL length would pick.
+    expect(url).toBe('http://localhost:4000/cubejs-api/v1/cubesql/params');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ query: sql });
+  });
+
+  test('should reject cubeSqlParams with the server error for an invalid query', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      status: 400,
+      text: () => Promise.resolve(JSON.stringify({ error: 'Error during planning: table "nope" not found' })),
+    } as any);
+
+    const cubeApi = new CubeApi('token', {
+      apiUrl: 'http://localhost:4000/cubejs-api/v1',
+    });
+
+    await expect(cubeApi.cubeSqlParams('SELECT * FROM nope WHERE x = :x'))
+      .rejects.toThrow('Error during planning: table "nope" not found');
   });
 
   test('should parse usedPreAggregations from response', async () => {

@@ -1252,7 +1252,7 @@ fn test_count_distinct_approx_rolling_pre_agg_keeps_state() -> Result<(), CubeEr
     assert_eq!(pre_aggrs.len(), 1);
     assert_eq!(pre_aggrs[0].name(), "approx_rolling");
 
-    // Leaf reads the rollup column as a bare merged state (hll_merge).
+    // Leaf reads the rollup column as a bare merged state (hll_merge_only).
     assert!(
         sql.contains("merge(\"orders__rolling_unique_customers_approx_7d\")"),
         "Rolling leaf should keep the merged HLL state, got:\n{}",
@@ -1278,7 +1278,7 @@ fn test_count_distinct_approx_rolling_pre_agg_keeps_state() -> Result<(), CubeEr
 //
 // The mock driver renders these as distinct, CubeStore-style forms:
 //   hll_init               -> hll_add_agg(hll_hash_any(x))
-//   hll_merge              -> merge(x)                       (state only)
+//   hll_merge_only         -> merge(x)                       (state only)
 //   hll_cardinality_merge  -> cardinality(merge(x))
 //   count_distinct_approx  -> round(hll_cardinality(hll_add_agg(hll_hash_any(x))))
 

@@ -708,7 +708,7 @@ fn invoke_driver_tools<IT: InnerTypes>(b: &NativeDriverTools<IT>) -> InvokeResul
         b.interval_and_minimal_time_unit(s()),
     );
     r.record("hll_init", b.hll_init(s()));
-    r.record("hll_merge", b.hll_merge(s()));
+    r.record("hll_merge_only", b.hll_merge_only(s()));
     r.record("hll_cardinality_merge", b.hll_cardinality_merge(s()));
     r.record("count_distinct_approx", b.count_distinct_approx(s()));
     r.record(

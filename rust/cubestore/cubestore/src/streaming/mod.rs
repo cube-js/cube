@@ -17,26 +17,34 @@ use crate::store::ChunkDataStore;
 use crate::streaming::kafka::{KafkaClientService, KafkaStreamingSource};
 use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue, TimestampValue};
+use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::util::decimal::Decimal;
+use crate::util::metrics::metrics_enabled;
 use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use buffered_stream::BufferedStream;
 use chrono::Utc;
 use datafusion::arrow::array::ArrayBuilder;
 use datafusion::arrow::array::ArrayRef;
+use datafusion::cube_ext;
 use futures::future::join_all;
 use futures::stream::StreamExt;
+use futures::FutureExt;
 use futures::Stream;
 use futures_util::stream;
 use itertools::Itertools;
 use json::JsonValue;
 use log::debug;
+use rand::Rng;
 use reqwest::{Response, Url};
 use serde::{Deserialize, Serialize};
+use std::future::Future;
 use std::io::{Cursor, Write};
+use std::panic::AssertUnwindSafe;
 use std::pin::Pin;
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime};
 use tracing::Instrument;
 use traffic_sender::TrafficSender;
 use warp::hyper::body::Bytes;
@@ -229,6 +237,32 @@ impl StreamingServiceImpl {
 #[async_trait]
 impl StreamingService for StreamingServiceImpl {
     async fn stream_table(&self, table: IdRow<Table>, location: &str) -> Result<(), CubeError> {
+        let lag_reset = LagGaugesReset::new(vec![format!("location:{}", location)]);
+        run_with_lag_reset(
+            &lag_reset,
+            self.stream_table_impl(table, location, &lag_reset),
+        )
+        .await
+    }
+
+    async fn validate_table_location(
+        &self,
+        table: IdRow<Table>,
+        location: &str,
+    ) -> Result<(), CubeError> {
+        let source = self.source_by(&table, location, None).await?;
+        source.validate_table_location()?;
+        Ok(())
+    }
+}
+
+impl StreamingServiceImpl {
+    async fn stream_table_impl(
+        &self,
+        table: IdRow<Table>,
+        location: &str,
+        lag_reset: &LagGaugesReset,
+    ) -> Result<(), CubeError> {
         if table.get_row().sealed() {
             return Ok(());
         }
@@ -271,6 +305,17 @@ impl StreamingService for StreamingServiceImpl {
         let mut last_init_seq_check = SystemTime::now();
         let mut round_trip_started: Option<SystemTime> = None;
         let tags = vec![format!("location:{}", location)];
+        let last_seq = Arc::new(AtomicI64::new(initial_seq_value.unwrap_or(NO_SEQ)));
+        let _lag_reporter = (source.reports_lag() && metrics_enabled()).then(|| {
+            lag_reset.arm();
+            spawn_lag_reporter(
+                source.clone(),
+                last_seq.clone(),
+                lag_reset.stopped.clone(),
+                tags.clone(),
+                STREAMING_LAG_REPORT_INTERVAL,
+            )
+        });
 
         while !sealed {
             let new_rows = match tokio::time::timeout(
@@ -286,7 +331,8 @@ impl StreamingService for StreamingServiceImpl {
                 }
                 Err(e) => {
                     self.try_seal_table(&table).await?;
-
+                    // An idle stream ends here; it is not a broken one.
+                    lag_reset.stop_cleanly();
                     return Err(CubeError::user(format!("Stale stream timeout: {}", e)));
                 }
             };
@@ -391,11 +437,9 @@ impl StreamingService for StreamingServiceImpl {
                 .add_with_tags(new_chunk_ids.len() as i64, Some(&tags));
             app_metrics::STREAMING_ROUNDTRIP_CHUNKS
                 .report_with_tags(new_chunk_ids.len() as i64, Some(&tags));
-            if let Some(last_seq) = end_seq {
-                app_metrics::STREAMING_LASTOFFSET.report_with_tags(last_seq, Some(&tags));
-                if let Some(lag) = source.calulate_lag(last_seq.clone()).await {
-                    app_metrics::STREAMING_LAG.report_with_tags(lag, Some(&tags));
-                }
+            if let Some(end_seq) = end_seq {
+                app_metrics::STREAMING_LASTOFFSET.report_with_tags(end_seq, Some(&tags));
+                last_seq.store(end_seq, Ordering::Relaxed);
             }
             self.meta_store
                 .activate_chunks(table.get_id(), new_chunk_ids, Some(replay_handle.get_id()))
@@ -411,15 +455,127 @@ impl StreamingService for StreamingServiceImpl {
 
         Ok(())
     }
+}
 
-    async fn validate_table_location(
-        &self,
-        table: IdRow<Table>,
-        location: &str,
-    ) -> Result<(), CubeError> {
-        let source = self.source_by(&table, location, None).await?;
-        source.validate_table_location()?;
-        Ok(())
+const STREAMING_LAG_REPORT_INTERVAL: Duration = Duration::from_secs(10);
+const NO_SEQ: i64 = i64::MIN;
+const STALE_LAG_AGE_MS: i64 = i64::MAX;
+
+// Lag is reported on its own schedule rather than per received batch, so it keeps updating while
+// the stream is idle and a failing watermark fetch shows up as a growing age instead of a frozen
+// value. The task stops when the returned handle is dropped.
+fn spawn_lag_reporter(
+    source: Arc<dyn StreamingSource>,
+    last_seq: Arc<AtomicI64>,
+    stopped: Arc<Mutex<bool>>,
+    tags: Vec<String>,
+    interval: Duration,
+) -> AbortingJoinHandle<()> {
+    // A random phase keeps streams started together from fetching watermarks in one burst.
+    let phase = interval.mul_f64(rand::thread_rng().gen_range(0.0..1.0));
+    AbortingJoinHandle::new(cube_ext::spawn(async move {
+        tokio::time::sleep(phase).await;
+        let mut last_computed: Option<Instant> = None;
+        let mut last_lag: Option<i64> = None;
+        loop {
+            let seq = last_seq.load(Ordering::Relaxed);
+            if seq != NO_SEQ {
+                // A fetch that never succeeds still shows up as an age growing from the first offset.
+                last_computed.get_or_insert_with(Instant::now);
+                if let Some(lag) = source.calulate_lag(seq).await {
+                    last_lag = Some(lag);
+                    last_computed = Some(Instant::now());
+                }
+            }
+            {
+                // An abort lands only at the next await, so a send can race the final values;
+                // the reset sends them under the same lock.
+                let stopped = stopped.lock().unwrap();
+                if *stopped {
+                    return;
+                }
+                // Re-sent while the fetch fails, so an exporter ttl does not drop it; the age tells
+                // that it is stale.
+                if let Some(lag) = last_lag {
+                    app_metrics::STREAMING_LAG.report_with_tags(lag, Some(&tags));
+                }
+                if let Some(t) = last_computed {
+                    app_metrics::STREAMING_LAG_AGE_MS
+                        .report_with_tags(t.elapsed().as_millis() as i64, Some(&tags));
+                }
+            }
+            tokio::time::sleep(interval).await;
+        }
+    }))
+}
+
+// Marks the stream failed on an error or a panic. A panic must be caught here: the runtime drops
+// the panicked future only after unwinding, when `Drop` can no longer tell it from a clean stop.
+async fn run_with_lag_reset(
+    lag_reset: &LagGaugesReset,
+    stream: impl Future<Output = Result<(), CubeError>>,
+) -> Result<(), CubeError> {
+    match AssertUnwindSafe(stream).catch_unwind().await {
+        Ok(res) => {
+            if res.is_err() {
+                lag_reset.mark_failed();
+            }
+            res
+        }
+        Err(panic) => {
+            lag_reset.mark_failed();
+            std::panic::resume_unwind(panic)
+        }
+    }
+}
+
+// Zeroes the lag gauges when a stream stops cleanly on this node (sealed, table dropped, stream
+// moved away). After a failure the lag stays and its age is pinned to a stale sentinel instead.
+struct LagGaugesReset {
+    tags: Vec<String>,
+    armed: AtomicBool,
+    failed: AtomicBool,
+    clean_stop: AtomicBool,
+    stopped: Arc<Mutex<bool>>,
+}
+
+impl LagGaugesReset {
+    fn new(tags: Vec<String>) -> Self {
+        Self {
+            tags,
+            armed: AtomicBool::new(false),
+            failed: AtomicBool::new(false),
+            clean_stop: AtomicBool::new(false),
+            stopped: Arc::new(Mutex::new(false)),
+        }
+    }
+
+    fn arm(&self) {
+        self.armed.store(true, Ordering::Relaxed);
+    }
+
+    fn mark_failed(&self) {
+        self.failed.store(true, Ordering::Relaxed);
+    }
+
+    fn stop_cleanly(&self) {
+        self.clean_stop.store(true, Ordering::Relaxed);
+    }
+}
+
+impl Drop for LagGaugesReset {
+    fn drop(&mut self) {
+        let mut stopped = self.stopped.lock().unwrap();
+        *stopped = true;
+        if !self.armed.load(Ordering::Relaxed) {
+            return;
+        }
+        if self.failed.load(Ordering::Relaxed) && !self.clean_stop.load(Ordering::Relaxed) {
+            app_metrics::STREAMING_LAG_AGE_MS.report_with_tags(STALE_LAG_AGE_MS, Some(&self.tags));
+        } else {
+            app_metrics::STREAMING_LAG.report_with_tags(0, Some(&self.tags));
+            app_metrics::STREAMING_LAG_AGE_MS.report_with_tags(0, Some(&self.tags));
+        }
     }
 }
 
@@ -438,6 +594,11 @@ pub trait StreamingSource: Send + Sync {
 
     async fn apply_post_processing(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
         Ok(data)
+    }
+
+    /// Whether [StreamingSource::calulate_lag] can return a value; otherwise no lag is reported.
+    fn reports_lag(&self) -> bool {
+        false
     }
 
     async fn calulate_lag(&self, _current_seq: i64) -> Option<i64> {
@@ -954,6 +1115,144 @@ mod tests {
     use sqlparser::parser::Parser;
     use sqlparser::tokenizer::Tokenizer;
     use tokio::time::timeout;
+
+    struct LagSource {
+        columns: Vec<Column>,
+        lag_calls: Arc<std::sync::Mutex<Vec<i64>>>,
+    }
+
+    #[async_trait]
+    impl StreamingSource for LagSource {
+        async fn row_stream(
+            &self,
+            _columns: Vec<Column>,
+            _seq_column: Column,
+            _initial_seq_value: Option<i64>,
+        ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError> {
+            Ok(Box::pin(stream::empty()))
+        }
+
+        fn source_columns(&self) -> &Vec<Column> {
+            &self.columns
+        }
+
+        fn source_seq_column_index(&self) -> usize {
+            0
+        }
+
+        fn reports_lag(&self) -> bool {
+            true
+        }
+
+        async fn calulate_lag(&self, current_seq: i64) -> Option<i64> {
+            self.lag_calls.lock().unwrap().push(current_seq);
+            Some(0)
+        }
+
+        fn validate_table_location(&self) -> Result<(), CubeError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn lag_reporter_keeps_polling_without_traffic() {
+        let interval = Duration::from_millis(20);
+        let lag_calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let source = Arc::new(LagSource {
+            columns: Vec::new(),
+            lag_calls: lag_calls.clone(),
+        });
+        let last_seq = Arc::new(AtomicI64::new(NO_SEQ));
+        let reporter = spawn_lag_reporter(
+            source,
+            last_seq.clone(),
+            Arc::new(Mutex::new(false)),
+            Vec::new(),
+            interval,
+        );
+
+        tokio::time::sleep(interval * 2).await;
+        assert!(lag_calls.lock().unwrap().is_empty(), "nothing consumed yet");
+
+        last_seq.store(41, Ordering::Relaxed);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while lag_calls.lock().unwrap().len() < 3 && Instant::now() < deadline {
+            tokio::time::sleep(interval).await;
+        }
+        let calls = lag_calls.lock().unwrap().clone();
+        assert!(calls.len() >= 3, "polled {} times", calls.len());
+        assert!(calls.iter().all(|s| *s == 41));
+
+        drop(reporter);
+        let polled = lag_calls.lock().unwrap().len();
+        tokio::time::sleep(interval * 3).await;
+        assert_eq!(
+            lag_calls.lock().unwrap().len(),
+            polled,
+            "stops with its handle"
+        );
+    }
+
+    #[test]
+    fn lag_gauges_reset_final_values() {
+        use crate::util::metrics::test_capture;
+        test_capture::watch("cs.streaming.lag");
+        test_capture::watch("cs.streaming.lag.age.ms");
+        let final_values = |case: &str, setup: &dyn Fn(&LagGaugesReset)| {
+            let tags = vec![format!("location:lag_gauges_reset_{}", case)];
+            let reset = LagGaugesReset::new(tags.clone());
+            setup(&reset);
+            drop(reset);
+            let of = |name| {
+                test_capture::samples(name)
+                    .into_iter()
+                    .filter(|(_, t)| *t == tags)
+                    .map(|(v, _)| v)
+                    .collect::<Vec<_>>()
+            };
+            (of("cs.streaming.lag"), of("cs.streaming.lag.age.ms"))
+        };
+
+        assert_eq!(final_values("unarmed", &|_| {}), (vec![], vec![]));
+        assert_eq!(final_values("clean", &|r| r.arm()), (vec![0], vec![0]));
+        assert_eq!(
+            final_values("failed", &|r| {
+                r.arm();
+                r.mark_failed();
+            }),
+            (vec![], vec![STALE_LAG_AGE_MS])
+        );
+        assert_eq!(
+            final_values("stale_stream", &|r| {
+                r.arm();
+                r.stop_cleanly();
+                r.mark_failed();
+            }),
+            (vec![0], vec![0])
+        );
+    }
+
+    #[tokio::test]
+    async fn stream_panic_marks_lag_failed() {
+        use crate::util::metrics::test_capture;
+        test_capture::watch("cs.streaming.lag.age.ms");
+        let tags = vec!["location:stream_panic_marks_lag_failed".to_string()];
+        let reset = LagGaugesReset::new(tags.clone());
+        reset.arm();
+        let panicked = AssertUnwindSafe(run_with_lag_reset(&reset, async {
+            panic!("ingest panic");
+        }))
+        .catch_unwind()
+        .await;
+        assert!(panicked.is_err());
+        drop(reset);
+        let ages = test_capture::samples("cs.streaming.lag.age.ms")
+            .into_iter()
+            .filter(|(_, t)| *t == tags)
+            .map(|(v, _)| v)
+            .collect::<Vec<_>>();
+        assert_eq!(ages, vec![STALE_LAG_AGE_MS]);
+    }
 
     pub struct MockKsqlClient;
 

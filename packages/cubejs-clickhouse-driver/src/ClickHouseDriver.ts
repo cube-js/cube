@@ -15,6 +15,7 @@ import {
   GenericDataBaseType,
   QueryOptions,
   QuerySchemasResult,
+  S3Credentials,
   StreamOptions,
   StreamTableDataWithTypes,
   TableColumn,
@@ -41,6 +42,49 @@ import { buildTransformFromMeta, transformRow } from './Transform';
 import { formatError } from './utils';
 
 const SUPPORTED_BUCKET_TYPES = ['s3'];
+
+// ClickHouse signs every upload part with the export's credentials, so each export must start with at least
+// this long left. Of a default 1h STS session that leaves 10 min of sharing: enough to absorb a build burst.
+const EXPORT_CREDENTIALS_REFRESH_MARGIN_MS = 50 * 60 * 1000;
+
+/**
+ * Inline session policy for the credentials handed to ClickHouse: the role's rights, cut down to the
+ * export bucket path. A session policy can only narrow the role, never widen it.
+ */
+export function exportBucketSessionPolicy(bucketName: string, path: string, partition: string = 'aws'): string {
+  const prefix = path ? `${path}/` : '';
+
+  return JSON.stringify({
+    Version: '2012-10-17',
+    Statement: [
+      {
+        Effect: 'Allow',
+        Action: ['s3:PutObject', 's3:GetObject', 's3:AbortMultipartUpload', 's3:ListMultipartUploadParts'],
+        Resource: `arn:${partition}:s3:::${bucketName}/${prefix}*`,
+      },
+      {
+        Effect: 'Allow',
+        Action: ['s3:ListBucket', 's3:GetBucketLocation'],
+        Resource: `arn:${partition}:s3:::${bucketName}`,
+      },
+      {
+        // SSE-KMS: key use only through S3 for this bucket (bucket ARN too, for S3 Bucket Keys).
+        Effect: 'Allow',
+        Action: ['kms:GenerateDataKey', 'kms:Decrypt'],
+        Resource: '*',
+        Condition: {
+          StringLike: {
+            'kms:ViaService': 's3.*.amazonaws.com*',
+            'kms:EncryptionContext:aws:s3:arn': [
+              `arn:${partition}:s3:::${bucketName}`,
+              `arn:${partition}:s3:::${bucketName}/${prefix}*`,
+            ],
+          },
+        },
+      },
+    ],
+  });
+}
 
 // Statements without a result set. Sent through `client.query()`, ClickHouse answers them with an
 // empty body, or with a TabSeparated DDL status on a Replicated database: neither parses as JSONCompact.
@@ -120,8 +164,8 @@ interface ClickhouseDriverExportRequiredAWS {
 }
 
 interface ClickhouseDriverExportKeySecretAWS extends ClickhouseDriverExportRequiredAWS {
-  keyId: string,
-  secretKey: string,
+  keyId?: string,
+  secretKey?: string,
 }
 
 interface ClickhouseDriverExportAWS extends ClickhouseDriverExportKeySecretAWS {
@@ -156,6 +200,8 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   protected readonly config: ClickHouseDriverConfig;
 
   protected readonly killQueryTimeout: number = 10 * 1000;
+
+  protected exportCredentials: Promise<S3Credentials> | null = null;
 
   /**
    * Class constructor.
@@ -723,31 +769,43 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unload is not configured');
     }
 
+    const { keyId, secretKey, region } = this.config.exportBucket;
+    // Checked here, not in the constructor, so a half-set pair fails only the export, never other queries.
+    if (!keyId !== !secretKey) {
+      throw new Error(
+        'Unsupported configuration exportBucket, keyId and secretKey must be set together, ' +
+        'or both left empty to use the AWS SDK default credential chain'
+      );
+    }
+
     const types = await this.queryColumnTypes(`(${sql})`, params, { requestId: options.requestId });
     const { bucketName, path } = this.parseBucketUrl(this.config.exportBucket.bucketName);
     const exportPrefix = path ? `${path}/${uuidv4()}` : uuidv4();
 
-    const formattedQuery = formatClickHouse(`
+    const staticCredentials = keyId && secretKey ? { accessKeyId: keyId, secretAccessKey: secretKey } : undefined;
+    // ClickHouse writes to S3 itself, so the pod's OIDC identity never reaches it: hand it short-lived credentials.
+    const credentials: S3Credentials = staticCredentials ?? await this.getExportCredentials(bucketName, path, region);
+    const credentialParams = [credentials.accessKeyId, credentials.secretAccessKey];
+    if (credentials.sessionToken) {
+      credentialParams.push(credentials.sessionToken);
+    }
+
+    // Formatted apart from `sql`: an empty `params` must keep skipping the scan, or a ClickHouse `a ? b : c` breaks.
+    const insertInto = formatClickHouse(`
       INSERT INTO FUNCTION
          s3(
-             'https://${bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
-             '${this.config.exportBucket.keyId}',
-             '${this.config.exportBucket.secretKey}',
+             'https://${bucketName}.s3.${region}.amazonaws.com/${exportPrefix}/export.csv.gz',
+             ${credentialParams.map(() => '?').join(',\n             ')},
              'CSV'
           )
-      ${sql}
+      `, credentialParams);
+    const formattedQuery = insertInto + formatClickHouse(`${sql}
     `, params);
 
     await this.command(formattedQuery, { requestId: options.requestId });
 
     const csvFile = await this.extractUnloadedFilesFromS3(
-      {
-        credentials: {
-          accessKeyId: this.config.exportBucket.keyId,
-          secretAccessKey: this.config.exportBucket.secretKey,
-        },
-        region: this.config.exportBucket.region,
-      },
+      staticCredentials ? { credentials: staticCredentials, region } : { region },
       bucketName,
       exportPrefix,
     );
@@ -759,6 +817,58 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       // Can be controlled via SET format_csv_delimiter
       csvDelimiter: ','
     };
+  }
+
+  /**
+   * Shares one set of temporary credentials across exports until it nears expiry, so a partitioned
+   * build does not make one STS call per partition.
+   */
+  protected async getExportCredentials(bucketName: string, path: string, region: string): Promise<S3Credentials> {
+    const current = this.exportCredentials;
+    if (current) {
+      const credentials = await current.catch(() => null);
+      if (
+        credentials &&
+        (!credentials.expiration || credentials.expiration.getTime() - Date.now() > EXPORT_CREDENTIALS_REFRESH_MARGIN_MS)
+      ) {
+        return credentials;
+      }
+
+      if (this.exportCredentials !== current) {
+        return this.getExportCredentials(bucketName, path, region);
+      }
+    }
+
+    const next = this.resolveExportCredentials(bucketName, path, region);
+    this.exportCredentials = next;
+
+    return next;
+  }
+
+  protected async resolveExportCredentials(bucketName: string, path: string, region: string): Promise<S3Credentials> {
+    const stsRegion = process.env.AWS_REGION || region;
+
+    // Static env keys win in the SDK default chain too, so only scope when web identity is what it would use.
+    if (
+      process.env.AWS_WEB_IDENTITY_TOKEN_FILE && process.env.AWS_ROLE_ARN &&
+      !(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY)
+    ) {
+      // The bucket ARN must be in the role's partition (aws-us-gov, aws-cn), or the policy matches nothing.
+      const partition = process.env.AWS_ROLE_ARN.split(':')[1] || 'aws';
+      return this.resolveWebIdentityCredentials(exportBucketSessionPolicy(bucketName, path, partition), stsRegion);
+    }
+
+    return this.resolveS3Credentials({ region: stsRegion });
+  }
+
+  protected async resolveWebIdentityCredentials(policy: string, region: string): Promise<S3Credentials> {
+    const { fromTokenFile } = await import('@aws-sdk/credential-provider-web-identity');
+    const { accessKeyId, secretAccessKey, sessionToken, expiration } = await fromTokenFile({
+      policy,
+      clientConfig: { region },
+    })();
+
+    return { accessKeyId, secretAccessKey, sessionToken, expiration };
   }
 
   public capabilities(): DriverCapabilities {

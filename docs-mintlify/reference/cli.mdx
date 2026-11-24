@@ -1008,9 +1008,9 @@ Leave `--sync-on-deploy` off for production, so that no deployment publishes the
 `target set` creates a target that doesn't exist. It reads the target first and saves with the
 configuration version it read, so a save that races another fails with `409`. The flags change
 only what they name. `--data` (inline JSON, `@file`, or `-` for standard input) replaces all
-settings instead, with the flags winning over the same key; it can also carry the `connection` of
-a data source [served by `driver_factory`](/docs/integrations/databricks-metric-views#data-sources-served-by-driver_factory),
-and an `expectedConfigurationVersion` to send as given.
+settings instead, with the flags winning over the same key; it can also carry the target's own
+[`connection`](/docs/integrations/databricks-metric-views#publish-to-another-workspace) and an
+`expectedConfigurationVersion` to send as given.
 
 Publish to staging, run your own checks there, then publish the same build to production:
 
