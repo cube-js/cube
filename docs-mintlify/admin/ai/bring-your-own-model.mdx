@@ -82,17 +82,25 @@ come from a different provider or account than the agent's LLM. For example,
 an agent can answer questions with GLM through a Custom OpenAI-compatible
 model and run short tasks on Claude Haiku 5.5 through Anthropic.
 
+{/* TODO: video — small LLMs: add a Small LLM model and assign it to an agent (GTM-316) */}
+
 ### Adding a small LLM
 
 Add a small LLM the same way as any other model: in **Admin > Models**, click
 **Add model**, select the **Small LLM** model type, and choose a provider,
 model and credentials.
 
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/admin/ai/bring-your-own-model/add-small-llm-model.png"
+    alt="Add model dialog with the Small LLM model type, the Anthropic provider, the Claude Haiku 5.5 model and the API Key field"
+  />
+</Frame>
+
 ### Assigning a small LLM to an agent
 
-Pick the agent's small LLM in the **Small LLM** field of the agent's settings,
-or with the `small_llm` property in the agents YAML configuration. It accepts
-`auto`, a built-in model (`claude-haiku-5-5` or `gpt-6-luna`), or a BYOM
+Set the agent's small LLM with the `small_llm` property in the agents YAML
+configuration. It accepts `auto`, a built-in model (`claude-haiku-5-5` or `gpt-6-luna`), or a BYOM
 reference to a model of type **Small LLM**:
 
 ```yaml
@@ -125,6 +133,17 @@ If the agent's LLM is a BYOM model, keep its small LLM on BYOM too. A built-in
 small LLM consumes Cube AI tokens (see [Billing](#billing)).
 
 </Tip>
+
+The **Small LLM** field of the agent's settings shows the agent's small LLM. It
+warns you when an agent on a BYOM LLM runs its short tasks on a built-in small
+LLM:
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/admin/ai/bring-your-own-model/agent-small-llm-setting.png"
+    alt="Agent settings with the LLM, Small LLM and Embedding model fields, and a warning that the agent's short tasks run on Cube-hosted Claude Haiku 5.5 and use Cube AI tokens"
+  />
+</Frame>
 
 If the provider refuses a BYOM small LLM (for example, the model is not enabled
 for your account or region), the agent falls back to `auto`. If the provider
