@@ -191,3 +191,31 @@ async fn test_granularity_dimension_and_time_dimension_with_time_shift_and_rolli
         insta::assert_snapshot!(result);
     }
 }
+
+// The SQL API can alias the time dimension on its own; the dimension then keeps
+// its default alias and both columns are read back, so both stay projected.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_granularity_dimension_kept_when_time_dimension_alias_differs() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+        dimensions:
+          - orders.created_at.month
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+        memberToAlias:
+          orders.created_at.month: td_month
+        order:
+          - id: orders.created_at.month
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_unique_columns(&result);
+        insta::assert_snapshot!(result);
+    }
+}
