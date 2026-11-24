@@ -104,12 +104,12 @@ impl JobStatus {
     }
 }
 
-/// A bounded label for a job failure message, for metrics.
 /// Error message of a job that exceeded its timeout.
 pub const JOB_TIMED_OUT_MESSAGE: &str = "timed out";
 /// Error message of a job interrupted by the process shutting down.
 pub const JOB_SHUTTING_DOWN_MESSAGE: &str = "shutting down";
 
+/// A bounded label for a job failure message, for metrics.
 pub fn job_error_class(message: &str, is_panic: bool) -> &'static str {
     if message.contains("offset overflow") {
         "offset_overflow"
