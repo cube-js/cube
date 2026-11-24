@@ -47,9 +47,9 @@ cubes:
   });
 
   const dialects = [
-    { name: 'Snowflake', queryClass: SnowflakeQuery, cardinality: 'HLL_ESTIMATE' },
-    { name: 'BigQuery', queryClass: BigqueryQuery, cardinality: 'HLL_COUNT.MERGE' },
-    { name: 'Presto', queryClass: PrestodbQuery, cardinality: 'cardinality' },
+    { name: 'Snowflake', queryClass: SnowflakeQuery, cardinality: 'HLL_ESTIMATE', mergeOnly: 'HLL_EXPORT(HLL_COMBINE(' },
+    { name: 'BigQuery', queryClass: BigqueryQuery, cardinality: 'HLL_COUNT.MERGE', mergeOnly: 'HLL_COUNT.MERGE_PARTIAL(' },
+    { name: 'Presto', queryClass: PrestodbQuery, cardinality: 'cardinality', mergeOnly: ') as varbinary)' },
   ];
 
   // Matches `fn(` only as a whole name: `HLL_COUNT.MERGE(` is not `HLL_COUNT.MERGE_PARTIAL(`.
@@ -58,13 +58,13 @@ cubes:
     return (sql.match(new RegExp(`(?<![\\w.])${escaped}\\(`, 'g')) || []).length;
   };
 
-  describe.each(dialects)('$name', ({ queryClass, cardinality }) => {
-    function buildSql(measure: string): string {
+  describe.each(dialects)('$name', ({ queryClass, cardinality, mergeOnly }) => {
+    function buildSql(measure: string, withGranularity = true): string {
       const query = compilers.createQuery(queryClass, {
         measures: [measure],
         timeDimensions: [{
           dimension: 'sessions.created_at',
-          granularity: 'day',
+          granularity: withGranularity ? 'day' : undefined,
           dateRange: ['2024-01-01', '2024-01-10'],
         }],
         timezone: 'UTC',
@@ -79,12 +79,21 @@ cubes:
     it('keeps the per-day union a sketch and takes the cardinality once', () => {
       const sql = buildSql('sessions.weekly_users_approx');
 
+      expect(sql).toContain(mergeOnly);
+      expect(count(sql, cardinality)).toBe(1);
+    });
+
+    it('takes the cardinality in the leaf when no window merges on top', () => {
+      const sql = buildSql('sessions.weekly_users_approx', false);
+
+      expect(sql).not.toContain(mergeOnly);
       expect(count(sql, cardinality)).toBe(1);
     });
 
     it('reads a non-rolling measure with one cardinality', () => {
       const sql = buildSql('sessions.users_approx');
 
+      expect(sql).not.toContain(mergeOnly);
       expect(count(sql, cardinality)).toBe(1);
     });
   });

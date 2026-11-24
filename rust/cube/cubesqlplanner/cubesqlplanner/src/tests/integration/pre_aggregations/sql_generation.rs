@@ -1268,6 +1268,52 @@ fn test_count_distinct_approx_rolling_pre_agg_keeps_state() -> Result<(), CubeEr
     Ok(())
 }
 
+// Without a granularity the window collapses to one bucket and nothing merges
+// on top of the leaf, so the leaf itself must return the cardinality.
+#[test]
+fn test_count_distinct_approx_rolling_without_granularity_returns_cardinality(
+) -> Result<(), CubeError> {
+    let query = indoc! {r#"
+        measures:
+          - orders.rolling_unique_customers_approx_7d
+        time_dimensions:
+          - dimension: orders.created_at
+            dateRange:
+              - "2024-01-10"
+              - "2024-01-25"
+        cubestoreSupportMultistage: true
+    "#};
+
+    let ctx = TestContext::new(MockSchema::from_yaml_file(
+        "common/integration_rolling_window.yaml",
+    ))?;
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query)?;
+    assert_eq!(pre_aggrs.len(), 1);
+    assert_eq!(pre_aggrs[0].name(), "approx_rolling");
+    assert!(
+        sql.contains("merge(")
+            && sql.matches("merge(").count() == sql.matches("cardinality(merge(").count(),
+        "Every rollup merge should take the cardinality, got:\n{}",
+        sql
+    );
+
+    let ctx = TestContext::new(
+        MockSchema::from_yaml_file("common/integration_rolling_window.yaml")
+            .only_pre_aggregations(&[]),
+    )?;
+    let (sql, pre_aggrs) = ctx.build_sql_with_used_pre_aggregations(query)?;
+    assert!(pre_aggrs.is_empty());
+    assert!(
+        sql.contains("hll_add_agg(")
+            && sql.matches("hll_add_agg(").count()
+                == sql.matches("hll_cardinality(hll_add_agg(").count(),
+        "Every raw HLL state should be finalized to a count, got:\n{}",
+        sql
+    );
+
+    Ok(())
+}
+
 // --- HLL count_distinct_approx through a pre-aggregation ---
 //
 // A count_distinct_approx measure materialized in a rollup keeps an HLL
