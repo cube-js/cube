@@ -154,9 +154,12 @@ to generate front-end code in [Chart Prototyping][ref-chart-prototyping].
 
 View the SQL query that Cube did (or will) run against the data source to get the results
 on the **Generated SQL** tab. Click **Copy** to put it into your clipboard.
+The legend under the query names the data source that runs it, or **Cube Store**
+when a pre-aggregation serves it. See [where each part of Generated SQL
+runs][ref-where-each-part-runs] for details.
 
 <Frame>
-  <img src="https://ucarecdn.com/d2b6e514-9219-49ea-bae6-bcd0f1936542/" />
+  <img src="https://static.cube.dev/docs/explore-analyze/playground/generated-sql-v2.png" alt="Generated SQL tab in Playground with the Copy and Open in Explore buttons and the data source legend under the SQL" />
 </Frame>
 
 <Info>
@@ -214,3 +217,4 @@ manually.
 [ref-chart-prototyping]: /embedding/vizard
 [ref-boolean-filters]: /reference/core-data-apis/rest-api/query-format#boolean-logical-operators
 [ref-explorations]: /docs/explore-analyze/explore#saving-explorations
+[ref-where-each-part-runs]: /docs/explore-analyze/workbooks/querying-data#where-each-part-runs
