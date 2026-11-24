@@ -57,6 +57,7 @@ use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
 use mockall::automock;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use simple_logger::SimpleLogger;
 use std::fmt::Display;
@@ -75,6 +76,11 @@ const LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY: Duration = Duration::from_secs(
 // Also the refresh period of the in-memory chunk gauges, so a restarted process overwrites the
 // value its previous incarnation left in the metrics exporter.
 const IN_MEMORY_CHUNKS_RECONCILE_INTERVAL: Duration = Duration::from_secs(60);
+
+// Spreads the workers' reconcile calls to the main node instead of keeping them aligned from boot.
+fn jittered(interval: Duration) -> Duration {
+    interval.mul_f64(rand::thread_rng().gen_range(0.8..1.2))
+}
 
 #[derive(Clone)]
 pub struct CubeServices {
@@ -247,7 +253,7 @@ impl CubeServices {
                     }
                     tokio::select! {
                         _ = stop_token.cancelled() => return,
-                        _ = tokio::time::sleep(IN_MEMORY_CHUNKS_RECONCILE_INTERVAL) => {}
+                        _ = tokio::time::sleep(jittered(IN_MEMORY_CHUNKS_RECONCILE_INTERVAL)) => {}
                     }
                 }
             });

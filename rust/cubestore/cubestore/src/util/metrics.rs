@@ -272,6 +272,11 @@ mod global_sink {
 
 use global_sink::sink;
 
+/// Whether a metrics sink is configured; reporting work can be skipped when it is not.
+pub fn metrics_enabled() -> bool {
+    sink().is_some()
+}
+
 /// Records the samples of chosen metrics, so tests can assert what was reported.
 #[cfg(test)]
 pub mod test_capture {

@@ -19,6 +19,7 @@ use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::util::aborting_join_handle::AbortingJoinHandle;
 use crate::util::decimal::Decimal;
+use crate::util::metrics::metrics_enabled;
 use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use buffered_stream::BufferedStream;
@@ -33,6 +34,7 @@ use futures_util::stream;
 use itertools::Itertools;
 use json::JsonValue;
 use log::debug;
+use rand::Rng;
 use reqwest::{Response, Url};
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Write};
@@ -301,7 +303,7 @@ impl StreamingServiceImpl {
         let mut round_trip_started: Option<SystemTime> = None;
         let tags = vec![format!("location:{}", location)];
         let last_seq = Arc::new(AtomicI64::new(initial_seq_value.unwrap_or(NO_SEQ)));
-        let _lag_reporter = source.reports_lag().then(|| {
+        let _lag_reporter = (source.reports_lag() && metrics_enabled()).then(|| {
             lag_reset.arm();
             spawn_lag_reporter(
                 source.clone(),
@@ -325,7 +327,8 @@ impl StreamingServiceImpl {
                 }
                 Err(e) => {
                     self.try_seal_table(&table).await?;
-
+                    // An idle stream ends here; it is not a broken one.
+                    lag_reset.stop_cleanly();
                     return Err(CubeError::user(format!("Stale stream timeout: {}", e)));
                 }
             };
@@ -463,7 +466,10 @@ fn spawn_lag_reporter(
     tags: Vec<String>,
     interval: Duration,
 ) -> AbortingJoinHandle<()> {
+    // A random phase keeps streams started together from fetching watermarks in one burst.
+    let phase = interval.mul_f64(rand::thread_rng().gen_range(0.0..1.0));
     AbortingJoinHandle::new(cube_ext::spawn(async move {
+        tokio::time::sleep(phase).await;
         let mut last_computed: Option<Instant> = None;
         loop {
             let seq = last_seq.load(Ordering::Relaxed);
@@ -490,6 +496,7 @@ struct LagGaugesReset {
     tags: Vec<String>,
     armed: AtomicBool,
     failed: AtomicBool,
+    clean_stop: AtomicBool,
 }
 
 impl LagGaugesReset {
@@ -498,6 +505,7 @@ impl LagGaugesReset {
             tags,
             armed: AtomicBool::new(false),
             failed: AtomicBool::new(false),
+            clean_stop: AtomicBool::new(false),
         }
     }
 
@@ -508,6 +516,10 @@ impl LagGaugesReset {
     fn mark_failed(&self) {
         self.failed.store(true, Ordering::Relaxed);
     }
+
+    fn stop_cleanly(&self) {
+        self.clean_stop.store(true, Ordering::Relaxed);
+    }
 }
 
 impl Drop for LagGaugesReset {
@@ -515,7 +527,7 @@ impl Drop for LagGaugesReset {
         if !*self.armed.get_mut() {
             return;
         }
-        if *self.failed.get_mut() {
+        if *self.failed.get_mut() && !*self.clean_stop.get_mut() {
             app_metrics::STREAMING_LAG_AGE_MS.report_with_tags(STALE_LAG_AGE_MS, Some(&self.tags));
         } else {
             app_metrics::STREAMING_LAG.report_with_tags(0, Some(&self.tags));

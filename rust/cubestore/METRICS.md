@@ -54,7 +54,7 @@ the OSS `cubestored` passes none. Tags listed below are the ones set per metric.
 ## In-memory chunks held by a process
 
 Reported by every node that holds in-memory chunks (the workers owning streaming partitions).
-Refreshed on every add/release and by a reconcile pass every 60 s, which also runs right after
+Refreshed on every add/release and by a reconcile pass every 60 s (±20% jitter), which also runs right after
 startup, so a restarted process overwrites the previous incarnation's value within a minute.
 
 | Metric | Type | Unit | Semantics |
@@ -121,7 +121,7 @@ Tagged `location` (the stream location of the table).
 |--------|------|------|-----------------------|
 | `cs.streaming.rows` / `cs.streaming.chunks` | counter | | Rows / chunks ingested |
 | `cs.streaming.lastoffset` | gauge | offset | Last sequence value of the last received batch |
-| `cs.streaming.lag` | gauge | messages | Partition high watermark minus the last consumed offset (Kafka only). Recomputed every 10 s whether or not messages arrive; set to 0 when the stream stops cleanly on this node (table dropped, stream moved or sealed) |
+| `cs.streaming.lag` | gauge | messages | Partition high watermark minus the last consumed offset (Kafka only). Recomputed every 10 s whether or not messages arrive, only when a metrics sink is configured; set to 0 when the stream stops cleanly on this node (table dropped, stream moved, sealed, or idle past `CUBESTORE_STALE_STREAM_TIMEOUT`) |
 | `cs.streaming.lag.age.ms` | gauge | ms | Time since `cs.streaming.lag` was last computed (before the first success: since the first consumed offset), reported every 10 s. Kafka only. Stays below ~10 s when healthy; grows while the watermark fetch fails, i.e. while the lag value is stale. When the stream stops cleanly it is set to 0 (with the lag); when the stream fails it is set to `i64::MAX` and the lag keeps its last value |
 | `cs.streaming.import_time.ms`, `.partition_time.ms`, `.upload_time.ms`, `.roundtrip_time.ms` | histogram | ms | Per received batch |
 | `cs.streaming.roundtrip_rows` / `.roundtrip_chunks` | histogram | | Per received batch |
