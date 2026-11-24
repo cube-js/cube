@@ -58,7 +58,9 @@ A `between` filter also reads a range typed in the search field. Each reading is
 - A past or to-date range moved back, such as "past 30 days, 1 year earlier". Its name says so, as in **Past 30 days, 1 year earlier**, and it cannot end now. Only typing moves a range back.
 - Dates, such as "2026-01-01 to 2026-03-31", "Q1 2026", "march 2026" or "since 2026-01-01".
 
-A phrase with two common meanings gives two rows: "last 3 months" reads as **Past 3 months** and **Last 3 whole months**. Text that nothing reads shows "Can't read … as dates." with examples to try; click one to type it.
+A phrase with two common meanings gives two rows: "last 3 months" reads as **Past 3 months** and **Last 3 whole months**.
+
+If you have access to AI, text the search field can't read goes to the deployment's [small LLM](/admin/ai/bring-your-own-model#small-llm). It reads phrases such as "Q3", "same 30 days last year" or "since Black Friday" into up to two rows, the same as any other reading. A named period, such as "Q3", reads as its dates, so it doesn't move when the year turns. While the model reads, the list shows "Reading …". Text that nothing reads shows "Can't read … as dates." with examples to try; click one to type it.
 
 `after`, `after or on`, `before`, `before or on`, `is` and `is not` pick one value, and they have no now box. **Presets** lists **Now**, **Today**, **Yesterday**, **7 days ago**, **30 days ago**, **Start of this month**, **Start of last month**, **3 months ago**, **Start of this year** and **1 year ago**. **Relative** offers moments such as **Start of last month**, **Start of 3 months ago** and **2 weeks from now**. **Fixed** picks one date in a sentence, such as "Before \[date\]" or "On \[date\]". On **Presets** and **Relative**, `is` and `is not` take a day rather than a moment, so they list only values that name a day: **Today**, **Yesterday**, **Tomorrow**, **7 days ago**, **30 days ago** and **1 year ago** on **Presets**, and *N* units ago or from now on **Relative**.
 
