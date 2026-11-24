@@ -16,8 +16,32 @@
  */
 
 use crate::error::Result;
-use protobuf::rt::ProtobufVarint;
-use protobuf::{wire_format, CodedInputStream, CodedOutputStream};
+use protobuf::rt::{compute_raw_varint64_size, skip_field_for_tag, WireType};
+use protobuf::{CodedInputStream, CodedOutputStream};
+
+/// Encoded varint length, as protobuf 2's `ProtobufVarint::len_varint`
+/// computed it (negative int32 values are sign-extended to 64 bits).
+trait LenVarint {
+    fn len_varint(&self) -> u32;
+}
+
+impl LenVarint for u32 {
+    fn len_varint(&self) -> u32 {
+        compute_raw_varint64_size(*self as u64) as u32
+    }
+}
+
+impl LenVarint for i32 {
+    fn len_varint(&self) -> u32 {
+        compute_raw_varint64_size(*self as i64 as u64) as u32
+    }
+}
+
+impl LenVarint for i64 {
+    fn len_varint(&self) -> u32 {
+        compute_raw_varint64_size(*self as u64) as u32
+    }
+}
 use std::convert::TryFrom;
 
 /// This is actually an enum from .proto file. This is the only place that would require `protoc`,
@@ -88,17 +112,16 @@ pub mod aggregator_state_proto {
 // Protocol buffer tags consist of the field number concatenated with the field type. Because we
 // use these in case statements below, they must be constant expressions and the bitshift can not
 // be refactored into a method.
-const TYPE_TAG: u32 =
-    aggregator_state_proto::TYPE_FIELD_NUMBER << 3 | wire_format::WireType::WireTypeVarint as u32;
-const NUM_VALUES_TAG: u32 = aggregator_state_proto::NUM_VALUES_FIELD_NUMBER << 3
-    | wire_format::WireType::WireTypeVarint as u32;
-const ENCODING_VERSION_TAG: u32 = aggregator_state_proto::ENCODING_VERSION_FIELD_NUMBER << 3
-    | wire_format::WireType::WireTypeVarint as u32;
-const VALUE_TYPE_TAG: u32 = aggregator_state_proto::VALUE_TYPE_FIELD_NUMBER << 3
-    | wire_format::WireType::WireTypeVarint as u32;
+const TYPE_TAG: u32 = aggregator_state_proto::TYPE_FIELD_NUMBER << 3 | WireType::Varint as u32;
+const NUM_VALUES_TAG: u32 =
+    aggregator_state_proto::NUM_VALUES_FIELD_NUMBER << 3 | WireType::Varint as u32;
+const ENCODING_VERSION_TAG: u32 =
+    aggregator_state_proto::ENCODING_VERSION_FIELD_NUMBER << 3 | WireType::Varint as u32;
+const VALUE_TYPE_TAG: u32 =
+    aggregator_state_proto::VALUE_TYPE_FIELD_NUMBER << 3 | WireType::Varint as u32;
 const HYPERLOGLOGPLUS_UNIQUE_STATE_TAG: u32 =
     aggregator_state_proto::HYPERLOGLOGPLUS_UNIQUE_STATE_FIELD_NUMBER << 3
-        | wire_format::WireType::WireTypeLengthDelimited as u32;
+        | WireType::LengthDelimited as u32;
 
 const DEFAULT_TYPE: AggregatorType =
     aggregator_state_proto::AGGREGATOR_TYPE_HYPERLOGLOG_PLUS_UNIQUE;
@@ -115,17 +138,14 @@ pub mod hpp_unique_proto {
 }
 
 const SPARSE_SIZE_TAG: u32 =
-    hpp_unique_proto::SPARSE_SIZE_FIELD_NUMBER << 3 | wire_format::WireType::WireTypeVarint as u32;
-const PRECISION_OR_NUM_BUCKETS_TAG: u32 = hpp_unique_proto::PRECISION_OR_NUM_BUCKETS_FIELD_NUMBER
-    << 3
-    | wire_format::WireType::WireTypeVarint as u32;
+    hpp_unique_proto::SPARSE_SIZE_FIELD_NUMBER << 3 | WireType::Varint as u32;
+const PRECISION_OR_NUM_BUCKETS_TAG: u32 =
+    hpp_unique_proto::PRECISION_OR_NUM_BUCKETS_FIELD_NUMBER << 3 | WireType::Varint as u32;
 const SPARSE_PRECISION_OR_NUM_BUCKETS_TAG: u32 =
-    hpp_unique_proto::SPARSE_PRECISION_OR_NUM_BUCKETS_FIELD_NUMBER << 3
-        | wire_format::WireType::WireTypeVarint as u32;
-const DATA_TAG: u32 = hpp_unique_proto::DATA_FIELD_NUMBER << 3
-    | wire_format::WireType::WireTypeLengthDelimited as u32;
-const SPARSE_DATA_TAG: u32 = hpp_unique_proto::SPARSE_DATA_FIELD_NUMBER << 3
-    | wire_format::WireType::WireTypeLengthDelimited as u32;
+    hpp_unique_proto::SPARSE_PRECISION_OR_NUM_BUCKETS_FIELD_NUMBER << 3 | WireType::Varint as u32;
+const DATA_TAG: u32 = hpp_unique_proto::DATA_FIELD_NUMBER << 3 | WireType::LengthDelimited as u32;
+const SPARSE_DATA_TAG: u32 =
+    hpp_unique_proto::SPARSE_DATA_FIELD_NUMBER << 3 | WireType::LengthDelimited as u32;
 
 const DEFAULT_SPARSE_SIZE: i32 = 0;
 const DEFAULT_PRECISION_OR_NUM_BUCKETS: i32 = 0;
@@ -145,10 +165,8 @@ impl State {
     pub fn parse_stream(mut input: CodedInputStream) -> Result<State> {
         let mut s = State::default();
 
-        while !input.eof()? {
-            let tag = input.read_tag()?;
-            let (_, wire_type) = tag.unpack();
-            match tag.value() {
+        while let Some(tag) = input.read_raw_tag_or_eof()? {
+            match tag {
                 TYPE_TAG => s.type_ = input.read_int32()?,
                 NUM_VALUES_TAG => s.num_values = input.read_int64()?,
                 ENCODING_VERSION_TAG => s.encoding_version = input.read_int32()?,
@@ -157,7 +175,7 @@ impl State {
                     let size = u32::try_from(input.read_int32()?)?;
                     Self::parse_hll(&mut s, &mut input, size)?;
                 }
-                _ => input.skip_field(wire_type)?,
+                _ => skip_field_for_tag(tag, &mut input)?,
             }
         }
 
@@ -170,16 +188,18 @@ impl State {
     fn parse_hll(s: &mut State, input: &mut CodedInputStream, size: u32) -> Result<()> {
         let limit = input.pos() + size as u64;
 
-        while input.pos() < limit && !input.eof()? {
-            let tag = input.read_tag()?;
-            let (_, wire_type) = tag.unpack();
-            match tag.value() {
+        while input.pos() < limit {
+            let tag = match input.read_raw_tag_or_eof()? {
+                Some(tag) => tag,
+                None => break,
+            };
+            match tag {
                 SPARSE_SIZE_TAG => s.sparse_size = input.read_int32()?,
                 PRECISION_OR_NUM_BUCKETS_TAG => s.precision = input.read_int32()?,
                 SPARSE_PRECISION_OR_NUM_BUCKETS_TAG => s.sparse_precision = input.read_int32()?,
                 DATA_TAG => s.data = Some(input.read_bytes()?),
                 SPARSE_DATA_TAG => s.sparse_data = Some(input.read_bytes()?),
-                _ => input.skip_field(wire_type)?,
+                _ => skip_field_for_tag(tag, input)?,
             }
         }
         Ok(())
@@ -188,9 +208,11 @@ impl State {
     pub fn to_byte_array(&self) -> Vec<u8> {
         let (size, hll_size) = self.get_serialized_size();
         let mut result = vec![0; size as usize];
-        let mut output = CodedOutputStream::bytes(result.as_mut_slice());
-        self.write_to(hll_size, &mut output);
-        output.check_eof();
+        {
+            let mut output = CodedOutputStream::bytes(result.as_mut_slice());
+            self.write_to(hll_size, &mut output);
+            output.check_eof();
+        }
         result
     }
 

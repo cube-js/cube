@@ -8,4 +8,4 @@ description = "HyperLogLog++ implementation ported from ZetaSketch"
 
 [dependencies]
 itertools = "0.10.0"
-protobuf = "2.20.0"
+protobuf = "3.7.2"
