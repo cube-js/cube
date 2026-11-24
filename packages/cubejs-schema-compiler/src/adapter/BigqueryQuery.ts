@@ -397,7 +397,8 @@ export class BigqueryQuery extends BaseQuery {
     templates.types.boolean = 'BOOL';
     templates.types.float = 'FLOAT64';
     templates.types.double = 'FLOAT64';
-    templates.types.decimal = 'BIGDECIMAL({{ precision }},{{ scale }})';
+    // CAST takes no parameterized types; BIGNUMERIC holds every precision and scale a cast asks for
+    templates.types.decimal = 'BIGNUMERIC';
     templates.types.binary = 'BYTES';
     templates.operators.is_not_distinct_from = 'IS NOT DISTINCT FROM';
     templates.statements.time_series_select = 'SELECT TIMESTAMP(f) date_from, TIMESTAMP(t) date_to \n' +

@@ -17348,10 +17348,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             vec![
                 ("types/float".to_string(), "FLOAT64".to_string()),
                 ("types/double".to_string(), "FLOAT64".to_string()),
-                (
-                    "types/decimal".to_string(),
-                    "BIGDECIMAL({{ precision }},{{ scale }})".to_string(),
-                ),
+                ("types/decimal".to_string(), "BIGNUMERIC".to_string()),
             ],
         )
         .await;
@@ -17366,7 +17363,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains(" AS STRING)"));
         assert!(sql.contains(" AS FLOAT64)"));
-        assert!(sql.contains(" AS BIGDECIMAL(38,10))"));
+        assert!(sql.contains(" AS BIGNUMERIC)"));
 
         // PostgreSQL
         let query_plan = convert_select_to_query_plan_customized(
