@@ -18,6 +18,19 @@ context", the same way the chat shows [context usage][ref-context-usage]. Use
 it to debug slow or degraded answers. Threads with no reported usage, such as
 older ones, don't show it.
 
+A chat started in a [published][ref-publish] or [embedded][ref-embedding]
+dashboard's agent panel also shows its **Dashboard**. Admins see the
+dashboard's title. Other users with **Access chat history** see its public id,
+and so do admins when the dashboard was deleted or belongs to another
+deployment. Older chats, started before Cube recorded the dashboard, don't
+show it.
+
+The [Chat History API][ref-chat-history-api] returns the same information as
+`dashboard` (`publicId`, `title`) on each thread; `title` is `null` when the
+dashboard isn't in the deployment. To list one dashboard's chats, filter
+`GET /api/v1/deployments/{deploymentId}/chat-history/threads` by
+`dashboardPublicId`. You can repeat the parameter up to 100 times.
+
 To send chat turns to your own monitoring tools, use [chat history
 export][ref-chat-history-export].
 
@@ -51,4 +64,6 @@ requires the same access as **Monitoring → Chat history**.
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles#actions
 [ref-chat-history-export]: /admin/monitoring/monitoring-integrations#chat-history-export
 [ref-context-usage]: /docs/explore-analyze/analytics-chat#context-usage
+[ref-publish]: /docs/explore-analyze/dashboards#publishing-and-versions
+[ref-embedding]: /embedding/iframe/dashboards
 [ref-chat-history-api]: /api-reference/chat-history/list-chat-threads
