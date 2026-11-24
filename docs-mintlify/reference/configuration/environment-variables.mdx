@@ -1912,7 +1912,9 @@ are streamed instead and aren't capped by it.
 Queries with a `LIMIT` at or below that limit are not streamed.
 
 Cube Store can't stream, so streamed queries read the data source rather than
-pre-aggregations in Cube Store. See also
+pre-aggregations in Cube Store. With [`CUBEJS_ROLLUP_ONLY`](#cubejs_rollup_only), which
+doesn't allow querying the data source, a streamed query fails unless a pre-aggregation
+stored in the data source serves it. See also
 [`CUBESQL_STREAM_MODE_PRE_AGGREGATIONS`](#cubesql_stream_mode_pre_aggregations).
 
 | Possible Values | Default in Development | Default in Production |
