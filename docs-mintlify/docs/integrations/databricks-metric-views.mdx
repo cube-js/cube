@@ -163,10 +163,8 @@ Cube stores the secret encrypted and never returns it. To rotate it, enter a new
 changing the hostname or client ID also requires the secret again. A data source whose
 environment variables configure another driver can't take a credential until you remove them.
 
-Through the API, pass the credential as `connection` (`host`, `httpPath`, `clientId`,
-`clientSecret`, and an optional `catalog`) when
-[saving settings](/api-reference/databricks-metric-view-integration/create-or-update-databricks-metric-view-publication-settings).
-Omit it to keep the stored credential, or pass `null` to remove it.
+Through the API, pass the credential as `connection`, as for
+[any publication target with its own connection](#publish-to-another-databricks-workspace).
 
 ## Publish after each deployment {#publish-after-each-deployment}
 
@@ -367,11 +365,11 @@ body on HTTP errors.
 
 A data source can have several publication targets, such as `staging` and `production`. Each has
 its own settings (target catalog and schema, scope, target-name overrides, `deletionPolicy`,
-`syncOnDeploy`, and the `connection` of a data source
-[served by `driver_factory`](#data-sources-served-by-driver_factory)), its own run history, and its
-own Metric Views. What this page says about a data source's settings, runs, and Metric Views holds
-for each publication target. Give each one its own catalog or schema: a Metric View belongs to one
-publication target, so another that publishes to the same name is blocked with `ownership-conflict`.
+`syncOnDeploy`, and its [Databricks connection](#publish-to-another-databricks-workspace)), its own
+run history, and its own Metric Views. What this page says about a data source's settings, runs,
+and Metric Views holds for each publication target. Give each one its own catalog or schema: a
+Metric View belongs to one publication target, so another that publishes to the same name is
+blocked with `ownership-conflict`.
 
 Every data source has the `default` publication target. In the **Databricks Metric View sync** card,
 pick one under **Publication target**: the settings, **Preview**, **Test access**, and run history
@@ -461,6 +459,35 @@ refusal, so read it before you retry.
 A run returns its `targetName` and, when promoted, `promotedFromRunId`, which run history shows as
 **Promoted from run**. Its `sourceSha256` hashes the model files it converted, and `runtime` names
 the converter version it used.
+
+### Publish to another Databricks workspace {#publish-to-another-databricks-workspace}
+
+A publication target connects to Databricks with its data source's connection unless it has a
+connection of its own. To publish staging and production to different Databricks workspaces, give
+production its own connection:
+
+{/* TODO: screenshot — a target's Databricks connection section with Use a separate connection on and the credential fields showing, on a data source with an env-defined connection */}
+
+1. In the other workspace, create a
+   [service principal with an OAuth secret](https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m)
+   and grant it the privileges listed in [Before you start](#before-you-start).
+2. In the **Databricks Metric View sync** card, pick the target under **Publication target**. Under
+   **Databricks connection**, turn on **Use a separate connection**.
+3. Enter the SQL warehouse's **Server hostname** and **HTTP path** and the service principal's
+   **OAuth client ID** and **OAuth client secret**. If a cube uses a two-part `schema.table` name,
+   also enter the **Default catalog** it resolves in; for this target it replaces
+   `CUBEJS_DB_DATABRICKS_CATALOG`.
+4. Save, then run **Test access**.
+
+While **Use a separate connection** is off, the target uses the data source's connection. Turning
+it off on a target that has its own connection and saving removes that connection and deletes its
+secret. A data source [served by `driver_factory`](#data-sources-served-by-driver_factory) has no
+connection to fall back to, so each of its targets needs its own, and there is no switch.
+
+Through the API, pass the connection as `connection` (`host`, `httpPath`, `clientId`,
+`clientSecret`, and an optional `catalog`) when
+[saving settings](/api-reference/databricks-metric-view-integration/create-or-update-databricks-metric-view-publication-settings)
+with `?target=<name>`. Omit it to keep the stored connection, or pass `null` to remove it.
 
 ## Check a pull request before it merges
 
