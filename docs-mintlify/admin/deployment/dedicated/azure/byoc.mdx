@@ -91,4 +91,20 @@ The actual deployment will be done by Cube automation. All that's left to
 do is notify your Cube contact point that access has been granted, and pass
 along your Azure Tenant/Subscription/Region information.
 
+## Export buckets behind a firewall
+
+With [Snowflake][ref-snowflake-export-bucket] or
+[Databricks][ref-databricks-export-bucket], pre-aggregations are unloaded to
+an export bucket in Azure Blob Storage, and Cube Store downloads them from
+there itself. If that storage account limits network access, add a virtual
+network rule for Cube Store's subnet, `cube-store-nodes`. It's in the virtual
+network of the resource group Cube created in your subscription.
+
+Allowing Cube's outbound IP addresses isn't enough. Azure Storage ignores IP
+rules for requests from the same region, and Cube Store reaches storage
+accounts in its region over a service endpoint, from the subnet's private
+addresses.
+
 [azure-console]: https://portal.azure.com
+[ref-snowflake-export-bucket]: /admin/connect-to-data/data-sources/snowflake#export-bucket
+[ref-databricks-export-bucket]: /admin/connect-to-data/data-sources/databricks-jdbc#export-bucket
