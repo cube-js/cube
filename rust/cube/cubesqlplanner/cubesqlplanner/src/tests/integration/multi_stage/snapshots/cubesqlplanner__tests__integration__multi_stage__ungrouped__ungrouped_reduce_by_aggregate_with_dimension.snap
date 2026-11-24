@@ -1,0 +1,15 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/multi_stage/ungrouped.rs
+expression: result
+---
+orders__status | orders__category | orders__unique_customers_reduce_category
+---------------+------------------+-----------------------------------------
+cancelled      | books            | 3                                       
+cancelled      | clothing         | 3                                       
+cancelled      | electronics      | 3                                       
+completed      | books            | 3                                       
+completed      | clothing         | 3                                       
+completed      | electronics      | 3                                       
+pending        | books            | 3                                       
+pending        | clothing         | 3                                       
+pending        | electronics      | 3
