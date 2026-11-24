@@ -1,8 +1,12 @@
+use crate::app_metrics;
 use crate::cluster::ingestion::job_processor::{JobProcessResult, JobProcessor};
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::config::ConfigObj;
 use crate::import::ImportService;
-use crate::metastore::job::{Job, JobRunnerPool, JobStatus, JobType};
+use crate::metastore::job::{
+    job_error_class, Job, JobRunnerPool, JobStatus, JobType, JOB_SHUTTING_DOWN_MESSAGE,
+    JOB_TIMED_OUT_MESSAGE,
+};
 use crate::metastore::table::Table;
 use crate::metastore::{IdRow, MetaStore, RowKey, TableId};
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
@@ -10,7 +14,7 @@ use crate::store::compaction::CompactionService;
 use crate::store::ChunkDataStore;
 use crate::telemetry::tracing::{record_error, record_trace_obj};
 use crate::util::aborting_join_handle::AbortingJoinHandle;
-use crate::CubeError;
+use crate::{CubeError, CubeErrorCauseType};
 use core::mem;
 use datafusion::cube_ext;
 use futures_timer::Delay;
@@ -23,6 +27,16 @@ use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tracing::{Instrument, Span};
+
+fn report_job_failure(job_type_tag: String, message: &str, is_panic: bool) {
+    app_metrics::JOBS_FAILED.add_with_tags(
+        1,
+        Some(&vec![
+            job_type_tag,
+            format!("error_class:{}", job_error_class(message, is_panic)),
+        ]),
+    );
+}
 
 fn record_job_result(job_span: &Span, job_result: &JobProcessResult) {
     job_span.record(
@@ -132,17 +146,17 @@ impl JobRunner {
             // TODO duplicate
             tokio::select! {
                 _ = self.stop_token.cancelled() => {
-                    Err(CubeError::user("shutting down".to_string()))
+                    Err(CubeError::user(JOB_SHUTTING_DOWN_MESSAGE.to_string()))
                 }
                 res = future => {
-                    res.map_err(|_| CubeError::user("timed out".to_string()))
+                    res.map_err(|_| CubeError::user(JOB_TIMED_OUT_MESSAGE.to_string()))
                 }
             }
         } else {
             // TODO duplicate
             tokio::select! {
                 _ = self.stop_token.cancelled() => {
-                    Err(CubeError::user("shutting down".to_string()))
+                    Err(CubeError::user(JOB_SHUTTING_DOWN_MESSAGE.to_string()))
                 }
                 res = handle => {
                     Ok(res)
@@ -159,6 +173,18 @@ impl JobRunner {
             }
             Ok(Err(e)) => record_error(&Span::current(), &CubeError::internal(e.to_string())),
             Ok(Ok(Ok(()))) => {}
+        }
+        let job_type_tag = format!("job_type:{}", job.get_row().job_type().name());
+        match &res {
+            Ok(Ok(Ok(()))) => {
+                app_metrics::JOBS_COMPLETED.add_with_tags(1, Some(&vec![job_type_tag]));
+            }
+            Err(e) | Ok(Ok(Err(e))) => report_job_failure(
+                job_type_tag,
+                &e.message,
+                e.cause == CubeErrorCauseType::Panic,
+            ),
+            Ok(Err(e)) => report_job_failure(job_type_tag, &e.to_string(), e.is_panic()),
         }
         if let Err(e) = res {
             self.meta_store

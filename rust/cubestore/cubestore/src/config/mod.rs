@@ -57,6 +57,7 @@ use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
 use mockall::automock;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use simple_logger::SimpleLogger;
 use std::fmt::Display;
@@ -72,6 +73,14 @@ use tokio::time::{timeout_at, Duration, Instant};
 
 const LOST_IN_MEMORY_CHUNKS_CLEANUP_ATTEMPTS: usize = 40;
 const LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY: Duration = Duration::from_secs(15);
+// Also refreshes the held in-memory chunk gauge, so a restarted process overwrites the value its
+// previous incarnation left in the metrics exporter.
+const IN_MEMORY_CHUNK_STATES_INTERVAL: Duration = Duration::from_secs(60);
+
+// Spreads the workers' lookups on the main node instead of keeping them aligned from boot.
+fn jittered(interval: Duration) -> Duration {
+    interval.mul_f64(rand::thread_rng().gen_range(0.8..1.2))
+}
 
 #[derive(Clone)]
 pub struct CubeServices {
@@ -222,6 +231,29 @@ impl CubeServices {
                     tokio::select! {
                         _ = stop_token.cancelled() => return,
                         _ = tokio::time::sleep(LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY) => {}
+                    }
+                }
+            });
+        }
+
+        if self
+            .injector
+            .has_service_typed::<dyn ChunkDataStore>()
+            .await
+        {
+            let chunk_store = self
+                .injector
+                .get_service_typed::<dyn ChunkDataStore>()
+                .await;
+            let stop_token = self.cluster.stop_token();
+            cube_ext::spawn(async move {
+                loop {
+                    if let Err(e) = chunk_store.report_memory_chunk_states().await {
+                        log::error!("Error reporting in-memory chunk states: {}", e);
+                    }
+                    tokio::select! {
+                        _ = stop_token.cancelled() => return,
+                        _ = tokio::time::sleep(jittered(IN_MEMORY_CHUNK_STATES_INTERVAL)) => {}
                     }
                 }
             });
