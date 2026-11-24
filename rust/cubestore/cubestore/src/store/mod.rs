@@ -924,6 +924,10 @@ impl ChunkDataStore for ChunkStore {
         let (mut active, mut inactive) = (0, 0);
         let mut orphans = Vec::new();
         for name in held {
+            // Only a name that was looked up can be judged deleted.
+            if chunk_id_from_file_name(&name).is_none() {
+                continue;
+            }
             match rows.get(&name) {
                 Some(c) if c.get_row().active() => active += 1,
                 // Not uploaded means not activated yet, e.g. a compaction output before its swap.

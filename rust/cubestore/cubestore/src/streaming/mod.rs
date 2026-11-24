@@ -40,7 +40,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Write};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 use tracing::Instrument;
 use traffic_sender::TrafficSender;
@@ -464,7 +464,7 @@ const STALE_LAG_AGE_MS: i64 = i64::MAX;
 fn spawn_lag_reporter(
     source: Arc<dyn StreamingSource>,
     last_seq: Arc<AtomicI64>,
-    stopped: Arc<AtomicBool>,
+    stopped: Arc<Mutex<bool>>,
     tags: Vec<String>,
     interval: Duration,
 ) -> AbortingJoinHandle<()> {
@@ -475,21 +475,29 @@ fn spawn_lag_reporter(
         let mut last_computed: Option<Instant> = None;
         loop {
             let seq = last_seq.load(Ordering::Relaxed);
+            let mut lag = None;
             if seq != NO_SEQ {
                 // A fetch that never succeeds still shows up as an age growing from the first offset.
                 last_computed.get_or_insert_with(Instant::now);
-                if let Some(lag) = source.calulate_lag(seq).await {
-                    // An abort lands only at the next await, after the final values may be sent.
-                    if stopped.load(Ordering::Acquire) {
-                        return;
-                    }
-                    app_metrics::STREAMING_LAG.report_with_tags(lag, Some(&tags));
+                lag = source.calulate_lag(seq).await;
+                if lag.is_some() {
                     last_computed = Some(Instant::now());
                 }
             }
-            if let Some(t) = last_computed.filter(|_| !stopped.load(Ordering::Acquire)) {
-                app_metrics::STREAMING_LAG_AGE_MS
-                    .report_with_tags(t.elapsed().as_millis() as i64, Some(&tags));
+            {
+                // An abort lands only at the next await, so a send can race the final values;
+                // the reset sends them under the same lock.
+                let stopped = stopped.lock().unwrap();
+                if *stopped {
+                    return;
+                }
+                if let Some(lag) = lag {
+                    app_metrics::STREAMING_LAG.report_with_tags(lag, Some(&tags));
+                }
+                if let Some(t) = last_computed {
+                    app_metrics::STREAMING_LAG_AGE_MS
+                        .report_with_tags(t.elapsed().as_millis() as i64, Some(&tags));
+                }
             }
             tokio::time::sleep(interval).await;
         }
@@ -503,7 +511,7 @@ struct LagGaugesReset {
     armed: AtomicBool,
     failed: AtomicBool,
     clean_stop: AtomicBool,
-    stopped: Arc<AtomicBool>,
+    stopped: Arc<Mutex<bool>>,
 }
 
 impl LagGaugesReset {
@@ -513,7 +521,7 @@ impl LagGaugesReset {
             armed: AtomicBool::new(false),
             failed: AtomicBool::new(false),
             clean_stop: AtomicBool::new(false),
-            stopped: Arc::new(AtomicBool::new(false)),
+            stopped: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -532,11 +540,12 @@ impl LagGaugesReset {
 
 impl Drop for LagGaugesReset {
     fn drop(&mut self) {
-        self.stopped.store(true, Ordering::Release);
-        if !*self.armed.get_mut() {
+        let mut stopped = self.stopped.lock().unwrap();
+        *stopped = true;
+        if !self.armed.load(Ordering::Relaxed) {
             return;
         }
-        if *self.failed.get_mut() && !*self.clean_stop.get_mut() {
+        if self.failed.load(Ordering::Relaxed) && !self.clean_stop.load(Ordering::Relaxed) {
             app_metrics::STREAMING_LAG_AGE_MS.report_with_tags(STALE_LAG_AGE_MS, Some(&self.tags));
         } else {
             app_metrics::STREAMING_LAG.report_with_tags(0, Some(&self.tags));
@@ -1132,7 +1141,7 @@ mod tests {
         let reporter = spawn_lag_reporter(
             source,
             last_seq.clone(),
-            Arc::new(AtomicBool::new(false)),
+            Arc::new(Mutex::new(false)),
             Vec::new(),
             interval,
         );
@@ -1156,6 +1165,45 @@ mod tests {
             lag_calls.lock().unwrap().len(),
             polled,
             "stops with its handle"
+        );
+    }
+
+    #[test]
+    fn lag_gauges_reset_final_values() {
+        use crate::util::metrics::test_capture;
+        test_capture::watch("cs.streaming.lag");
+        test_capture::watch("cs.streaming.lag.age.ms");
+        let final_values = |case: &str, setup: &dyn Fn(&LagGaugesReset)| {
+            let tags = vec![format!("location:lag_gauges_reset_{}", case)];
+            let reset = LagGaugesReset::new(tags.clone());
+            setup(&reset);
+            drop(reset);
+            let of = |name| {
+                test_capture::samples(name)
+                    .into_iter()
+                    .filter(|(_, t)| *t == tags)
+                    .map(|(v, _)| v)
+                    .collect::<Vec<_>>()
+            };
+            (of("cs.streaming.lag"), of("cs.streaming.lag.age.ms"))
+        };
+
+        assert_eq!(final_values("unarmed", &|_| {}), (vec![], vec![]));
+        assert_eq!(final_values("clean", &|r| r.arm()), (vec![0], vec![0]));
+        assert_eq!(
+            final_values("failed", &|r| {
+                r.arm();
+                r.mark_failed();
+            }),
+            (vec![], vec![STALE_LAG_AGE_MS])
+        );
+        assert_eq!(
+            final_values("stale_stream", &|r| {
+                r.arm();
+                r.stop_cleanly();
+                r.mark_failed();
+            }),
+            (vec![0], vec![0])
         );
     }
 
