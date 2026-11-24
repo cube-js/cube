@@ -295,6 +295,32 @@ published dashboard click its data and open another dashboard, filtered by what
 they clicked. Unlike a `dashboard:` link, it is set on the chart in the
 dashboard builder rather than on a dimension in the data model.
 
+## Inspect a chart's query {#inspect-a-chart-query}
+
+To see the query behind a chart on a published dashboard, hover the chart, open
+its **⋮** menu, and choose **Inspect**. A chart whose query failed has an
+**Inspect** button next to its error instead.
+
+The **Inspect** dialog shows the chart's query with the dashboard's current
+filters and cross-filters applied, and lists those filters under the chart's
+title. Change a filter and reopen the dialog to see the new query. It has the
+same tabs as [inspecting a query][ref-inspecting-queries] in a workbook:
+
+- **Semantic SQL** is shown to everyone who can view the dashboard.
+- **Generated SQL**, the SQL sent to your data warehouse, is shown only to
+  users whose role includes [Access SQL Runner][ref-custom-roles].
+
+A chart built with source SQL shows that SQL as written, and only to users with
+**Access SQL Runner**. Dashboard filters don't apply to it, so the dialog lists
+none. Charts built with Python have no **Inspect** item. Embedded dashboards
+don't offer **Inspect**.
+
+Use the copy button to copy the SQL on the open tab.
+
+The chart's **⋮** menu groups its items: **Inspect** and **Ask a follow up
+question** first, then **Add comment** and **Create alert**, then **Edit in
+workbook**. Each item appears only when you can use it.
+
 ## Dashboard slug
 
 A dashboard can have a **slug** — a short, stable, human-readable identifier
@@ -519,6 +545,8 @@ Plane API print the whole dashboard only.
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
 [ref-drill-through]: /docs/explore-analyze/dashboards/drill-through
+[ref-inspecting-queries]: /docs/explore-analyze/workbooks/querying-data#inspecting-queries
+[ref-custom-roles]: /admin/users-and-permissions/custom-roles
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-sharing-selection]: /docs/explore-analyze/dashboards/widgets/controls#sharing-the-current-selection
 [ref-tabs-url]: /docs/explore-analyze/dashboards/widgets/layout#tabs-on-a-published-dashboard
