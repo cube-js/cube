@@ -276,10 +276,6 @@ function hasDevTokenScope(securityContext: unknown): boolean {
   return Array.isArray(scope) && scope.includes(DEV_TOKEN_SCOPE);
 }
 
-function sqlApiReadsCubeStore(): boolean {
-  return !getEnv('sqlStreamMode') || getEnv('sqlStreamModePreAggregations');
-}
-
 // Prepared CheckAuthFn, default or from config: always async
 type PreparedCheckAuthFn = (ctx: any, authorization?: string) => Promise<{
   securityContext: any;
@@ -2202,7 +2198,7 @@ class ApiGateway {
       // is rendered in its dialect, so it needs templates of its own. cubesql plans such
       // SQL only for scans whose members fit a rollup, so the rollups' members go along
       const anySqlGenerator: any = Object.values(dataSourceToSqlGenerator)[0];
-      const externalPreAggregationMembers = getEnv('sqlPushDownPreAggregations') && sqlApiReadsCubeStore() ?
+      const externalPreAggregationMembers = getEnv('sqlPushDownPreAggregations') ?
         await compilerApi.externalPreAggregationMembers() :
         [];
       const externalSqlGenerator = anySqlGenerator?.externalQueryClass && externalPreAggregationMembers.length > 0 ?
@@ -2762,10 +2758,8 @@ class ApiGateway {
       // SQL on top for Cube Store and says so with `external`
       const external = Boolean(request.sqlQuery && request.external);
       // Cube Store returns a whole result in one message, so a streamed query reads the
-      // data source instead of a Cube Store rollup, as does every query in stream mode when
-      // CUBESQL_STREAM_MODE_PRE_AGGREGATIONS is off
-      const disableExternalPreAggregations = Boolean(request.streaming) || !sqlApiReadsCubeStore() ||
-        (Boolean(request.sqlQuery) && !external);
+      // data source instead of a Cube Store rollup
+      const disableExternalPreAggregations = Boolean(request.streaming) || (Boolean(request.sqlQuery) && !external);
       const sqlQueries = await this
         .getSqlQueriesInternal(
           context,

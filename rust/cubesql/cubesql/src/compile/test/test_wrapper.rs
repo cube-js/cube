@@ -7669,7 +7669,13 @@ async fn test_wrapper_cube_store_pre_aggregation_count_distinct_dimension() {
 /// A test context with one external rollup holding only `members` of
 /// `KibanaSampleDataEcommerce`, which Cube matches for any query it can serve
 async fn pre_aggregation_test_context_with_rollup(members: &[&str]) -> TestContext {
-    let mut config = ConfigObjImpl::default();
+    pre_aggregation_test_context_with_rollup_and_config(ConfigObjImpl::default(), members).await
+}
+
+async fn pre_aggregation_test_context_with_rollup_and_config(
+    mut config: ConfigObjImpl,
+    members: &[&str],
+) -> TestContext {
     config.sql_push_down_pre_aggregations = true;
     let context = TestContext::with_config_and_meta(
         DatabaseProtocol::PostgreSQL,
@@ -7734,6 +7740,45 @@ async fn test_wrapper_cube_store_pre_aggregation_push_to_cube() {
         assert!(!source_sql.external, "{}", query);
         assert!(source_sql.sql.contains("SqlFunction"));
         assert!(context.pre_aggregation_match_calls().await.is_empty());
+    }
+}
+
+/// Cube Store can't stream, so in stream mode a query that is streamed reads the data source,
+/// and one under the non-streaming row limit still reads the rollup
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_stream_mode() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query = "SELECT customer_gender, SUM(sumPrice) FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY customer_gender ORDER BY 2 DESC";
+    for (limit, external) in [("", false), (" LIMIT 50001", false), (" LIMIT 5000", true)] {
+        let mut config = ConfigObjImpl::default();
+        config.stream_mode = true;
+        let context = pre_aggregation_test_context_with_rollup_and_config(
+            config,
+            &["customer_gender", "sumPrice"],
+        )
+        .await;
+        let query = format!("{query}{limit}");
+        let wrapped_sql = wrapped_sql(&context, &query).await;
+
+        assert_eq!(wrapped_sql.external, external, "{}", query);
+        assert_eq!(
+            wrapped_sql
+                .sql
+                .contains("dev_pre_aggregations.kibana_sample_data_ecommerce_main"),
+            external,
+            "{}",
+            query
+        );
+        assert_eq!(
+            !context.pre_aggregation_match_calls().await.is_empty(),
+            external,
+            "{}",
+            query
+        );
     }
 }
 

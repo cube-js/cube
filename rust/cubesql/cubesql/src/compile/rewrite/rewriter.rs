@@ -1,6 +1,9 @@
 use crate::{
     compile::{
-        engine::df::{scan::CubeScanNode, wrapper::WrappedSelectNode},
+        engine::df::{
+            scan::{is_streamed_request, CubeScanNode},
+            wrapper::WrappedSelectNode,
+        },
         qtrace::{Qtrace, QtraceEclass, QtraceEgraphIteration},
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -470,6 +473,11 @@ impl Rewriter {
                 if let Some(request) =
                     Self::pre_aggregation_request(&cube_context, &load_request_meta, node).await
                 {
+                    // Cube Store returns a whole result at once, so a streamed query is
+                    // served by the data source
+                    if is_streamed_request(config_obj.as_ref(), request.limit) {
+                        continue;
+                    }
                     asked.push(request);
                     asked_positions.push(position);
                 }
