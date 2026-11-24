@@ -37,7 +37,9 @@ Databricks definitions into Cube. You start it from Console or the public REST A
   [Data sources served by `driver_factory`](#data-sources-served-by-driver_factory).
 - If a Cube source uses a two-part `schema.table` name, set
   [`CUBEJS_DB_DATABRICKS_CATALOG`](/reference/configuration/environment-variables#cubejs_db_databricks_catalog)
-  for that data source so Preview can resolve its catalog. Without it, those views are blocked.
+  for that data source so Preview can resolve its catalog, or the **Default catalog** of a
+  [publication target with its own connection](#publish-to-another-workspace). Without it, those
+  views are blocked.
 - Ask your Databricks administrator for a **dedicated target catalog and schema** for the
   published Metric Views.
   The Databricks identity Cube publishes with (the data source's, or a publication target's own
