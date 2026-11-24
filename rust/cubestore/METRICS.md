@@ -109,7 +109,7 @@ per-node count costs one partition lookup per partition that holds active in-mem
 | `cs.jobs` | gauge, set | `job_type`, `status` | Jobs in the metastore (what `system.jobs` shows), by status `Scheduled`, `ProcessingBy`, `Completed`, `Timeout`, `Error`, `Orphaned`. Main, from the orphaned-job scan of every reconcile (30 s) |
 | `cs.jobs.scheduled` | counter | `job_type` | Jobs added; a job already queued for the same row is not added and not counted. Main |
 | `cs.jobs.completed` | counter | `job_type` | Jobs finished successfully. Emitted by the node that ran the job |
-| `cs.jobs.failed` | counter | `job_type`, `error_class` | Jobs that failed or timed out. `error_class`: `offset_overflow`, `source_chunk_not_active`, `partition_not_active`, `timeout`, `shutdown`, `panic`, `other` |
+| `cs.jobs.failed` | counter | `job_type`, `error_class` | Jobs that failed or timed out. `error_class`: `offset_overflow`, `source_chunk_not_active`, `partition_not_active`, `timeout`, `stale_stream` (an idle stream ended by `CUBESTORE_STALE_STREAM_TIMEOUT`, not a failure), `shutdown`, `panic`, `other` |
 | `cs.jobs.partition_compaction.{count,completed,failures}`, `cs.jobs.multi_partition_split.*`, `cs.jobs.finish_multi_split.*`, `cs.jobs.repartition_chunk.*` | counter | | Older per-type counters, kept for existing dashboards |
 | `cs.jobs.unknown.deleted` | counter | | Jobs of a type this binary does not know, removed by cleanup (version skew) |
 
@@ -178,8 +178,8 @@ max by (tenant) (cs_metastore_in_memory_compaction_pending_partitions)
 Streaming lag that is actually current:
 
 ```promql
-max by (tenant, location) (cs_streaming_lag)
-  and on (tenant, location) (max by (tenant, location) (cs_streaming_lag_age_ms) < 60000)
+# Lag and age share their labels, so each lag series is kept only if its own age is fresh.
+max by (tenant, location) (cs_streaming_lag and cs_streaming_lag_age_ms < 60000)
 ```
 
 Average data query latency (do not use the summary's max or quantiles for this):

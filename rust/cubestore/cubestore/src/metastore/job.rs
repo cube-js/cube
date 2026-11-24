@@ -112,6 +112,8 @@ pub fn job_error_class(message: &str, is_panic: bool) -> &'static str {
         "source_chunk_not_active"
     } else if message.contains("partition is not active") {
         "partition_not_active"
+    } else if message.contains("Stale stream timeout") {
+        "stale_stream"
     } else if message.contains("timed out") {
         "timeout"
     } else if message.contains("shutting down") {
@@ -335,6 +337,11 @@ mod tests {
                 "partition_not_active",
             ),
             ("timed out", false, "timeout"),
+            (
+                "Stale stream timeout: deadline has elapsed",
+                false,
+                "stale_stream",
+            ),
             ("shutting down", false, "shutdown"),
             ("Reason: index out of bounds", true, "panic"),
             ("Panic in a message is not a panic", false, "other"),

@@ -1578,6 +1578,8 @@ impl RocksMetaStore {
         // fresh on table changes), so it costs nothing in the common no-streaming case.
         let tables = self.get_tables_with_path(false).await?;
         if !tables.iter().any(|t| t.table.get_row().in_memory_ingest()) {
+            app_metrics::IN_MEMORY_COMPACTION_PENDING_PARTITIONS.report(0);
+            app_metrics::IN_MEMORY_COMPACTION_DISCOVERY_AGE_MS.report(0);
             return Ok(Vec::new());
         }
 

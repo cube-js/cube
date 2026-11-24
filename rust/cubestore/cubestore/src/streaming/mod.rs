@@ -308,6 +308,7 @@ impl StreamingServiceImpl {
             spawn_lag_reporter(
                 source.clone(),
                 last_seq.clone(),
+                lag_reset.stopped.clone(),
                 tags.clone(),
                 STREAMING_LAG_REPORT_INTERVAL,
             )
@@ -463,6 +464,7 @@ const STALE_LAG_AGE_MS: i64 = i64::MAX;
 fn spawn_lag_reporter(
     source: Arc<dyn StreamingSource>,
     last_seq: Arc<AtomicI64>,
+    stopped: Arc<AtomicBool>,
     tags: Vec<String>,
     interval: Duration,
 ) -> AbortingJoinHandle<()> {
@@ -477,11 +479,15 @@ fn spawn_lag_reporter(
                 // A fetch that never succeeds still shows up as an age growing from the first offset.
                 last_computed.get_or_insert_with(Instant::now);
                 if let Some(lag) = source.calulate_lag(seq).await {
+                    // An abort lands only at the next await, after the final values may be sent.
+                    if stopped.load(Ordering::Acquire) {
+                        return;
+                    }
                     app_metrics::STREAMING_LAG.report_with_tags(lag, Some(&tags));
                     last_computed = Some(Instant::now());
                 }
             }
-            if let Some(t) = last_computed {
+            if let Some(t) = last_computed.filter(|_| !stopped.load(Ordering::Acquire)) {
                 app_metrics::STREAMING_LAG_AGE_MS
                     .report_with_tags(t.elapsed().as_millis() as i64, Some(&tags));
             }
@@ -497,6 +503,7 @@ struct LagGaugesReset {
     armed: AtomicBool,
     failed: AtomicBool,
     clean_stop: AtomicBool,
+    stopped: Arc<AtomicBool>,
 }
 
 impl LagGaugesReset {
@@ -506,6 +513,7 @@ impl LagGaugesReset {
             armed: AtomicBool::new(false),
             failed: AtomicBool::new(false),
             clean_stop: AtomicBool::new(false),
+            stopped: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -524,6 +532,7 @@ impl LagGaugesReset {
 
 impl Drop for LagGaugesReset {
     fn drop(&mut self) {
+        self.stopped.store(true, Ordering::Release);
         if !*self.armed.get_mut() {
             return;
         }
@@ -1120,7 +1129,13 @@ mod tests {
             lag_calls: lag_calls.clone(),
         });
         let last_seq = Arc::new(AtomicI64::new(NO_SEQ));
-        let reporter = spawn_lag_reporter(source, last_seq.clone(), Vec::new(), interval);
+        let reporter = spawn_lag_reporter(
+            source,
+            last_seq.clone(),
+            Arc::new(AtomicBool::new(false)),
+            Vec::new(),
+            interval,
+        );
 
         tokio::time::sleep(interval * 2).await;
         assert!(lag_calls.lock().unwrap().is_empty(), "nothing consumed yet");
