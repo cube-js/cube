@@ -49,7 +49,7 @@ cubes:
   const dialects = [
     { name: 'Snowflake', queryClass: SnowflakeQuery, cardinality: 'HLL_ESTIMATE', mergeOnly: 'HLL_EXPORT(HLL_COMBINE(' },
     { name: 'BigQuery', queryClass: BigqueryQuery, cardinality: 'HLL_COUNT.MERGE', mergeOnly: 'HLL_COUNT.MERGE_PARTIAL(' },
-    { name: 'Presto', queryClass: PrestodbQuery, cardinality: 'cardinality', mergeOnly: ') as varbinary)' },
+    { name: 'Presto', queryClass: PrestodbQuery, cardinality: 'cardinality', mergeOnly: 'cast(merge(cast(' },
   ];
 
   // Matches `fn(` only as a whole name: `HLL_COUNT.MERGE(` is not `HLL_COUNT.MERGE_PARTIAL(`.
