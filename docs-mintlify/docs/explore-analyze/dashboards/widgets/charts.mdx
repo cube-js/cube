@@ -29,6 +29,12 @@ If some controls are incompatible with a chart's query, the chart skips them and
 
 Charts on a published dashboard reflect the most recent published version of the workbook. To change the query, switch the chart type, or restyle the visualization, edit the underlying report in the workbook and publish a new version of the dashboard.
 
+The chart's settings menu (`⋮`) groups its items by what they do: **Inspect** and **Ask a follow up question**, then **Add comment** and **Create alert**, then **Edit in workbook**.
+
+**Inspect** in the chart's settings menu shows the chart's query — see [Inspecting a chart's query](#inspecting-a-charts-query).
+
+**Ask a follow up question** in the chart's settings menu starts a [chat][ref-chart-follow-up] about this chart.
+
 **Add comment** in the chart's settings menu opens the [comments][ref-comments] panel with only this chart's threads.
 
 **Create alert** in the chart's settings menu opens a new [alert][ref-data-alerts] with this chart already picked, or an upgrade dialog on a plan without dashboard deliveries. In the builder it is enabled only once the chart is in the published dashboard — see [From a chart's menu][ref-data-alerts-menu].
@@ -51,6 +57,29 @@ When the report already filters the same field, both filters apply — exactly a
 
 Only filters are carried. A [time granularity switcher or field switcher][ref-controls] on the dashboard does not follow into the workbook, so a report opened this way shows its own granularity and its own fields.
 
+## Inspecting a chart's query
+
+On a published dashboard, **Inspect** in a chart's settings menu (`⋮`) opens a dialog with the query behind the chart. The query has the dashboard's current state applied: the values of its [controls][ref-controls] and any [cross-filters][ref-cross-filtering]. It is the query that produced the data on screen, so change a filter and reopen the dialog to see the query change with it.
+
+{/* TODO: video — inspecting a dashboard chart's query (GTM-330) */}
+
+{/* TODO: screenshot — the Inspect dialog on a filtered chart, with the applied filters under the title and the Semantic SQL and Generated SQL tabs */}
+
+The dialog's title is the chart's title. When filters reach the chart, a line under the title lists them, worded as on the dashboard's filter chips, such as **Status is completed**. Cross-filters come last, as **Filtered by** and the names of the cross-filtered fields.
+
+The query is shown on the same tabs as in a workbook's [SQL panel][ref-inspecting-queries], with a button to copy it:
+
+- **Semantic SQL** is shown to everyone who can view the dashboard.
+- **Generated SQL** is shown only to roles with the [**Access SQL Runner**][ref-custom-roles-actions] permission. Without it, the dialog shows only Semantic SQL.
+
+A chart built on [source SQL][ref-source-sql] shows its SQL as written, without tabs, and only to roles with **Access SQL Runner**. Dashboard filters do not apply to source SQL, so the dialog lists none.
+
+If a chart's query fails, **Inspect** also appears as an icon button next to the error, so you can read the query that failed.
+
+Every viewer who can inspect a chart gets its settings menu. For a viewer who can't use the [Dashboard Agent][ref-dashboard-agent], the menu holds **Inspect** and any other item their role allows.
+
+**Inspect** is not available on Python charts, on [embedded][ref-embedding] dashboards, in printed or PDF dashboards, or in a dashboard's version history.
+
 ## Title
 
 Each chart shows the name of the underlying workbook tab as its title. To rename it, open the tab in the workbook, rename the tab, and republish the dashboard — the new name flows through to every chart backed by that tab.
@@ -67,3 +96,10 @@ Use **Hide title** in the widget's settings menu to suppress the title on the da
 [ref-comments]: /docs/explore-analyze/dashboards/comments
 [ref-data-alerts]: /docs/explore-analyze/alerts
 [ref-data-alerts-menu]: /docs/explore-analyze/alerts#from-a-charts-menu
+[ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
+[ref-inspecting-queries]: /docs/explore-analyze/workbooks/querying-data#inspecting-queries
+[ref-custom-roles-actions]: /admin/users-and-permissions/custom-roles#deployment-permissions
+[ref-source-sql]: /docs/explore-analyze/workbooks/source-sql-tabs
+[ref-dashboard-agent]: /docs/explore-analyze/dashboards/dashboard-agent
+[ref-chart-follow-up]: /docs/explore-analyze/dashboards/dashboard-agent#focusing-on-a-specific-chart
+[ref-embedding]: /embedding
