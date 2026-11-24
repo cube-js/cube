@@ -343,6 +343,10 @@ export class BigqueryQuery extends BaseQuery {
     return `HLL_COUNT.MERGE(${sql})`;
   }
 
+  public hllMergeOnly(sql: string) {
+    return `HLL_COUNT.MERGE_PARTIAL(${sql})`;
+  }
+
   public countDistinctApprox(sql: string) {
     return `APPROX_COUNT_DISTINCT(${sql})`;
   }
