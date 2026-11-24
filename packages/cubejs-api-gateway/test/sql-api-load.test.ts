@@ -63,8 +63,8 @@ async function sqlApiLoad(
   await apiGateway.sqlApiLoad({
     query: { measures: ['Foo.bar'] },
     sqlQuery,
-    ...request,
     streaming: false,
+    ...request,
     memberExpressions: true,
     context: {
       requestId: 'sql-api-load-test',
@@ -256,6 +256,128 @@ describe('sqlApiLoad over Cube Store pre-aggregations', () => {
     const [executed] = adapterApi.executedQueries;
     expect(executed.external).toBeFalsy();
     expect(executed.preAggregations).toBeUndefined();
+  });
+});
+
+describe('Cube Store pre-aggregations in stream mode', () => {
+  afterEach(() => {
+    delete process.env.CUBESQL_STREAM_MODE;
+    delete process.env.CUBESQL_STREAM_MODE_PRE_AGGREGATIONS;
+  });
+
+  class StreamAdapterApiMock extends FreshnessAdapterApiMock {
+    public streamedQueries: any[] = [];
+
+    public async streamQuery(query: any) {
+      this.streamedQueries.push(query);
+      return { pipe: () => undefined };
+    }
+  }
+
+  function createStreamGateway(compilerApiMock: any, adapterApi: any = new StreamAdapterApiMock()) {
+    return new ApiGateway('secret', jest.fn().mockImplementation(async () => ({
+      ...(await compilerApi()),
+      ...compilerApiMock,
+    })), async () => adapterApi, testLogger, {
+      standalone: true,
+      dataSourceStorage: new DataSourceStorageMock(),
+      basePath: '/cubejs-api',
+      refreshScheduler: {},
+    });
+  }
+
+  async function load(streaming: boolean, sqlQuery?: [string, any[]]) {
+    const getSql = jest.fn(async (query: any) => ({
+      sql: ['SELECT * FROM test', []],
+      external: !query.disableExternalPreAggregations,
+      aliasNameToMember: { foo__bar: 'Foo.bar' },
+      order: [],
+      dataSource: 'default',
+    }));
+    const adapterApi = new StreamAdapterApiMock();
+    await createStreamGateway({ getSql }, adapterApi).sqlApiLoad({
+      query: { measures: ['Foo.bar'] },
+      sqlQuery,
+      streaming,
+      memberExpressions: true,
+      context: { requestId: 'sql-api-stream-test', securityContext: {} } as any,
+      res: () => undefined,
+      apiType: 'sql',
+    } as any);
+
+    return { disabled: getSql.mock.calls[0][0].disableExternalPreAggregations, adapterApi };
+  }
+
+  async function sqlGenerators() {
+    const externalPreAggregationMembers = jest.fn(async () => ['Foo.bar']);
+    let response: any;
+    await createStreamGateway({
+      memberToDataSource: async () => ({ 'Foo.bar': 'default' }),
+      getCompilers: async () => ({}),
+      createQueryByDataSource: async () => ({
+        externalQueryClass: class {},
+        externalQuery: () => 'cube-store-generator',
+      }),
+      externalPreAggregationMembers,
+    }).sqlGenerators({
+      context: { requestId: 'sql-generators-test', securityContext: {} } as any,
+      res: (r: any) => {
+        response = r;
+      },
+    });
+    return response;
+  }
+
+  test('streamed query reads the data source', async () => {
+    process.env.CUBESQL_STREAM_MODE = 'true';
+
+    for (const sqlQuery of [undefined, ['SELECT 1', []] as [string, any[]]]) {
+      const { disabled, adapterApi } = await load(true, sqlQuery);
+
+      expect(disabled).toBe(true);
+      expect(adapterApi.streamedQueries).toHaveLength(1);
+      expect(adapterApi.streamedQueries[0].external).toBe(false);
+    }
+  });
+
+  test('non-streamed query reads the data source in stream mode without pre-aggregations', async () => {
+    process.env.CUBESQL_STREAM_MODE = 'true';
+    process.env.CUBESQL_STREAM_MODE_PRE_AGGREGATIONS = 'false';
+
+    const { disabled, adapterApi } = await load(false);
+
+    expect(disabled).toBe(true);
+    expect(adapterApi.executedQueries[0].external).toBe(false);
+  });
+
+  test('non-streamed query reads Cube Store in stream mode by default', async () => {
+    process.env.CUBESQL_STREAM_MODE = 'true';
+
+    const { disabled, adapterApi } = await load(false);
+
+    expect(disabled).toBe(false);
+    expect(adapterApi.executedQueries[0].external).toBe(true);
+  });
+
+  test('non-streamed query reads Cube Store outside stream mode', async () => {
+    const { disabled, adapterApi } = await load(false);
+
+    expect(disabled).toBe(false);
+    expect(adapterApi.executedQueries[0].external).toBe(true);
+  });
+
+  // Without a Cube Store SQL generator cubesql plans no SQL over Cube Store rollups
+  test('sqlGenerators leaves out Cube Store in stream mode without pre-aggregations', async () => {
+    expect((await sqlGenerators()).externalSqlGenerator).toEqual('cube-store-generator');
+
+    process.env.CUBESQL_STREAM_MODE = 'true';
+    expect((await sqlGenerators()).externalSqlGenerator).toEqual('cube-store-generator');
+
+    process.env.CUBESQL_STREAM_MODE_PRE_AGGREGATIONS = 'false';
+    expect(await sqlGenerators()).toMatchObject({
+      externalSqlGenerator: undefined,
+      externalPreAggregationMembers: [],
+    });
   });
 });
 

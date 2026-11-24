@@ -872,6 +872,27 @@ filter_subq AS (
       expect(res.rows).toMatchSnapshot();
     });
 
+    // A streamed query reads the data source rather than the Cube Store rollup, which can't stream
+    const weeklySessions = async (limit: string) => {
+      const res = await connection.query(`
+        SELECT DATE_TRUNC('week', event_date) AS week, MEASURE(sessions) AS sessions
+        FROM "StreamPreAggTest"
+        WHERE event_date >= '2026-09-01' AND event_date < '2026-10-01'
+        GROUP BY 1
+        ORDER BY 1${limit}`);
+      return res.rows.map((r) => Number(r.sessions));
+    };
+
+    for (const [name, limit] of [
+      ['without LIMIT', ''],
+      ['with LIMIT above the non-streaming row limit', ' LIMIT 50001'],
+      ['with LIMIT at the non-streaming row limit', ' LIMIT 50000'],
+    ]) {
+      test(`query over a Cube Store pre-aggregation in stream mode ${name}`, async () => {
+        expect(await weeklySessions(limit)).toEqual([10, 20, 30]);
+      });
+    }
+
     test('tableau bi fiscal year query', async () => {
       const query = `
       SELECT
