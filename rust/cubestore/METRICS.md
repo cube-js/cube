@@ -174,7 +174,7 @@ Compaction throughput and failures:
 
 ```promql
 sum by (tenant, job_type) (rate(cs_jobs_completed[5m]))
-sum by (tenant, job_type, error_class) (increase(cs_jobs_failed[30m]))
+sum by (tenant, job_type, error_class) (increase(cs_jobs_failed{error_class!="stale_stream"}[30m]))
 sum by (tenant, job_type, status) (cs_jobs)
 max by (tenant) (cs_metastore_in_memory_compaction_pending_partitions)
 ```
