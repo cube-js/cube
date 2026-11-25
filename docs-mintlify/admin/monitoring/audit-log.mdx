@@ -47,7 +47,8 @@ and sanitize them, i.e., replace them with `[HIDDEN]` in event-specific
 attributes. You can see that a password was sanitized on the screenshot above.
 
 Values of environment variables and encryption keys are never stored in Audit Log,
-whatever their names. They are always shown as `[REDACTED]` or `[HIDDEN]`.
+whatever their names. They are shown as `[REDACTED]`, or as `[HIDDEN]` when the
+name of the variable or key includes one of the substrings listed below.
 
 For other event-specific attributes, a value is sanitized when the attribute's name
 includes one of the following substrings: `PASS`, `SECRET`, `TOKEN`, `KEY`.
