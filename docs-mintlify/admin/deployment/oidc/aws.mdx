@@ -480,12 +480,23 @@ deployment ID if you want isolation.
 
 ## Bedrock for bring-your-own LLM
 
-Bring-your-own LLM lets the AI engineer service call Bedrock through your
-own AWS account. The AI engineer's `sub` claim ends in
-`component:ai_engineer`, so the trust policy uses a `StringLike` match on
-`cube:deployment:*:component:ai_engineer` to grant access tenant-wide
-(every deployment's AI engineer assumes the same role and writes against
-the same Bedrock account).
+Bring-your-own LLM lets AI agents call Bedrock through your
+own AWS account. AI agents request a tenant-scoped token: its
+`{deployment_id}` is the literal `global`, and its `{component}` is
+`ai_engineer`. One role serves the whole tenant: AI agents in every
+deployment assume it and call the same Bedrock account.
+
+The token's `sub` claim depends on the token config's
+[subject claim format][ref-sub-editor]:
+
+| Subject claim format | `sub` claim of AI agents |
+| --- | --- |
+| Not set (default) | `cube:component:ai_engineer:deployment_id:global` |
+| `cube:deployment:{deployment_id}:component:{component}` | `cube:deployment:global:component:ai_engineer` |
+
+The trust policy below matches both, so you don't need to change the
+subject claim format for Bedrock. If you use a different format, match the
+`sub` it renders for these values instead.
 
 <Steps>
   <Step title="Create the Bedrock IAM role">
@@ -506,7 +517,10 @@ the same Bedrock account).
               "<tenant-name>.cubecloud.dev:aud": "sts.amazonaws.com"
             },
             "StringLike": {
-              "<tenant-name>.cubecloud.dev:sub": "cube:deployment:*:component:ai_engineer"
+              "<tenant-name>.cubecloud.dev:sub": [
+                "cube:component:ai_engineer:deployment_id:global",
+                "cube:deployment:*:component:ai_engineer"
+              ]
             }
           }
         }
@@ -557,7 +571,7 @@ the same Bedrock account).
       profile ID.
     - **Assume Role ARN** — the role you created above.
     - **Use OIDC workload identity** — toggle on. With this on, the AI
-      engineer authenticates via the deployment's OIDC token instead of
+      engineer authenticates via your tenant's OIDC token instead of
       static AWS credentials.
 
     <Frame>
