@@ -496,6 +496,7 @@ console.log(tools.map((tool) => tool.name));
 | `error` | Status | Cause |
 | --- | --- | --- |
 | `invalid_client` | 401 | `client_id` isn't `cube-api-key`, or the secret isn't a valid Cube API key. |
+| `unauthorized_client` | 400 | The key is valid, but the single endpoint is turned off for your account. Use a [region-specific endpoint](#authenticate-with-an-api-key) with the host from **Admin → MCP Server**. |
 | `invalid_request` | 400 | `subject_token` is missing or unknown, or `subject_token_type` is wrong. |
 | `invalid_scope` | 400 | `scope` was sent more than once. |
 | `access_denied` | 403 | The request isn't allowed — for example, a non-admin key naming a user, a key limited to particular deployments or to specific endpoints, or a deactivated user. |
