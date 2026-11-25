@@ -116,7 +116,7 @@ runs:
         } >> "$GITHUB_STEP_SUMMARY"
         for outcome in "$CRANE" "$RESOLVE" "$SBOM" "$PROVENANCE" "$SBOM_ATTEST"; do
           if [ "$outcome" != "success" ]; then
-            echo "::warning title=Image attestation incomplete::${IMAGE}${REF}: see the job summary. The image was pushed; only its attestations are missing."
+            echo "::warning title=Image attestation incomplete::${IMAGE}${REF} ${PLATFORM}: see the job summary. The image was pushed; only its attestations are missing."
             break
           fi
         done
