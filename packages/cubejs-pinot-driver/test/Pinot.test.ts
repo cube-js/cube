@@ -1,6 +1,7 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { DockerComposeEnvironment, Wait, StartedDockerComposeEnvironment } from 'testcontainers';
 import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
+import { streamToArray } from '@cubejs-backend/shared';
 import { PinotQuery } from '../src/PinotQuery';
 import { PinotDriver } from '../src/PinotDriver';
 
@@ -85,6 +86,31 @@ describe('Pinot', () => {
     it('tests the connection', async () => {
       await doWithDriver(async (driver: any) => {
         await driver.testConnection();
+      });
+    });
+
+    it('streams query results', async () => {
+      await doWithDriver(async (driver: PinotDriver) => {
+        // A page smaller than the result makes brokers with cursor support serve it in two pages.
+        const source = await driver.stream(
+          'SELECT studentID, firstName FROM students WHERE studentID >= ? ORDER BY studentID',
+          [200],
+          { highWaterMark: 2 }
+        );
+
+        try {
+          expect(source.types).toEqual([
+            { name: 'studentID', type: 'int' },
+            { name: 'firstName', type: 'text' },
+          ]);
+          expect(await streamToArray(<any> source.rowStream)).toEqual([
+            { studentID: 200, firstName: 'Lucy' },
+            { studentID: 201, firstName: 'Bob' },
+            { studentID: 202, firstName: 'Nick' },
+          ]);
+        } finally {
+          await source.release?.();
+        }
       });
     });
   });

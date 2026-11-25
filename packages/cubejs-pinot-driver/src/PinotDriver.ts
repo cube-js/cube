@@ -4,6 +4,8 @@ import {
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   QueryOptions,
+  StreamOptions,
+  TableStructure,
   BaseDriver
 } from '@cubejs-backend/base-driver';
 import {
@@ -23,6 +25,7 @@ import {
 } from 'ramda';
 import fetch, { Headers, Request, Response } from 'node-fetch';
 import { PinotQuery } from './PinotQuery';
+import { PinotRow, PinotRowStream } from './PinotRowStream';
 
 export type PinotDriverConfiguration = {
   host?: string;
@@ -55,6 +58,14 @@ type AuthorizationHeaders = {
   database?: string;
 };
 
+type PinotResultTable = {
+  dataSchema: {
+    columnDataTypes: string[],
+    columnNames: string[]
+  },
+  rows: any[][]
+};
+
 type PinotResponse = {
   exceptions: any[],
   minConsumingFreshnessTimeMs: number,
@@ -68,18 +79,32 @@ type PinotResponse = {
   numSegmentsQueried: number,
   numServersQueried: number,
   numServersResponded: number,
-  resultTable: {
-    dataSchema: {
-      columnDataTypes: string[],
-      columnNames: string[]
-    },
-    rows: any[][]
-  },
+  // Pinot omits the table from a cursor response when the result is empty.
+  resultTable?: PinotResultTable,
   segmentStatistics: any[],
   timeUsedMs: number,
   totalDocs: number,
-  traceInfo: any
+  traceInfo: any,
+  requestId?: string,
+  numRowsResultSet?: number,
+  // Set only on responses served from a cursor.
+  offset?: number,
+  numRows?: number,
 };
+
+type PinotCursorResponse = PinotResponse & {
+  requestId: string,
+  numRowsResultSet: number,
+  offset: number,
+  numRows: number,
+};
+
+const isCursorResponse = (response: PinotResponse): response is PinotCursorResponse => (
+  typeof response.offset === 'number' &&
+  typeof response.numRows === 'number' &&
+  typeof response.numRowsResultSet === 'number' &&
+  Boolean(response.requestId)
+);
 
 const PinotTypeToGenericType: Record<string, string> = {
   string: 'text',
@@ -102,6 +127,8 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
   protected readonly config: Required<PinotDriverConfiguration, 'queryTimeout'>;
 
   protected readonly url: string;
+
+  protected readonly responseStoreUrl: string;
 
   public static dialectClass() {
     return PinotQuery;
@@ -145,6 +172,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       ? rawHost
       : `${useSsl ? 'https' : 'http'}://${rawHost}`;
     this.url = `${host}:${this.config.port}/query/sql`;
+    this.responseStoreUrl = `${host}:${this.config.port}/responseStore`;
   }
 
   public readOnly(): boolean {
@@ -224,45 +252,161 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     return querystring.stringify(options, ';', '=', { encodeURIComponent: (value) => value });
   }
 
-  protected async request(query: string, requestId?: string): Promise<PinotResponse> {
-    const toError = (error: any) => new Error(error.error ? `${error.message}\n${error.error}` : error.message);
+  protected toError(error: any): Error {
+    return new Error(error.error ? `${error.message}\n${error.error}` : error.message);
+  }
 
-    const request: Request = new Request(this.url, {
-      method: 'POST',
+  protected async send(url: string, init: { method: string, body?: string }): Promise<Response> {
+    const request: Request = new Request(url, {
+      ...init,
       headers: new Headers({
         'Content-Type': 'application/json',
         ...this.authorizationHeaders()
       }),
+    });
+
+    try {
+      return await fetch(request);
+    } catch (error: any) {
+      throw this.toError(error);
+    }
+  }
+
+  protected async readResponse(response: Response): Promise<PinotResponse> {
+    const result: PinotResponse = await response.json();
+
+    if (result?.exceptions?.length) {
+      throw this.toError(result.exceptions[0]);
+    }
+
+    return result;
+  }
+
+  /**
+   * With `cursorPageSize` the broker keeps the result in its response store and
+   * returns only the first page. Brokers without cursor support (before 1.3)
+   * ignore the parameters and return the whole result.
+   */
+  protected async request(query: string, requestId?: string, cursorPageSize?: number): Promise<PinotResponse> {
+    const url = cursorPageSize ? `${this.url}?getCursor=true&numRows=${cursorPageSize}` : this.url;
+
+    const response = await this.send(url, {
+      method: 'POST',
       body: JSON.stringify({
         sql: query,
         queryOptions: this.queryOptions(requestId)
       })
     });
 
-    let response: Response;
-
-    try {
-      response = await fetch(request);
-    } catch (error: any) {
-      throw toError(error);
+    if (!response.ok) {
+      throw this.toError({ message: response.status === 401 ? 'Unauthorized request' : 'Unexpected error' });
     }
+
+    return this.readResponse(response);
+  }
+
+  protected async fetchCursorPage(cursorId: string, offset: number, numRows: number): Promise<PinotCursorResponse> {
+    const response = await this.send(
+      `${this.responseStoreUrl}/${encodeURIComponent(cursorId)}/results?offset=${offset}&numRows=${numRows}`,
+      { method: 'GET' }
+    );
 
     if (!response.ok) {
-      throw toError({ message: response.status === 401 ? 'Unauthorized request' : 'Unexpected error' });
+      if (response.status === 401) {
+        throw this.toError({ message: 'Unauthorized request' });
+      }
+
+      // The response store answers errors in plain text, e.g. for a cursor that has
+      // expired or that belongs to another broker behind the same address.
+      throw this.toError({
+        message: `Unable to fetch Pinot cursor ${cursorId} at offset ${offset}`,
+        error: (await response.text()).trim(),
+      });
     }
 
-    const result: PinotResponse = await response.json();
-
-    if (result?.exceptions?.length) {
-      throw toError(result.exceptions[0]);
+    const page = await this.readResponse(response);
+    if (!isCursorResponse(page) || page.numRows === 0) {
+      throw this.toError({ message: `Unexpected Pinot cursor ${cursorId} response at offset ${offset}` });
     }
 
-    return result;
+    return page;
+  }
+
+  protected async deleteCursor(cursorId: string): Promise<void> {
+    try {
+      await this.send(`${this.responseStoreUrl}/${encodeURIComponent(cursorId)}`, { method: 'DELETE' });
+    } catch {
+      // The broker drops the cursor on its own once it expires.
+    }
+  }
+
+  protected resultTableRows(resultTable?: PinotResultTable): PinotRow[] {
+    if (!resultTable) {
+      return [];
+    }
+
+    return this.normalizeResultOverColumns(resultTable.rows, resultTable.dataSchema.columnNames);
+  }
+
+  protected resultTableTypes(resultTable?: PinotResultTable): TableStructure {
+    if (!resultTable) {
+      return [];
+    }
+
+    const { columnNames, columnDataTypes } = resultTable.dataSchema;
+
+    return columnNames.map((name, index) => ({
+      name,
+      type: this.toGenericType(columnDataTypes[index]),
+    }));
+  }
+
+  public async stream(
+    query: string,
+    values: unknown[],
+    { highWaterMark, requestId }: StreamOptions,
+  ): Promise<StreamTableData> {
+    const pageSize = highWaterMark || getEnv('dbQueryStreamHighWaterMark');
+    const first = await this.request(this.prepareQueryWithParams(query, values), requestId, pageSize);
+
+    const cursor = isCursorResponse(first) ? first : null;
+    let pending: PinotResponse | null = first;
+    let nextOffset = cursor ? cursor.offset + cursor.numRows : 0;
+
+    const nextPage = async () => {
+      let page: PinotResponse | null = pending;
+      pending = null;
+
+      if (!page) {
+        if (!cursor || nextOffset >= cursor.numRowsResultSet) {
+          return null;
+        }
+
+        const fetched = await this.fetchCursorPage(cursor.requestId, nextOffset, pageSize);
+        nextOffset = fetched.offset + fetched.numRows;
+        page = fetched;
+      }
+
+      return this.resultTableRows(page.resultTable);
+    };
+
+    let released = false;
+
+    return {
+      rowStream: new PinotRowStream(nextPage, pageSize),
+      types: this.resultTableTypes(first.resultTable),
+      release: async () => {
+        if (cursor && !released) {
+          released = true;
+          await this.deleteCursor(cursor.requestId);
+        }
+      },
+    };
   }
 
   public async queryPromised(query: string, requestId?: string): Promise<any[] | StreamTableData> {
     const { resultTable } = await this.request(query, requestId);
-    return this.normalizeResultOverColumns(resultTable.rows, resultTable.dataSchema.columnNames);
+    return this.resultTableRows(resultTable);
   }
 
   public async downloadQueryResults(
@@ -271,14 +415,10 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     options: DownloadQueryResultsOptions,
   ): Promise<DownloadQueryResultsResult> {
     const { resultTable } = await this.request(this.prepareQueryWithParams(query, values), options?.requestId);
-    const { rows, dataSchema } = resultTable;
 
     return {
-      rows: this.normalizeResultOverColumns(rows, dataSchema.columnNames),
-      types: dataSchema.columnNames.map((name, index) => ({
-        name,
-        type: this.toGenericType(dataSchema.columnDataTypes[index]),
-      })),
+      rows: this.resultTableRows(resultTable),
+      types: this.resultTableTypes(resultTable),
     };
   }
 
@@ -290,7 +430,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     return identifier;
   }
 
-  public normalizeResultOverColumns(data: any[], columns: string[]) {
+  public normalizeResultOverColumns(data: any[], columns: string[]): PinotRow[] {
     const arrayToObject = zipObj(columns);
     return map(arrayToObject, data || []);
   }
