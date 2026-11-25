@@ -124,6 +124,42 @@ pub fn partition_by_dimension_overrides(
     Ok(partitions)
 }
 
+/// Whether every override of `measures` that applies to `dimensions` is
+/// applied to them. A query merging measures of different overrides is not:
+/// only its legs are.
+pub fn are_overrides_applied(
+    measures: &[Rc<MemberSymbol>],
+    dimensions: &[Rc<MemberSymbol>],
+) -> bool {
+    let dimensions = dimensions
+        .iter()
+        .map(time_dimension_base)
+        .collect::<Vec<_>>();
+    let used = dimensions
+        .iter()
+        .map(|symbol| symbol.id().clone())
+        .collect::<HashSet<_>>();
+    measures.iter().all(|measure| {
+        let overrides = AppliedOverrides::for_measure(measure, &used);
+        overrides
+            .items
+            .iter()
+            .zip(&overrides.targets)
+            .all(|((dimension, _), target)| {
+                dimensions
+                    .iter()
+                    .filter(|symbol| symbol.id() == dimension)
+                    .all(|symbol| {
+                        symbol
+                            .as_ref_symbol()
+                            .ok()
+                            .and_then(|reference| reference.target_member().cloned())
+                            .is_some_and(|member| member.id() == target.id())
+                    })
+            })
+    })
+}
+
 // The view dimensions a query groups, filters or orders by. A time dimension
 // counts as the dimension it is a granularity of.
 fn used_dimensions(query: &QueryProperties) -> Vec<Rc<MemberSymbol>> {
@@ -137,13 +173,14 @@ fn used_dimensions(query: &QueryProperties) -> Vec<Rc<MemberSymbol>> {
         item.find_all_member_evaluators(&mut members);
     }
     members.extend(query.extract_dimensions_from_order());
-    members
-        .into_iter()
-        .map(|member| match member.as_time_dimension() {
-            Ok(time_dimension) => time_dimension.base_symbol().clone(),
-            Err(_) => member,
-        })
-        .collect()
+    members.iter().map(time_dimension_base).collect()
+}
+
+fn time_dimension_base(member: &Rc<MemberSymbol>) -> Rc<MemberSymbol> {
+    match member.as_time_dimension() {
+        Ok(time_dimension) => time_dimension.base_symbol().clone(),
+        Err(_) => member.clone(),
+    }
 }
 
 fn query_dimension(query: &QueryProperties, id: &MemberId) -> Option<Rc<MemberSymbol>> {

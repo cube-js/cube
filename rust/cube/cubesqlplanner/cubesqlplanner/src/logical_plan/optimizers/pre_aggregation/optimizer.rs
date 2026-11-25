@@ -3,6 +3,7 @@ use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::planner::collectors::{collect_cube_names_from_symbols, has_multi_stage_members};
+use crate::planner::dimension_overrides::are_overrides_applied;
 use crate::planner::filter::operators::date_range::DateRangeKind;
 use crate::planner::filter::typed_filter::resolve_base_symbol;
 use crate::planner::filter::FilterItem;
@@ -874,11 +875,23 @@ impl PreAggregationOptimizer {
         row_grain: RowGrain,
     ) -> Result<Option<PreAggregationMatch>, CubeError> {
         let helper = OptimizerHelper::new();
+        let all_measures = helper.all_measures(schema, filters);
+
+        let mut dimensions = schema.all_dimensions().cloned().collect::<Vec<_>>();
+        for item in filters
+            .dimensions_filters
+            .iter()
+            .chain(filters.time_dimensions_filters.iter())
+        {
+            item.find_all_member_evaluators(&mut dimensions);
+        }
+        if !are_overrides_applied(&all_measures, &dimensions) {
+            return Ok(None);
+        }
 
         let (match_state, read_time_dimensions) =
             self.match_dimensions(schema, filters, pre_aggregation)?;
 
-        let all_measures = helper.all_measures(schema, filters);
         if match_state == MatchState::NotMatched {
             return Ok(None);
         }

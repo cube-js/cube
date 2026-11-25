@@ -1,0 +1,122 @@
+# view_dimension_overrides.yaml with a rollup per date role: counts stored by
+# purchase month, cancellations by cancel month, carts by their own month.
+cubes:
+  - name: calendar
+    sql_table: vdo_calendar
+    dimensions:
+      - name: dt_ts
+        type: time
+        sql: dt_ts
+        primary_key: true
+      - name: dt_year
+        type: string
+        sql: dt_year
+      - name: dt_year_month
+        type: string
+        sql: dt_year_month
+
+  - name: subscriptions
+    sql_table: vdo_subscriptions
+    joins:
+      - name: calendar
+        alias: purchase_cal
+        sql: "{CUBE}.purchase_date = {purchase_cal.dt_ts}"
+        relationship: many_to_one
+      - name: calendar
+        alias: cancel_cal
+        sql: "{CUBE}.cancel_date = {cancel_cal.dt_ts}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: plan
+        type: string
+        sql: plan
+    measures:
+      - name: count
+        type: count
+      - name: cancellations
+        type: count
+        filters:
+          - sql: "{CUBE}.cancel_date IS NOT NULL"
+      - name: cancellations_cumulative
+        type: count
+        filters:
+          - sql: "{CUBE}.cancel_date IS NOT NULL"
+        rolling_window:
+          trailing: unbounded
+    pre_aggregations:
+      - name: counts_by_purchase_month
+        measures:
+          - count
+        dimensions:
+          - purchase_cal.dt_year
+          - purchase_cal.dt_year_month
+      - name: cancellations_by_cancel_month
+        measures:
+          - cancellations
+        dimensions:
+          - cancel_cal.dt_year
+          - cancel_cal.dt_year_month
+
+  - name: carts
+    sql_table: vdo_carts
+    joins:
+      - name: calendar
+        sql: "{CUBE}.created_date = {calendar.dt_ts}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+    pre_aggregations:
+      - name: counts_by_month
+        measures:
+          - count
+        dimensions:
+          - calendar.dt_year
+          - calendar.dt_year_month
+
+views:
+  - name: biz
+    cubes:
+      - join_path: calendar
+        includes:
+          - dt_ts
+          - dt_year
+          - dt_year_month
+      - join_path: subscriptions
+        alias: purchases
+        prefix: true
+        includes:
+          - count
+        dimension_overrides:
+          dt_ts: subscriptions.purchase_cal.dt_ts
+          dt_year: subscriptions.purchase_cal.dt_year
+          dt_year_month: subscriptions.purchase_cal.dt_year_month
+      - join_path: subscriptions
+        alias: cancellations
+        prefix: true
+        includes:
+          - count
+          - cancellations
+          - cancellations_cumulative
+        dimension_overrides:
+          dt_ts: subscriptions.cancel_cal.dt_ts
+          dt_year: subscriptions.cancel_cal.dt_year
+          dt_year_month: subscriptions.cancel_cal.dt_year_month
+      - join_path: subscriptions
+        alias: subs
+        prefix: true
+        includes:
+          - plan
+      - join_path: carts
+        prefix: true
+        includes:
+          - count
