@@ -38,8 +38,7 @@
     "@cubejs-backend/base-driver": "1.8.34",
     "@cubejs-backend/schema-compiler": "1.8.34",
     "@cubejs-backend/shared": "1.8.34",
-    "node-fetch": "^2.7.0",
-    "ramda": "^0.32.0"
+    "node-fetch": "^2.7.0"
   },
   "license": "Apache-2.0",
   "publishConfig": {

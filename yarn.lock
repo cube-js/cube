@@ -4022,7 +4022,6 @@ __metadata:
     "@types/node": "npm:^22"
     jest: "npm:^29"
     node-fetch: "npm:^2.7.0"
-    ramda: "npm:^0.32.0"
     should: "npm:^13.2.3"
     testcontainers: "npm:^12.1.0"
     typescript: "npm:~6.0.3"

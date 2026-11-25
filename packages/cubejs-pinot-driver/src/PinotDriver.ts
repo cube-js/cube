@@ -20,9 +20,6 @@ import {
 import querystring from 'node:querystring';
 import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 
-import {
-  map, zipObj
-} from 'ramda';
 import fetch, { Headers, Request, Response } from 'node-fetch';
 import { PinotQuery } from './PinotQuery';
 import { PinotRow, PinotRowStream } from './PinotRowStream';
@@ -431,7 +428,14 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
   }
 
   public normalizeResultOverColumns(data: any[], columns: string[]): PinotRow[] {
-    const arrayToObject = zipObj(columns);
-    return map(arrayToObject, data || []);
+    return (data || []).map((values) => {
+      const row: PinotRow = {};
+
+      for (let i = 0; i < columns.length; i++) {
+        row[columns[i]] = values[i];
+      }
+
+      return row;
+    });
   }
 }
