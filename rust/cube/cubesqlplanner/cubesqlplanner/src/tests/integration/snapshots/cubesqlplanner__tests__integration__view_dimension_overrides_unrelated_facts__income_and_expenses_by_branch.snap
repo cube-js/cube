@@ -1,9 +1,0 @@
----
-source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_overrides_unrelated_facts.rs
-expression: result
----
-finance__branch | finance__income | finance__expenses
-----------------+-----------------+------------------
-East            | NULL            | 10               
-North           | 170             | 40               
-South           | 100             | 85

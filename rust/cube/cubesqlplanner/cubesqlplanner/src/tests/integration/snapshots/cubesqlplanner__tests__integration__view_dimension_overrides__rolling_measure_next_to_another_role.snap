@@ -1,9 +1,0 @@
----
-source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_overrides.rs
-expression: result
----
-biz__dt_ts_month    | biz__purchases_count | biz__cancellations_cancellations_cumulative
---------------------+----------------------+--------------------------------------------
-2026-01-01 00:00:00 | 1                    | 1                                          
-2026-02-01 00:00:00 | 1                    | 3                                          
-2026-03-01 00:00:00 | NULL                 | 3

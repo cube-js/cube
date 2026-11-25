@@ -1,7 +1,0 @@
----
-source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_overrides.rs
-expression: result
----
-biz__cancellations_per_purchase_single_stage
---------------------------------------------
-0.75000000000000000000

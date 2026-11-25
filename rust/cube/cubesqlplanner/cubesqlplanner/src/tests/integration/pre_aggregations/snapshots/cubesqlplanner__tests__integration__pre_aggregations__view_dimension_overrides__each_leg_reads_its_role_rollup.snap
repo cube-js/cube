@@ -1,8 +1,0 @@
----
-source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/view_dimension_overrides.rs
-expression: result
----
-biz__dt_year_month | biz__purchases_count | biz__cancellations_cancellations | biz__carts_count
--------------------+----------------------+----------------------------------+-----------------
-2026-01            | 1                    | NULL                             | NULL            
-2026-02            | 1                    | 2                                | 2

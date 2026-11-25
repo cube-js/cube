@@ -173,7 +173,7 @@ impl FromSchema {
 
     // Members referencing one member are one column, unless different inputs
     // provide them: view measures over one cube measure under different
-    // dimension overrides compute different values.
+    // dimension mappings compute different values.
     fn add(&mut self, member: &Rc<MemberSymbol>, provider: Provider) -> Result<(), CubeError> {
         if let Some(position) = self.by_member.get(member.id()) {
             let existing = &self.columns[*position].provider;

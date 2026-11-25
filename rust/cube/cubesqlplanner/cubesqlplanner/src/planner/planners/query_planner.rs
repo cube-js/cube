@@ -42,11 +42,11 @@ impl QueryPlanner {
         if analysis.is_simple() {
             let planner = SimpleQueryPlanner::new(self.query_tools.clone(), analysis);
             planner.plan(scope)
-        } else if !analysis.override_legs().is_empty() {
+        } else if !analysis.mapped_legs().is_empty() {
             let refs = analysis
-                .override_legs()
+                .mapped_legs()
                 .iter()
-                .map(|leg| self.plan_override_leg(leg, scope))
+                .map(|leg| self.plan_mapped_leg(leg, scope))
                 .collect::<Result<Vec<_>, _>>()?;
             MergeQueryPlanner::new(analysis).plan_logical_plan(refs, scope)
         } else {
@@ -69,7 +69,7 @@ impl QueryPlanner {
         }
     }
 
-    fn plan_override_leg(
+    fn plan_mapped_leg(
         &self,
         leg: &Rc<QueryProperties>,
         scope: &mut PlanningScope,

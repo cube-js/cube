@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_map.rs
+expression: result
+---
+biz__purchases_count | biz__cancellations_cancellations
+---------------------+---------------------------------
+2                    | 2

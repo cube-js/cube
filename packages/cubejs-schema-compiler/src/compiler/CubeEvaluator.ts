@@ -177,7 +177,7 @@ export type MeasureDefinition = {
   aliasMember?: string;
   case?: MemberCaseDefinition;
   /** View dimension name -> full path of the dimension it means for this view measure */
-  dimensionOverrides?: Record<string, string>;
+  dimensionMap?: Record<string, string>;
 };
 
 export type CaseLabel = string | SqlDefinition;

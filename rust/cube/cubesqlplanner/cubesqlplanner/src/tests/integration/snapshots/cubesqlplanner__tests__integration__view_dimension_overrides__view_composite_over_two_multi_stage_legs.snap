@@ -1,8 +1,0 @@
----
-source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_overrides.rs
-expression: result
----
-biz__dt_ts_year     | biz__prev_year_cancellations_per_yearly_purchase
---------------------+-------------------------------------------------
-2025-01-01 00:00:00 | NULL                                            
-2026-01-01 00:00:00 | 0.50000000000000000000

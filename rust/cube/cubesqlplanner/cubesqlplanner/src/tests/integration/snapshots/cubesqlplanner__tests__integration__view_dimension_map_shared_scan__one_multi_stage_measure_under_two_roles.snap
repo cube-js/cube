@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_map_shared_scan.rs
+expression: rows
+---
+2026-01|2.000000|NULL
+2026-02|2.000000|4.000000
+biz__dt_year_month|biz__purchases_count_doubled|biz__cancellations_count_doubled

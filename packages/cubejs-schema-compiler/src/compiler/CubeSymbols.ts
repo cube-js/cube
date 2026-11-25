@@ -247,7 +247,7 @@ export type ViewCubeInclude = {
   includes: '*' | (string | ViewCubeIncludeMember)[];
   excludes?: string[];
   // View dimension name -> full path of the dimension it means for the measures of this include
-  dimensionOverrides?: Record<string, string>;
+  dimensionMap?: Record<string, string>;
 };
 
 export interface CubeDefinition {
@@ -311,7 +311,7 @@ type ViewResolvedMember = {
   // The cube the member is defined on, which the join path reaches
   cube: string;
   name: string;
-  dimensionOverrides?: Record<string, string>;
+  dimensionMap?: Record<string, string>;
 };
 
 type ViewExcludedMember = {
@@ -1077,8 +1077,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         excludes
       );
 
-      if (cubeInclude.split && cubeInclude.dimensionOverrides && type === 'measures') {
-        errorReporter.error(`Dimension overrides of '${fullPath}' can't be used together with split`);
+      if (cubeInclude.split && cubeInclude.dimensionMap && type === 'measures') {
+        errorReporter.error(`The dimension map of '${fullPath}' can't be used together with split`);
       }
 
       if (cubeInclude.split) {
@@ -1098,16 +1098,16 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         const includeMembers = this.generateIncludeMembers(finalIncludes, type, splitViewDef, viewAllMembers);
         this.applyIncludeMembers(includeMembers, splitViewDef, type, errorReporter);
       } else {
-        // Dimensions are applied to the view before measures, so the override keys can be checked
-        const dimensionOverrides = type === 'measures' && cubeInclude.dimensionOverrides ?
-          this.resolveDimensionOverrides(parentCube, cubeInclude.dimensionOverrides, fullPath, errorReporter) :
+        // Dimensions are applied to the view before measures, so the mapping keys can be checked
+        const dimensionMap = type === 'measures' && cubeInclude.dimensionMap ?
+          this.resolveDimensionMap(parentCube, cubeInclude.dimensionMap, fullPath, errorReporter) :
           undefined;
 
         for (const member of finalIncludes) {
           const key = `${member.member}|${member.name}`;
           if (!seen.has(key)) {
             seen.add(key);
-            result.push(dimensionOverrides ? { ...member, dimensionOverrides } : member);
+            result.push(dimensionMap ? { ...member, dimensionMap } : member);
           }
         }
       }
@@ -1116,16 +1116,16 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return result;
   }
 
-  protected resolveDimensionOverrides(
+  protected resolveDimensionMap(
     view: CubeDefinition,
-    overrides: Record<string, string>,
+    mappings: Record<string, string>,
     joinPath: string,
     errorReporter: ErrorReporter
   ): Record<string, string> {
     const result: Record<string, string> = {};
 
-    for (const [name, target] of Object.entries(overrides)) {
-      const error = this.dimensionOverrideError(view, name, target, joinPath);
+    for (const [name, target] of Object.entries(mappings)) {
+      const error = this.dimensionMappingError(view, name, target, joinPath);
       if (error) {
         errorReporter.error(error);
       } else {
@@ -1136,19 +1136,19 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     return result;
   }
 
-  protected dimensionOverrideError(view: CubeDefinition, name: string, target: string, joinPath: string): string | undefined {
+  protected dimensionMappingError(view: CubeDefinition, name: string, target: string, joinPath: string): string | undefined {
     const viewDimension = view.dimensions?.[name] as (CubeSymbolDefinition & { included?: boolean }) | undefined;
     if (!viewDimension) {
-      return `Dimension override '${name}' of '${joinPath}' names no dimension of view '${view.name}'`;
+      return `Dimension mapping '${name}' of '${joinPath}' names no dimension of view '${view.name}'`;
     }
-    const prefix = `Dimension override '${name}' of '${joinPath}'`;
-    // A dimension the view declares itself is not a reference to override;
-    // one built on an included dimension follows that dimension's override
+    const prefix = `Dimension mapping '${name}' of '${joinPath}'`;
+    // A dimension the view declares itself is not a reference to map;
+    // one built on an included dimension follows that dimension's mapping
     if (!viewDimension.included) {
-      return `${prefix}: '${view.name}.${name}' is declared by the view, only included dimensions can be overridden`;
+      return `${prefix}: '${view.name}.${name}' is declared by the view, only included dimensions can be mapped`;
     }
 
-    const dimension = this.resolveOverrideTarget(target, joinPath);
+    const dimension = this.resolveMappingTarget(target, joinPath);
     if (typeof dimension === 'string') {
       return `${prefix}: ${dimension}`;
     }
@@ -1168,7 +1168,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
 
   // The dimension a path from the include's join path, through joins by alias
   // or cube name, names; or why it names none.
-  protected resolveOverrideTarget(target: string, joinPath: string): CubeSymbolDefinition | string {
+  protected resolveMappingTarget(target: string, joinPath: string): CubeSymbolDefinition | string {
     if (!target.startsWith(`${joinPath}.`)) {
       return `'${target}' must start with the join path '${joinPath}'`;
     }
@@ -1289,7 +1289,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           ...(processedDrillMembers && { drillMembers: processedDrillMembers }),
           ...(resolvedMember.drillMembersGrouped && { drillMembersGrouped: resolvedMember.drillMembersGrouped }),
           ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
-          ...(memberRef.dimensionOverrides && { dimensionOverrides: memberRef.dimensionOverrides }),
+          ...(memberRef.dimensionMap && { dimensionMap: memberRef.dimensionMap }),
         };
       } else if (type === 'dimensions') {
         memberDefinition = {

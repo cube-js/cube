@@ -1,0 +1,98 @@
+# One fact read twice by one view: a flight is a departure of its origin and
+# an arrival at its destination. The same measures blend on one airport axis,
+# through an airports cube joined twice, or through the flight's own columns.
+cubes:
+  - name: airports
+    sql_table: vdo_airports
+    dimensions:
+      - name: code
+        type: string
+        sql: code
+        primary_key: true
+      - name: city
+        type: string
+        sql: city
+      - name: country
+        type: string
+        sql: country
+
+  - name: flights
+    sql_table: vdo_flights
+    joins:
+      - name: airports
+        alias: origin_airport
+        sql: "{CUBE}.origin = {origin_airport.code}"
+        relationship: many_to_one
+      - name: airports
+        alias: destination_airport
+        sql: "{CUBE}.destination = {destination_airport.code}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: origin
+        type: string
+        sql: origin
+      - name: destination
+        type: string
+        sql: destination
+    measures:
+      - name: count
+        type: count
+      - name: passengers
+        type: sum
+        sql: passengers
+
+views:
+  - name: airport_traffic
+    cubes:
+      - join_path: airports
+        includes:
+          - code
+          - city
+          - country
+      - join_path: flights
+        alias: departures
+        prefix: true
+        includes:
+          - count
+          - passengers
+        dimension_map:
+          code: flights.origin_airport.code
+          city: flights.origin_airport.city
+          country: flights.origin_airport.country
+      - join_path: flights
+        alias: arrivals
+        prefix: true
+        includes:
+          - count
+          - passengers
+        dimension_map:
+          code: flights.destination_airport.code
+          city: flights.destination_airport.city
+          country: flights.destination_airport.country
+
+  # No airports cube: the view's airport is the flight's origin, and the
+  # arrivals mean its destination by it.
+  - name: route_ends
+    cubes:
+      - join_path: flights
+        includes:
+          - name: origin
+            alias: airport
+          - name: id
+            alias: flight_id
+      - join_path: flights
+        alias: departures
+        prefix: true
+        includes:
+          - count
+      - join_path: flights
+        alias: arrivals
+        prefix: true
+        includes:
+          - count
+        dimension_map:
+          airport: flights.destination

@@ -608,9 +608,9 @@ export class CompilerApi {
   }
 
   // Row filters hold only on the measure's own rows, the same in every leg; an
-  // overridden dimension is read from another instance. Masks follow member
-  // names, which the override target doesn't carry.
-  protected async rejectOverriddenDimensionsUnderPolicies(
+  // mapped dimension is read from another instance. Masks follow member
+  // names, which the mapping target doesn't carry.
+  protected async rejectMappedDimensionsUnderPolicies(
     queryMemberNames: Set<string>,
     cubeEvaluator: any,
     context: Context,
@@ -619,11 +619,11 @@ export class CompilerApi {
     for (const memberName of queryMemberNames) {
       const [viewName, name, ...rest] = memberName.split('.');
       const view = rest.length ? undefined : cubeEvaluator.cubeFromPath(viewName);
-      const overrides: Record<string, string> = (view?.isView && view.measures?.[name]?.dimensionOverrides) || {};
+      const mappings: Record<string, string> = (view?.isView && view.measures?.[name]?.dimensionMap) || {};
       const included = (type: string, viewMember: string): ViewIncludedMember | undefined => (view?.includedMembers || [])
         .find((m: ViewIncludedMember) => m.type === type && m.name === viewMember);
       const ownCube = included('measures', name)?.memberPath.split('.')[0];
-      const used = Object.entries(overrides)
+      const used = Object.entries(mappings)
         .filter(([dimension]) => queryMemberNames.has(`${viewName}.${dimension}`));
 
       for (const [dimension, target] of used) {
@@ -637,14 +637,14 @@ export class CompilerApi {
         ];
 
         for (const { cubeName, aliased } of instances) {
-          if (cubeName && await this.policiesConflictWithOverride(
+          if (cubeName && await this.policiesConflictWithMapping(
             cubeEvaluator.cubeFromPath(cubeName),
             !aliased && cubeName === ownCube,
             context,
             compilers,
           )) {
             throw new UserError(
-              `Measure '${memberName}' overrides '${viewName}.${dimension}', whose cube restricts rows or masks members by access policies, which dimension overrides don't support yet`
+              `Measure '${memberName}' maps '${viewName}.${dimension}', whose cube restricts rows or masks members by access policies, which dimension mappings don't support yet`
             );
           }
         }
@@ -653,8 +653,8 @@ export class CompilerApi {
   }
 
   // No policy applying to the user leaves the cube unreadable, which the
-  // override legs would not enforce either.
-  protected async policiesConflictWithOverride(
+  // mapping legs would not enforce either.
+  protected async policiesConflictWithMapping(
     cube: any,
     ownRows: boolean,
     context: Context,
@@ -696,7 +696,7 @@ export class CompilerApi {
     const memberNames = await this.getQueryMemberNames(evaluatedQuery, context?.requestId);
     const queryMemberNames = new Set(memberNames);
     const queryCubes = new Set(memberNames.map(memberName => memberName.split('.')[0]));
-    await this.rejectOverriddenDimensionsUnderPolicies(queryMemberNames, cubeEvaluator, context, compilers);
+    await this.rejectMappedDimensionsUnderPolicies(queryMemberNames, cubeEvaluator, context, compilers);
 
     // A member reached through a join alias belongs to a cube instance: the
     // policies of the cube it instantiates apply to it, and they constrain that

@@ -3,7 +3,7 @@ use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::planner::collectors::{collect_cube_names_from_symbols, has_multi_stage_members};
-use crate::planner::dimension_overrides::{are_overrides_applied, has_overrides_for};
+use crate::planner::dimension_map::{are_mappings_applied, has_mappings_for};
 use crate::planner::filter::operators::date_range::DateRangeKind;
 use crate::planner::filter::typed_filter::resolve_base_symbol;
 use crate::planner::filter::FilterItem;
@@ -238,7 +238,7 @@ impl PreAggregationOptimizer {
     }
 
     // A leg of view measures, planned on its own and merged with the other
-    // legs: under dimension overrides, or of a view's own measure. Under its
+    // legs: under dimension mappings, or of a view's own measure. Under its
     // own evaluation context its inputs would not be matched alike.
     fn is_view_measures_leg(query: &Query) -> bool {
         let schema = query.schema();
@@ -253,7 +253,7 @@ impl PreAggregationOptimizer {
                     .is_ok_and(|reference| !reference.is_terminal())
             });
         let dimensions = schema.all_dimensions().cloned().collect::<Vec<_>>();
-        plain_context && (view_measures || has_overrides_for(&schema.measures, &dimensions))
+        plain_context && (view_measures || has_mappings_for(&schema.measures, &dimensions))
     }
 
     fn try_rewrite_simple_query(
@@ -909,7 +909,7 @@ impl PreAggregationOptimizer {
         {
             item.find_all_member_evaluators(&mut dimensions);
         }
-        if !are_overrides_applied(&all_measures, &dimensions) {
+        if !are_mappings_applied(&all_measures, &dimensions) {
             return Ok(None);
         }
 

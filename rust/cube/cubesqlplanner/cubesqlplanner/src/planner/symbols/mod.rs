@@ -28,6 +28,6 @@ pub use measure_symbol::{
 };
 pub use member_expression_symbol::{MemberExpressionExpression, MemberExpressionSymbol};
 pub use member_symbol::MemberSymbol;
-pub use ref_symbol::{DimensionOverride, RefSymbol, RefTarget};
+pub use ref_symbol::{DimensionMapping, RefSymbol, RefTarget};
 pub use symbol_factory::SymbolFactory;
 pub use time_dimension_symbol::TimeDimensionSymbol;

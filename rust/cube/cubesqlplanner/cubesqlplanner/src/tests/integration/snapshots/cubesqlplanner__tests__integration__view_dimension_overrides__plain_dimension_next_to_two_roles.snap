@@ -1,8 +1,0 @@
----
-source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_overrides.rs
-expression: result
----
-biz__subs_plan | biz__purchases_count | biz__cancellations_cancellations
----------------+----------------------+---------------------------------
-basic          | 1                    | NULL                            
-pro            | 1                    | 2

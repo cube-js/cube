@@ -127,7 +127,7 @@ struct YamlViewCube {
     #[serde(default)]
     alias: Option<String>,
     #[serde(default)]
-    dimension_overrides: Option<HashMap<String, String>>,
+    dimension_map: Option<HashMap<String, String>>,
 }
 
 impl YamlSchema {
@@ -243,7 +243,7 @@ impl YamlSchema {
                     include_aliases,
                     prefix: view_cube.prefix.unwrap_or(false),
                     alias: view_cube.alias,
-                    dimension_overrides: view_cube.dimension_overrides,
+                    dimension_map: view_cube.dimension_map,
                 });
             }
 
@@ -408,7 +408,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_view_dimension_overrides() {
+    fn test_parse_view_dimension_map() {
         let yaml = indoc! {r#"
             cubes:
               - name: calendar
@@ -449,36 +449,36 @@ mod tests {
                     alias: purchases
                     prefix: true
                     includes: [count]
-                    dimension_overrides:
+                    dimension_map:
                       dt_year: subscriptions.purchase_cal.dt_year
                   - join_path: subscriptions
                     alias: cancellations
                     prefix: true
                     includes: [count]
-                    dimension_overrides:
+                    dimension_map:
                       dt_year: subscriptions.cancel_cal.dt_year
         "#};
 
         let yaml_schema: YamlSchema = serde_yaml::from_str(yaml).unwrap();
         let schema = yaml_schema.build().unwrap();
 
-        let overrides = |measure: &str| {
+        let mappings = |measure: &str| {
             schema
                 .get_measure("biz", measure)
                 .unwrap()
                 .static_data()
-                .dimension_overrides
+                .dimension_map
                 .clone()
         };
         assert_eq!(
-            overrides("purchases_count"),
+            mappings("purchases_count"),
             Some(HashMap::from([(
                 "dt_year".to_string(),
                 "subscriptions.purchase_cal.dt_year".to_string()
             )]))
         );
         assert_eq!(
-            overrides("cancellations_count"),
+            mappings("cancellations_count"),
             Some(HashMap::from([(
                 "dt_year".to_string(),
                 "subscriptions.cancel_cal.dt_year".to_string()

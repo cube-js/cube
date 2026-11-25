@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_map_airport_traffic.rs
+expression: result
+---
+route_ends__departures_count | route_ends__arrivals_count
+-----------------------------+---------------------------
+1                            | 2

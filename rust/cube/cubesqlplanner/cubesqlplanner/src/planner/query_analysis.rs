@@ -3,7 +3,7 @@ use super::symbol_classification::{FullKeyAggregateMeasures, SymbolClassificatio
 use super::MemberSymbol;
 use crate::logical_plan::{FilterPlacement, LogicalFilter};
 use crate::planner::collectors::has_multi_stage_members;
-use crate::planner::dimension_overrides::{self, partition_by_dimension_overrides};
+use crate::planner::dimension_map::{self, partition_by_dimension_map};
 use crate::planner::filter::{FilterGroupOperator, FilterItem};
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::symbols::transforms;
@@ -29,19 +29,19 @@ pub struct QueryAnalysis {
     is_simple: bool,
     // Planned on their own and merged when the query's measures need
     // different dimensions; empty otherwise.
-    override_legs: Vec<Rc<QueryProperties>>,
+    mapped_legs: Vec<Rc<QueryProperties>>,
 }
 
 impl QueryAnalysis {
     pub fn try_new(request: Rc<QueryProperties>) -> Result<Rc<Self>, CubeError> {
-        let partitions = partition_by_dimension_overrides(&request)?;
+        let partitions = partition_by_dimension_map(&request)?;
         let view_composites = request
             .all_used_measures()?
             .into_iter()
-            .filter(dimension_overrides::is_view_composite)
+            .filter(dimension_map::is_view_composite)
             .collect_vec();
         // A view composite is computed over legs only when it can't be planned
-        // as one measure: its leaves need different overrides, or no single
+        // as one measure: its leaves need different mappings, or no single
         // join reaches them all.
         let composites_need_legs = !view_composites.is_empty()
             && match partitions.as_slice() {
@@ -54,8 +54,8 @@ impl QueryAnalysis {
                 view_composites.iter().map(|m| m.full_name()).join(", ")
             )));
         }
-        let (request, override_legs) = match partitions.as_slice() {
-            [single] if single.has_overrides() && !composites_need_legs => {
+        let (request, mapped_legs) = match partitions.as_slice() {
+            [single] if single.has_mappings() && !composites_need_legs => {
                 (single.apply(&request)?, vec![])
             }
             [_, ..] if composites_need_legs || partitions.len() > 1 => {
@@ -70,19 +70,19 @@ impl QueryAnalysis {
         let specializer = transforms::Specializer::for_query(&request, request.allow_multi_stage());
         let query = request.map_symbols(&|symbol| specializer.specialize(symbol))?;
         // Over legs the query only reads their measures' columns.
-        let classified = if override_legs.is_empty() {
+        let classified = if mapped_legs.is_empty() {
             query.clone()
         } else {
             query.leg_for_measures(vec![])
         };
         let join_groups = OnceCell::new();
-        let leg_join_groups = override_legs.iter().map(|_| OnceCell::new()).collect_vec();
+        let leg_join_groups = mapped_legs.iter().map(|_| OnceCell::new()).collect_vec();
         let mut classification = SymbolClassification::try_new(&classified, |measure| {
-            let groups = match override_legs
+            let groups = match mapped_legs
                 .iter()
                 .position(|leg| leg.measures().iter().any(|m| m.id() == measure.id()))
             {
-                Some(leg) => Self::join_groups_in(&override_legs[leg], &leg_join_groups[leg])?,
+                Some(leg) => Self::join_groups_in(&mapped_legs[leg], &leg_join_groups[leg])?,
                 None => Self::join_groups_in(&query, &join_groups)?,
             };
             groups
@@ -105,7 +105,7 @@ impl QueryAnalysis {
         for dim in query.dimensions().iter().chain(query.time_dimensions()) {
             has_multi_stage_dimensions |= classification.has_multi_stage(dim, true)?;
         }
-        let is_simple = override_legs.is_empty()
+        let is_simple = mapped_legs.is_empty()
             && measures.multiplied_measures.is_empty()
             && (measures.multi_stage_measures.is_empty() || !query.allow_multi_stage())
             && !Self::join_groups_in(&query, &join_groups)?.is_multi_fact()
@@ -128,14 +128,14 @@ impl QueryAnalysis {
             classification,
             select_measures,
             is_simple,
-            override_legs,
+            mapped_legs,
         }))
     }
 
     /// The queries computing the measures that need different dimensions, to
     /// be merged; empty when the measures agree on their dimensions.
-    pub fn override_legs(&self) -> &[Rc<QueryProperties>] {
-        &self.override_legs
+    pub fn mapped_legs(&self) -> &[Rc<QueryProperties>] {
+        &self.mapped_legs
     }
 
     /// The query as requested, before specialization.

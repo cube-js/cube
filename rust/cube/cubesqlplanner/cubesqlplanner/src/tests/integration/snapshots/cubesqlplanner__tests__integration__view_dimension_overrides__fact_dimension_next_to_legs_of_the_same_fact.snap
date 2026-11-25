@@ -1,9 +1,0 @@
----
-source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_overrides.rs
-expression: result
----
-biz__dt_year | biz__carts_id | biz__carts_count | biz__carts_own_count
--------------+---------------+------------------+---------------------
-2026         | 1             | 1                | 1                   
-2026         | 2             | 1                | 1                   
-2025         | 3             | 1                | 1

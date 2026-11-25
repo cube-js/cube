@@ -52,13 +52,13 @@ pub struct RefSymbol {
     pub(super) compiled_path: CompiledMemberPath,
     pub(super) target: RefTarget,
     pub(super) mask_sql: Option<Rc<SqlCall>>,
-    pub(super) dimension_overrides: Vec<DimensionOverride>,
+    pub(super) dimension_map: Vec<DimensionMapping>,
 }
 
 /// A view dimension that means another dimension for the view measure that
 /// declares it.
 #[derive(Clone)]
-pub struct DimensionOverride {
+pub struct DimensionMapping {
     /// The view dimension's own id, not the id of the member it references.
     pub dimension: MemberId,
     pub target: Rc<MemberSymbol>,
@@ -69,9 +69,9 @@ symbol_deps! {
         target: dep,
         mask_sql: dep,
         compiled_path: skip,
-        // Not dependencies: a measure joins an override's target only when the
-        // query uses the view dimension it overrides.
-        dimension_overrides: skip,
+        // Not dependencies: a measure joins a mapping's target only when the
+        // query uses the view dimension it maps.
+        dimension_map: skip,
     }
 }
 
@@ -93,16 +93,13 @@ impl RefSymbol {
             compiled_path,
             target: RefTarget::Member(target),
             mask_sql,
-            dimension_overrides: vec![],
+            dimension_map: vec![],
         }))
     }
 
-    pub fn with_dimension_overrides(
-        &self,
-        dimension_overrides: Vec<DimensionOverride>,
-    ) -> Rc<Self> {
+    pub fn with_dimension_map(&self, dimension_map: Vec<DimensionMapping>) -> Rc<Self> {
         Rc::new(Self {
-            dimension_overrides,
+            dimension_map,
             ..self.clone()
         })
     }
@@ -125,7 +122,7 @@ impl RefSymbol {
                 origin: origin.clone(),
             },
             mask_sql: None,
-            dimension_overrides: vec![],
+            dimension_map: vec![],
         })
     }
 
@@ -138,7 +135,7 @@ impl RefSymbol {
                 origin: origin.clone(),
             },
             mask_sql: None,
-            dimension_overrides: vec![],
+            dimension_map: vec![],
         })
     }
 
@@ -183,8 +180,8 @@ impl RefSymbol {
         &self.mask_sql
     }
 
-    pub fn dimension_overrides(&self) -> &[DimensionOverride] {
-        &self.dimension_overrides
+    pub fn dimension_map(&self) -> &[DimensionMapping] {
+        &self.dimension_map
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {

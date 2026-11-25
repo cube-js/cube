@@ -57,8 +57,8 @@ pub struct MeasureDefinitionStatic {
     /// Re-exported by a view from its `includes`, rather than declared by it.
     pub included: Option<bool>,
     /// View dimension name -> full path of the dimension it means for this view measure.
-    #[serde(rename = "dimensionOverrides")]
-    pub dimension_overrides: Option<HashMap<String, String>>,
+    #[serde(rename = "dimensionMap")]
+    pub dimension_map: Option<HashMap<String, String>>,
 }
 
 #[nativebridge::native_bridge(MeasureDefinitionStatic, with_static_meta)]

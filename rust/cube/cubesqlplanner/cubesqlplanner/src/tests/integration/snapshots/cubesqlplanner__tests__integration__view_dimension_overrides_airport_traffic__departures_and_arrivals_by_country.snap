@@ -1,8 +1,0 @@
----
-source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_overrides_airport_traffic.rs
-expression: result
----
-airport_traffic__country | airport_traffic__departures_count | airport_traffic__arrivals_count
--------------------------+-----------------------------------+--------------------------------
-GB                       | 1                                 | 2                              
-US                       | 5                                 | 4

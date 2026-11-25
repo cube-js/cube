@@ -3,7 +3,7 @@ use super::deps::{self, symbol_deps};
 use super::measure_kinds::MeasureKind;
 use super::AggregationType;
 use super::SymbolPath;
-use super::{DimensionOverride, MemberSymbol, RefSymbol, SymbolFactory};
+use super::{DimensionMapping, MemberSymbol, RefSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::{MeasureDefinition, RollingWindow};
 use crate::cube_bridge::member_sql::MemberSql;
@@ -570,14 +570,14 @@ impl SymbolFactory for MeasureSymbolFactory {
                 canonical_alias,
                 path.path().clone(),
             );
-            let dimension_overrides = compile_dimension_overrides(
+            let dimension_map = compile_dimension_map(
                 compiler,
                 path.cube_id(),
-                definition.static_data().dimension_overrides.as_ref(),
+                definition.static_data().dimension_map.as_ref(),
             )?;
             let ref_symbol = RefSymbol::try_new(compiled_path, sql, mask_sql)?;
             return Ok(MemberSymbol::new_ref(
-                ref_symbol.with_dimension_overrides(dimension_overrides),
+                ref_symbol.with_dimension_map(dimension_map),
             ));
         }
 
@@ -781,21 +781,21 @@ impl crate::utils::debug::DebugSql for MeasureSymbol {
 }
 
 // Sorted by view dimension name, so planning doesn't depend on map order.
-fn compile_dimension_overrides(
+fn compile_dimension_map(
     compiler: &mut Compiler,
     view: &CubeId,
-    overrides: Option<&HashMap<String, String>>,
-) -> Result<Vec<DimensionOverride>, CubeError> {
-    let Some(overrides) = overrides else {
+    mappings: Option<&HashMap<String, String>>,
+) -> Result<Vec<DimensionMapping>, CubeError> {
+    let Some(mappings) = mappings else {
         return Ok(vec![]);
     };
-    overrides
+    mappings
         .iter()
         .sorted_by(|(a, _), (b, _)| a.cmp(b))
         .map(|(name, target)| {
             let dimension = compiler.add_dimension_evaluator(format!("{view}.{name}"))?;
             let target = compiler.add_dimension_evaluator(target.clone())?;
-            Ok(DimensionOverride {
+            Ok(DimensionMapping {
                 dimension: dimension.id().clone(),
                 target,
             })

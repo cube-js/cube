@@ -1,0 +1,12 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_map_airport_traffic.rs
+expression: result
+---
+route_ends__airport | route_ends__flight_id | route_ends__arrivals_count
+--------------------+-----------------------+---------------------------
+JFK                 | 1                     | 1                         
+LHR                 | 2                     | 1                         
+SFO                 | 3                     | 1                         
+SFO                 | 4                     | 1                         
+LHR                 | 5                     | 1                         
+JFK                 | 6                     | 1

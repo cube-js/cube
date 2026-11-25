@@ -55,7 +55,7 @@ pub struct MockMeasureDefinition {
     #[builder(default)]
     included: Option<bool>,
     #[builder(default)]
-    dimension_overrides: Option<HashMap<String, String>>,
+    dimension_map: Option<HashMap<String, String>>,
 }
 
 impl_static_data!(
@@ -70,7 +70,7 @@ impl_static_data!(
     time_shift_references,
     rolling_window,
     included,
-    dimension_overrides
+    dimension_map
 );
 
 impl MockMeasureDefinition {

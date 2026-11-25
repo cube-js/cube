@@ -1,7 +1,0 @@
----
-source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/view_dimension_overrides.rs
-expression: result
----
-biz__dt_year_month | biz__cancellations_count
--------------------+-------------------------
-2026-02            | 2

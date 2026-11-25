@@ -467,7 +467,7 @@ pub struct ViewCube {
     pub prefix: bool,
     /// Prefix of the members when `prefix` is set; defaults to the last segment of `join_path`.
     pub alias: Option<String>,
-    pub dimension_overrides: Option<HashMap<String, String>>,
+    pub dimension_map: Option<HashMap<String, String>>,
 }
 
 pub struct MockViewBuilder {
@@ -674,7 +674,7 @@ impl MockViewBuilder {
                                     .order_by(measure.raw_order_by())
                                     .resolved_mask_sql_opt(measure.raw_mask_sql())
                                     .included(Some(true))
-                                    .dimension_overrides(view_cube.dimension_overrides.clone())
+                                    .dimension_map(view_cube.dimension_map.clone())
                                     .build(),
                             ),
                         );
