@@ -13,7 +13,8 @@ use crate::{
             },
             CubeScanLimit, CubeScanWrapped, LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
             ScanWrapping, WrappedSelectLimit, WrappedSelectPushToCube, WRAPPED_SELECT_FROM,
-            WRAPPED_SELECT_JOINS, WRAPPED_SELECT_LIMIT, WRAPPED_SELECT_PUSH_TO_CUBE,
+            WRAPPED_SELECT_GROUP_EXPR, WRAPPED_SELECT_JOINS, WRAPPED_SELECT_LIMIT,
+            WRAPPED_SELECT_PUSH_TO_CUBE,
         },
         CubeContext,
     },
@@ -400,6 +401,7 @@ impl Rewriter {
         let mut rejected: HashSet<LogicalPlanLanguage> = HashSet::new();
         let mut extraction = 0;
         let mut unconvertible = false;
+        let mut streamed = false;
         let (best_cost, best) = loop {
             extraction += 1;
             // Past the bound, or past a plan that fails to convert, settle for the plan over
@@ -407,7 +409,8 @@ impl Rewriter {
             let prefer_pre_aggregations = pre_aggregations
                 && !describe_only
                 && extraction <= MAX_PRE_AGGREGATION_EXTRACTIONS
-                && !unconvertible;
+                && !unconvertible
+                && !streamed;
             let extraction_start = Instant::now();
             let (cost, best, egraph_nodes) = {
                 let egraph = egraph.clone();
@@ -442,6 +445,12 @@ impl Rewriter {
             if !prefer_pre_aggregations {
                 break (cost, best);
             }
+            // Cube Store returns a whole result at once and isn't streamed, so a query with a
+            // push down of unbounded rows over a pre-aggregation reads the data source instead
+            if config_obj.stream_mode() && Self::streams_pre_aggregation(&best, max_row_limit) {
+                streamed = true;
+                continue;
+            }
 
             // Conversion recurses over the plan, so it runs on a thread of its own
             let scans = {
@@ -463,21 +472,11 @@ impl Rewriter {
                     continue;
                 }
             };
-            let bounded = if config_obj.stream_mode() {
-                Self::bounded_push_down_nodes(&best, max_row_limit)
-            } else {
-                HashSet::new()
-            };
             // What can't be asked is not matched
             let mut matched = vec![false; scans.len()];
             let mut asked = vec![];
             let mut asked_positions = vec![];
-            for (position, (index, node)) in scans.iter().enumerate() {
-                // Cube Store returns a whole result at once and isn't streamed, so in stream
-                // mode only SQL with a bounded result may read it
-                if config_obj.stream_mode() && !bounded.contains(index) {
-                    continue;
-                }
+            for (position, (_, node)) in scans.iter().enumerate() {
                 if let Some(request) =
                     Self::pre_aggregation_request(&cube_context, &load_request_meta, node).await
                 {
@@ -641,63 +640,96 @@ impl Rewriter {
             })
     }
 
-    /// Nodes of `best` under a push down whose SQL returns at most `max_row_limit` rows: a
-    /// select or scan on its chain of `FROM`s has a `LIMIT` within it, and no select above
-    /// that one joins anything that could multiply its rows
-    fn bounded_push_down_nodes(
-        best: &RecExpr<LogicalPlanLanguage>,
-        max_row_limit: usize,
-    ) -> HashSet<usize> {
+    /// Whether a push down of `best` reads a pre-aggregation with SQL that can return more
+    /// than `max_row_limit` rows. A wrapper inside another renders into that one's SQL
+    fn streams_pre_aggregation(best: &RecExpr<LogicalPlanLanguage>, max_row_limit: usize) -> bool {
         let nodes = best.as_ref();
-        let is_bounded = |mut index: usize| loop {
-            let select = match &nodes[index] {
-                LogicalPlanLanguage::WrappedSelect(select) => select,
-                LogicalPlanLanguage::CubeScan(params) => {
-                    return matches!(
-                        &nodes[usize::from(params[4])],
-                        LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(limit))
-                            if !is_limitless(limit, max_row_limit)
-                    );
-                }
-                _ => return false,
-            };
-            if let LogicalPlanLanguage::WrappedSelectLimit(WrappedSelectLimit(limit)) =
-                &nodes[usize::from(select[WRAPPED_SELECT_LIMIT])]
-            {
-                if !is_limitless(limit, max_row_limit) {
-                    return true;
-                }
-            }
-            if !nodes[usize::from(select[WRAPPED_SELECT_JOINS])]
-                .children()
-                .is_empty()
-            {
-                return false;
-            }
-            index = usize::from(select[WRAPPED_SELECT_FROM]);
-        };
-        let mut bounded = HashSet::new();
-        for node in nodes {
-            let LogicalPlanLanguage::CubeScanWrapper(params) = node else {
-                continue;
-            };
-            let input = usize::from(params[0]);
-            if !is_bounded(input) {
+        let mut stack = vec![nodes.len() - 1];
+        let mut seen = HashSet::new();
+        while let Some(index) = stack.pop() {
+            if !seen.insert(index) {
                 continue;
             }
-            let mut stack = vec![input];
-            while let Some(index) = stack.pop() {
-                if bounded.insert(index) {
-                    stack.extend(
-                        nodes[index]
-                            .children()
-                            .iter()
-                            .map(|child| usize::from(*child)),
-                    );
+            match &nodes[index] {
+                LogicalPlanLanguage::CubeScanWrapper(params) => {
+                    let input = usize::from(params[0]);
+                    if is_limitless(&Self::push_down_rows(nodes, input), max_row_limit)
+                        && Self::contains(nodes, input, |node| {
+                            matches!(
+                                node,
+                                LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(
+                                    ScanWrapping::PreAggregation
+                                ))
+                            )
+                        })
+                    {
+                        return true;
+                    }
                 }
+                node => stack.extend(node.children().iter().map(|id| usize::from(*id))),
             }
         }
-        bounded
+        false
+    }
+
+    /// At most how many rows the SQL of this node of a push down returns, if bounded
+    fn push_down_rows(nodes: &[LogicalPlanLanguage], index: usize) -> Option<usize> {
+        match &nodes[index] {
+            LogicalPlanLanguage::CubeScanWrapper(params) => {
+                Self::push_down_rows(nodes, usize::from(params[0]))
+            }
+            LogicalPlanLanguage::CubeScan(params) => match &nodes[usize::from(params[4])] {
+                LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(limit)) => *limit,
+                _ => None,
+            },
+            LogicalPlanLanguage::WrappedSelect(params) => {
+                let limit = match &nodes[usize::from(params[WRAPPED_SELECT_LIMIT])] {
+                    LogicalPlanLanguage::WrappedSelectLimit(WrappedSelectLimit(limit)) => *limit,
+                    _ => None,
+                };
+                // Joins and grouping sets can return more rows than they read
+                let multiplies = !nodes[usize::from(params[WRAPPED_SELECT_JOINS])]
+                    .children()
+                    .is_empty()
+                    || Self::contains(
+                        nodes,
+                        usize::from(params[WRAPPED_SELECT_GROUP_EXPR]),
+                        |node| matches!(node, LogicalPlanLanguage::GroupingSetExpr(_)),
+                    );
+                let from = (!multiplies)
+                    .then(|| Self::push_down_rows(nodes, usize::from(params[WRAPPED_SELECT_FROM])))
+                    .flatten();
+                limit.into_iter().chain(from).min()
+            }
+            // The rows of the queries of a union add up
+            LogicalPlanLanguage::WrappedUnion(params) => nodes[usize::from(params[0])]
+                .children()
+                .iter()
+                .try_fold(0usize, |rows, input| {
+                    rows.checked_add(Self::push_down_rows(nodes, usize::from(*input))?)
+                }),
+            _ => None,
+        }
+    }
+
+    /// Whether a node under `index`, itself included, is `found`. Shared nodes are visited once
+    fn contains(
+        nodes: &[LogicalPlanLanguage],
+        index: usize,
+        found: impl Fn(&LogicalPlanLanguage) -> bool,
+    ) -> bool {
+        let mut stack = vec![index];
+        let mut seen = HashSet::new();
+        while let Some(index) = stack.pop() {
+            if !seen.insert(index) {
+                continue;
+            }
+            if found(&nodes[index]) {
+                return true;
+            }
+            stack.extend(nodes[index].children().iter().map(|id| usize::from(*id)));
+        }
+        false
     }
 
     /// The nodes of `best` Cube is asked about, with their indexes in `best`: each scan
