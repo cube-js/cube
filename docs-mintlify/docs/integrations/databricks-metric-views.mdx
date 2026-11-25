@@ -108,7 +108,7 @@ Scope rules:
 - The name pattern supports literals, `^`, `$`, a bare `.` that matches any single character, and
   at most one `.*` wildcard. It is not a general regular expression and is limited to 128
   characters. Review the matched views in Preview before syncing.
-- **All public views** (`all` in the API) takes every view in the deployed YAML model, including
+- **All views** (`all` in the API) takes every view in the deployed YAML model, including
   views with `public: false` and views over another data source's cubes. Preview and sync block
   the latter with `CUBE_DATA_SOURCE_MISMATCH`, so when the model has such views, every **all** run
   ends **Partial** or **Failed**, which the [CI recipe](#trigger-publication-from-ci) and
@@ -245,9 +245,9 @@ a CI secret. The recipe reads the saved settings, starts a run with their `confi
 then polls the returned `statusUrl`. The start endpoint returns `202` with a `runId`, `buildJobId`,
 optional `commit`, root-relative `statusUrl`, and `reused`. It accepts an optional UUID
 `idempotencyKey` for safe retries: a repeated key returns the earlier run with `reused: true`, but
-`buildJobId` and `commit` name the build this request resolved; the run's status has its own,
-which the recipe checks. A
-start returns `409` while another run of that publication target is active,
+`buildJobId` and `commit` name the build this request resolved, not the reused run's. The run's
+status response carries the run's own `buildJobId`, which the recipe checks. A start returns `409`
+while another run of that publication target is active,
 while a [take-over](#take-over-an-existing-metric-view) runs in your account, and, for a data model
 with [Jinja templates](#jinja-templates), while the deployment is still rolling out the new build.
 The recipe retries a `409` for up to `MAX_START_ATTEMPTS` attempts, 10 seconds apart (default: 30).
