@@ -267,7 +267,11 @@ Requires a workspace URL and access token.
 Supports two authentication methods:
 
 - JWT authentication
-- Key-pair authentication (requires an encrypted PKCS#8 PEM private key)
+- Key-pair authentication with a PKCS#8 PEM private key, either unencrypted
+  (`-----BEGIN PRIVATE KEY-----`) or encrypted
+  (`-----BEGIN ENCRYPTED PRIVATE KEY-----`). Set **Private Key Passphrase**
+  only for an encrypted key. When you edit a model, leave the private key
+  blank to keep the stored one
 
 ### Custom OpenAI-compatible
 
