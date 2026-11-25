@@ -360,7 +360,18 @@ Viewers can still switch granularities unless the control's [visibility](#visibi
 
 ### Charts with a period comparison {#time-granularity-period-comparisons}
 
-A chart with a [period comparison][ref-period-comparison] keeps the granularity it was built with. The comparison presets depend on that granularity, so a different granularity would break the match between the current and the comparison rows. Time granularity switchers don't affect such a chart, and it shows a crossed-out clock icon with the notice **"Time granularity controls don't affect this chart — period comparisons pin it to its original granularity."** Other charts on the dashboard still switch.
+A chart with a [period comparison][ref-period-comparison] follows the switcher like any other chart, and each comparison follows the new granularity. A comparison is saved as a preset, such as **Previous period** or **Same period previous year**, so it keeps meaning the same thing at the granularity the viewer picks. A chart saved at month with **Previous period** compares each week with the week before when the viewer picks week, and each quarter with the quarter before at quarter. **Same period previous year** becomes 52 weeks earlier at week.
+
+Not every preset exists at every granularity. When the granularity a viewer picks doesn't offer a chart's comparison, the comparison's columns are hidden for that view. For example, **Same period previous quarter** isn't offered at week. The chart then shows a crossed-out adjustments icon, and its tooltip names the hidden columns and the granularity that shows them again: **"Count (1 quarter earlier) isn't available at Week granularity. Switch to Month to see it."** Switch back to that granularity and the columns return, since the saved chart doesn't change. A [custom granularity][ref-granularities] or a sub-day granularity, such as **hour**, offers no presets, so it hides every comparison on the chart. At year, **Same period previous year** is the same as **Previous period**, so the two show as one column.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/period-comparison-hidden-at-week.png"
+    alt="Table chart switched to Week with a Count (1 week earlier) column and the crossed-out adjustments icon's tooltip naming the hidden Count (1 quarter earlier) column"
+  />
+</Frame>
+
+Column widths, formats and series colors set on a comparison column carry over to its new name, such as from *1 month earlier* to *1 quarter earlier*.
 
 ## Field switcher
 
@@ -763,9 +774,9 @@ The chart displays a warning icon to indicate the problem:
 | Icon | Meaning |
 |---|---|
 | Crossed-out filter | Filters were skipped for this chart |
-| Crossed-out clock | Time granularity override was skipped for this chart, or the chart's [period comparison](#time-granularity-period-comparisons) keeps its granularity |
+| Crossed-out clock | Time granularity override was skipped for this chart |
 
-Hover over the icon for details. Click it to open the chart's [Controls mapping](#controls-mapping) and fix the issue — remap the control to a compatible dimension or disable it for this chart. For a chart with a period comparison, remove the comparison if the chart should follow the switcher.
+Hover over the icon for details. Click it to open the chart's [Controls mapping](#controls-mapping) and fix the issue — remap the control to a compatible dimension or disable it for this chart.
 
 ### Controls mapping
 
