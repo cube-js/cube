@@ -364,6 +364,13 @@ A chart with a [period comparison][ref-period-comparison] follows the switcher l
 
 Not every preset exists at every granularity. When the granularity a viewer picks doesn't offer a chart's comparison, the comparison's columns are hidden for that view. For example, **Same period previous quarter** isn't offered at week. The chart then shows a crossed-out adjustments icon, and its tooltip names the hidden columns and the granularity that shows them again: **"Count (1 quarter earlier) isn't available at Week granularity. Switch to Month to see it."** Switch back to that granularity and the columns return, since the saved chart doesn't change. A [custom granularity][ref-granularities] or a sub-day granularity, such as **hour**, offers no presets, so it hides every comparison on the chart. At year, **Same period previous year** is the same as **Previous period**, so the two show as one column.
 
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/period-comparison-hidden-at-week.png"
+    alt="Table chart switched to Week with a Count (1 week earlier) column and the crossed-out adjustments icon's tooltip naming the hidden Count (1 quarter earlier) column"
+  />
+</Frame>
+
 Column widths, formats and series colors set on a comparison column carry over to its new name, such as from *1 month earlier* to *1 quarter earlier*.
 
 ## Field switcher
