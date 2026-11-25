@@ -114,6 +114,32 @@ describe('View dimension overrides', () => {
     expect(sql).toMatch(/FROM\s+subscriptions/);
   });
 
+  it('rejects overrides the query uses under the legacy planner', async () => {
+    const compilers = prepareYamlCompiler(cubes + view(cancelCalendar));
+    await compilers.compiler.compile();
+
+    expect(() => compilers.createQuery(PostgresQuery, {
+      measures: ['biz.cancellations_count'],
+      dimensions: ['biz.dt_year_month'],
+      timezone: 'UTC',
+      useNativeSqlPlanner: false,
+    }).buildSqlAndParams()).toThrow(
+      /Measure 'biz.cancellations_count' has dimension overrides for dimensions of this query, which require the Tesseract SQL planner/
+    );
+  });
+
+  it('plans a view measure the query uses no override of under the legacy planner', async () => {
+    const compilers = prepareYamlCompiler(cubes + view(cancelCalendar));
+    await compilers.compiler.compile();
+
+    const [sql] = compilers.createQuery(PostgresQuery, {
+      measures: ['biz.cancellations_count'],
+      timezone: 'UTC',
+      useNativeSqlPlanner: false,
+    }).buildSqlAndParams();
+    expect(sql).toMatch(/FROM\s+subscriptions/);
+  });
+
   it('overrides with a dimension of the included cube itself', async () => {
     const { compiler, cubeEvaluator } = prepareYamlCompiler(cubes + view(`
           dt_year: subscriptions.cancel_year`));

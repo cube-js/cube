@@ -63,6 +63,10 @@ cubes:
     measures:
       - name: count
         type: count
+      - name: count_cumulative
+        type: count
+        rolling_window:
+          trailing: unbounded
 
 views:
   - name: biz
@@ -101,3 +105,4 @@ views:
         prefix: true
         includes:
           - count
+          - count_cumulative

@@ -412,3 +412,29 @@ fn test_ungrouped_query_with_different_overrides_is_rejected() {
         error.message
     );
 }
+
+// A rolling measure without overrides next to an overridden one. Purchases:
+// 2026-01: 1, 2026-02: 1. Carts so far: 2026-01: 1, 2026-02: 3, 2026-03: 3.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_measure_next_to_overridden_measure() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.carts_count_cumulative
+        time_dimensions:
+          - dimension: biz.dt_ts
+            granularity: month
+            dateRange:
+              - "2026-01-01"
+              - "2026-03-31"
+        order:
+          - id: biz.dt_ts
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

@@ -3112,6 +3112,15 @@ export class BaseQuery {
     return this.collectFrom(membersToCollectFrom, fn, methodName);
   }
 
+  protected usesOverriddenDimension(view: string, overrides: Record<string, string>): boolean {
+    const used = new Set(
+      this.allMembersConcat(false)
+        .flatMap((member: any) => member.getMembers())
+        .map((member: any) => member.path()?.join('.'))
+    );
+    return Object.keys(overrides).some(name => used.has(`${view}.${name}`));
+  }
+
   public allMembersConcat(excludeTimeDimensions: boolean): Array<BaseMeasure | BaseDimension | BaseSegment> {
     return (this.measures as any[])
       .concat(this.dimensions)
@@ -3633,6 +3642,10 @@ export class BaseQuery {
       if (type === 'measure') {
         if (!this.useNativeSqlPlanner && symbol.case?.when?.some((item: { context?: unknown }) => item.context)) {
           throw new UserError(`Measure '${cubeName}.${name}' uses QUERY_CONTEXT conditions, which require the Tesseract SQL planner`);
+        }
+        if (!this.useNativeSqlPlanner && symbol.dimensionOverrides &&
+          this.usesOverriddenDimension(cubeName, symbol.dimensionOverrides)) {
+          throw new UserError(`Measure '${cubeName}.${name}' has dimension overrides for dimensions of this query, which require the Tesseract SQL planner`);
         }
         let parentMeasure;
         if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
