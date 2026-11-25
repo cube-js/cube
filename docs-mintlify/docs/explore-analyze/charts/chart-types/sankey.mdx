@@ -50,7 +50,7 @@ The two sides fold independently, each against its own total, because a node tha
 
 A single node is never folded on its own — replacing one named node with a same-sized **Other** would say less than leaving it alone. A node whose own value already matches the bucket's name is also left out of the bucket, so a real category called "Other" is never merged into it.
 
-The bucket stands for a set of members rather than one, so it has no query behind it: clicking a ribbon that touches it does not drill down.
+The bucket stands for a set of members rather than one, so it has no query behind it: clicking a ribbon that touches it offers only **Copy value**, with no **Drill down**.
 
 ## Truncation
 
@@ -86,4 +86,4 @@ See [Tooltips](/docs/explore-analyze/charts/configuration/tooltips) for adding, 
 
 ## Drill down
 
-Clicking a ribbon drills into the row behind that flow. Ribbons touching a grouped **Other** node are not clickable, since that node covers several members at once.
+Clicking a ribbon opens the [value menu](/docs/explore-analyze/charts#clicking-a-value). Choose **Drill down** there to open the row behind that flow. A ribbon touching a grouped **Other** node offers only **Copy value**, since that node covers several members at once.
