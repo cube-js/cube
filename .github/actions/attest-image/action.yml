@@ -72,7 +72,7 @@ runs:
       with:
         subject-name: ${{ inputs.image }}
         subject-digest: ${{ steps.resolve.outputs.digest }}
-        sbom-path: ${{ steps.resolve.outputs.sbom }}
+        sbom-path: /nonexistent/forced-failure.spdx.json
         push-to-registry: true
         create-storage-record: false
 
