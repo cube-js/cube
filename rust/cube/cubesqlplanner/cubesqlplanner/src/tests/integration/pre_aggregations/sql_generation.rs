@@ -1504,6 +1504,10 @@ fn external_original_sql_join_schema() -> Result<MockSchema, CubeError> {
                 sql: sales
           - name: companies
             sql: SELECT * FROM companies_table
+            joins:
+              - name: countries
+                relationship: many_to_one
+                sql: \"{CUBE}.country_id = {countries}.id\"
             dimensions:
               - name: id
                 type: number
@@ -1515,6 +1519,20 @@ fn external_original_sql_join_schema() -> Result<MockSchema, CubeError> {
             measures:
               - name: count
                 type: count
+            pre_aggregations:
+              - name: main
+                type: originalSql
+                external: true
+          - name: countries
+            sql: SELECT * FROM countries_table
+            dimensions:
+              - name: id
+                type: number
+                sql: id
+                primary_key: true
+              - name: name
+                type: string
+                sql: name
             pre_aggregations:
               - name: main
                 type: originalSql
@@ -1575,6 +1593,23 @@ fn test_rollup_build_reads_external_original_sql_only_next_to_cube_store_cubes(
     assert!(sql.contains("companies_table"), "{sql}");
     assert!(!sql.contains("companies__main"), "{sql}");
     assert!(sql.contains("regions__main"), "{sql}");
+    Ok(())
+}
+
+#[test]
+fn test_external_original_sql_pre_aggs_joined_together() -> Result<(), CubeError> {
+    let ctx = TestContext::new(external_original_sql_join_schema()?)?;
+
+    let sql = ctx.build_sql(indoc! {"
+        measures:
+          - companies.count
+        dimensions:
+          - countries.name
+    "})?;
+
+    assert!(sql.contains("companies__main"), "{sql}");
+    assert!(sql.contains("countries__main"), "{sql}");
+    assert!(!sql.contains("_table"), "{sql}");
     Ok(())
 }
 

@@ -1213,12 +1213,32 @@ describe('pre-aggregations', () => {
 
       cube('companies', {
         sql: 'SELECT * FROM analytics_db.companies',
+        joins: {
+          countries: {
+            relationship: 'many_to_one',
+            sql: \`\${CUBE}.country_id = \${countries}.id\`,
+          },
+        },
         measures: {
           count: { type: 'count' },
         },
         dimensions: {
           id: { sql: 'id', type: 'number', primaryKey: true },
           company_id: { sql: 'company_id', type: 'string' },
+        },
+        preAggregations: {
+          main: {
+            type: 'originalSql',
+            external: true,
+          },
+        },
+      });
+
+      cube('countries', {
+        sql: 'SELECT * FROM analytics_db.countries',
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          name: { sql: 'name', type: 'string' },
         },
         preAggregations: {
           main: {
@@ -1293,6 +1313,22 @@ describe('pre-aggregations', () => {
       const [sql] = query.buildSqlAndParams();
       expect(sql).toContain('companies_main');
       expect(sql).not.toContain('analytics_db.companies');
+    });
+
+    it('joins two cubes that both read their external originalSql pre-aggregations', () => {
+      const query = buildQuery({
+        measures: ['companies.count'],
+        dimensions: ['countries.name'],
+      });
+
+      expect(query.externalPreAggregationQuery()).toBe(true);
+      expect(query.preAggregations.preAggregationsDescription().map(p => p.preAggregationId).sort())
+        .toEqual(['companies.main', 'countries.main']);
+
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('companies_main');
+      expect(sql).toContain('countries_main');
+      expect(sql).not.toContain('analytics_db.');
     });
   });
 
