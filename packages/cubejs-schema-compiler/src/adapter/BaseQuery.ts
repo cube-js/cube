@@ -3076,9 +3076,11 @@ export class BaseQuery {
     const roots: string[] = R.uniq([...joinMap.map(path => path[0]), ...(cube.directCubes ?? [])])
       .filter(head => !reached.has(head));
     if (roots.length !== 1) {
+      const detail = roots.length ?
+        `that view is built on cubes that don't share a single root: ${roots.join(', ')}` :
+        `the join paths of that view are cyclic: ${joinMap.map(path => path.join('.')).join(', ')}`;
       throw new UserError(
-        `Can't resolve the cube to query for a member expression of '${cubeName}' that references no members: ` +
-        `that view is not rooted at a single cube (${roots.join(', ')})`
+        `Can't resolve the cube to query for a member expression of '${cubeName}' that references no members: ${detail}`
       );
     }
     return roots[0];
