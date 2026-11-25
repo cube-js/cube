@@ -1,6 +1,6 @@
 import { Readable } from 'stream';
 import type { QueryColumnsResult, QuerySchemasResult, QueryTablesResult, TableStructure } from '@cubejs-backend/base-driver';
-import { testLogger } from '@cubejs-backend/shared';
+import { pausePromise, testLogger } from '@cubejs-backend/shared';
 import type { OmitKnown } from '@cubejs-backend/shared';
 import { QueryOrchestrator } from '../../src/orchestrator/QueryOrchestrator';
 import { LocalCacheDriver } from '../../src/orchestrator/LocalCacheDriver';
@@ -284,6 +284,32 @@ class MockDriverUnloadWithoutTempTableSupport extends MockDriver {
 
   public queryColumnTypes(): TableStructure {
     return [];
+  }
+}
+
+class NoStreamMockDriver {
+  public capabilities() {
+    return {};
+  }
+
+  public async query(query: string) {
+    return [{ query }];
+  }
+
+  public async tablesSchema() {
+    return {};
+  }
+
+  public async getTablesQuery(): Promise<unknown[]> {
+    return [];
+  }
+
+  public async release(): Promise<null> {
+    return null;
+  }
+
+  public nowTimestamp() {
+    return new Date().getTime();
   }
 }
 
@@ -1863,6 +1889,46 @@ describe('QueryOrchestrator', () => {
       expect(data['Foo.query']).toMatch(/orders_d/);
     }));
   }, 5000);
+
+  test('streaming with a driver without stream()', async () => {
+    const orchestrator = new TestQueryOrchestrator(
+      `ORCHESTRATOR_TEST_${testCount++}`,
+      // The handler reports the failure as an `error` event on the returned stream, so the client
+      // must not be ready before the caller has subscribed, as with a real connection.
+      async () => {
+        await pausePromise(100);
+        return asDriver(new NoStreamMockDriver());
+      },
+      testLogger,
+      {
+        queryCacheOptions: {
+          queueOptions: () => ({
+            concurrency: 1,
+          }),
+        },
+      }
+    );
+
+    try {
+      const stream = await orchestrator.fetchQuery({
+        query: 'SELECT 1',
+        values: [],
+        cacheKeyQueries: {
+          queries: []
+        },
+        preAggregations: [],
+        requestId: 'streaming without stream()',
+        persistent: true,
+      });
+
+      await expect(new Promise((resolve, reject) => {
+        stream.on('data', resolve);
+        stream.on('error', reject);
+      })).rejects.toThrow('NoStreamMockDriver does not implement streaming: stream() method is missing');
+    } finally {
+      await orchestrator.cleanup();
+    }
+  });
 
   test('drop lock', async () => {
     mockDriver.tablesDropDelay = 300;
