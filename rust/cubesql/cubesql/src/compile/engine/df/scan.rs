@@ -45,6 +45,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use futures::Stream;
+use itertools::Itertools;
 use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -304,20 +305,15 @@ struct WrappedSqlPlace<'a> {
 
 impl<'a> WrappedSqlPlace<'a> {
     fn new(sql: &'a SqlQuery) -> Self {
-        let mut pre_aggregations = Vec::new();
-        for id in sql
-            .pre_aggregations
-            .iter()
-            .filter_map(|desc| desc.get("preAggregationId")?.as_str())
-        {
-            if !pre_aggregations.contains(&id) {
-                pre_aggregations.push(id);
-            }
-        }
         Self {
             data_source: sql.data_source.as_deref().filter(|_| !sql.external),
             external: sql.external,
-            pre_aggregations,
+            pre_aggregations: sql
+                .pre_aggregations
+                .iter()
+                .filter_map(|desc| desc.get("preAggregationId")?.as_str())
+                .unique()
+                .collect(),
         }
     }
 }

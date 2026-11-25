@@ -3948,17 +3948,36 @@ async fn test_wrapper_explain_names_data_source_of_each_scan() {
 
     let physical_plan = query_plan.as_physical_plan().await.unwrap();
     let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
-    for data_source in ["default", "other"] {
+    let lines = plan.lines().collect::<Vec<_>>();
+    for (data_source, cube) in [("default", "KibanaSampleDataEcommerce"), ("other", "Logs")] {
         let prefix = format!(
             r#"CubeScanExecutionPlan, SQL: {{"dataSource":"{data_source}","external":false,"preAggregations":[]}}"#
         );
+        let scans = lines
+            .iter()
+            .enumerate()
+            .filter(|(_, line)| line.trim_start() == prefix)
+            .map(|(i, _)| i)
+            .collect::<Vec<_>>();
         assert_eq!(
-            plan.lines()
-                .filter(|line| line.trim_start() == prefix)
-                .count(),
+            scans.len(),
             1,
-            "one scan runs in {}, its SQL on the next line:\n{}",
+            "one scan runs in {}:\n{}",
             data_source,
+            plan
+        );
+        // The scan's SQL runs until the next scan
+        let sql = lines[scans[0] + 1..]
+            .iter()
+            .take_while(|line| !line.contains("CubeScanExecutionPlan"))
+            .copied()
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            sql.contains(&format!("\"{cube}.")),
+            "the SQL under the {} line reads {}:\n{}",
+            data_source,
+            cube,
             plan
         );
     }
@@ -8799,4 +8818,55 @@ async fn test_wrapper_join_subquery_source_pre_aggregations() {
         wrapped_sql.sql
     );
     assert_eq!(wrapped_sql.pre_aggregations, vec![logs, kibana]);
+}
+
+/// `EXPLAIN` lists the pre-aggregations in the data source that a pushed-down query
+/// reads, including those of a joined subquery
+#[tokio::test]
+async fn test_wrapper_source_pre_aggregations_explain() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context(false, vec![]).await;
+    context
+        .add_source_pre_aggregation_mock(
+            "KibanaSampleDataEcommerce",
+            json!({
+                "tableName": "dev_pre_aggregations.kibana_sample_data_ecommerce_main",
+                "preAggregationId": "KibanaSampleDataEcommerce.main",
+            }),
+        )
+        .await;
+    context
+        .add_source_pre_aggregation_mock(
+            "Logs",
+            json!({
+                "tableName": "dev_pre_aggregations.logs_main",
+                "preAggregationId": "Logs.main",
+            }),
+        )
+        .await;
+
+    let physical_plan = context
+        .convert_sql_to_cube_query(
+            "SELECT k.customer_gender, l.content \
+             FROM KibanaSampleDataEcommerce k \
+             JOIN (SELECT content FROM Logs GROUP BY 1) l ON k.customer_gender = l.content \
+             GROUP BY 1, 2",
+        )
+        .await
+        .unwrap()
+        .as_physical_plan()
+        .await
+        .unwrap();
+    let plan = format!("{}", displayable(physical_plan.as_ref()).indent());
+    assert!(
+        plan.contains(
+            r#"CubeScanExecutionPlan, SQL: {"dataSource":"default","external":false,"preAggregations":["Logs.main","KibanaSampleDataEcommerce.main"]}"#
+        ),
+        "the scan runs in the data source over both rollups:\n{}",
+        plan
+    );
 }

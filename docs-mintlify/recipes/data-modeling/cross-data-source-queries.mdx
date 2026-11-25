@@ -666,9 +666,9 @@ follows on the next lines:
 CubeScanExecutionPlan, SQL: {"dataSource":"default","external":false,"preAggregations":[]}
 ```
 
-`dataSource` is the data source that runs the SQL. When Cube Store runs it,
-`external` is `true`, `dataSource` is `null`, and `preAggregations` lists the IDs of
-the pre-aggregations the query reads, such as `orders.main`.
+`dataSource` is the data source that runs the SQL, and `preAggregations` lists the
+IDs of the pre-aggregations it reads, such as `orders.main`. When Cube Store runs it,
+`external` is `true` and `dataSource` is `null`.
 
 ## Limitations
 
