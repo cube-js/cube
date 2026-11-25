@@ -132,11 +132,13 @@ back to the **Open** tab.
 ## Comments on a chart
 
 A thread can be about one chart instead of the whole dashboard. Open the chart
-tile's menu (`⋮`) and choose **Add comment**. The item shows the number of
-unresolved threads on that chart. The panel opens and shows only that chart's
-threads, and the box reads **Start a thread on {chart}…**.
+tile's menu (`⋮`) and choose **Comment on this chart**. The item shows the
+number of unresolved threads on that chart. The panel opens and shows only that
+chart's threads, and the box reads **Start a thread on {chart}…**. You can also
+click a data point and choose **Comment on whole chart**, as described in the
+next section.
 
-{/* TODO: screenshot — a chart tile's ⋮ menu with the Add comment item and its unresolved count */}
+{/* TODO: screenshot — a chart tile's ⋮ menu with the Comment on this chart item and its unresolved count */}
 
 To change which threads the panel shows, use the picker at the top of the panel.
 Choose **All threads** to see every thread on the dashboard, or choose one
@@ -152,13 +154,18 @@ chart. In the list, a thread about a chart shows the chart's name:
 A thread can also be about one data point on a chart, for example one bar or one
 point on a line. Click the data point and choose **Comment on this point**: a
 popover opens next to the data point. It shows the data point and its value, and
-the box reads **Start a thread on this point…**. If the chart supports
-drill-down, the same menu also has **Drill down**. On a published dashboard with
+the box reads **Start a thread on this point…**. Under it, **Comment on whole
+chart** opens the panel on the chart's threads instead, and shows the number of
+unresolved threads on the chart.
+
+The comment items are the last section of the menu. If the chart supports
+drill-down, the menu also has **Drill down**. On a published dashboard with
 [cross-filtering](/docs/explore-analyze/dashboards/cross-filtering) on, it also
-has **Filter dashboard by this point**. On a point inside the chart's own
-cross-filter, that item reads **Narrow filter to this point** and is followed by
-**Reset this filter**. A point whose values are exactly the cross-filter offers
-only **Reset this filter**. On a published dashboard, a chart with a
+has **Filter dashboard by this point**, between **Drill down** and the comment
+items. On a point inside the chart's own cross-filter, that item reads **Narrow
+filter to this point** and is followed by **Reset this filter**. A point whose
+values are exactly the cross-filter offers **Reset this filter** in its place.
+On a published dashboard, a chart with a
 [drill-through](/docs/explore-analyze/dashboards/drill-through) lists its
 **Open in** item first, above the others.
 
@@ -282,7 +289,7 @@ You don't have to reload the dashboard to see what other people do. When
 someone starts a thread, replies, edits or deletes a comment, resolves or
 re-opens a thread, or adds or removes a reaction, the change appears in your
 open panel.
-The number on the **Comments** button and on each chart's **Add comment** item
+The number on the **Comments** button and on each chart's **Comment on this chart** item
 also updates, even when the panel is closed. The same is true for your changes
 in another browser tab.
 
