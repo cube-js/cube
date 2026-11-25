@@ -607,21 +607,26 @@ export class PreAggregations {
   }
 
   public findPreAggregationToUseForCube(cube: string): PreAggregationForCube | null {
-    const preAggregates = this.query.cubeEvaluator.preAggregationsForCube(cube);
-    const originalSqlPreAggregations = R.pipe(
-      R.toPairs,
-      R.filter(([, a]) => a.type === 'originalSql')
-    )(preAggregates);
-    if (originalSqlPreAggregations.length) {
-      const [preAggregationName, preAggregation] = originalSqlPreAggregations[0];
-      return {
-        preAggregationName,
-        preAggregation,
-        cube,
-        references: this.evaluateAllReferences(cube, preAggregation, preAggregationName)
-      };
+    const originalSqlPreAggregation = this.originalSqlPreAggregationForCube(cube);
+    if (!originalSqlPreAggregation) {
+      return null;
     }
-    return null;
+    const [preAggregationName, preAggregation] = originalSqlPreAggregation;
+    // A Cube Store table can only be read when every cube of the query is in Cube Store
+    if (preAggregation.external && !this.preAggregationCubes().every(c => this.originalSqlPreAggregationForCube(c)?.[1].external)) {
+      return null;
+    }
+    return {
+      preAggregationName,
+      preAggregation,
+      cube,
+      references: this.evaluateAllReferences(cube, preAggregation, preAggregationName)
+    };
+  }
+
+  protected originalSqlPreAggregationForCube(cube: string): [string, PreAggregationDefinitionExtended] | undefined {
+    return Object.entries(this.query.cubeEvaluator.preAggregationsForCube(cube))
+      .find(([, a]: [string, EvaluatedPreAggregationDefinition]) => a.type === 'originalSql');
   }
 
   public static transformQueryToCanUseForm(query: BaseQuery): TransformedQuery {

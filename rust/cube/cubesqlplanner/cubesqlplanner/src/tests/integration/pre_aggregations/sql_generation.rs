@@ -1479,6 +1479,121 @@ fn test_rollup_build_without_use_original_sql_pre_aggregations_in_pre_aggregatio
     Ok(())
 }
 
+// `companies` keeps its rows in Cube Store, `regions` in the source database,
+// `t1` has no pre-aggregation at all.
+fn external_original_sql_join_schema() -> Result<MockSchema, CubeError> {
+    MockSchema::from_yaml(indoc! {"
+        cubes:
+          - name: t1
+            sql: SELECT * FROM t1_table
+            joins:
+              - name: companies
+                relationship: many_to_one
+                sql: \"{CUBE}.company_id = {companies}.id\"
+              - name: regions
+                relationship: many_to_one
+                sql: \"{CUBE}.region_id = {regions}.id\"
+            dimensions:
+              - name: id
+                type: number
+                sql: id
+                primary_key: true
+            measures:
+              - name: sales
+                type: sum
+                sql: sales
+          - name: companies
+            sql: SELECT * FROM companies_table
+            dimensions:
+              - name: id
+                type: number
+                sql: id
+                primary_key: true
+              - name: company_id
+                type: string
+                sql: company_id
+            measures:
+              - name: count
+                type: count
+            pre_aggregations:
+              - name: main
+                type: originalSql
+                external: true
+          - name: regions
+            sql: SELECT * FROM regions_table
+            dimensions:
+              - name: id
+                type: number
+                sql: id
+                primary_key: true
+              - name: name
+                type: string
+                sql: name
+            pre_aggregations:
+              - name: main
+                type: originalSql
+    "})
+}
+
+// A Cube Store table can't be joined to a table the source database reads, so a
+// cube with an external originalSql pre-aggregation is read raw next to `t1`.
+#[test]
+fn test_external_original_sql_pre_agg_not_joined_to_source_cube() -> Result<(), CubeError> {
+    let ctx = TestContext::new(external_original_sql_join_schema()?)?;
+
+    let sql = ctx.build_sql(indoc! {"
+        measures:
+          - t1.sales
+        dimensions:
+          - regions.name
+          - companies.company_id
+    "})?;
+
+    assert!(sql.contains("t1_table"), "{sql}");
+    assert!(sql.contains("companies_table"), "{sql}");
+    assert!(!sql.contains("companies__main"), "{sql}");
+    assert!(sql.contains("regions__main"), "{sql}");
+    assert!(!sql.contains("regions_table"), "{sql}");
+    Ok(())
+}
+
+#[test]
+fn test_rollup_build_reads_external_original_sql_only_next_to_cube_store_cubes(
+) -> Result<(), CubeError> {
+    let ctx = TestContext::new(external_original_sql_join_schema()?)?;
+
+    let sql = ctx.build_sql(indoc! {"
+        measures:
+          - t1.sales
+        dimensions:
+          - regions.name
+          - companies.company_id
+        pre_aggregation_query: true
+        use_original_sql_pre_aggregations_in_pre_aggregation: true
+    "})?;
+
+    assert!(sql.contains("companies_table"), "{sql}");
+    assert!(!sql.contains("companies__main"), "{sql}");
+    assert!(sql.contains("regions__main"), "{sql}");
+    Ok(())
+}
+
+#[test]
+fn test_external_original_sql_pre_agg_read_on_its_own() -> Result<(), CubeError> {
+    let ctx = TestContext::new(external_original_sql_join_schema()?)?;
+
+    let sql = ctx.build_sql(indoc! {"
+        measures:
+          - companies.count
+        dimensions:
+          - companies.company_id
+    "})?;
+
+    assert!(sql.contains("companies__main"), "{sql}");
+    assert!(!sql.contains("companies_table"), "{sql}");
+    Ok(())
+}
+
 // A measure referenced only in ORDER BY (not in the selected measures) is dropped
 // from the ORDER BY when reading a pre-aggregation. CubeStore cannot ORDER BY an
 // aggregate of a rollup column that isn't projected, and the legacy planner
