@@ -696,14 +696,14 @@ Preview **blocks** a view when it finds any of these conditions:
 
 A view's joins are the joins on its join path plus any joins that member SQL reaches, such as
 `{CUBE.users.country}`. That includes the SQL of a member the view doesn't list but one of its
-members references. A one-to-many join on the join path blocks the view, as listed above. A
-one-to-many join that only member SQL reaches doesn't block the view, but it can withhold some
-of the view's measures.
+members references. A one-to-many join on the join path blocks the view, as listed above, and so
+does a dimension that reads a cube behind one. Otherwise, a one-to-many join that member SQL
+reaches doesn't block the view, but it can withhold some of the view's measures.
 
-A measure of the view's root cube publishes when all of the view's joins are many-to-one or
-one-to-one and the view has no root-source override, even when it reads a joined cube, such as
-`SUM(CASE WHEN {products.family} = 'CX' THEN {CUBE}.events END)`: such joins can't repeat a row
-of the root cube, so each row counts once, as in Cube.
+A measure of the view's root cube that reads a joined cube, such as
+`SUM(CASE WHEN {products.family} = 'CX' THEN {CUBE}.events END)`, publishes when all of the
+view's joins are many-to-one or one-to-one and the view has no root-source override: such joins
+can't repeat a row of the root cube, so each row counts once, as in Cube.
 
 A measure that can over-count is withheld: a non-idempotent aggregate, such as `sum`, `avg`, or a
 `count` of an expression, or a calculated measure built on one. It is withheld in these cases:
@@ -714,11 +714,11 @@ A measure that can over-count is withheld: a non-idempotent aggregate, such as `
   join, or in a view with a root-source override: remove the member reference that reaches that
   join, or the override, or keep that view in Cube.
 
-A view with a withheld measure is **still published without it**. That view
-may show **Created**, **Updated**, or **Unchanged**, and the run may show **Completed**, even
-though some measures are missing in Databricks. Check **Measures not published** in Preview and
-beside each view in run history before treating a run as complete. There is no opt-in gate for
-incomplete publication yet.
+A view with a withheld measure is **still published without it**. That view may show
+**Created**, **Updated**, or **Unchanged**, and the run may show **Completed**, even though some
+measures are missing in Databricks. Check **Measures not published** in Preview and beside each
+view in run history before treating a run as complete. There is no opt-in gate for incomplete
+publication yet.
 
 ### References and subqueries in SQL
 
