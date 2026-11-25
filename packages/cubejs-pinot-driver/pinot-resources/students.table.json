@@ -9,7 +9,7 @@
   "segmentsConfig": {
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "180",
-    "replication": "5",
+    "replication": "1",
     "schemaName": "students"
   },
   "tenants": {

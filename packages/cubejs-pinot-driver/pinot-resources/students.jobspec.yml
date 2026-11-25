@@ -6,7 +6,7 @@ executionFrameworkSpec:
 jobType: SegmentCreationAndTarPush
 inputDirURI: '/tmp/data/test-resources/rawdata/students/'
 includeFileNamePattern: 'glob:**/*.csv'
-outputDirURI: '/tmp/data/'
+outputDirURI: '/tmp/pinot-segments/students/'
 overwriteOutput: true
 pinotFSSpecs:
   - scheme: file
