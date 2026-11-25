@@ -74,6 +74,9 @@ ${withRollups ? `    pre_aggregations:
 ` : ''}
 views:
   - name: biz
+    segments:
+      - name: year_2026
+        sql: "{CUBE.dt_year} = '2026'"
     cubes:
       - join_path: calendar
         includes: [dt_ts, dt_year, dt_year_month]
@@ -149,6 +152,14 @@ views:
     timezone: 'UTC',
   }, [
     { biz__purchases_count: '2', biz__cancellations_cancellations: '2' },
+  ], compilers));
+
+  it('applies a view segment on each measure\'s own date', async () => dbRunner.runQueryTest({
+    measures: ['biz.purchases_count', 'biz.cancellations_cancellations', 'biz.carts_count'],
+    segments: ['biz.year_2026'],
+    timezone: 'UTC',
+  }, [
+    { biz__purchases_count: '2', biz__cancellations_cancellations: '2', biz__carts_count: '2' },
   ], compilers));
 
   it('reads one cube measure under two roles', async () => dbRunner.runQueryTest({

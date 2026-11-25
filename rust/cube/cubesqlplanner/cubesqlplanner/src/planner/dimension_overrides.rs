@@ -71,6 +71,19 @@ impl AppliedOverrides {
     fn has_dimension(&self, dimension: &MemberId) -> bool {
         self.items.iter().any(|(d, _)| d == dimension)
     }
+
+    // `symbol` is an overridden dimension still referencing another member
+    // than its override.
+    fn is_unapplied_to(&self, symbol: &Rc<MemberSymbol>) -> bool {
+        self.items.iter().any(|(dimension, target)| {
+            dimension == symbol.id()
+                && !symbol
+                    .as_ref_symbol()
+                    .ok()
+                    .and_then(|reference| reference.target_member().cloned())
+                    .is_some_and(|member| member.id() == target)
+        })
+    }
 }
 
 /// Measures of a query that agree on the dimension overrides applying to them.
@@ -169,6 +182,18 @@ pub fn are_overrides_applied(
     })
 }
 
+/// Whether an override of `measures` applies to `dimensions`: the query is a
+/// leg of measures under dimension overrides.
+pub fn has_overrides_for(measures: &[Rc<MemberSymbol>], dimensions: &[Rc<MemberSymbol>]) -> bool {
+    let used = dimension_trees(dimensions.to_vec())
+        .iter()
+        .map(|symbol| symbol.id().clone())
+        .collect::<HashSet<_>>();
+    measures
+        .iter()
+        .any(|measure| !AppliedOverrides::for_measure(measure, &used).is_empty())
+}
+
 // The dimensions a query groups, filters or orders by, with the dimensions
 // they are built on: a dimension a view declares over an overridden one is
 // overridden with it.
@@ -179,6 +204,7 @@ fn used_dimensions(query: &QueryProperties) -> Vec<Rc<MemberSymbol>> {
         .dimensions_filters()
         .iter()
         .chain(query.time_dimensions_filters())
+        .chain(query.segments())
     {
         item.find_all_member_evaluators(&mut members);
     }
@@ -243,9 +269,11 @@ fn check_no_dimension_left_behind(
             .and_then(|reference| reference.target_member().cloned())
             .map(|target| target.cube_id())
     };
+    // Once applied, an overridden dimension references its override and says
+    // nothing about the cube it was taken from.
     let overridden_cubes = used
         .iter()
-        .filter(|symbol| overrides.has_dimension(symbol.id()))
+        .filter(|symbol| overrides.is_unapplied_to(symbol))
         .filter_map(referenced_cube)
         .collect::<Vec<_>>();
     for symbol in used.iter() {

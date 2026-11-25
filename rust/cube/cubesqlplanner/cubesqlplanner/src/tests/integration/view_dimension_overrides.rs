@@ -791,10 +791,9 @@ async fn test_time_shift_next_to_another_fact() {
     }
 }
 
-// The view reads the year filter of these carts off their own column, and the
-// cube measure excludes only the calendar's year, which the rewritten query no
-// longer filters by: the filter stays, 2 carts in 2026. Without the override
-// the exclusion drops it: all 3.
+// Under the override the year filter is on the cart's own column, not on the
+// calendar year the cube measure excludes: 2 carts in 2026. Without the
+// override the exclusion drops the filter: all 3.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_directive_on_a_dimension_the_override_replaced() {
     let ctx = create_context();
@@ -807,5 +806,28 @@ async fn test_directive_on_a_dimension_the_override_replaced() {
         if let Some(result) = ctx.try_execute_pg(&query, SEED).await {
             insta::assert_snapshot!(measure.replace('.', "__"), result);
         }
+    }
+}
+
+// A fact dimension next to a dimension one leg overrides and the other keeps:
+// carts 3 (2025), 1 and 2 (2026), each 1 / 1.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_fact_dimension_next_to_legs_of_the_same_fact() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.carts_count
+          - biz.carts_own_count
+        dimensions:
+          - biz.dt_year
+          - biz.carts_id
+        order:
+          - id: biz.carts_id
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
     }
 }

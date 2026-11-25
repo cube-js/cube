@@ -49,12 +49,13 @@ impl QueryAnalysis {
         let specializer = transforms::Specializer::for_query(&request, request.allow_multi_stage());
         let query = request.map_symbols(&|symbol| specializer.specialize(symbol))?;
         let join_groups = OnceCell::new();
+        let leg_join_groups = override_legs.iter().map(|_| OnceCell::new()).collect_vec();
         let mut classification = SymbolClassification::try_new(&query, |measure| {
             let groups = match override_legs
                 .iter()
-                .find(|leg| leg.measures().iter().any(|m| m.id() == measure.id()))
+                .position(|leg| leg.measures().iter().any(|m| m.id() == measure.id()))
             {
-                Some(leg) => &Self::compute_join_groups(leg)?,
+                Some(leg) => Self::join_groups_in(&override_legs[leg], &leg_join_groups[leg])?,
                 None => Self::join_groups_in(&query, &join_groups)?,
             };
             groups

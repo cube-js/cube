@@ -3,7 +3,7 @@ use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::planner::collectors::{collect_cube_names_from_symbols, has_multi_stage_members};
-use crate::planner::dimension_overrides::are_overrides_applied;
+use crate::planner::dimension_overrides::{are_overrides_applied, has_overrides_for};
 use crate::planner::filter::operators::date_range::DateRangeKind;
 use crate::planner::filter::typed_filter::resolve_base_symbol;
 use crate::planner::filter::FilterItem;
@@ -237,6 +237,12 @@ impl PreAggregationOptimizer {
             .map(|item| (&item.table.cube_name, &item.table.name))
     }
 
+    fn is_dimension_overrides_leg(query: &Query) -> bool {
+        let schema = query.schema();
+        let dimensions = schema.all_dimensions().cloned().collect::<Vec<_>>();
+        has_overrides_for(&schema.measures, &dimensions)
+    }
+
     fn try_rewrite_simple_query(
         &mut self,
         query: &Rc<Query>,
@@ -438,9 +444,10 @@ impl PreAggregationOptimizer {
                             if let Some(rewritten) = rewritten {
                                 let new_member = member.with_body(SubqueryBody::Query(rewritten));
                                 NodeRewriteResult::rewritten(new_member.as_plan_node())
-                            } else if leaf.from().as_merge().is_some() {
-                                // Not a leaf: it merges subqueries matched on their
-                                // own, like a leg of measures under dimension overrides.
+                            } else if leaf.from().as_merge().is_some()
+                                && Self::is_dimension_overrides_leg(leaf)
+                            {
+                                // Not a leaf: it merges subqueries matched on their own.
                                 NodeRewriteResult::pass()
                             } else {
                                 has_unrewritten_leaf = true;
