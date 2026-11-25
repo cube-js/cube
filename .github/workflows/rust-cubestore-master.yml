@@ -235,6 +235,7 @@ jobs:
       - name: Inspect image
         run: docker buildx imagetools inspect ${{ steps.prep.outputs.image }}:${{ steps.prep.outputs.version }}${{ matrix.postfix }}
       # The -arm64v8 leg tags the same index, so attest it once.
+      # build-1<run> is unique to this run; edge may already point at a newer run's index.
       # Three bounded attest steps must fit in this job's 15-minute budget.
       - name: Attest image
         if: matrix.postfix == ''
@@ -243,7 +244,7 @@ jobs:
         uses: ./.github/actions/attest-image
         with:
           image: docker.io/cubejs/cubestore
-          ref: ":${{ steps.prep.outputs.version }}"
+          ref: ":build-1${{ github.run_number }}"
       - name: Attest image (linux/amd64)
         if: matrix.postfix == ''
         continue-on-error: true
@@ -251,7 +252,7 @@ jobs:
         uses: ./.github/actions/attest-image
         with:
           image: docker.io/cubejs/cubestore
-          ref: ":${{ steps.prep.outputs.version }}"
+          ref: ":build-1${{ github.run_number }}"
           platform: linux/amd64
       - name: Attest image (linux/arm64)
         if: matrix.postfix == ''
@@ -260,7 +261,7 @@ jobs:
         uses: ./.github/actions/attest-image
         with:
           image: docker.io/cubejs/cubestore
-          ref: ":${{ steps.prep.outputs.version }}"
+          ref: ":build-1${{ github.run_number }}"
           platform: linux/arm64
       - name: Update repo description
         if: matrix.postfix == ''
