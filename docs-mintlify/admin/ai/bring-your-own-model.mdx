@@ -44,6 +44,13 @@ admin panel:
    endpoint settings instead
 6. Enter the required credentials for the provider
 
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/admin/ai/bring-your-own-model/add-model-dialog.png"
+    alt="Add model dialog with the name, the LLM model type, the Anthropic provider, the Claude Opus 5.5 model, the Enable thinking toggle and the API Key field"
+  />
+</Frame>
+
 ### Step 2: Assign the model to an agent
 
 Once a model is registered, reference it in the agents YAML configuration by
@@ -191,6 +198,13 @@ with the **Enable thinking** toggle in the model settings. The toggle is on by
 default when you add a model. With thinking on, the agent's reasoning shows in
 the chat. For the Chat API, see its [`thinking` field][ref-chat-api-thinking].
 
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/admin/ai/bring-your-own-model/enable-thinking-toggle.png"
+    alt="Add model dialog for a GCP Vertex AI model with the Enable thinking toggle on"
+  />
+</Frame>
+
 ### Anthropic
 
 Requires an API key.
@@ -262,6 +276,13 @@ A mode that doesn't match the model makes every request fail: adaptive models
 reject a thinking budget, and older models don't support adaptive thinking.
 If the model doesn't support extended thinking at all, turn **Enable thinking**
 off. Small-model tasks run without thinking.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/admin/ai/bring-your-own-model/custom-anthropic-thinking-mode.png"
+    alt="Add model dialog for a Custom Anthropic-compatible model with Enable thinking on and the Thinking mode picker open on the Adaptive and Budgeted options"
+  />
+</Frame>
 
 ## Troubleshooting
 
