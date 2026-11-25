@@ -38,6 +38,11 @@ It can be useful to prevent queries from your end users from ever hitting the
 upstream data source, e.g., if you prefer to use your data warehouse only to
 build and refresh pre-aggregations and keep it suspended the rest of the time.
 
+Streamed [SQL API][ref-sql-api-streaming] queries can't read pre-aggregations in Cube
+Store, so in the rollup-only mode they fail unless a pre-aggregation stored in the data
+source serves them. See [`CUBESQL_STREAM_MODE`][ref-cubesql-stream-mode] for queries that
+are not streamed.
+
 <Warning>
 
 When the rollup-only mode is used with a single-node deployment (where the API
@@ -1286,3 +1291,5 @@ or a decimal type, depending on the nature of your data.
 [ref-cube-store-storage]: /docs/pre-aggregations/running-in-production#storage
 [ref-member-sql]: /reference/data-modeling/dimensions#sql
 [ref-incremental-refresh-recipe]: /recipes/pre-aggregations/incrementally-building-pre-aggregations-for-a-date-range
+[ref-sql-api-streaming]: /reference/core-data-apis/sql-api#streaming
+[ref-cubesql-stream-mode]: /reference/configuration/environment-variables#cubesql_stream_mode

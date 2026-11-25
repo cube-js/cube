@@ -1896,7 +1896,8 @@ If `true`, queries [pushed down][ref-sql-api-pushdown] by the [SQL API][ref-sql-
 be served from [pre-aggregations][ref-pre-aggs] stored in Cube Store. Such a query is
 planned for Cube Store as well, and that plan runs when a pre-aggregation matches it.
 Otherwise, or when Cube Store can't run the SQL the query needs, the query is sent to the
-data source as usual.
+data source as usual. In [streaming mode](#cubesql_stream_mode), only queries with a
+bounded result read Cube Store.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1912,9 +1913,11 @@ are streamed instead and aren't capped by it.
 Queries with a `LIMIT` at or below that limit are not streamed.
 
 Cube Store can't stream, so streamed queries read the data source rather than
-pre-aggregations in Cube Store. With [`CUBEJS_ROLLUP_ONLY`](#cubejs_rollup_only), which
-doesn't allow querying the data source, a streamed query fails unless a pre-aggregation
-stored in the data source serves it.
+pre-aggregations in Cube Store. A [pushed down][ref-sql-api-pushdown] query reads them
+only when a `LIMIT` at or below that limit bounds its whole result: a `LIMIT` below a
+join or grouping sets doesn't, and the rows of each query in a `UNION` add up. With
+[`CUBEJS_ROLLUP_ONLY`](#cubejs_rollup_only), which doesn't allow querying the data source,
+a streamed query fails unless a pre-aggregation stored in the data source serves it.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |

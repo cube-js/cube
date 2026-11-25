@@ -223,6 +223,11 @@ Queries that are not streamed are capped by
 which defaults to the value of `CUBEJS_DB_QUERY_LIMIT`. It also acts as the threshold
 above which a query is streamed rather than loaded in a single batch.
 
+Streamed queries read the data source rather than pre-aggregations in Cube Store, which
+can't stream. See
+[`CUBESQL_STREAM_MODE`](/reference/configuration/environment-variables#cubesql_stream_mode)
+for details.
+
 ### Session limit
 
 Each concurrent connection to the SQL API consumes some resources and attempting
