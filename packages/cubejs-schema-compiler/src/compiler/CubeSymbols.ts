@@ -246,6 +246,8 @@ export type ViewCubeInclude = {
   alias?: string;
   includes: '*' | (string | ViewCubeIncludeMember)[];
   excludes?: string[];
+  // View dimension name -> full path of the dimension it means for the measures of this include
+  dimensionOverrides?: Record<string, string>;
 };
 
 export interface CubeDefinition {
@@ -309,6 +311,7 @@ type ViewResolvedMember = {
   // The cube the member is defined on, which the join path reaches
   cube: string;
   name: string;
+  dimensionOverrides?: Record<string, string>;
 };
 
 type ViewExcludedMember = {
@@ -1074,6 +1077,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         excludes
       );
 
+      if (cubeInclude.split && cubeInclude.dimensionOverrides && type === 'measures') {
+        errorReporter.error(`Dimension overrides of '${fullPath}' can't be used together with split`);
+      }
+
       if (cubeInclude.split) {
         const viewName = `${parentCube.name}_${cubeName}`;
         let splitViewDef = splitViews[viewName];
@@ -1091,17 +1098,83 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         const includeMembers = this.generateIncludeMembers(finalIncludes, type, splitViewDef, viewAllMembers);
         this.applyIncludeMembers(includeMembers, splitViewDef, type, errorReporter);
       } else {
+        // Dimensions are applied to the view before measures, so the override keys can be checked
+        const dimensionOverrides = type === 'measures' && cubeInclude.dimensionOverrides ?
+          this.resolveDimensionOverrides(parentCube, cubeInclude.dimensionOverrides, fullPath, errorReporter) :
+          undefined;
+
         for (const member of finalIncludes) {
           const key = `${member.member}|${member.name}`;
           if (!seen.has(key)) {
             seen.add(key);
-            result.push(member);
+            result.push(dimensionOverrides ? { ...member, dimensionOverrides } : member);
           }
         }
       }
     }
 
     return result;
+  }
+
+  protected resolveDimensionOverrides(
+    view: CubeDefinition,
+    overrides: Record<string, string>,
+    joinPath: string,
+    errorReporter: ErrorReporter
+  ): Record<string, string> {
+    const result: Record<string, string> = {};
+
+    for (const [name, target] of Object.entries(overrides)) {
+      const viewDimension = view.dimensions?.[name];
+      if (!viewDimension) {
+        errorReporter.error(`Dimension override '${name}' of '${joinPath}' names no dimension of view '${view.name}'`);
+        continue;
+      }
+
+      const dimension = this.resolveOverrideTarget(target, joinPath);
+      if (typeof dimension === 'string') {
+        errorReporter.error(`Dimension override '${name}' of '${joinPath}': ${dimension}`);
+        continue;
+      }
+
+      if (dimension.type !== viewDimension.type) {
+        errorReporter.error(
+          `Dimension override '${name}' of '${joinPath}': '${target}' is of type '${dimension.type}' but '${view.name}.${name}' is of type '${viewDimension.type}'`
+        );
+        continue;
+      }
+
+      result[name] = target;
+    }
+
+    return result;
+  }
+
+  /**
+   * The dimension a full override path names, or why it names none. The path
+   * starts with the include's join path and then follows joins, by alias or
+   * cube name, to a dimension of the cube it reaches.
+   */
+  protected resolveOverrideTarget(target: string, joinPath: string): CubeSymbolDefinition | string {
+    if (!target.startsWith(`${joinPath}.`)) {
+      return `'${target}' must start with the join path '${joinPath}'`;
+    }
+
+    const steps = target.slice(joinPath.length + 1).split('.');
+    const memberName = steps.pop() as string;
+    let cubeName = this.resolveJoinPathTarget(joinPath.split('.'));
+
+    for (const step of steps) {
+      const joins = this.symbols[cubeName]?.cubeObj()?.joins;
+      const join = Array.isArray(joins) ? joins.find(j => (j.alias ?? j.name) === step) : undefined;
+      if (!join) {
+        return `'${cubeName}' has no join '${step}' in '${target}'`;
+      }
+      cubeName = join.name;
+    }
+
+    return this.getResolvedMember('dimensions', cubeName, memberName) ??
+      `'${target}' names no dimension of '${cubeName}'`;
   }
 
   protected diffByMember(includes: ViewResolvedMember[], excludes: ViewExcludedMember[]) {
@@ -1203,6 +1276,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           ...(processedDrillMembers && { drillMembers: processedDrillMembers }),
           ...(resolvedMember.drillMembersGrouped && { drillMembersGrouped: resolvedMember.drillMembersGrouped }),
           ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
+          ...(memberRef.dimensionOverrides && { dimensionOverrides: memberRef.dimensionOverrides }),
         };
       } else if (type === 'dimensions') {
         memberDefinition = {
