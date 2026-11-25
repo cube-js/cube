@@ -646,7 +646,12 @@ calculated measures, and many-to-one and one-to-one joins. Beyond that:
   as written in the Metric View join's `on`, as long as it reads a column of the joined cube. A
   Metric View join keeps at most one match per source row: if the condition matches several rows
   of the joined cube, the Metric View keeps one of them where Cube keeps all, and Preview does not
-  flag it. Make sure such a condition matches one row.
+  flag it. Make sure such a condition matches one row. A condition that compares the joined cube
+  with another cube joined from the same cube, such as `{accounts}.plan = {plans}.plan_name` on the
+  `deals` → `plans` join, is published with `plans` nested under `accounts`
+  (`accounts.plans.list_price`) when both joins are many-to-one or one-to-one and the condition
+  reads no column of `deals`. A view that also reaches `plans` another way is blocked, and Preview
+  names both paths.
 - **Dimensions:** a dimension can read a cube joined through many-to-one or one-to-one joins, such
   as `sql: "{users.name}"` on `orders`, a `{users}.name` column, or `coalesce({users.score}, 0)`.
   It is published through its join path, as `users.name`, or `a.b.column` for nested joins.
@@ -682,8 +687,9 @@ Preview **blocks** a view when it finds any of these conditions:
 - A two-part `schema.table` source without a default catalog: set `CUBEJS_DB_DATABRICKS_CATALOG`
   for the selected Databricks data source, or the **Default catalog** of a publication target with
   its own connection, and preview again.
-- Cyclic or one-to-many joins, or a join condition that reads a measure or a cube other than the
-  two it joins, including a `table.column` whose table is neither of them: simplify the join. For
+- Cyclic or one-to-many joins, a join condition that reads a measure, or one that reads a cube other
+  than the two it joins outside the nested case under **Joins** above, including a `table.column`
+  whose table is neither of them: simplify the join. For
   a one-to-many join (`CUBE_VIEW_JOIN_NOT_REPRESENTABLE`), root the view at the many-side cube.
 - A many-to-one or one-to-one join whose condition reads no column of the joined cube, such as
   `1 = 1` or `{CUBE}.status = 'open'` (Preview names the join): Cube keeps every row such a join
