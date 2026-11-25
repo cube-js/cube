@@ -77,5 +77,12 @@ describe('PinotDriver query options', () => {
       expect(() => new TestPinotDriver({ ...config, workloadName: 'bi;trace=true' })).toThrow(/workloadName/);
       expect(() => new TestPinotDriver({ ...config, workloadName: ' ' })).toThrow(/workloadName/);
     });
+
+    it('reports the rejected value', () => {
+      expect(() => new TestPinotDriver({ ...config, applicationName: 'a=b' })).toThrow(
+        'Pinot applicationName must be a non-empty string without \';\' and \'=\', got: "a=b"'
+      );
+      expect(() => new TestPinotDriver({ ...config, workloadName: ' ' })).toThrow('got: " "');
+    });
   });
 });

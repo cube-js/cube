@@ -191,9 +191,11 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
    * The queryOptions string has no escaping, so a value with `;` or `=` would
    * be parsed by Pinot as extra options.
    */
-  protected assertQueryOptionValue(name: string, value?: string): void {
+  protected assertQueryOptionValue(name: string, value?: unknown): void {
     if (value !== undefined && (typeof value !== 'string' || value.trim() === '' || /[;=]/.test(value))) {
-      throw new TypeError(`Pinot ${name} must be a non-empty string without ';' and '='`);
+      throw new TypeError(
+        `Pinot ${name} must be a non-empty string without ';' and '=', got: ${JSON.stringify(value)}`
+      );
     }
   }
 
