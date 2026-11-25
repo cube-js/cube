@@ -581,10 +581,6 @@ jobs:
             platforms: linux/arm64
             build-args: WITH_AVX2=0
     timeout-minutes: 60
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
@@ -637,13 +633,6 @@ jobs:
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
-      - name: Attest image
-        continue-on-error: true
-        timeout-minutes: 10
-        uses: ./.github/actions/attest-image
-        with:
-          image: docker.io/cubejs/cubestore
-          ref: "@${{ steps.build.outputs.digest }}"
 
   docker-cubestore-non-avx:
     name: Cube Store Docker (non-AVX)
@@ -797,14 +786,33 @@ jobs:
       - name: Inspect image
         run: docker buildx imagetools inspect ${{ steps.prep.outputs.image }}:${{ needs.docker-cubestore-prepare.outputs.version }}${{ matrix.postfix }}
       # The -arm64v8 leg tags the same index, so attest it once.
+      # Three bounded attest steps must fit in this job's 15-minute budget.
       - name: Attest image
         if: matrix.postfix == ''
         continue-on-error: true
-        timeout-minutes: 10
+        timeout-minutes: 4
         uses: ./.github/actions/attest-image
         with:
           image: docker.io/cubejs/cubestore
           ref: ":${{ needs.docker-cubestore-prepare.outputs.version }}"
+      - name: Attest image (linux/amd64)
+        if: matrix.postfix == ''
+        continue-on-error: true
+        timeout-minutes: 4
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cubestore
+          ref: ":${{ needs.docker-cubestore-prepare.outputs.version }}"
+          platform: linux/amd64
+      - name: Attest image (linux/arm64)
+        if: matrix.postfix == ''
+        continue-on-error: true
+        timeout-minutes: 4
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cubestore
+          ref: ":${{ needs.docker-cubestore-prepare.outputs.version }}"
+          platform: linux/arm64
       - name: Update repo description
         if: matrix.postfix == ''
         uses: peter-evans/dockerhub-description@v5

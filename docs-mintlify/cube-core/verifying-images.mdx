@@ -50,9 +50,10 @@ gh attestation verify oci://cubejs/cube:vX.Y.Z --owner cube-js \
 Add `--bundle-from-oci` to read the attestations from the registry, where they
 are stored next to the image, rather than from the GitHub API.
 
-On a multi-architecture tag, the SBOM attested on the tag describes
-`linux/amd64`. Each platform's manifest carries its own: verify
-`oci://cubejs/cube@<digest>` with the platform digest that
+On the multi-architecture tags (`cubejs/cube` and `cubejs/cubestore`
+releases, and `cubejs/cubestore:edge`), the SBOM attested on the tag describes
+`linux/amd64`. Their `linux/amd64` and `linux/arm64` manifests carry their own:
+verify `oci://cubejs/cube@<digest>` with the platform digest that
 `docker buildx imagetools inspect cubejs/cube:vX.Y.Z` lists.
 
 ## With cosign
