@@ -410,7 +410,8 @@ blocked with `ownership-conflict`.
 {/* TODO: video — publication targets: add staging and production, promote a staging run (GTM-324) */}
 
 The card always lists the `default` publication target, but it exists only once its settings are
-saved. In the **Databricks Metric View sync** card, pick one under
+saved; until then, reading its settings or starting a run returns `404`. In the
+**Databricks Metric View sync** card, pick one under
 **Publication target**: the settings, **Preview**, **Test access**, and run history below it are
 that target's own. To create one, select **Add target**, enter its name, then save its
 settings. Through the API, add `?target=<name>` when
