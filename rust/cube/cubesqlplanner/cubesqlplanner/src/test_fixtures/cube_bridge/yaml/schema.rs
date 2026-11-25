@@ -4,10 +4,11 @@ use crate::test_fixtures::cube_bridge::yaml::{
 };
 use crate::test_fixtures::cube_bridge::{
     MockCubeDefinition, MockJoinItemDefinition, MockSchema, MockSchemaBuilder,
-    MockViewFilterDefinition,
+    MockViewFilterDefinition, ViewCube,
 };
 use cubenativeutils::CubeError;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug, Deserialize)]
@@ -115,6 +116,10 @@ struct YamlViewCube {
     includes: Option<YamlIncludes>,
     #[serde(default)]
     prefix: Option<bool>,
+    #[serde(default)]
+    alias: Option<String>,
+    #[serde(default)]
+    dimension_overrides: Option<HashMap<String, String>>,
 }
 
 impl YamlSchema {
@@ -213,9 +218,13 @@ impl YamlSchema {
                     Some(YamlIncludes::List(list)) => list,
                     _ => vec![],
                 };
-                let prefix = view_cube.prefix.unwrap_or(false);
-                view_builder =
-                    view_builder.include_cube_with_prefix(view_cube.join_path, includes, prefix);
+                view_builder = view_builder.include_view_cube(ViewCube {
+                    join_path: view_cube.join_path,
+                    includes,
+                    prefix: view_cube.prefix.unwrap_or(false),
+                    alias: view_cube.alias,
+                    dimension_overrides: view_cube.dimension_overrides,
+                });
             }
 
             for filter in view.default_filters {
@@ -376,6 +385,85 @@ mod tests {
 
         assert!(schema.get_dimension("orders_view", "id").is_some());
         assert!(schema.get_measure("orders_view", "count").is_some());
+    }
+
+    #[test]
+    fn test_parse_view_dimension_overrides() {
+        let yaml = indoc! {r#"
+            cubes:
+              - name: calendar
+                sql: "SELECT * FROM calendar"
+                dimensions:
+                  - name: dt_ts
+                    type: time
+                    sql: dt_ts
+                    primary_key: true
+                  - name: dt_year
+                    type: string
+                    sql: dt_year
+              - name: subscriptions
+                sql: "SELECT * FROM subscriptions"
+                joins:
+                  - name: calendar
+                    alias: purchase_cal
+                    relationship: many_to_one
+                    sql: "{CUBE}.purchase_date = {purchase_cal.dt_ts}"
+                  - name: calendar
+                    alias: cancel_cal
+                    relationship: many_to_one
+                    sql: "{CUBE}.cancel_date = {cancel_cal.dt_ts}"
+                dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                measures:
+                  - name: count
+                    type: count
+            views:
+              - name: biz
+                cubes:
+                  - join_path: calendar
+                    includes: [dt_year]
+                  - join_path: subscriptions
+                    alias: purchases
+                    prefix: true
+                    includes: [count]
+                    dimension_overrides:
+                      dt_year: subscriptions.purchase_cal.dt_year
+                  - join_path: subscriptions
+                    alias: cancellations
+                    prefix: true
+                    includes: [count]
+                    dimension_overrides:
+                      dt_year: subscriptions.cancel_cal.dt_year
+        "#};
+
+        let yaml_schema: YamlSchema = serde_yaml::from_str(yaml).unwrap();
+        let schema = yaml_schema.build().unwrap();
+
+        let overrides = |measure: &str| {
+            schema
+                .get_measure("biz", measure)
+                .unwrap()
+                .static_data()
+                .dimension_overrides
+                .clone()
+        };
+        assert_eq!(
+            overrides("purchases_count"),
+            Some(HashMap::from([(
+                "dt_year".to_string(),
+                "subscriptions.purchase_cal.dt_year".to_string()
+            )]))
+        );
+        assert_eq!(
+            overrides("cancellations_count"),
+            Some(HashMap::from([(
+                "dt_year".to_string(),
+                "subscriptions.cancel_cal.dt_year".to_string()
+            )]))
+        );
     }
 
     #[test]

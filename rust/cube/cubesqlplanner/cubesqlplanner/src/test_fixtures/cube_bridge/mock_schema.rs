@@ -458,10 +458,14 @@ impl MockCubeBuilder {
     }
 }
 
+#[derive(Default)]
 pub struct ViewCube {
     pub join_path: String,
     pub includes: Vec<String>,
     pub prefix: bool,
+    /// Prefix of the members when `prefix` is set; defaults to the last segment of `join_path`.
+    pub alias: Option<String>,
+    pub dimension_overrides: Option<HashMap<String, String>>,
 }
 
 pub struct MockViewBuilder {
@@ -494,8 +498,13 @@ impl MockViewBuilder {
         self.view_cubes.push(ViewCube {
             join_path: join_path.into(),
             includes,
-            prefix: false,
+            ..Default::default()
         });
+        self
+    }
+
+    pub fn include_view_cube(mut self, view_cube: ViewCube) -> Self {
+        self.view_cubes.push(view_cube);
         self
     }
 
@@ -509,6 +518,7 @@ impl MockViewBuilder {
             join_path: join_path.into(),
             includes,
             prefix,
+            ..Default::default()
         });
         self
     }
@@ -598,9 +608,10 @@ impl MockViewBuilder {
                     view_cube.includes.clone()
                 };
 
+                let member_prefix = view_cube.alias.as_deref().unwrap_or(target_cube_name);
                 let make_view_name = |member_name: &str| -> String {
                     if view_cube.prefix {
-                        format!("{}_{}", target_cube_name, member_name)
+                        format!("{}_{}", member_prefix, member_name)
                     } else {
                         member_name.to_string()
                     }
@@ -671,6 +682,7 @@ impl MockViewBuilder {
                                     .order_by(measure.raw_order_by())
                                     .resolved_mask_sql_opt(measure.raw_mask_sql())
                                     .included(Some(true))
+                                    .dimension_overrides(view_cube.dimension_overrides.clone())
                                     .build(),
                             ),
                         );
