@@ -17,6 +17,11 @@ cubes:
         type: number
         mask: -1
 
+      # A number dimension over a text column: the database orders its bounds as text.
+      - name: price_text
+        sql: "CAST(price AS TEXT)"
+        type: number
+
     measures:
       - name: count
         type: count
@@ -78,3 +83,13 @@ cubes:
               values:
                 - "2018-02-01"
                 - "2018-03-31"
+
+      - group: "conditional_text_number_mask_group"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: price_text
+              operator: gt
+              values:
+                - "20"

@@ -14,12 +14,20 @@ class CompilerApiTestable extends CompilerApi {
     return this.queryFactory;
   }
 
-  public leafFilterImplies(queryLeaf: any, targetLeaf: any): boolean {
-    return super.leafFilterImplies(queryLeaf, targetLeaf);
+  public leafFilterImplies(
+    queryLeaf: any,
+    targetLeaf: any,
+    isNumberDimension: (member: string) => boolean = () => true,
+  ): boolean {
+    return super.leafFilterImplies(queryLeaf, targetLeaf, isNumberDimension);
   }
 
-  public queryFiltersImplyFilter(queryFilters: any[], maskFilter: any): boolean {
-    return super.queryFiltersImplyFilter(queryFilters, maskFilter);
+  public queryFiltersImplyFilter(
+    queryFilters: any[],
+    maskFilter: any,
+    isNumberDimension: (member: string) => boolean = () => true,
+  ): boolean {
+    return super.queryFiltersImplyFilter(queryFilters, maskFilter, isNumberDimension);
   }
 }
 
@@ -1110,6 +1118,75 @@ describe('CompilerApi leafFilterImplies', () => {
     )).toBe(false);
   });
 
+  test('numeric bounds only compare plain decimals', () => {
+    const loose = ['0x100', '0b1111111', '0o777', '', ' ', 'Infinity', '1e3', ' 200', '+200'];
+
+    for (const value of loose) {
+      expect(compilerApi.leafFilterImplies(leaf('gt', [value]), leaf('gt', ['100']))).toBe(false);
+    }
+    expect(compilerApi.leafFilterImplies(
+      leaf('gt', ['9007199254740992']),
+      leaf('gt', ['9007199254740993']),
+    )).toBe(false);
+
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['200']), leaf('gt', ['100']))).toBe(true);
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['100.5']), leaf('gte', ['100']))).toBe(true);
+    expect(compilerApi.leafFilterImplies(leaf('lt', ['-3']), leaf('lt', ['-2.5']))).toBe(true);
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['50']), leaf('gt', ['100']))).toBe(false);
+  });
+
+  test('numeric bounds compare as numbers of any length', () => {
+    const implies = (qOp: string, q: string, tOp: string, t: string) => compilerApi.leafFilterImplies(leaf(qOp, [q]), leaf(tOp, [t]));
+
+    // Number() reads both of these as 9007199254740992.
+    expect(implies('gt', '9007199254740993', 'gt', '9007199254740992')).toBe(true);
+    expect(implies('lt', '9007199254740992', 'lt', '9007199254740993')).toBe(true);
+    expect(implies('lt', '9007199254740993', 'lt', '9007199254740992')).toBe(false);
+    expect(implies('gte', '12345678901234567890.123456789013', 'gte', '12345678901234567890.123456789012')).toBe(true);
+    expect(implies('gte', '12345678901234567890.123456789011', 'gte', '12345678901234567890.123456789012')).toBe(false);
+    expect(implies('lte', '-12345678901234567890.5', 'lte', '-12345678901234567890.4')).toBe(true);
+    expect(implies('gt', '-12345678901234567890.5', 'gt', '-12345678901234567890.4')).toBe(false);
+
+    expect(implies('gt', '100', 'gt', '99.999')).toBe(true);
+    expect(implies('gt', '0100.50', 'gte', '100.5')).toBe(true);
+    expect(implies('gt', '9', 'gt', '10')).toBe(false);
+    expect(implies('gt', '-0', 'gt', '0.0')).toBe(true);
+    expect(implies('lt', '-9', 'lt', '-10')).toBe(false);
+    expect(implies('lt', '-10', 'lt', '-9')).toBe(true);
+    expect(implies('gt', '-1', 'gt', '1')).toBe(false);
+  });
+
+  test('an inclusive query bound never implies an exclusive policy bound', () => {
+    const implies = (qOp: string, q: string, tOp: string, t: string) => compilerApi.leafFilterImplies(leaf(qOp, [q]), leaf(tOp, [t]));
+
+    // The bound is sent untyped and takes the column type: a `real` column runs
+    // `amount >= 1.0000001` as `amount >= 1`, which returns the `amount = 1` row.
+    expect(implies('gte', '1.0000001', 'gt', '1')).toBe(false);
+    expect(implies('lte', '0.9999999', 'lt', '1')).toBe(false);
+    // A fixed-scale decimal column rounds 100.004 to 100.00.
+    expect(implies('gte', '100.004', 'gt', '100')).toBe(false);
+    expect(implies('gte', '9007199254740993', 'gt', '9007199254740992')).toBe(false);
+    expect(implies('lte', '9007199254740992', 'lt', '9007199254740993')).toBe(false);
+    expect(implies('gte', '100.5', 'gt', '100')).toBe(false);
+    expect(implies('gte', '200', 'gt', '100')).toBe(false);
+    expect(implies('lte', '-3', 'lt', '-2.5')).toBe(false);
+    expect(implies('gte', '100', 'gt', '100')).toBe(false);
+    expect(implies('lte', '100', 'lt', '100')).toBe(false);
+
+    // Rounding keeps the order of the bounds, so the other pairs still hold.
+    expect(implies('gt', '1.0000001', 'gt', '1')).toBe(true);
+    expect(implies('gte', '1.0000001', 'gte', '1')).toBe(true);
+    expect(implies('gt', '1', 'gte', '1')).toBe(true);
+    expect(implies('lt', '1', 'lte', '1')).toBe(true);
+  });
+
+  test('numeric bounds only compare on number dimensions', () => {
+    // As text '1000' passes `gt '100'` and fails `gt '20'`.
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['100']), leaf('gt', ['20']), () => false)).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('lt', ['-3']), leaf('lt', ['-2.5']), () => false)).toBe(false);
+    expect(compilerApi.leafFilterImplies(leaf('gt', ['20']), leaf('gt', ['20']), () => false)).toBe(true);
+  });
+
   test('an empty policy group does not unmask', () => {
     const queryFilters = [leaf('equals', ['a'])];
     expect(compilerApi.queryFiltersImplyFilter(queryFilters, { and: [] })).toBe(false);
@@ -1267,6 +1344,12 @@ cubes:
         filter:
           keep_only:
             - orders.id
+      - name: code
+        sql: code
+        type: string
+      - name: amount
+        sql: amount
+        type: number
     measures:
       - name: total
         sql: amount
@@ -1346,6 +1429,22 @@ cubes:
             - member: created_at_ref
               operator: inDateRange
               values: ["2025-02-01", "2025-03-31"]
+      - group: codes
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: code
+              operator: gt
+              values: ["20"]
+      - group: amounts
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: amount
+              operator: gt
+              values: ["20"]
 `;
   const repository: SchemaFileRepository = {
     localPath: () => '/mock/path',
@@ -1417,5 +1516,20 @@ cubes:
 
   test('a filter directive that only adds filters does not keep the mask', async () => {
     expect(await maskedMembers('dates', 'total_from_march', policyRange)).toEqual([]);
+  });
+
+  test('a narrower bound unmasks on a number dimension only', async () => {
+    const narrower = (member: string) => ({ member: `orders.${member}`, operator: 'gt', values: ['100'] });
+
+    expect(await maskedMembers('amounts', 'total', narrower('amount'))).toEqual([]);
+    expect(await maskedMembers('codes', 'total', narrower('code'))).toContain('orders.total');
+  });
+
+  test('an inclusive bound above an exclusive policy bound keeps the mask', async () => {
+    const amount = (operator: string, value: string) => ({ member: 'orders.amount', operator, values: [value] });
+
+    expect(await maskedMembers('amounts', 'total', amount('gte', '20.0000001'))).toContain('orders.total');
+    expect(await maskedMembers('amounts', 'total', amount('gte', '100'))).toContain('orders.total');
+    expect(await maskedMembers('amounts', 'total', amount('gt', '20.0000001'))).toEqual([]);
   });
 });
