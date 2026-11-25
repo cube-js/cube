@@ -60,8 +60,8 @@ are stored next to the image, rather than from the GitHub API.
 On the multi-architecture tags (`cubejs/cube` and `cubejs/cubestore`
 releases, and `cubejs/cubestore:edge`), the SBOM attested on the tag describes
 `linux/amd64`. Their `linux/amd64` and `linux/arm64` manifests carry their own:
-verify `oci://cubejs/cube@<digest>` with the platform digest that
-`docker buildx imagetools inspect cubejs/cube:vX.Y.Z` lists.
+verify `oci://<image>@<digest>`, with the same flags as above, using the platform
+digest that `docker buildx imagetools inspect <image>:<tag>` lists.
 
 ## With cosign
 
