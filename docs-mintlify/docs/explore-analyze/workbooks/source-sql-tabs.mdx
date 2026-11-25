@@ -57,8 +57,8 @@ You can query source SQL in two ways:
 - **Ask AI** – Use the AI agent to help you research your data source, build SQL queries, and refine results in real-time
 
 Click **Run** or press **Cmd+Enter** (macOS) or **Ctrl+Enter** (Windows/Linux)
-to run the query. Results show up to 5,000 rows. When a query fails, click
-**Fix in chat** to have the agent fix it.
+to run the query. The [row limit](#row-limit) caps how many rows it returns.
+When a query fails, click **Fix in chat** to have the agent fix it.
 
 Queries run with the [security context](/docs/explore-analyze/workbooks/querying-data#applying-a-security-context)
 selected in the header, if any.
@@ -66,3 +66,27 @@ selected in the header, if any.
 DDL statements, such as `CREATE` or `DROP`, run only when **Enable DDL
 operations in SQL** is turned on in the deployment's **Settings →
 Configuration**.
+
+## Row limit
+
+To set how many rows a Source SQL tab returns, click **Row limit** in the
+toolbar and enter a number.
+
+{/* TODO: video — setting a row limit on a Source SQL tab (GTM-332) */}
+
+- **Empty** — The query runs with the deployment's
+  [default row limit](/docs/data-modeling/configuration#default-row-limit),
+  10,000 rows unless it's changed. The field shows the default as its
+  placeholder. A tab saved without a row limit runs with the default, too.
+- **A number** — The query returns up to that many rows. A number above the
+  deployment's [maximum row limit](/docs/data-modeling/configuration#maximum-row-limit)
+  is reduced to the maximum. Hover over the info icon next to **Row limit** to
+  see the maximum. If you can edit the deployment's environment variables,
+  click the icon to open **Environment variables** in a new tab, where the
+  default and the maximum are set.
+
+A new limit re-runs the query on screen. If you haven't run the query yet,
+the limit is saved and applies when you run it.
+
+The limit is saved with the tab, so it stays after a reload and when the
+workbook is promoted. A CSV export includes the rows that the limit returns.
