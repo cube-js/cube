@@ -82,6 +82,8 @@ views:
         includes:
           - name: origin
             alias: airport
+          - name: id
+            alias: flight_id
       - join_path: flights
         alias: departures
         prefix: true

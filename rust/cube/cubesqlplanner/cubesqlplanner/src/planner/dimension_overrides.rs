@@ -270,11 +270,14 @@ fn check_no_dimension_left_behind(
             .map(|target| target.cube_id())
     };
     // Once applied, an overridden dimension references its override and says
-    // nothing about the cube it was taken from.
+    // nothing about the cube it was taken from. The measure's own cube is left
+    // out: its other columns have no role of their own.
+    let own_cube = measure.peel_refs().cube_id();
     let overridden_cubes = used
         .iter()
         .filter(|symbol| overrides.is_unapplied_to(symbol))
         .filter_map(referenced_cube)
+        .filter(|cube| *cube != own_cube)
         .collect::<Vec<_>>();
     for symbol in used.iter() {
         if overrides.has_dimension(symbol.id()) {

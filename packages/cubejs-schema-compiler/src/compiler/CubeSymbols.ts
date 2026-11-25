@@ -1125,46 +1125,45 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     const result: Record<string, string> = {};
 
     for (const [name, target] of Object.entries(overrides)) {
-      const viewDimension = view.dimensions?.[name] as (CubeSymbolDefinition & { included?: boolean }) | undefined;
-      if (!viewDimension) {
-        errorReporter.error(`Dimension override '${name}' of '${joinPath}' names no dimension of view '${view.name}'`);
-        continue;
+      const error = this.dimensionOverrideError(view, name, target, joinPath);
+      if (error) {
+        errorReporter.error(error);
+      } else {
+        result[name] = target;
       }
-      // A dimension the view declares itself is not a reference to override;
-      // one built on an included dimension follows that dimension's override
-      if (!viewDimension.included) {
-        errorReporter.error(
-          `Dimension override '${name}' of '${joinPath}': '${view.name}.${name}' is declared by the view, only included dimensions can be overridden`
-        );
-        continue;
-      }
-
-      const dimension = this.resolveOverrideTarget(target, joinPath);
-      if (typeof dimension === 'string') {
-        errorReporter.error(`Dimension override '${name}' of '${joinPath}': ${dimension}`);
-        continue;
-      }
-
-      if (dimension.type !== viewDimension.type) {
-        errorReporter.error(
-          `Dimension override '${name}' of '${joinPath}': '${target}' is of type '${dimension.type}' but '${view.name}.${name}' is of type '${viewDimension.type}'`
-        );
-        continue;
-      }
-
-      const missingGranularities = Object.keys(viewDimension.granularities || {})
-        .filter(granularity => !(dimension.granularities || {})[granularity]);
-      if (missingGranularities.length) {
-        errorReporter.error(
-          `Dimension override '${name}' of '${joinPath}': '${target}' has no granularities ${missingGranularities.join(', ')} of '${view.name}.${name}'`
-        );
-        continue;
-      }
-
-      result[name] = target;
     }
 
     return result;
+  }
+
+  protected dimensionOverrideError(view: CubeDefinition, name: string, target: string, joinPath: string): string | undefined {
+    const viewDimension = view.dimensions?.[name] as (CubeSymbolDefinition & { included?: boolean }) | undefined;
+    if (!viewDimension) {
+      return `Dimension override '${name}' of '${joinPath}' names no dimension of view '${view.name}'`;
+    }
+    const prefix = `Dimension override '${name}' of '${joinPath}'`;
+    // A dimension the view declares itself is not a reference to override;
+    // one built on an included dimension follows that dimension's override
+    if (!viewDimension.included) {
+      return `${prefix}: '${view.name}.${name}' is declared by the view, only included dimensions can be overridden`;
+    }
+
+    const dimension = this.resolveOverrideTarget(target, joinPath);
+    if (typeof dimension === 'string') {
+      return `${prefix}: ${dimension}`;
+    }
+
+    if (dimension.type !== viewDimension.type) {
+      return `${prefix}: '${target}' is of type '${dimension.type}' but '${view.name}.${name}' is of type '${viewDimension.type}'`;
+    }
+
+    const missingGranularities = Object.keys(viewDimension.granularities || {})
+      .filter(granularity => !(dimension.granularities || {})[granularity]);
+    if (missingGranularities.length) {
+      return `${prefix}: '${target}' has no granularities ${missingGranularities.join(', ')} of '${view.name}.${name}'`;
+    }
+
+    return undefined;
   }
 
   // The dimension a path from the include's join path, through joins by alias

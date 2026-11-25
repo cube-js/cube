@@ -20,6 +20,7 @@ import {
   QueryPlan,
   QueryPlanner,
   TransformedQuery,
+  UserError,
   ViewIncludedMember,
 } from '@cubejs-backend/schema-compiler';
 import { GraphQLSchema } from 'graphql';
@@ -606,6 +607,32 @@ export class CompilerApi {
     return result;
   }
 
+  // A row filter constrains one cube instance in every leg of the query, while
+  // the legs of an overriding measure read the overridden dimension elsewhere.
+  protected rejectOverriddenDimensionsUnderPolicies(queryMemberNames: Set<string>, cubeEvaluator: any) {
+    const underPolicy = (cubeName: string | undefined) => !!cubeName &&
+      cubeEvaluator.isRbacEnabledForCube(cubeEvaluator.cubeFromPath(cubeName));
+    for (const memberName of queryMemberNames) {
+      const [viewName, name, ...rest] = memberName.split('.');
+      const view = rest.length ? undefined : cubeEvaluator.cubeFromPath(viewName);
+      const overrides: Record<string, string> = (view?.isView && view.measures?.[name]?.dimensionOverrides) || {};
+      const usedOverride = Object.entries(overrides).find(([dimension, target]) => {
+        if (!queryMemberNames.has(`${viewName}.${dimension}`)) {
+          return false;
+        }
+        const included = (view.includedMembers || [])
+          .find((m: ViewIncludedMember) => m.type === 'dimensions' && m.name === dimension);
+        return underPolicy(included?.memberPath.split('.')[0]) ||
+          underPolicy(cubeEvaluator.resolveMemberPath(target)?.targetCube);
+      });
+      if (usedOverride) {
+        throw new UserError(
+          `Measure '${memberName}' overrides '${viewName}.${usedOverride[0]}', whose cube has access policies, which dimension overrides don't support yet`
+        );
+      }
+    }
+  }
+
   /**
    * This method rewrites the query according to RBAC row level security policies.
    *
@@ -631,6 +658,7 @@ export class CompilerApi {
     const memberNames = await this.getQueryMemberNames(evaluatedQuery, context?.requestId);
     const queryMemberNames = new Set(memberNames);
     const queryCubes = new Set(memberNames.map(memberName => memberName.split('.')[0]));
+    this.rejectOverriddenDimensionsUnderPolicies(queryMemberNames, cubeEvaluator);
 
     // A member reached through a join alias belongs to a cube instance: the
     // policies of the cube it instantiates apply to it, and they constrain that

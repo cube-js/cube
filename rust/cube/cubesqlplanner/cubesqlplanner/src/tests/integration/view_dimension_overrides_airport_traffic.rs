@@ -190,3 +190,25 @@ async fn test_own_columns_by_filter() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Another column of the fact next to the overridden one: each flight arrives
+// at its destination, 1 each.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_own_columns_next_to_another_fact_column() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - route_ends.arrivals_count
+        dimensions:
+          - route_ends.airport
+          - route_ends.flight_id
+        order:
+          - id: route_ends.flight_id
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
