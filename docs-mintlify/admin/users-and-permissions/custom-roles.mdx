@@ -118,7 +118,7 @@ Either grant **Full access** (a shortcut that enables every current and future d
 | Data model  | View data model                     | Read data model files and dev branches.                                                                                                                                   |
 | Data model  | Edit data model                     | Edit the data model on any branch, including the main/deploy branch. Allows committing and merging to main, force-syncing main, and starting dev mode against main.       |
 | Data model  | Edit data model on dev branches     | Edit the data model only on non-default branches. Blocks any write that targets the main/deploy branch (including merging to main).                                       |
-| Data model  | Access SQL Runner                   | Query data sources directly with SQL: source SQL in Explore, Source SQL tabs in workbooks, dashboard widgets based on them, the agent's SQL queries against data sources, and the legacy SQL Runner. Also shows the **Generated SQL** tab when [inspecting queries][ref-inspecting-queries] in workbooks and in chat. |
+| Data model  | Access SQL Runner                   | Query data sources directly with SQL: source SQL in Explore, Source SQL tabs in workbooks, dashboard widgets based on them, the agent's SQL queries against data sources, and the legacy SQL Runner. Also shows the **Generated SQL** tab when [inspecting queries][ref-inspecting-queries] in workbooks, in chat, and in [dashboard charts][ref-inspecting-chart-queries]. |
 | AI          | Access AI agents                    | Use the agent in Analytics Chat, workbooks, the IDE, and dashboards.                                                                                                      |
 | AI          | Create scheduled tasks              | Create [scheduled tasks][ref-scheduled-tasks] in the deployment, from the **Scheduled** page, by asking the agent, or with the Platform API. Editing, pausing, running, and deleting a task stay with its creator, an admin, or a role with **Manage all scheduled tasks**. |
 | AI          | View all scheduled tasks            | See every scheduled task and [report delivery][ref-report-deliveries] in the deployment, whoever created it, with its run history. |
@@ -287,6 +287,7 @@ Assignment is the exception — `PUT /api/v1/roles/{roleId}/users/{userId}` reso
 [ref-api-create-role]: /api-reference/roles/create-a-custom-role
 [ref-built-in-role-ids]: /admin/users-and-permissions/roles-and-permissions#built-in-role-ids
 [ref-inspecting-queries]: /docs/explore-analyze/workbooks/querying-data#inspecting-queries
+[ref-inspecting-chart-queries]: /docs/explore-analyze/dashboards/widgets/charts#inspecting-a-charts-query
 [ref-api-create-deployment]: /api-reference/deployment-creation/create-a-deployment-with-an-empty-starter-project-and-trigger-its-first-build
 
 ## Reference: action catalog
