@@ -45,4 +45,37 @@ describe('PinotDriver query options', () => {
     expect(driver.queryOptions('abc def')).toBe(baseOptions);
     expect(driver.queryOptions('a'.repeat(129))).toBe(baseOptions);
   });
+
+  describe('applicationName and workloadName', () => {
+    const config = {
+      host: 'localhost',
+      port: '8099',
+      dataSource: 'default',
+      nullHandling: false,
+      queryTimeout: 30,
+    };
+
+    it('sends applicationName and workloadName when configured', () => {
+      const tagged = new TestPinotDriver({ ...config, applicationName: 'cube', workloadName: 'bi' });
+
+      expect(tagged.queryOptions()).toBe(`${baseOptions};applicationName=cube;workloadName=bi`);
+      expect(tagged.queryOptions(uuid)).toBe(
+        `${baseOptions};applicationName=cube;workloadName=bi;clientQueryId=${uuid}`
+      );
+    });
+
+    it('sends each option independently', () => {
+      expect(new TestPinotDriver({ ...config, applicationName: 'cube' }).queryOptions())
+        .toBe(`${baseOptions};applicationName=cube`);
+      expect(new TestPinotDriver({ ...config, workloadName: 'bi' }).queryOptions())
+        .toBe(`${baseOptions};workloadName=bi`);
+    });
+
+    it('rejects values that would break the options string', () => {
+      expect(() => new TestPinotDriver({ ...config, applicationName: 'cube;timeoutMs=1' })).toThrow(/applicationName/);
+      expect(() => new TestPinotDriver({ ...config, applicationName: 'a=b' })).toThrow(/applicationName/);
+      expect(() => new TestPinotDriver({ ...config, workloadName: 'bi;trace=true' })).toThrow(/workloadName/);
+      expect(() => new TestPinotDriver({ ...config, workloadName: ' ' })).toThrow(/workloadName/);
+    });
+  });
 });

@@ -5,7 +5,10 @@ description: Broker-level connection details and required Pinot SQL features for
 
 [Apache Pinot][link-pinot] is a real-time distributed OLAP datastore purpose-built
 for low-latency, high-throughput analytics, and perfect for user-facing analytical
-workloads. [StarTree][link-startree] is a fully-managed platform for Pinot.
+workloads. [StarTree][link-pinot-app-quota]: https://docs.pinot.apache.org/build-with-pinot/querying-and-sql/query-execution-controls/query-quotas
+[link-pinot-workload]: https://docs.pinot.apache.org/operate-pinot/tuning/workload-query-isolation
+[ref-config-driver-factory]: /reference/configuration/config#driver_factory
+[link-startree] is a fully-managed platform for Pinot.
 
 ## Prerequisites
 
@@ -59,6 +62,52 @@ Queries Cube runs on behalf of an API request are sent with that request's ID
 as the [`clientQueryId`][link-pinot-query-options] query option, so they can be
 matched to the request in Pinot.
 
+## Application and workload names
+
+The driver can also send the `applicationName` and `workloadName`
+[query options][link-pinot-query-options]. Neither is sent by default; set them
+as driver options with [`driver_factory`][ref-config-driver-factory]:
+
+<CodeGroup>
+
+```python title="Python"
+from cube import config
+
+@config('driver_factory')
+def driver_factory(ctx: dict) -> dict:
+  return {
+    'type': 'pinot',
+    'applicationName': 'cube',
+    'workloadName': 'bi'
+  }
+```
+
+```javascript title="JavaScript"
+module.exports = {
+  driverFactory: () => ({
+    type: 'pinot',
+    applicationName: 'cube',
+    workloadName: 'bi'
+  })
+};
+```
+
+</CodeGroup>
+
+- `applicationName` makes Cube queries count against the
+  [QPS quota][link-pinot-app-quota] of that application.
+- `workloadName` charges Cube queries to the CPU and memory budget of that
+  workload when [query workload isolation][link-pinot-workload] is enabled.
+
+<Warning>
+
+Queries without `applicationName` are exempt from application quotas. Once it
+is set, they are limited by the quota of that application, or by the default
+application quota of the cluster if the application has none, and Pinot rejects
+the queries that exceed it.
+
+</Warning>
+
 ## Pre-Aggregation Feature Support
 
 ### count_distinct_approx
@@ -111,4 +160,7 @@ Cube does not require any additional configuration to enable SSL as Pinot connec
   https://docs.pinot.apache.org/users/user-guide-query/query-syntax/how-to-handle-unique-counting
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
 [link-pinot-query-options]: https://docs.pinot.apache.org/users/user-guide-query/query-options
+[link-pinot-app-quota]: https://docs.pinot.apache.org/build-with-pinot/querying-and-sql/query-execution-controls/query-quotas
+[link-pinot-workload]: https://docs.pinot.apache.org/operate-pinot/tuning/workload-query-isolation
+[ref-config-driver-factory]: /reference/configuration/config#driver_factory
 [link-startree]: https://startree.ai
