@@ -193,6 +193,7 @@
     ]
   },
   "skip": [
+    "SQL API: BTRIM filters with default and explicit spaces",
     "---------------------------------------",
     "SKIPPED FOR PINOT (query-only driver: no SQL DDL, no streaming download).",
     "Seeding + teardown are handled by controller ingestion in runEnvironment.",
@@ -298,6 +299,7 @@
     "filtering ECommerce: equals a whole number with leading zeros"
   ],
   "tesseractSkip": [
+    "SQL API: BTRIM filters with default and explicit spaces",
     "---------------------------------------",
     "SKIPPED FOR ALL                        ",
     "---------------------------------------",

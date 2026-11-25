@@ -142,6 +142,7 @@
     ]
   },
   "skip": [
+    "SQL API: BTRIM filters with default and explicit spaces",
     "---------------------------------------",
     "Core tests                             ",
     "---------------------------------------",
@@ -227,6 +228,7 @@
     "filtering ECommerce: equals a whole number with leading zeros"
   ],
   "tesseractSkip": [
+    "SQL API: BTRIM filters with default and explicit spaces",
     "for the ECommerce.TimeAnalysisExternal",
     "for the ECommerce.TimeAnalysisInternal",
 
