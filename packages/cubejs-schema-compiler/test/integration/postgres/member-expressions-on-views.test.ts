@@ -277,6 +277,21 @@ describe('Member expressions on views', () => {
       ]
     });
 
+    view('direct_cube_and_path_view', {
+      cubes: [
+        {
+          join_path: 'single_cube',
+          includes: ['dim'],
+          prefix: true,
+        },
+        {
+          join_path: 'many_to_one_root.many_to_one_child',
+          includes: ['dim'],
+          prefix: true,
+        },
+      ]
+    });
+
     `;
 
   let compilers: Compilers;
@@ -702,8 +717,11 @@ describe('Member expressions on views', () => {
       [{ count_star: count }]
     ));
 
-    it('is rejected on a view with two unrelated direct cubes', async () => {
-      expect(() => compilers.createQuery(PostgresQuery, { measures: [countStar('two_direct_cubes_view')] }).buildSqlAndParams())
+    it.each([
+      'two_direct_cubes_view',
+      'direct_cube_and_path_view',
+    ])('is rejected on %s, which has two roots', async (cubeName) => {
+      expect(() => compilers.createQuery(PostgresQuery, { measures: [countStar(cubeName)] }).buildSqlAndParams())
         .toThrow(/Can't resolve the cube to query/);
     });
 

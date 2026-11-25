@@ -544,36 +544,38 @@ async fn test_expr_measure_count_star_only_member_on_view() {
     }
 }
 
-// Two cubes included directly and no join path between them: which one gets
-// counted would come down to the order the view lists them, so the query is
-// rejected instead.
+// Two roots of a view, whether both cubes are included directly or one heads a
+// join path: which one gets counted would come down to the order the view
+// lists them, so the query is rejected instead.
 #[test]
-fn test_expr_measure_count_star_only_member_on_view_with_two_direct_cubes() {
+fn test_expr_measure_count_star_only_member_on_view_with_two_roots() {
     let schema = MockSchema::from_yaml_file("common/integration_views.yaml");
     let ctx = TestContext::new(schema).unwrap();
 
-    let total_count = make_measure_expression("total_count", "two_direct_cubes_view", "COUNT(*)");
+    for view in ["two_direct_cubes_view", "direct_cube_and_path_view"] {
+        let total_count = make_measure_expression("total_count", view, "COUNT(*)");
 
-    let options = Rc::new(
-        MockBaseQueryOptions::builder()
-            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
-            .base_tools(ctx.query_tools().base_tools().clone())
-            .join_graph(ctx.query_tools().join_graph().clone())
-            .security_context(ctx.security_context().clone())
-            .measures(Some(vec![total_count]))
-            .build(),
-    );
+        let options = Rc::new(
+            MockBaseQueryOptions::builder()
+                .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+                .base_tools(ctx.query_tools().base_tools().clone())
+                .join_graph(ctx.query_tools().join_graph().clone())
+                .security_context(ctx.security_context().clone())
+                .measures(Some(vec![total_count]))
+                .build(),
+        );
 
-    let err = ctx
-        .build_sql_from_options(options)
-        .expect_err("a view with two unrelated direct cubes has no single root");
-    assert!(
-        err.message.contains("don't share a single root")
-            && err.message.contains("orders")
-            && err.message.contains("returns"),
-        "expected a no-single-root error naming both cubes, got: {}",
-        err.message
-    );
+        let err = ctx
+            .build_sql_from_options(options)
+            .expect_err("a view with two roots has no single root");
+        assert!(
+            err.message.contains("don't share a single root")
+                && err.message.contains("orders")
+                && err.message.contains("returns"),
+            "{view}: expected a no-single-root error naming both roots, got: {}",
+            err.message
+        );
+    }
 }
 
 // Multiplied dim-only ME: a measure expression evaluating to a

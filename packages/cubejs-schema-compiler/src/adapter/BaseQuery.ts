@@ -3071,11 +3071,10 @@ export class BaseQuery {
       return cubeName;
     }
     const joinMap = cube.joinMap ?? [];
-    // A path head reached from another path is the tail of a longer walk, not a root
+    // A path head or direct cube reached from another path is part of a longer walk, not a root
     const reached = new Set(joinMap.flatMap(path => path.slice(1)));
-    const roots: string[] = R.uniq(joinMap.length ?
-      joinMap.map(path => path[0]).filter(head => !reached.has(head)) :
-      cube.directCubes ?? []);
+    const roots: string[] = R.uniq([...joinMap.map(path => path[0]), ...(cube.directCubes ?? [])])
+      .filter(head => !reached.has(head));
     if (roots.length !== 1) {
       throw new UserError(
         `Can't resolve the cube to query for a member expression of '${cubeName}' that references no members: ` +

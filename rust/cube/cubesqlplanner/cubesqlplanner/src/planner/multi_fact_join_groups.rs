@@ -655,8 +655,9 @@ impl MultiFactJoinGroups {
     /// When there is nothing to borrow from either, the view's own join map is
     /// the last resort: its paths start at the cube the view is rooted at, so
     /// that cube is the one to query. This is what makes a query built only from
-    /// such member expressions, like `COUNT(*)` over a view, resolvable. A view
-    /// with no multi-hop join path is rooted at the cubes it includes directly.
+    /// such member expressions, like `COUNT(*)` over a view, resolvable. The cubes
+    /// a view includes directly are root candidates too, as join map paths leave
+    /// them out.
     ///
     /// Note that borrowing makes the meaning of such a measure depend on the rest
     /// of the query: `COUNT(*)` over a view with two facts counts the rows of the
@@ -711,26 +712,23 @@ impl MultiFactJoinGroups {
                 )
             })
             .unwrap_or_default();
-        let roots = if join_map.is_empty() {
-            if direct_cubes.is_empty() {
-                return Ok(JoinHints::new());
-            }
-            direct_cubes.iter().unique().collect_vec()
-        } else {
-            // A cube that heads one path but is reached from another one is not a
-            // root of the view - the path it heads is just the tail of a longer walk.
-            // Only the heads that nothing else reaches are candidates.
-            let reached = join_map
-                .iter()
-                .flat_map(|path| path.iter().skip(1))
-                .collect::<HashSet<_>>();
-            join_map
-                .iter()
-                .filter_map(|path| path.first())
-                .filter(|head| !reached.contains(*head))
-                .unique()
-                .collect_vec()
-        };
+        if join_map.is_empty() && direct_cubes.is_empty() {
+            return Ok(JoinHints::new());
+        }
+        // A cube that heads one path, or is included directly, but is reached from
+        // another path is not a root of the view - it is just part of a longer walk.
+        // Only the candidates that nothing else reaches are roots.
+        let reached = join_map
+            .iter()
+            .flat_map(|path| path.iter().skip(1))
+            .collect::<HashSet<_>>();
+        let roots = join_map
+            .iter()
+            .filter_map(|path| path.first())
+            .chain(direct_cubes.iter())
+            .filter(|head| !reached.contains(*head))
+            .unique()
+            .collect_vec();
 
         let no_single_root = |detail: String| {
             CubeError::user(format!(
