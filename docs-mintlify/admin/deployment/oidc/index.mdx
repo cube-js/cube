@@ -123,9 +123,10 @@ Tenant-scoped tokens, which AI agents request for
 `cube:component:{component}:deployment_id:{deployment_id}`. Their `sub` claim
 is then `cube:component:ai_engineer:deployment_id:global`, which doesn't
 match trust policies or IAM bindings written for `cube:deployment:...`
-subjects. To make the AI agents' `sub` claim
-`cube:deployment:global:component:ai_engineer`, set the format to
-`cube:deployment:{deployment_id}:component:{component}`.
+subjects. Either match that `sub` in the trust policy, as the
+[Bedrock trust policy][ref-oidc-aws-bedrock] does, or set the format to
+`cube:deployment:{deployment_id}:component:{component}` to make it
+`cube:deployment:global:component:ai_engineer`.
 
 To scope further — by component (Cube API vs. Cube Store vs. the AI Engineer)
 or by Cube Cloud region — override the template with one of the **Common
@@ -491,6 +492,7 @@ Together these give you an end-to-end record of which deployment accessed
 which resource and when, without ever issuing a long-lived credential.
 
 [ref-oidc-aws]: /admin/deployment/oidc/aws
+[ref-oidc-aws-bedrock]: /admin/deployment/oidc/aws#bedrock-for-bring-your-own-llm
 [ref-oidc-gcp]: /admin/deployment/oidc/gcp
 [ref-oidc-azure]: /admin/deployment/oidc/azure
 [ref-oidc-snowflake]: /admin/connect-to-data/data-sources/snowflake#oidc-workload-identity
