@@ -609,20 +609,22 @@ export class CompilerApi {
 
   // A row filter constrains one cube instance in every leg of the query, while
   // the legs of an overriding measure read the overridden dimension elsewhere.
+  // The measure's own cube is the same rows in every leg, so its filters hold.
   protected rejectOverriddenDimensionsUnderPolicies(queryMemberNames: Set<string>, cubeEvaluator: any) {
-    const underPolicy = (cubeName: string | undefined) => !!cubeName &&
-      cubeEvaluator.isRbacEnabledForCube(cubeEvaluator.cubeFromPath(cubeName));
     for (const memberName of queryMemberNames) {
       const [viewName, name, ...rest] = memberName.split('.');
       const view = rest.length ? undefined : cubeEvaluator.cubeFromPath(viewName);
       const overrides: Record<string, string> = (view?.isView && view.measures?.[name]?.dimensionOverrides) || {};
+      const includedCube = (type: string, viewMember: string) => (view?.includedMembers || [])
+        .find((m: ViewIncludedMember) => m.type === type && m.name === viewMember)?.memberPath.split('.')[0];
+      const ownCube = includedCube('measures', name);
+      const underPolicy = (cubeName: string | undefined) => !!cubeName && cubeName !== ownCube &&
+        cubeEvaluator.isRbacEnabledForCube(cubeEvaluator.cubeFromPath(cubeName));
       const usedOverride = Object.entries(overrides).find(([dimension, target]) => {
         if (!queryMemberNames.has(`${viewName}.${dimension}`)) {
           return false;
         }
-        const included = (view.includedMembers || [])
-          .find((m: ViewIncludedMember) => m.type === 'dimensions' && m.name === dimension);
-        return underPolicy(included?.memberPath.split('.')[0]) ||
+        return underPolicy(includedCube('dimensions', dimension)) ||
           underPolicy(cubeEvaluator.resolveMemberPath(target)?.targetCube);
       });
       if (usedOverride) {

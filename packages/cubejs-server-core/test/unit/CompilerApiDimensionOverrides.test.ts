@@ -2,6 +2,17 @@ import { SchemaFileRepository } from '@cubejs-backend/shared';
 import { CompilerApi } from '../../src/core/CompilerApi';
 import { DbTypeInternalFn } from '../../src/core/types';
 
+const airportsPolicy = `    access_policy:
+      - group: "*"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: "{CUBE}.country"
+              operator: equals
+              values: ["US"]
+`;
+
 const model = `
 cubes:
   - name: airports
@@ -14,16 +25,7 @@ cubes:
       - name: country
         sql: country
         type: string
-    access_policy:
-      - group: "*"
-        member_level:
-          includes: "*"
-        row_level:
-          filters:
-            - member: "{CUBE}.country"
-              operator: equals
-              values: ["US"]
-
+${airportsPolicy}
   - name: flights
     sql_table: flights
     joins:
@@ -80,11 +82,32 @@ views:
           airport: flights.destination
 `;
 
+// The fact's own policy instead of the airports' one.
+const modelWithFactPolicy = model
+  .replace(airportsPolicy, '')
+  .replace(`    measures:
+      - name: count
+        type: count
+`, `    measures:
+      - name: count
+        type: count
+    access_policy:
+      - group: "*"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: "{CUBE}.origin"
+              operator: equals
+              values: ["SFO"]
+`);
+
 describe('CompilerApi row level security with view dimension overrides', () => {
   let compilerApi: CompilerApi;
+  let content = model;
   const repository: SchemaFileRepository = {
     localPath: () => '/mock/path',
-    dataSchemaFiles: () => Promise.resolve([{ fileName: 'model.yml', content: model }]),
+    dataSchemaFiles: () => Promise.resolve([{ fileName: 'model.yml', content }]),
   };
   const dbType: DbTypeInternalFn = async () => 'postgres';
   const context: any = { securityContext: {}, requestId: 'test' };
@@ -96,7 +119,10 @@ describe('CompilerApi row level security with view dimension overrides', () => {
     });
   });
 
-  afterEach(() => compilerApi.dispose());
+  afterEach(() => {
+    compilerApi.dispose();
+    content = model;
+  });
 
   const applyRls = async (query: any) => {
     const normalized = { timezone: 'UTC', filters: [], ...query };
@@ -126,5 +152,15 @@ describe('CompilerApi row level security with view dimension overrides', () => {
       dimensions: ['route_ends.airport'],
     });
     expect(denied).toBe(false);
+  });
+
+  test('applies the fact\'s own policy to an override within the fact', async () => {
+    content = modelWithFactPolicy;
+    const { query, denied } = await applyRls({
+      measures: ['route_ends.arrivals_count'],
+      dimensions: ['route_ends.airport'],
+    });
+    expect(denied).toBe(false);
+    expect(JSON.stringify(query.filters)).toContain('"member":"flights.origin","operator":"equals","values":["SFO"]');
   });
 });
