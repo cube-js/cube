@@ -121,10 +121,30 @@ To delete many notifications at once, open the `⋯` menu in the header:
 
 Cube asks you to confirm both actions. You can't undo a delete.
 
-Cube also deletes a notification, read or unread, when a newer one replaces
-it. A **New Cube version** notification is deleted once a newer version is
-announced for its deployments, and an **End of support** notification once a
-later notice arrives for the same deployment and version.
+Cube also deletes notifications that are out of date, read or unread. A newer
+notification replaces an older one about the same thing, so a job that keeps
+failing leaves only one notification about its latest failure:
+
+- **New Cube version**: a newer version announced for the same deployments
+  replaces the earlier notification.
+- **End of support**: a later notice for the same deployment and version
+  replaces the earlier notification.
+- **Dashboard schedule failed**: a newer failure of the same refresh,
+  dashboard delivery, or alert replaces the earlier notification.
+- **Scheduled task run**: a newer failed run of the same task replaces the
+  earlier failure notification, and a finished run deletes it.
+- **Production build failed**: a newer failed build of the same deployment
+  replaces the earlier notification, and a successful production build
+  deletes it for everyone who got it.
+- **Model sync**: a newer failure of the same kind of sync on the deployment,
+  for example a dbt pull, replaces the earlier failure notification, and a
+  successful sync of that kind deletes it.
+- **Report delivery**: a newer failure of the same delivery replaces the
+  earlier failure notification, and the delivery starting to work again
+  deletes it for everyone who got it.
+
+Notifications about finished runs, successful syncs, and recovered deliveries
+stay.
 
 [ref-preferences-notifications]: /docs/preferences#notifications
 [ref-comments]: /docs/explore-analyze/dashboards/comments#mentions
