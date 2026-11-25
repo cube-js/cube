@@ -235,6 +235,7 @@ const EXCLUDE_OPERATIONS = new Set([
   'GET /api/v1/deployments/{deploymentId}/automation-runs/{runUuid}',
   'GET /api/v1/deployments/{deploymentId}/automation-runs/{runUuid}/files',
   'GET /api/v1/deployments/{deploymentId}/automation-runs/{runUuid}/files/{fileUuid}',
+  'GET /api/v1/deployments/{deploymentId}/automation-runs/{runUuid}/result',
   'GET /api/v1/deployments/{deploymentId}/automation-templates',
   'POST /api/v1/deployments/{deploymentId}/automation-templates/{templateId}/instructions',
   'GET /api/v1/deployments/{deploymentId}/automation-triggers',
