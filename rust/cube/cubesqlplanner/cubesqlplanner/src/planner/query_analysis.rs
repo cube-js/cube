@@ -287,9 +287,11 @@ impl QueryAnalysis {
         else {
             return Ok(false);
         };
+        // A measure without groups computes its leaves as stages, which need
+        // no join of their own.
         for measure in measures {
             let measure_groups = groups.for_measures(std::slice::from_ref(measure))?;
-            if !matches!(measure_groups.single_join(), Ok(Some(_))) {
+            if measure_groups.single_join().is_err() {
                 return Ok(false);
             }
         }

@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/pre_aggregations/view_dimension_overrides_unrelated_facts.rs
+expression: result
+---
+finance__income_share 
+----------------------
+1.00000000000000000000

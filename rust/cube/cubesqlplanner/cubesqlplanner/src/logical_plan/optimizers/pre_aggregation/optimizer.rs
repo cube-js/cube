@@ -237,10 +237,22 @@ impl PreAggregationOptimizer {
             .map(|item| (&item.table.cube_name, &item.table.name))
     }
 
-    fn is_dimension_overrides_leg(query: &Query) -> bool {
+    // A leg of view measures, planned on its own and merged with the other
+    // legs: under dimension overrides, or of a view's own measure. Under its
+    // own evaluation context its inputs would not be matched alike.
+    fn is_view_measures_leg(query: &Query) -> bool {
         let schema = query.schema();
+        let plain_context = query.evaluation_context().as_ref().map_or(true, |context| {
+            context.time_shifts.is_empty() && !context.measure_for_ungrouped
+        });
+        let view_measures = !schema.measures.is_empty()
+            && schema.measures.iter().all(|measure| {
+                measure
+                    .as_ref_symbol()
+                    .is_ok_and(|reference| !reference.is_terminal())
+            });
         let dimensions = schema.all_dimensions().cloned().collect::<Vec<_>>();
-        has_overrides_for(&schema.measures, &dimensions)
+        plain_context && (view_measures || has_overrides_for(&schema.measures, &dimensions))
     }
 
     fn try_rewrite_simple_query(
@@ -445,7 +457,7 @@ impl PreAggregationOptimizer {
                                 let new_member = member.with_body(SubqueryBody::Query(rewritten));
                                 NodeRewriteResult::rewritten(new_member.as_plan_node())
                             } else if leaf.from().as_merge().is_some()
-                                && Self::is_dimension_overrides_leg(leaf)
+                                && Self::is_view_measures_leg(leaf)
                             {
                                 // Not a leaf: it merges subqueries matched on their own.
                                 NodeRewriteResult::pass()
@@ -919,7 +931,11 @@ impl PreAggregationOptimizer {
 
         // The query's join groups answer both the multiplicativity gate
         // and the join-path comparison below, so build them once.
-        let query_groups = self.query_join_groups(schema, filters, &all_measures)?;
+        // Measures of no single join, a view's own measure over unrelated
+        // facts, say, are read from their legs, not from one rollup.
+        let Ok(query_groups) = self.query_join_groups(schema, filters, &all_measures)? else {
+            return Ok(None);
+        };
 
         // A measure sitting under a row-multiplying join can't be rolled
         // up from a partially matching pre-aggregation.
@@ -1216,7 +1232,7 @@ impl PreAggregationOptimizer {
         schema: &Rc<LogicalSchema>,
         filters: &Rc<LogicalFilter>,
         measures: &[Rc<MemberSymbol>],
-    ) -> Result<MultiFactJoinGroups, CubeError> {
+    ) -> Result<Result<MultiFactJoinGroups, CubeError>, CubeError> {
         // The query is planned with its filters: their members' join hints pick
         // the path to a cube, can multiply measures, or be the only link between cubes.
         let hints = MeasuresJoinHints::builder(&self.query_join_hints)
@@ -1226,7 +1242,7 @@ impl PreAggregationOptimizer {
             .add_filters(&filters.time_dimensions_filters)
             .add_filters(&filters.segments)
             .build(measures)?;
-        MultiFactJoinGroups::try_new(self.query_tools.clone(), hints)
+        MultiFactJoinGroups::try_new_if_joinable(self.query_tools.clone(), hints)
     }
 
     fn are_join_paths_matching(

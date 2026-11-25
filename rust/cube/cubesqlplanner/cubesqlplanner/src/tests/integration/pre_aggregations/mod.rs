@@ -16,4 +16,5 @@ mod rollup_join_usages;
 mod sql_generation;
 mod ungrouped_gate;
 mod view_dimension_overrides;
+mod view_dimension_overrides_unrelated_facts;
 mod views;
