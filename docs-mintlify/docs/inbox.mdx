@@ -53,7 +53,7 @@ New notifications appear as they arrive. You don't need to reload the page.
 | Budget | Usage crosses a [budget][ref-budgets] threshold | Users who get the budget's notifications and have a Cube account | No **Open** button |
 | Scheduled task run | A run of a [scheduled task][ref-scheduled-tasks] finishes or fails, if the task notifies by **Inbox** | The task's [recipients][ref-scheduled-task-notifications] who can view the task and read its deployment. For a failed run, only its creator, if they are a recipient | The run's chat thread. If the run failed before it started a thread, the task's page. |
 | New Cube version | A deployment runs an older version than the latest one on its [update channel][ref-update-channels] | Admins | The deployment's **Settings** page |
-| End of support | A deployment runs a Cube version that is about to reach end of support. You get one notification with each end-of-support email. | Admins | The deployment's **Settings** page |
+| End of support | A deployment runs a Cube version that is about to reach end of support. You get a notification with each end-of-support email, and each one replaces the earlier one for the same deployment and version. | Admins | The deployment's **Settings** page |
 | Production build failed | A build of a deployment's production branch fails | The user who started the build. If no user started it, for example a Git push, or that user is deactivated: admins | The build and its logs |
 | Dashboard review | Someone requests a [review][ref-reviews] of a dashboard or a new revision of it, comments on the review, approves, requests changes, or publishes the review | Everyone taking part in the review, except the person who acted: the requester, the reviewers, and anyone who commented. Only those who can still view the dashboard. | The review page. For a published review, the published dashboard. |
 | Dashboard schedule failed | A [refresh, dashboard delivery, or alert][ref-dashboard-deliveries] of a dashboard fails, or its notification doesn't reach some or all of its recipients or Slack channels | The schedule's owner, the user who created it | The dashboard |
@@ -120,6 +120,11 @@ To delete many notifications at once, open the `⋯` menu in the header:
 - **Delete all notifications** deletes every notification, read or unread.
 
 Cube asks you to confirm both actions. You can't undo a delete.
+
+Cube also deletes a notification, read or unread, when a newer one replaces
+it. A **New Cube version** notification is deleted once a newer version is
+announced for its deployments, and an **End of support** notification once a
+later notice arrives for the same deployment and version.
 
 [ref-preferences-notifications]: /docs/preferences#notifications
 [ref-comments]: /docs/explore-analyze/dashboards/comments#mentions
