@@ -229,9 +229,10 @@ export class QueryOrchestrator {
     // data source it would query the source itself
     if (this.rollupOnlyMode && preAggregationsTablesToTempTables.length === 0) {
       throw new Error(
-        'Streaming queries read no Cube Store pre-aggregations, and rollup only mode ' +
-        'doesn\'t allow querying the data source. Add a LIMIT at or below ' +
-        'CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT, or turn off CUBESQL_STREAM_MODE.'
+        'A streamed query can\'t read Cube Store pre-aggregations, and rollup only mode ' +
+        'doesn\'t allow querying the data source. To read a Cube Store pre-aggregation, ' +
+        'add a LIMIT at or below CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT to the outermost ' +
+        'query, outside any join.'
       );
     }
     query.values = values || query.values;

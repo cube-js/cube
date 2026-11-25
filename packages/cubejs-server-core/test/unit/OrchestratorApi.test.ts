@@ -1,5 +1,5 @@
 import type { BaseDriver } from '@cubejs-backend/base-driver';
-import { DriverType } from '@cubejs-backend/query-orchestrator';
+import { ContinueWaitError, DriverType } from '@cubejs-backend/query-orchestrator';
 
 import { OrchestratorApi } from '../../src/core/OrchestratorApi';
 
@@ -31,6 +31,33 @@ describe('OrchestratorApi', () => {
     // dataSource to 'default', so calls without one keep working.
     await api.getPreAggregationQueueStates();
     expect(getPreAggregationQueueStates).toHaveBeenLastCalledWith(undefined);
+  });
+
+  // A rejected stream reaches the API gateway as an orchestrator error (400), like a
+  // rejected `executeQuery`, instead of an internal one
+  test('streamQuery rethrows an orchestrator rejection as { error }', async () => {
+    const api = makeApi();
+    (api as any).orchestrator = {
+      streamQuery: jest.fn(async () => {
+        throw new Error('rollup only mode');
+      }),
+    };
+
+    await expect(api.streamQuery({ query: 'SELECT 1', values: [] } as any))
+      .rejects.toEqual({ error: 'Error: rollup only mode' });
+  });
+
+  test('streamQuery passes a continue wait through for the caller to retry', async () => {
+    const api = makeApi();
+    const continueWait = new ContinueWaitError();
+    (api as any).orchestrator = {
+      streamQuery: jest.fn(async () => {
+        throw continueWait;
+      }),
+    };
+
+    await expect(api.streamQuery({ query: 'SELECT 1', values: [] } as any))
+      .rejects.toBe(continueWait);
   });
 
   describe('testDriverConnection', () => {
