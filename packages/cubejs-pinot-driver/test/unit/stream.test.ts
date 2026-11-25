@@ -12,6 +12,11 @@ type BrokerOptions = {
   cursors?: boolean,
   exception?: { message: string, errorCode: number },
   failResultsWith?: { status: number, body: string },
+  failDeleteWith?: { status: number, body: string },
+  // Accepts the page request and never answers it.
+  hangResults?: boolean,
+  // Reported as the broker that ran the query.
+  owner?: { host: string, port: number },
 };
 
 const DATA_SCHEMA = { columnNames: ['id', 'name'], columnDataTypes: ['LONG', 'STRING'] };
@@ -50,6 +55,8 @@ class FakeBroker {
   }
 
   public async close(): Promise<void> {
+    this.server.closeAllConnections();
+
     await new Promise((resolve) => {
       this.server.close(resolve);
     });
@@ -66,6 +73,7 @@ class FakeBroker {
       numRowsResultSet: this.options.rows.length,
       offset,
       numRows: rows.length,
+      ...(this.options.owner ? { brokerHost: this.options.owner.host, brokerPort: this.options.owner.port } : {}),
     };
   }
 
@@ -102,6 +110,10 @@ class FakeBroker {
     }
 
     if (req.method === 'GET' && url.pathname === `/responseStore/${CURSOR_ID}/results`) {
+      if (this.options.hangResults) {
+        return undefined;
+      }
+
       if (this.options.failResultsWith) {
         return res.writeHead(this.options.failResultsWith.status).end(this.options.failResultsWith.body);
       }
@@ -110,6 +122,10 @@ class FakeBroker {
     }
 
     if (req.method === 'DELETE' && url.pathname === `/responseStore/${CURSOR_ID}`) {
+      if (this.options.failDeleteWith) {
+        return res.writeHead(this.options.failDeleteWith.status).end(this.options.failDeleteWith.body);
+      }
+
       return res.writeHead(200).end(`Query Results for ${CURSOR_ID} deleted.`);
     }
 
@@ -122,28 +138,35 @@ describe('PinotDriver stream', () => {
   const EXPECTED = ROWS.map(([id, name]) => ({ id, name }));
   const TYPES = [{ name: 'id', type: 'bigint' }, { name: 'name', type: 'text' }];
 
-  let broker: FakeBroker | undefined;
+  let brokers: FakeBroker[] = [];
 
-  const start = async (options: BrokerOptions) => {
-    broker = new FakeBroker(options);
+  const startBroker = async (options: BrokerOptions) => {
+    const broker = new FakeBroker(options);
+    brokers.push(broker);
+
+    return { port: await broker.listen(), requests: broker.requests };
+  };
+
+  const start = async (options: BrokerOptions, queryTimeout = 30) => {
+    const { port, requests } = await startBroker(options);
 
     const driver = new PinotDriver({
       host: '127.0.0.1',
-      port: await broker.listen(),
+      port,
       dataSource: 'default',
       basicAuth: { user: 'admin', password: 'mysecret' },
       nullHandling: false,
-      queryTimeout: 30,
+      queryTimeout,
     });
 
-    return { driver, requests: broker.requests };
+    return { driver, requests };
   };
 
   const calls = (requests: RecordedRequest[]) => requests.map(({ method, url }) => `${method} ${url}`);
 
   afterEach(async () => {
-    await broker?.close();
-    broker = undefined;
+    await Promise.all(brokers.map((broker) => broker.close()));
+    brokers = [];
   });
 
   it('pages through a cursor and deletes it on release', async () => {
@@ -265,5 +288,120 @@ describe('PinotDriver stream', () => {
     await expect(streamToArray(<any> source.rowStream)).rejects.toThrow(
       `Unable to fetch Pinot cursor ${CURSOR_ID} at offset 2\nQuery results for ${CURSOR_ID} not found.`
     );
+  });
+
+  it('deletes the cursor when the stream is destroyed without a release', async () => {
+    const { driver, requests } = await start({ rows: ROWS });
+
+    const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 2 });
+    const rowStream = <Readable> source.rowStream;
+
+    await new Promise((resolve) => {
+      rowStream.once('close', resolve);
+      rowStream.destroy();
+    });
+
+    expect(calls(requests)).toEqual([
+      'POST /query/sql?getCursor=true&numRows=2',
+      `DELETE /responseStore/${CURSOR_ID}`,
+    ]);
+  });
+
+  it('deletes the cursor once the stream has been read to the end', async () => {
+    const { driver, requests } = await start({ rows: ROWS });
+
+    const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 5 });
+    const rowStream = <Readable> source.rowStream;
+    const closed = new Promise((resolve) => {
+      rowStream.once('close', resolve);
+    });
+
+    expect(await streamToArray(<any> rowStream)).toEqual(EXPECTED);
+    await closed;
+
+    expect(calls(requests).at(-1)).toBe(`DELETE /responseStore/${CURSOR_ID}`);
+  });
+
+  it('follows the cursor to the broker that owns it', async () => {
+    const owner = await startBroker({ rows: ROWS });
+    const { driver, requests } = await start({
+      rows: ROWS,
+      owner: { host: '127.0.0.1', port: Number(owner.port) },
+      failResultsWith: { status: 404, body: `Query results for ${CURSOR_ID} not found.` },
+    });
+
+    const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 2 });
+
+    expect(await streamToArray(<any> source.rowStream)).toEqual(EXPECTED);
+    await source.release?.();
+
+    // The configured address is asked once, every later request goes to the owner.
+    expect(calls(requests)).toEqual([
+      'POST /query/sql?getCursor=true&numRows=2',
+      `GET /responseStore/${CURSOR_ID}/results?offset=2&numRows=2`,
+    ]);
+    expect(calls(owner.requests)).toEqual([
+      `GET /responseStore/${CURSOR_ID}/results?offset=2&numRows=2`,
+      `GET /responseStore/${CURSOR_ID}/results?offset=4&numRows=2`,
+      `DELETE /responseStore/${CURSOR_ID}`,
+    ]);
+  });
+
+  it('keeps the answer of the configured address when the owning broker is unreachable', async () => {
+    const unreachable = await startBroker({ rows: ROWS });
+    await brokers.pop()?.close();
+
+    const { driver } = await start({
+      rows: ROWS,
+      owner: { host: '127.0.0.1', port: Number(unreachable.port) },
+      failResultsWith: { status: 404, body: `Query results for ${CURSOR_ID} not found.` },
+    });
+
+    const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 2 });
+
+    await expect(streamToArray(<any> source.rowStream)).rejects.toThrow(
+      `Unable to fetch Pinot cursor ${CURSOR_ID} at offset 2\nQuery results for ${CURSOR_ID} not found.`
+    );
+  });
+
+  it('fails the stream when a page is not answered within the query timeout', async () => {
+    const { driver } = await start({ rows: ROWS, hangResults: true }, 0.2);
+
+    const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 2 });
+
+    await expect(streamToArray(<any> source.rowStream)).rejects.toThrow(/timeout/);
+  });
+
+  it('aborts a page request in flight when the stream is destroyed', async () => {
+    const { driver, requests } = await start({ rows: ROWS, hangResults: true });
+
+    const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 2 });
+    const rowStream = <Readable> source.rowStream;
+    rowStream.resume();
+
+    while (requests.length < 2) {
+      await new Promise((resolve) => { setTimeout(resolve, 5); });
+    }
+
+    await new Promise((resolve) => {
+      rowStream.once('close', resolve);
+      rowStream.destroy();
+    });
+
+    expect(calls(requests).at(-1)).toBe(`DELETE /responseStore/${CURSOR_ID}`);
+  });
+
+  it('reports a cursor that could not be deleted', async () => {
+    const { driver } = await start({ rows: ROWS, failDeleteWith: { status: 500, body: 'Response store is down' } });
+    const logger = jest.fn();
+    driver.setLogger(logger);
+
+    const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 2 });
+    await source.release?.();
+
+    expect(logger).toHaveBeenCalledWith('Pinot Cursor Delete Failed', {
+      cursorId: CURSOR_ID,
+      error: '500 Response store is down',
+    });
   });
 });

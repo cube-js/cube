@@ -86,6 +86,9 @@ type PinotResponse = {
   traceInfo: any,
   requestId?: string,
   numRowsResultSet?: number,
+  // The broker that ran the query. A cursor lives in the response store of that broker only.
+  brokerHost?: string,
+  brokerPort?: number,
   // Set only on responses served from a cursor.
   offset?: number,
   numRows?: number,
@@ -104,6 +107,21 @@ const isCursorResponse = (response: PinotResponse): response is PinotCursorRespo
   typeof response.numRowsResultSet === 'number' &&
   Boolean(response.requestId)
 );
+
+type PinotCursor = {
+  id: string,
+  // Starts as the configured address and moves to the owning broker once that address
+  // turns out to route to a broker without the cursor.
+  storeUrl: string,
+  brokerStoreUrl: string | null,
+};
+
+type SendOptions = {
+  method: string,
+  body?: string,
+  timeout?: number,
+  signal?: AbortSignal,
+};
 
 const PinotTypeToGenericType: Record<string, string> = {
   string: 'text',
@@ -255,9 +273,11 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     return new Error(error.error ? `${error.message}\n${error.error}` : error.message);
   }
 
-  protected async send(url: string, init: { method: string, body?: string }): Promise<Response> {
+  protected async send(url: string, { signal, ...init }: SendOptions): Promise<Response> {
     const request: Request = new Request(url, {
       ...init,
+      // node-fetch ships its own AbortSignal type, which the global one satisfies at runtime.
+      signal: <any> signal,
       headers: new Headers({
         'Content-Type': 'application/json',
         ...this.authorizationHeaders()
@@ -298,44 +318,138 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     });
 
     if (!response.ok) {
+      await this.discardBody(response);
+
       throw this.toError({ message: response.status === 401 ? 'Unauthorized request' : 'Unexpected error' });
     }
 
     return this.readResponse(response);
   }
 
-  protected async fetchCursorPage(cursorId: string, offset: number, numRows: number): Promise<PinotCursorResponse> {
-    const response = await this.send(
-      `${this.responseStoreUrl}/${encodeURIComponent(cursorId)}/results?offset=${offset}&numRows=${numRows}`,
-      { method: 'GET' }
+  /**
+   * node-fetch keeps the socket of an unread response busy until the body is collected.
+   */
+  protected async discardBody(response: Response): Promise<void> {
+    try {
+      await response.text();
+    } catch {
+      // Nothing to release when the body cannot be read.
+    }
+  }
+
+  protected responseStoreTimeout(): number {
+    return this.config.queryTimeout * 1000;
+  }
+
+  protected createCursor(response: PinotCursorResponse): PinotCursor {
+    let brokerStoreUrl: string | null = null;
+
+    if (response.brokerHost && response.brokerPort) {
+      const { protocol } = new URL(this.responseStoreUrl);
+      brokerStoreUrl = `${protocol}//${response.brokerHost}:${response.brokerPort}/responseStore`;
+    }
+
+    return {
+      id: response.requestId,
+      storeUrl: this.responseStoreUrl,
+      brokerStoreUrl: brokerStoreUrl === this.responseStoreUrl ? null : brokerStoreUrl,
+    };
+  }
+
+  /**
+   * The configured address may balance over several brokers, while a cursor is known only
+   * to the broker that ran the query. When the address answers that it has no such cursor,
+   * the request is repeated against the owning broker, and the cursor stays there.
+   */
+  protected async sendToResponseStore(
+    cursor: PinotCursor,
+    path: string,
+    options: SendOptions,
+  ): Promise<Response> {
+    const response = await this.send(`${cursor.storeUrl}/${encodeURIComponent(cursor.id)}${path}`, options);
+    if (response.status !== 404 || cursor.brokerStoreUrl === null) {
+      return response;
+    }
+
+    const { brokerStoreUrl } = cursor;
+    // One attempt only: an expired cursor is missing on the owning broker too.
+    cursor.brokerStoreUrl = null;
+
+    let brokerResponse: Response;
+
+    try {
+      brokerResponse = await this.send(`${brokerStoreUrl}/${encodeURIComponent(cursor.id)}${path}`, options);
+    } catch {
+      // The broker may be unreachable from here; the answer of the configured address stands.
+      return response;
+    }
+
+    await this.discardBody(response);
+    cursor.storeUrl = brokerStoreUrl;
+
+    return brokerResponse;
+  }
+
+  protected async fetchCursorPage(
+    cursor: PinotCursor,
+    offset: number,
+    numRows: number,
+    signal?: AbortSignal,
+  ): Promise<PinotCursorResponse> {
+    const response = await this.sendToResponseStore(
+      cursor,
+      `/results?offset=${offset}&numRows=${numRows}`,
+      { method: 'GET', timeout: this.responseStoreTimeout(), signal }
     );
 
     if (!response.ok) {
       if (response.status === 401) {
+        await this.discardBody(response);
+
         throw this.toError({ message: 'Unauthorized request' });
       }
 
       // The response store answers errors in plain text, e.g. for a cursor that has
       // expired or that belongs to another broker behind the same address.
       throw this.toError({
-        message: `Unable to fetch Pinot cursor ${cursorId} at offset ${offset}`,
+        message: `Unable to fetch Pinot cursor ${cursor.id} at offset ${offset}`,
         error: (await response.text()).trim(),
       });
     }
 
     const page = await this.readResponse(response);
     if (!isCursorResponse(page) || page.numRows === 0) {
-      throw this.toError({ message: `Unexpected Pinot cursor ${cursorId} response at offset ${offset}` });
+      throw this.toError({ message: `Unexpected Pinot cursor ${cursor.id} response at offset ${offset}` });
     }
 
     return page;
   }
 
-  protected async deleteCursor(cursorId: string): Promise<void> {
+  /**
+   * Never rejects: the broker drops the cursor on its own once it expires, so a failed
+   * delete is reported and otherwise left alone.
+   */
+  protected async deleteCursor(cursor: PinotCursor): Promise<void> {
+    let failure: string | null = null;
+
     try {
-      await this.send(`${this.responseStoreUrl}/${encodeURIComponent(cursorId)}`, { method: 'DELETE' });
-    } catch {
-      // The broker drops the cursor on its own once it expires.
+      const response = await this.sendToResponseStore(
+        cursor,
+        '',
+        { method: 'DELETE', timeout: this.responseStoreTimeout() }
+      );
+
+      if (response.ok) {
+        await this.discardBody(response);
+      } else {
+        failure = `${response.status} ${(await response.text()).trim()}`.trim();
+      }
+    } catch (error: any) {
+      failure = error.message;
+    }
+
+    if (failure !== null && this.logger) {
+      this.logger('Pinot Cursor Delete Failed', { cursorId: cursor.id, error: failure });
     }
   }
 
@@ -372,16 +486,18 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     if (isCursorResponse(first) && !first.resultTable) {
       // An empty cursor result carries no schema, while a pre-aggregation build needs the
       // column types even for an empty table. A plain response always has them.
-      await this.deleteCursor(first.requestId);
+      await this.deleteCursor(this.createCursor(first));
       first = await this.request(sql, requestId);
     }
 
     // The closures below outlive the first page, so they hold the cursor fields they need
     // rather than the response, which would keep its rows in memory for the whole stream.
-    const cursorId = isCursorResponse(first) ? first.requestId : null;
+    const cursor = isCursorResponse(first) ? this.createCursor(first) : null;
     const totalRows = isCursorResponse(first) ? first.numRowsResultSet : 0;
     let nextOffset = isCursorResponse(first) ? first.offset + first.numRows : 0;
     let pendingRows: PinotRow[] | null = this.resultTableRows(first.resultTable);
+
+    const abortController = new AbortController();
 
     const nextPage = async () => {
       if (pendingRows) {
@@ -391,27 +507,34 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
         return rows;
       }
 
-      if (cursorId === null || nextOffset >= totalRows) {
+      if (cursor === null || nextOffset >= totalRows) {
         return null;
       }
 
-      const page = await this.fetchCursorPage(cursorId, nextOffset, pageSize);
+      const page = await this.fetchCursorPage(cursor, nextOffset, pageSize, abortController.signal);
       nextOffset = page.offset + page.numRows;
 
       return this.resultTableRows(page.resultTable);
     };
 
-    let released = false;
+    let released: Promise<void> | null = null;
+
+    const release = (): Promise<void> => {
+      if (released === null) {
+        // A page still in flight would otherwise race the delete and hold its socket.
+        abortController.abort();
+        released = cursor === null ? Promise.resolve() : this.deleteCursor(cursor);
+      }
+
+      return released;
+    };
 
     return {
-      rowStream: new PinotRowStream(nextPage, pageSize),
+      // The stream releases the cursor itself when it closes, so a consumer that never
+      // calls `release` does not leave the result in the broker's response store.
+      rowStream: new PinotRowStream(nextPage, pageSize, release),
       types: this.resultTableTypes(first.resultTable),
-      release: async () => {
-        if (cursorId !== null && !released) {
-          released = true;
-          await this.deleteCursor(cursorId);
-        }
-      },
+      release,
     };
   }
 

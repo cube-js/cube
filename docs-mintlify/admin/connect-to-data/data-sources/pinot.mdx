@@ -148,8 +148,10 @@ A Pinot version without cursors returns the whole result in a single response.
 <Note>
 
 A cursor is stored on the broker that ran the query. If several brokers share
-one address, the load balancer in front of them has to route follow-up requests
-to the same broker.
+one address and a follow-up request lands on another broker, Cube repeats it
+against the host and port that the owning broker reports. When the brokers are
+not reachable from Cube directly, the load balancer in front of them has to
+route follow-up requests to the same broker.
 
 </Note>
 
