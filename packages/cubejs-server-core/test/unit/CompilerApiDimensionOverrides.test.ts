@@ -129,12 +129,12 @@ describe('CompilerApi row level security with view dimension overrides', () => {
     return compilerApi.applyRowLevelSecurity(normalized, normalized, context);
   };
 
-  test('rejects an override of a dimension whose cube has access policies', async () => {
+  test('rejects an override of a dimension whose cube restricts the user\'s rows', async () => {
     await expect(applyRls({
       measures: ['airport_traffic.arrivals_count'],
       dimensions: ['airport_traffic.code'],
     })).rejects.toThrow(
-      "Measure 'airport_traffic.arrivals_count' overrides 'airport_traffic.code', whose cube has access policies, which dimension overrides don't support yet"
+      "Measure 'airport_traffic.arrivals_count' overrides 'airport_traffic.code', whose cube restricts rows by access policies, which dimension overrides don't support yet"
     );
   });
 
@@ -162,5 +162,25 @@ describe('CompilerApi row level security with view dimension overrides', () => {
     });
     expect(denied).toBe(false);
     expect(JSON.stringify(query.filters)).toContain('"member":"flights.origin","operator":"equals","values":["SFO"]');
+  });
+
+  test.each([
+    ['grants members only', `    access_policy:
+      - group: "*"
+        member_level:
+          includes: "*"
+`],
+    ['allows all rows', `    access_policy:
+      - group: "*"
+        row_level:
+          allow_all: true
+`],
+  ])('allows an override of a dimension whose cube\'s policy %s', async (_name, policy) => {
+    content = model.replace(airportsPolicy, policy);
+    const { denied } = await applyRls({
+      measures: ['airport_traffic.arrivals_count'],
+      dimensions: ['airport_traffic.code'],
+    });
+    expect(denied).toBe(false);
   });
 });
