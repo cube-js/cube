@@ -47,7 +47,6 @@ views:
         includes: "*"
 `;
 
-// `filterSql` is written with YAML-style `{member}` references
 // `filterSql` uses YAML-style `{member}` references; they become `${member}` here
 const jsModel = (filterSql: string) => `
 cube('orders', {
@@ -73,12 +72,12 @@ describe('Measure filter references', () => {
 
   it('fails compile on an unresolved reference in a JS measure filter', async () => {
     const { compiler } = prepareJsCompiler(jsModel("{status} = 'completed'"));
-    await expect(compiler.compile()).rejects.toThrow(/status is not defined/);
+    await expect(compiler.compile()).rejects.toThrow(/orders\.completed_orders' filter 1: status is not defined/);
   });
 
   it('fails compile on an unresolved CUBE member in a measure filter', async () => {
     const { compiler } = prepareYamlCompiler(yamlModel("{CUBE.status} = 'completed'"));
-    await expect(compiler.compile()).rejects.toThrow(/status/);
+    await expect(compiler.compile()).rejects.toThrow(/orders\.completed_orders' filter 1: .*status/);
   });
 
   const allMeasures = ['orders.completed_orders', 'orders_ext.completed_orders', 'orders_view.completed_orders'];
