@@ -134,7 +134,7 @@ describe('CompilerApi row level security with view dimension overrides', () => {
       measures: ['airport_traffic.arrivals_count'],
       dimensions: ['airport_traffic.code'],
     })).rejects.toThrow(
-      "Measure 'airport_traffic.arrivals_count' overrides 'airport_traffic.code', whose cube restricts rows by access policies, which dimension overrides don't support yet"
+      "Measure 'airport_traffic.arrivals_count' overrides 'airport_traffic.code', whose cube restricts rows or masks members by access policies, which dimension overrides don't support yet"
     );
   });
 
@@ -182,5 +182,76 @@ describe('CompilerApi row level security with view dimension overrides', () => {
       dimensions: ['airport_traffic.code'],
     });
     expect(denied).toBe(false);
+  });
+
+  test('rejects an override within a fact whose policy masks members', async () => {
+    content = model.replace(airportsPolicy, '').replace(`    measures:
+      - name: count
+        type: count
+`, `    measures:
+      - name: count
+        type: count
+    access_policy:
+      - group: "*"
+        member_level:
+          includes: [count]
+        member_masking:
+          includes: "*"
+`);
+    await expect(applyRls({
+      measures: ['route_ends.arrivals_count'],
+      dimensions: ['route_ends.airport'],
+    })).rejects.toThrow(
+      "Measure 'route_ends.arrivals_count' overrides 'route_ends.airport', whose cube restricts rows or masks members by access policies"
+    );
+  });
+
+  test('rejects an override to another instance of the fact under a row filter', async () => {
+    content = `
+cubes:
+  - name: tickets
+    sql_table: tickets
+    joins:
+      - name: tickets
+        alias: parent
+        sql: "{CUBE}.parent_id = {parent.id}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: status
+        sql: status
+        type: string
+    measures:
+      - name: count
+        type: count
+    access_policy:
+      - group: "*"
+        row_level:
+          filters:
+            - member: "{CUBE}.status"
+              operator: equals
+              values: ["open"]
+
+views:
+  - name: ticket_tree
+    cubes:
+      - join_path: tickets
+        includes: [status]
+      - join_path: tickets
+        alias: children
+        prefix: true
+        includes: [count]
+        dimension_overrides:
+          status: tickets.parent.status
+`;
+    await expect(applyRls({
+      measures: ['ticket_tree.children_count'],
+      dimensions: ['ticket_tree.status'],
+    })).rejects.toThrow(
+      "Measure 'ticket_tree.children_count' overrides 'ticket_tree.status', whose cube restricts rows or masks members by access policies"
+    );
   });
 });

@@ -609,7 +609,8 @@ export class CompilerApi {
 
   // A row filter constrains one cube instance in every leg of the query, while
   // the legs of an overriding measure read the overridden dimension elsewhere.
-  // The measure's own cube is the same rows in every leg, so its filters hold.
+  // The measure's own rows are the same in every leg, so their filters hold;
+  // masks follow member names, which the override target doesn't carry.
   protected async rejectOverriddenDimensionsUnderPolicies(
     queryMemberNames: Set<string>,
     cubeEvaluator: any,
@@ -620,18 +621,31 @@ export class CompilerApi {
       const [viewName, name, ...rest] = memberName.split('.');
       const view = rest.length ? undefined : cubeEvaluator.cubeFromPath(viewName);
       const overrides: Record<string, string> = (view?.isView && view.measures?.[name]?.dimensionOverrides) || {};
-      const includedCube = (type: string, viewMember: string) => (view?.includedMembers || [])
-        .find((m: ViewIncludedMember) => m.type === type && m.name === viewMember)?.memberPath.split('.')[0];
-      const ownCube = includedCube('measures', name);
+      const included = (type: string, viewMember: string): ViewIncludedMember | undefined => (view?.includedMembers || [])
+        .find((m: ViewIncludedMember) => m.type === type && m.name === viewMember);
+      const ownCube = included('measures', name)?.memberPath.split('.')[0];
       const used = Object.entries(overrides)
         .filter(([dimension]) => queryMemberNames.has(`${viewName}.${dimension}`));
+
       for (const [dimension, target] of used) {
-        const cubes = [includedCube('dimensions', dimension), cubeEvaluator.resolveMemberPath(target)?.targetCube]
-          .filter((cubeName): cubeName is string => !!cubeName && cubeName !== ownCube);
-        for (const cubeName of cubes) {
-          if (await this.restrictsRowsFor(cubeEvaluator.cubeFromPath(cubeName), context, compilers)) {
+        const viewDimension = included('dimensions', dimension);
+        const resolvedTarget = cubeEvaluator.resolveMemberPath(target);
+        // A cube instance reached through an alias is other rows than the
+        // measure's own, even when it is the same cube
+        const instances = [
+          { cubeName: viewDimension?.memberPath.split('.')[0], aliased: !!viewDimension?.path },
+          { cubeName: resolvedTarget?.targetCube, aliased: !!resolvedTarget?.aliased },
+        ];
+
+        for (const { cubeName, aliased } of instances) {
+          if (cubeName && await this.policiesConflictWithOverride(
+            cubeEvaluator.cubeFromPath(cubeName),
+            !aliased && cubeName === ownCube,
+            context,
+            compilers,
+          )) {
             throw new UserError(
-              `Measure '${memberName}' overrides '${viewName}.${dimension}', whose cube restricts rows by access policies, which dimension overrides don't support yet`
+              `Measure '${memberName}' overrides '${viewName}.${dimension}', whose cube restricts rows or masks members by access policies, which dimension overrides don't support yet`
             );
           }
         }
@@ -641,14 +655,21 @@ export class CompilerApi {
 
   // No policy applying to the user leaves the cube unreadable, which the
   // override legs would not enforce either.
-  protected async restrictsRowsFor(cube: any, context: Context, compilers: Compilers): Promise<boolean> {
+  protected async policiesConflictWithOverride(
+    cube: any,
+    ownRows: boolean,
+    context: Context,
+    compilers: Compilers,
+  ): Promise<boolean> {
     if (!compilers.cubeEvaluator.isRbacEnabledForCube(cube)) {
       return false;
     }
     const policies = await this.getApplicablePolicies(cube, context, compilers);
-    return policies.length === 0 || policies.some((policy: any) => !!(
+    const filtersRows = (policy: any) => !!(
       policy.rowLevel && !policy.rowLevel.allowAll && policy.rowLevel.filters?.length > 0
-    ));
+    );
+    return policies.length === 0 ||
+      policies.some((policy: any) => !!policy.memberMasking || (!ownRows && filtersRows(policy)));
   }
 
   /**
