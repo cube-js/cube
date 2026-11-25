@@ -18,7 +18,7 @@ account, apply across all devices, and don't affect other users in the account.
 | New message scrolling | Automatically scroll to new messages in chat | On |
 | Alternating row colors | Highlight alternating rows in data tables | Off |
 | Default deployment | Open this deployment when you go to Cube without one in the URL | Account default |
-| Notifications | Choose whether comment, sharing, access-request and dashboard review notifications also arrive by email | On |
+| Notifications | Choose which notifications also arrive by email | On |
 
 ## Language
 
@@ -84,10 +84,9 @@ deployment. The control is hidden on accounts with only one reachable deployment
 
 ## Notifications
 
-These switches control email only. Mentions, replies, shares, access requests and
-dashboard reviews arrive in your [inbox][ref-inbox] whatever you choose here. In the
-**Notifications** section of the **Preferences** page, choose which of them also
-arrive by email:
+These switches control email only. The notifications they cover arrive in your
+[inbox][ref-inbox] whatever you choose here. In the **Notifications** section of
+the **Preferences** page, choose which of them also arrive by email:
 
 | Switch | You get an email when | Default |
 | --- | --- | --- |
@@ -96,6 +95,11 @@ arrive by email:
 | Shared with you | Someone [shares][ref-sharing] a workbook, a folder, or a chat with you, or approves your access request | On |
 | Access requests | Someone [requests access][ref-request-access] to an item you can share, or declines your request | On |
 | Dashboard reviews | Something happens on a [dashboard review][ref-reviews] you take part in: a request, a comment, an approval, a change request or a publish | On |
+| End of support | A deployment's Cube version is about to reach end of support. One email names every deployment that reaches it on the same date. | On |
+| AI tokens | An automatic [AI tokens][ref-ai-tokens] top-up fails | On |
+
+Only admins see **End of support** and **AI tokens**. If the account's billing
+contact isn't an admin, they still get the AI tokens email.
 
 A switch saves as soon as you change it. Turning a switch off stops the email
 only; the notification still arrives in your inbox.
@@ -110,9 +114,8 @@ The email is in the language you set under [Language](#language) and links to th
 comment, the item or the review. Cube doesn't email you about a comment, a shared
 item or a review you can no longer open. An email about a declined request doesn't name the item.
 
-Alerts, budgets, end-of-support notices, scheduled tasks and
-[report deliveries][ref-report-deliveries] send their own email, as set up on
-each of them, and have no switch here.
+Alerts, budgets, scheduled tasks and [report deliveries][ref-report-deliveries]
+send their own email, as set up on each of them, and have no switch here.
 
 [ref-inbox]: /docs/inbox
 [ref-mentions]: /docs/explore-analyze/dashboards/comments#mentions
@@ -121,3 +124,4 @@ each of them, and have no switch here.
 [ref-request-access]: /docs/organize-content/sharing#requesting-access
 [ref-report-deliveries]: /docs/explore-analyze/report-deliveries#notifications
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews#notifications
+[ref-ai-tokens]: /admin/account-billing/ai-tokens
