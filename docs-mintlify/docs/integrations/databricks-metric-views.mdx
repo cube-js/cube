@@ -643,7 +643,8 @@ run a new **Preview** after a Cube upgrade.
   and joins. Review the generated YAML, then test access and sync.
 - **Warning** — behavior-neutral metadata Databricks cannot represent, or a measure that can
   over-count withheld as `CUBE_MEMBER_WITHHELD`. Review the exact difference before accepting
-  publication; for a withheld measure, publish it from a view rooted at its own cube.
+  publication; for a withheld measure, apply the fix for its case under
+  [withheld measures](#withheld-measures).
 
 Preview **blocks** a view when it finds any of these conditions:
 
@@ -693,17 +694,28 @@ Preview **blocks** a view when it finds any of these conditions:
   must place such a dimension after every dimension that reads its name, and no order works for
   two that read each other. Rename one of them.
 
-A measure of the view's root cube publishes when every join the view projects is many-to-one or
+### Withheld measures
+
+A view's joins are the joins on its join path and any joins that member SQL or a hidden dependency
+pulls in. A one-to-many join on the join path blocks the view, as listed above. A one-to-many
+join that only member SQL or a hidden dependency pulls in doesn't block the view, but it can
+withhold some of its measures.
+
+A measure of the view's root cube publishes when all of the view's joins are many-to-one or
 one-to-one, even when it reads a joined cube, such as
 `SUM(CASE WHEN {products.family} = 'CX' THEN {CUBE}.events END)`: such joins can't repeat a row
-of the root cube, so each row counts once, as in Cube. A measure that can over-count is withheld:
-a measure such as `sum` or `avg` of a joined cube, a calculated measure that references another
-cube's measure, and a root-cube `sum` or `avg` that reads a joined cube in a view that projects a
-one-to-many join or has a root-source override. A one-to-many join on the view's join path blocks
-the view; one that only member SQL or a hidden dependency pulls in lets the view publish without
-these measures.
+of the root cube, so each row counts once, as in Cube.
 
-A withheld measure can be **left out while the rest of its view is published**. That view
+A measure that can over-count is withheld. It is a non-idempotent aggregate, such as `sum`, `avg`,
+or a `count` of an expression, in one of these cases:
+
+- A measure of a joined cube: publish it from a view rooted at its own cube.
+- A calculated measure that references another cube's measure: keep that view in Cube.
+- A root-cube measure that reads a joined cube, in a view where member SQL or a hidden dependency
+  pulls in a one-to-many join, or in a view with a root-source override: remove that one-to-many
+  dependency or the override, or keep that view in Cube.
+
+A view with a withheld measure is **still published without it**. That view
 may show **Created**, **Updated**, or **Unchanged**, and the run may show **Completed**, even
 though some measures are missing in Databricks. Check **Measures not published** in Preview and
 beside each view in run history before treating a run as complete. There is no opt-in gate for
