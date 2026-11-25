@@ -497,13 +497,16 @@ Cube's own post-processing. The **Generated SQL** tab shows where each part runs
   <img src="https://static.cube.dev/docs/explore-analyze/workbooks/generated-sql-where-each-part-runs.png" alt="Generated SQL tab with a default data source part tinted green, a Cube Store part tinted amber, and the legend under the SQL" />
 </Frame>
 
-- A legend under the SQL names each place: a data source by its name, with its
-  logo when you can query source data, or **Cube Store**. Hover over or focus an
-  item to see the pre-aggregations that serve it.
+- A legend under the SQL names each place: a data source by its name, or
+  **Cube Store**. Data sources show their logo to users with the **Access SQL
+  Runner** permission, which [Source SQL tabs][ref-source-sql-tabs] also need.
+  Hover over or focus an item to see the pre-aggregations that serve it.
 - When a query runs in more than one place, each part is tinted in the color of
   its place, and the parts Cube post-processes stay untinted. `default` is always
   green and Cube Store always amber. Other data sources take four more colors in
-  name order, so a data source keeps its color from query to query.
+  name order. Two data sources in one query get different colors unless it uses
+  more than four of them, so a data source can take another color when its own is
+  already taken in that query.
 - A query that runs entirely in one place is not tinted. The legend still names
   the place.
 - On Cube versions that don't report where a pushed-down SQL query runs, that
@@ -709,4 +712,5 @@ behaves as intended.
 [ref-auto-run]: /reference/data-modeling/view#auto_run
 [ref-configuration-auto-run]: /docs/data-modeling/configuration#auto-run
 [ref-cube-store]: /docs/pre-aggregations/running-in-production#architecture
+[ref-source-sql-tabs]: /docs/explore-analyze/workbooks/source-sql-tabs#adding-a-source-sql-tab
 
