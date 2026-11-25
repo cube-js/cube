@@ -23,7 +23,6 @@ outputs:
 runs:
   using: composite
   steps:
-    # Provenance goes before the slow SBOM scan, so a caller's step timeout cannot cost both.
     - name: Install crane
       id: crane
       continue-on-error: true
@@ -51,6 +50,7 @@ runs:
           echo "sbom=${RUNNER_TEMP}/sbom-${digest#sha256:}.spdx.json"
         } >> "$GITHUB_OUTPUT"
 
+    # Provenance goes before the slow SBOM scan, so a caller's step timeout cannot cost both.
     - name: Attest build provenance
       id: provenance
       if: steps.resolve.outputs.digest != ''
