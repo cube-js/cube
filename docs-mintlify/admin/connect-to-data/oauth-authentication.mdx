@@ -320,6 +320,34 @@ module.exports = {
    theirs, which the liveness probe keeps testing, until they are evicted
    from the orchestrator cache.
 
+4. **Failed queries point to Connected accounts** — When a query fails
+   with an error from the data source and any of the user's credentials
+   is `missing`, `expired` or in `error`, Cube appends a hint to the
+   error message. The hint names the OAuth app and links to
+   **Connected accounts**, so a user who gets a permission error from the
+   service account knows to connect or reconnect their account. SQL API
+   and MCP clients show the hint as part of the message. The REST API
+   error response also includes `userCredentials`, with an entry for each
+   such credential, so API clients can handle the case without parsing
+   the message:
+
+   ```json
+   {
+     "error": "<data source error>\n\nThis may be because you have not connected your databricks account to Cube. Connect it at https://example.cubecloud.dev/connected-accounts, then retry.",
+     "requestId": "...",
+     "userCredentials": [
+       {
+         "integration": "databricks",
+         "status": "missing",
+         "connectUrl": "https://example.cubecloud.dev/connected-accounts"
+       }
+     ]
+   }
+   ```
+
+   Errors that Cube raises itself, such as authentication or validation
+   errors, carry no hint, and status codes don't change.
+
 [ref-config]: /reference/configuration/config
 [ref-driver-factory]: /reference/configuration/config#driver_factory
 [ref-context-to-orchestrator-id]: /reference/configuration/config#context_to_orchestrator_id
