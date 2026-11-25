@@ -60,9 +60,11 @@ A `between` filter also reads a range typed in the search field. Each reading is
 
 A phrase with two common meanings gives two rows: "last 3 months" reads as **Past 3 months** and **Last 3 whole months**.
 
-When neither these rules nor the presets read the text, and AI features are available for your account, Cube asks the agent's [small LLM][ref-small-llm]. It reads phrases such as "Q3", "H1 2026", "since Black Friday" or "same 30 days last year", and gives at most two readings. They are rows like any other reading, with their dates, and Enter or a click applies one. While Cube is asking, the list reads "Reading “…”…". A named period, such as a quarter, a month or a holiday, is stored as specific dates, so "Q3" typed in 2026 stays Q3 2026 after the year turns. Without AI features, the search field reads only the phrases above, and no text is sent to a model.
+When neither these rules nor the presets read the text, and AI features are available for your account, Cube asks the Auto agent's [small LLM][ref-small-llm], or the [default agent][ref-default-agent]'s when Auto is turned off. It reads phrases such as "Q3", "H1 2026", "since Black Friday" or "same 30 days last year", and gives at most two readings. They are rows like any other reading, with their dates, and Enter or a click applies one. While Cube is asking, the list reads "Reading “…”…". A named period, such as a quarter, a month or a holiday, is stored as specific dates, so "Q3" typed in 2026 stays Q3 2026 after the year turns. Without AI features, the search field reads only the phrases above, and no text is sent to a model.
 
+<Frame>
 ![Date range popover with "Q3" typed in the search field and two readings, Jul 1 – Sep 30 and Jul 1 – Sep 30, 2025, above the Up to now box](https://static.cube.dev/docs/explore-analyze/dashboards/widgets/controls/date-range-filter-model-readings.png)
+</Frame>
 
 Text that nothing reads, the small LLM included, shows "Can't read … as dates." with examples to try; click one to type it.
 
@@ -817,6 +819,7 @@ The controls icon on a chart counts these filters along with the other controls,
 [ref-embed-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
 [ref-relative-date-values]: /reference/data-modeling/view#default_ui_filters
 [ref-small-llm]: /admin/ai/bring-your-own-model#small-llm
+[ref-default-agent]: /admin/ai/multi-agent#default-agent-and-auto
 [ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
 [ref-advanced-queries]: /docs/explore-analyze/workbooks/querying-data#advanced-semantic-queries
 [ref-print-version]: /docs/explore-analyze/dashboards#print-version
