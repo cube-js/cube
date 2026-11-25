@@ -126,10 +126,10 @@ The built-in Claude and GPT small LLM ids use hyphens, unlike the
 [`llm`](/admin/ai#llm) names: write `claude-haiku-5-5`, not
 `claude_5_5_haiku`. `kimi_k3` and `glm_5_3` are the same names as in `llm`.
 
-With `auto`, the default, an agent on a built-in LLM runs short tasks on
-`claude-haiku-5-5` if its LLM is a Claude model, `glm_5_3` or `kimi_k3`, and on
-`gpt-6-luna` otherwise. To run short tasks on GLM 5.3 or Kimi K3 too, set the
-small LLM to the same model:
+With `auto`, the default, an agent whose built-in LLM is a Claude model,
+`glm_5_3` or `kimi_k3` runs short tasks on `claude-haiku-5-5`. Any other built-in
+LLM runs them on `gpt-6-luna`. To run short tasks on GLM 5.3 or Kimi K3 instead,
+set the small LLM to the same model:
 
 ```yaml
 agents:
@@ -138,7 +138,7 @@ agents:
     small_llm: glm_5_3
 ```
 
-Embeddings are a separate setting: the agent still calls the
+The small LLM doesn't change embeddings: the agent calls the
 [embedding model](/admin/ai#embedding-models) set in `embedding_llm`.
 
 An agent on a BYOM LLM uses a small LLM from the same provider, region and
