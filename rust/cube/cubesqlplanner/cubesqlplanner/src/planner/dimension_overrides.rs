@@ -222,6 +222,10 @@ fn dimension_trees(roots: Vec<Rc<MemberSymbol>>) -> Vec<Rc<MemberSymbol>> {
         if !seen.insert(member.id().clone()) {
             continue;
         }
+        // Its dependencies see through the view dimension it is a granularity of.
+        if let Ok(time_dimension) = member.as_time_dimension() {
+            pending.push(time_dimension.base_symbol().clone());
+        }
         if !matches!(member.as_ref(), MemberSymbol::Ref(_)) {
             pending.extend(
                 member

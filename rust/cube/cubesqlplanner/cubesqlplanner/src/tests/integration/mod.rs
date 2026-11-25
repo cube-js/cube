@@ -36,5 +36,6 @@ mod view_default_filters;
 mod view_dimension_overrides;
 mod view_dimension_overrides_airport_traffic;
 mod view_dimension_overrides_shared_scan;
+mod view_dimension_overrides_unrelated_facts;
 mod view_members;
 mod views;

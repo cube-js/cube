@@ -327,3 +327,83 @@ views:
     { route_ends__airport: 'SFO', route_ends__departures_count: '3', route_ends__arrivals_count: '2' },
   ], compilers));
 });
+
+// Two facts with no join and no shared dimension cube, related by a view:
+// income and expenses, each by its own date and branch.
+(tesseract ? describe : describe.skip)('View dimension overrides of unrelated facts', () => {
+  jest.setTimeout(200000);
+
+  const compilers = prepareYamlCompiler(`
+cubes:
+  - name: income
+    sql: >
+      SELECT * FROM (VALUES
+        (1, 'North', '2026-01-05'::timestamp, 100),
+        (2, 'North', '2026-01-20'::timestamp, 50),
+        (3, 'South', '2026-01-10'::timestamp, 70),
+        (4, 'South', '2026-02-03'::timestamp, 30),
+        (5, 'North', '2026-02-14'::timestamp, 20)
+      ) AS t(id, branch, received_at, amount)
+    dimensions:
+      - {name: id, sql: id, type: number, primary_key: true}
+      - {name: branch, sql: branch, type: string}
+      - {name: received_at, sql: received_at, type: time}
+    measures:
+      - {name: amount, sql: amount, type: sum}
+
+  - name: expenses
+    sql: >
+      SELECT * FROM (VALUES
+        (1, 'North', '2026-01-07'::timestamp, 40),
+        (2, 'South', '2026-01-15'::timestamp, 25),
+        (3, 'South', '2026-02-20'::timestamp, 60),
+        (4, 'East', '2026-02-01'::timestamp, 10)
+      ) AS t(id, branch, spent_at, amount)
+    dimensions:
+      - {name: id, sql: id, type: number, primary_key: true}
+      - {name: branch, sql: branch, type: string}
+      - {name: spent_at, sql: spent_at, type: time}
+    measures:
+      - {name: amount, sql: amount, type: sum}
+
+views:
+  - name: finance
+    cubes:
+      - join_path: income
+        includes:
+          - {name: received_at, alias: date}
+          - branch
+          - {name: amount, alias: income}
+      - join_path: expenses
+        includes:
+          - {name: amount, alias: expenses}
+        dimension_overrides:
+          date: expenses.spent_at
+          branch: expenses.branch
+`);
+
+  it('blends income and expenses by month and branch', async () => dbRunner.runQueryTest({
+    measures: ['finance.income', 'finance.expenses'],
+    dimensions: ['finance.branch'],
+    timeDimensions: [{ dimension: 'finance.date', granularity: 'month', dateRange: ['2026-01-01', '2026-02-28'] }],
+    order: [{ id: 'finance.date' }, { id: 'finance.branch' }],
+    timezone: 'UTC',
+  }, [
+    { finance__branch: 'North', finance__date_month: '2026-01-01T00:00:00.000Z', finance__income: '150', finance__expenses: '40' },
+    { finance__branch: 'South', finance__date_month: '2026-01-01T00:00:00.000Z', finance__income: '70', finance__expenses: '25' },
+    { finance__branch: 'East', finance__date_month: '2026-02-01T00:00:00.000Z', finance__income: null, finance__expenses: '10' },
+    { finance__branch: 'North', finance__date_month: '2026-02-01T00:00:00.000Z', finance__income: '20', finance__expenses: null },
+    { finance__branch: 'South', finance__date_month: '2026-02-01T00:00:00.000Z', finance__income: '30', finance__expenses: '60' },
+  ], compilers));
+
+  it('blends income and expenses of one branch by month', async () => dbRunner.runQueryTest({
+    measures: ['finance.income', 'finance.expenses'],
+    timeDimensions: [{ dimension: 'finance.date', granularity: 'month' }],
+    filters: [{ member: 'finance.branch', operator: 'equals', values: ['South'] }],
+    order: [{ id: 'finance.date' }],
+    timezone: 'UTC',
+  }, [
+    { finance__date_month: '2026-01-01T00:00:00.000Z', finance__income: '70', finance__expenses: '25' },
+    { finance__date_month: '2026-02-01T00:00:00.000Z', finance__income: '30', finance__expenses: '60' },
+  ], compilers));
+});

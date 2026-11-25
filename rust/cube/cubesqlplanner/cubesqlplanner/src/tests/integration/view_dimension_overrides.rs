@@ -831,3 +831,26 @@ async fn test_fact_dimension_next_to_legs_of_the_same_fact() {
         insta::assert_snapshot!(result);
     }
 }
+
+// A time dimension without a date range, two roles: purchases by purchase
+// month, cancellations by cancel month; subscription 4 has no cancel month.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_two_roles_by_time_dimension_without_date_range() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.cancellations_cancellations
+        time_dimensions:
+          - dimension: biz.dt_ts
+            granularity: month
+        order:
+          - id: biz.dt_ts
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
