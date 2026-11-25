@@ -19600,6 +19600,21 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_union_with_different_column_counts_returns_error() {
+        init_testing_logger();
+
+        let error = execute_query(
+            "SELECT 1 UNION ALL SELECT 1, 2".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .expect_err("Query should return an error");
+        assert!(error
+            .to_string()
+            .contains("UNION queries must have the same number of columns (left: 1, right: 2)"));
+    }
+
+    #[tokio::test]
     async fn test_order_by_ungrouped_column_returns_error() {
         init_testing_logger();
 
