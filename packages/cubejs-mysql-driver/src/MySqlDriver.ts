@@ -127,16 +127,27 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       testConnectionTimeout?: number,
     } = {}
   ) {
+    // mysql2 warns about every connection option it doesn't know, so the options
+    // addressed to the driver itself must not reach restConfig.
+    const {
+      pool,
+      readOnly,
+      maxPoolSize,
+      testConnectionTimeout,
+      dataSource: configDataSource,
+      preAggregations: configPreAggregations,
+      ...restConfig
+    } = config;
+
     super({
-      testConnectionTimeout: config.testConnectionTimeout,
+      testConnectionTimeout,
     });
 
     const dataSource =
-      config.dataSource ||
+      configDataSource ||
       assertDataSource('default');
-    const preAggregations = config.preAggregations || false;
+    const preAggregations = configPreAggregations || false;
 
-    const { pool, readOnly, ...restConfig } = config;
     this.config = {
       host: getEnv('dbHost', { dataSource, preAggregations }),
       database: getEnv('dbName', { dataSource, preAggregations }),
@@ -148,6 +159,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
       ssl: this.getSslOptions(dataSource, preAggregations) as any,
       dateStrings: true,
       decimalNumbers: false,
+      jsonStrings: true,
       readOnly: readOnly !== undefined ? readOnly : true,
       ...restConfig,
     };
@@ -155,7 +167,6 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     const poolName = createPoolName('mysql', dataSource, preAggregations);
     this.pool = new Pool(poolName, {
       create: async () => {
-        // Extract driver-specific options that mysql2 doesn't recognize
         const { readOnly: _, loadPreAggregationWithoutMetaLock: __, storeTimezone: ___, ...connectionConfig } = this.config;
         const conn: any = mysql.createConnection(connectionConfig);
         const connect = promisify(conn.connect.bind(conn));
@@ -184,7 +195,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     }, {
       min: 0,
       max:
-        config.maxPoolSize ||
+        maxPoolSize ||
         getEnv('dbMaxPoolSize', { dataSource, preAggregations }) ||
         8,
       evictionRunIntervalMillis: 10000,

@@ -117,6 +117,57 @@ describe('MySqlDriver', () => {
     }
   });
 
+  test('json field', async () => {
+    const [{ version }] = await mySqlDriver.query('SELECT VERSION() as version', []);
+    // The JSON type was added in MySQL 5.7
+    if (/^5\.[0-6]\./.test(version)) {
+      return;
+    }
+
+    await mySqlDriver.query('CREATE TABLE test.json_test (id int, payload json)', []);
+    await mySqlDriver.query('INSERT INTO test.json_test (id, payload) VALUES (1, \'{"a": 1}\'), (2, NULL)', []);
+
+    const expected = [
+      { id: 1, payload: '{"a": 1}' },
+      { id: 2, payload: null },
+    ];
+
+    expect(JSON.parse(JSON.stringify(await mySqlDriver.query('select * from test.json_test order by id', []))))
+      .toStrictEqual(expected);
+    expect(JSON.parse(JSON.stringify((await mySqlDriver.downloadQueryResults('select * from test.json_test order by id', [], { highWaterMark: 1000 })).rows)))
+      .toStrictEqual(expected);
+
+    const tableData = await mySqlDriver.stream('select * from test.json_test order by id', [], { highWaterMark: 1000 });
+    try {
+      expect(await streamToArray(tableData.rowStream)).toEqual(expected);
+    } finally {
+      await tableData.release();
+    }
+  });
+
+  test('does not pass Cube options to the connection', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const driver = createDriver(container, {
+      dataSource: 'default',
+      preAggregations: false,
+      maxPoolSize: 2,
+      testConnectionTimeout: 10000,
+      readOnly: true,
+      storeTimezone: '+00:00',
+      loadPreAggregationWithoutMetaLock: true,
+    });
+
+    try {
+      await driver.testConnection();
+      await driver.query('SELECT 1', []);
+
+      expect(consoleError.mock.calls.map(([message]) => message)).toEqual([]);
+    } finally {
+      consoleError.mockRestore();
+      await driver.release();
+    }
+  });
+
   test('table name check', async () => {
     const tblName = 'really-really-really-looooooooooooooooooooooooooooooooooooooooooooooooooooong-table-name';
     try {
