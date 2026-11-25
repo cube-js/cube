@@ -4,10 +4,10 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_list_rewrite_per_elem_with_lists_and_vars, union, wrapped_union,
-        wrapper_pullup_replacer, wrapper_replacer_context, ListApplierListPattern, ListPattern,
-        ListType, LogicalPlanLanguage, UnionAlias, WrappedUnionAlias,
-        WrapperReplacerContextAliasToCube, WrapperReplacerContextGroupedSubqueries,
-        WrapperReplacerContextInputDataSource,
+        wrapper_nested_query_replacer, wrapper_pullup_replacer, wrapper_replacer_context,
+        ListApplierListPattern, ListPattern, ListType, LogicalPlanLanguage, UnionAlias,
+        WrappedUnionAlias, WrapperReplacerContextAliasToCube,
+        WrapperReplacerContextGroupedSubqueries, WrapperReplacerContextInputDataSource,
     },
     transport::DataSource,
     var, var_iter,
@@ -39,12 +39,9 @@ impl WrapperRules {
             // query has to reach the same data source for this to match at all: a union
             // spanning two of them is left to post processing without a check of its own.
             //
-            // The element pattern of the new list is the matched query itself, so each
-            // element resolves to the query's class whichever of its pulled up forms
-            // matched, and the union is one node rather than one per combination of forms.
-            // Extraction picks the form of each query, in the wrapper's state (see
-            // `plan_nodes_inside_wrapper` in `cost.rs`), and SQL generation reads the
-            // nested wrapper as the query it holds.
+            // Each element reads its query's class through the union's data source
+            // (`wrapper-nested-query`), so the union is one node whichever forms matched and
+            // extraction picks each query's form among those reaching that data source.
             transforming_list_rewrite_per_elem_with_lists_and_vars(
                 "wrapper-pull-up-union",
                 ListType::UnionInputs,
@@ -77,7 +74,7 @@ impl WrapperRules {
                 [ListApplierListPattern {
                     list_type: ListType::WrappedUnionInputs,
                     new_list_var: "?new_list".to_string(),
-                    elem_pattern: query,
+                    elem_pattern: wrapper_nested_query_replacer(&query, "?input_data_source"),
                 }],
                 &["?input_data_source"],
                 // One query is not a union, and folding a `Distinct` into a single query

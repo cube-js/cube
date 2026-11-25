@@ -4,11 +4,12 @@ use crate::{
         cube_scan, cube_scan_wrapper, rewrite,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
-        transforming_rewrite_multi, wrapper_pullup_replacer, wrapper_replacer_context,
-        CubeScanAliasToCube, CubeScanLimit, CubeScanOffset, CubeScanUngrouped, CubeScanWrapped,
-        LogicalPlanLanguage, ScanWrapping, WrapperReplacerContextAliasToCube,
-        WrapperReplacerContextGroupedSubqueries, WrapperReplacerContextInputDataSource,
-        WrapperReplacerContextPushToCube, WrapperReplacerContextUngroupedScan,
+        transforming_rewrite_multi, wrapped_nested_query, wrapper_nested_query_replacer,
+        wrapper_pullup_replacer, wrapper_replacer_context, CubeScanAliasToCube, CubeScanLimit,
+        CubeScanOffset, CubeScanUngrouped, CubeScanWrapped, LogicalPlanLanguage, ScanWrapping,
+        WrapperReplacerContextAliasToCube, WrapperReplacerContextGroupedSubqueries,
+        WrapperReplacerContextInputDataSource, WrapperReplacerContextPushToCube,
+        WrapperReplacerContextUngroupedScan,
     },
     copy_flag,
     transport::CUBE_STORE_DATA_SOURCE,
@@ -147,6 +148,31 @@ impl WrapperRules {
                 cube_scan_wrapper("?cube_scan_input", "CubeScanWrapperFinalized:true"),
             ),
         ]);
+        // A nested query's class holds forms over every data source its scans may read, the
+        // pre-aggregation one included. Those reaching the outer query's data source go to a
+        // class of their own, so extraction only picks among forms the outer query renders
+        rules.push(rewrite(
+            "wrapper-nested-query",
+            wrapper_nested_query_replacer(
+                cube_scan_wrapper(
+                    wrapper_pullup_replacer(
+                        "?nested_input",
+                        wrapper_replacer_context(
+                            "?nested_alias_to_cube",
+                            "?nested_push_to_cube",
+                            "?nested_in_projection",
+                            "?nested_cube_members",
+                            "?nested_grouped_subqueries",
+                            "?nested_ungrouped_scan",
+                            "?input_data_source",
+                        ),
+                    ),
+                    "CubeScanWrapperFinalized:false",
+                ),
+                "?input_data_source",
+            ),
+            wrapped_nested_query("?nested_input", "?input_data_source"),
+        ));
     }
 
     fn transform_wrap_cube_scan(

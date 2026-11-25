@@ -134,11 +134,11 @@ that match the list node itself — never by a transform that walks it.
   query) and the rewrite builds one list node from them, the combinations of the
   alternatives are the product of their counts, and so is the number of list nodes; every
   rule above the list multiplies it again. Use
-  `transforming_list_rewrite_per_elem_with_lists_and_vars` there, with the searcher's own
-  element pattern as the applier's element pattern: each element then resolves to the class
-  it was matched in, whichever alternative matched, so the list is one node and extraction
-  picks between the alternatives. Where that class also holds forms the parent cannot use,
-  the cost model has to rule them out in the parent's state (`plan_nodes_inside_wrapper`).
+  `transforming_list_rewrite_per_elem_with_lists_and_vars` there, with an element pattern
+  built over the searcher's own: each element then resolves to one class whichever
+  alternative matched, so the list is one node and extraction picks between the
+  alternatives. Where that class also holds forms the parent cannot use, read it through a
+  replacer whose class gets only the usable ones (`WrapperNestedQueryReplacer`, below).
 - Generate the traversal with the existing helpers rather than by hand:
   `WrapperRules::list_pushdown_pullup_rules` / `flat_list_pushdown_pullup_rules`
   (or `replacer_push_down_node` / `replacer_pull_up_node` underneath them). They emit
@@ -161,11 +161,17 @@ that match the list node itself — never by a transform that walks it.
   the one representation the pattern happened to bind. A grouped subquery has several plans
   under one `cube_scan_wrapper`; a join built over the plan exists once per plan, and a rule
   applied once per join then multiplies those copies along a chain of joins.
+- That shared e-class holds forms of every place the input may be read from: its data
+  source, and Cube Store where a rollup may serve it. Extraction picks one form per class,
+  not per parent, so a parent that renders for one data source must not reference it: it
+  reads the input through `WrapperNestedQueryReplacer(input, ?input_data_source)`, whose
+  class gets only the `WrappedNestedQuery` forms reaching that data source
+  (`wrapper-nested-query`), as `WrappedSubquery` does for subqueries.
 - A push-down replacer must never end up on top of an already pulled-up subtree. Inputs
-  that arrive as a finished `cube_scan_wrapper(wrapper_pullup_replacer(..))` — the queries
-  of a set operation, the sides of a join — have nothing left to push into, so their list
-  carries a **pull-up** replacer and is consumed by pull-up rules. Putting a push-down
-  replacer there instead makes `wrapper-subqueries-wrapped-scan-to-pull`
+  that arrive as a finished `cube_scan_wrapper(wrapper_pullup_replacer(..))` (the queries
+  of a set operation, the sides of a join) have nothing left to push into: the rule over
+  them matches them as they are and reads each through `WrapperNestedQueryReplacer`.
+  Putting a push-down replacer there instead makes `wrapper-subqueries-wrapped-scan-to-pull`
   (`rules/wrapper/subquery.rs`) match, which turns the element into a `WrappedSubquery`
   that only a subquery list consumes. That rule is for the subquery path only; reaching
   it from anywhere else means the rules above it are shaped wrong.

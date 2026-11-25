@@ -203,6 +203,7 @@ impl BestCubePlan {
             LogicalPlanLanguage::CaseExprReplacer(_) => 1,
             LogicalPlanLanguage::WrapperPushdownReplacer(_) => 1,
             LogicalPlanLanguage::WrapperPullupReplacer(_) => 1,
+            LogicalPlanLanguage::WrapperNestedQueryReplacer(_) => 1,
             LogicalPlanLanguage::FlattenPushdownReplacer(_) => 1,
             LogicalPlanLanguage::AggregateSplitPushDownReplacer(_) => 1,
             LogicalPlanLanguage::AggregateSplitPullUpReplacer(_) => 1,
@@ -409,7 +410,7 @@ pub struct CubePlanCostOptions {
 /// - `replacers` > other nodes - having replacers in structure means not finished processing
 /// - `forbidden_pre_aggregation_scans` > other nodes - the plan that must not read pre-aggregations never does
 /// - `mixed_wrappers` > other nodes - one pushed down query reads from one place, Cube Store or the data source
-/// - `plan_nodes_inside_wrapper` > other nodes - a DataFusion node under a wrapper cannot be rendered as SQL, which matters where a wrapper reads a class that also holds plain forms (the queries of a pushed down union)
+/// - `plan_nodes_inside_wrapper` > other nodes - a DataFusion node under a wrapper cannot be rendered as SQL, which matters where a wrapper reads a class that also holds plain forms
 /// - `penalized_ast_size_outside_wrapper` > other nodes - this is used to force "no post processing" mode, only CubeScan and CubeScanWrapped are expected as result
 /// - `table_scans` > other nodes - having table scan means not detected cube scan
 /// - `empty_wrappers` > `non_detected_cube_scans` - we don't want empty wrapper to hide non detected cube scan errors
@@ -606,14 +607,12 @@ impl CubePlanCost {
     ) -> Self {
         // `wrapper_depth` counts this node, so a wrapper is inside another at depth two
         let plan_node_inside_wrapper = wrapper_depth > 0 && is_post_processing_node(enode);
-        // A joined side can be the scan itself rather than its wrapper, and it reads the
-        // data source all the same: the leaf counters below only see wrapped scans
+        // A plain scan under a wrapper reads the data source all the same: the leaf
+        // counters below only see wrapped scans
         let plain_scan_inside_wrapper = wrapper_depth > 0
             && matches!(enode, LogicalPlanLanguage::CubeScan(_))
             && matches!(state, CubePlanState::Unwrapped(_));
-        // A wrapper inside a wrapper is how a pushed down union reads its queries and how a
-        // wrapped select holds a joined side: it renders as the plan it holds, so it costs
-        // like none
+        // A wrapper inside a wrapper renders as the plan it holds, so it costs like none
         let nested_wrapper =
             wrapper_depth > 1 && matches!(enode, LogicalPlanLanguage::CubeScanWrapper(_));
         let ast_size_outside_wrapper = match state {
@@ -804,7 +803,7 @@ impl CubePlanCost {
 /// when it is outside a wrapper and makes the plan invalid when it is inside one. Every
 /// plan variant of the language is here except the ones SQL generation handles: the Cube
 /// nodes (`CubeScan`, `CubeScanWrapper`, `WrappedSelect`, `WrappedUnion`,
-/// `WrappedSubquery`) and `EmptyRelation`.
+/// `WrappedSubquery`, `WrappedNestedQuery`) and `EmptyRelation`.
 ///
 /// One list serves both directions: it is what `plan_nodes_inside_wrapper` rejects and
 /// what `ast_size_outside_wrapper` counts, so a variant added or removed here changes the
