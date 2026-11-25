@@ -18,7 +18,7 @@ account, apply across all devices, and don't affect other users in the account.
 | New message scrolling | Automatically scroll to new messages in chat | On |
 | Alternating row colors | Highlight alternating rows in data tables | Off |
 | Default deployment | Open this deployment when you go to Cube without one in the URL | Account default |
-| Notifications | Choose whether comment, sharing and access-request notifications also arrive by email | On |
+| Notifications | Choose whether comment, sharing, access-request and dashboard review notifications also arrive by email | On |
 
 ## Language
 
@@ -84,10 +84,10 @@ deployment. The control is hidden on accounts with only one reachable deployment
 
 ## Notifications
 
-These switches control email only. Mentions, replies, shares and access requests
-arrive in your [inbox][ref-inbox] whatever you choose here. In the **Notifications**
-section of the **Preferences** page, choose which of them also arrive by email:
-choose which of them also arrive by email:
+These switches control email only. Mentions, replies, shares, access requests and
+dashboard reviews arrive in your [inbox][ref-inbox] whatever you choose here. In the
+**Notifications** section of the **Preferences** page, choose which of them also
+arrive by email:
 
 | Switch | You get an email when | Default |
 | --- | --- | --- |
@@ -95,6 +95,7 @@ choose which of them also arrive by email:
 | Replies to comments | Someone replies [in a comment thread][ref-replies] you wrote in | On |
 | Shared with you | Someone [shares][ref-sharing] a workbook, a folder, or a chat with you, or approves your access request | On |
 | Access requests | Someone [requests access][ref-request-access] to an item you can share, or declines your request | On |
+| Dashboard reviews | Something happens on a [dashboard review][ref-reviews] you take part in: a request, a comment, an approval, a change request or a publish | On |
 
 A switch saves as soon as you change it. Turning a switch off stops the email
 only; the notification still arrives in your inbox.
@@ -106,10 +107,10 @@ unsubscribe offer the same action next to the sender. To get the emails again,
 turn the switch back on here.
 
 The email is in the language you set under [Language](#language) and links to the
-comment or the item. Cube doesn't email you about a comment or a shared item you
-can no longer open. An email about a declined request doesn't name the item.
+comment, the item or the review. Cube doesn't email you about a comment, a shared
+item or a review you can no longer open. An email about a declined request doesn't name the item.
 
-Alerts, budgets, end-of-support notices, dashboard reviews, scheduled tasks and
+Alerts, budgets, end-of-support notices, scheduled tasks and
 [report deliveries][ref-report-deliveries] send their own email, as set up on
 each of them, and have no switch here.
 
@@ -119,3 +120,4 @@ each of them, and have no switch here.
 [ref-sharing]: /docs/organize-content/sharing
 [ref-request-access]: /docs/organize-content/sharing#requesting-access
 [ref-report-deliveries]: /docs/explore-analyze/report-deliveries#notifications
+[ref-reviews]: /docs/explore-analyze/dashboards/reviews#notifications
