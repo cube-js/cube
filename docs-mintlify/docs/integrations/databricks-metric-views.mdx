@@ -658,9 +658,10 @@ Preview **blocks** a view when it finds any of these conditions:
 - A two-part `schema.table` source without a default catalog: set `CUBEJS_DB_DATABRICKS_CATALOG`
   for the selected Databricks data source, or the **Default catalog** of a publication target with
   its own connection, and preview again.
-- Cyclic or one-to-many joins, or a join condition that reads a measure or a cube other than the
-  two it joins, including a `table.column` whose table is neither of them: simplify the join. For
-  a one-to-many join (`CUBE_VIEW_JOIN_NOT_REPRESENTABLE`), root the view at the many-side cube.
+- Cyclic joins, a one-to-many join on the view's join path, or a join condition that reads a
+  measure or a cube other than the two it joins, including a `table.column` whose table is neither
+  of them: simplify the join. For a one-to-many join (`CUBE_VIEW_JOIN_NOT_REPRESENTABLE`), root
+  the view at the many-side cube.
 - A many-to-one or one-to-one join whose condition reads no column of the joined cube, such as
   `1 = 1` or `{CUBE}.status = 'open'` (Preview names the join): Cube keeps every row such a join
   matches, and a Metric View keeps one. This includes a cube the view reaches only through member
@@ -687,10 +688,10 @@ Preview **blocks** a view when it finds any of these conditions:
   `CASE WHEN {layout.idx} = 1 THEN {count} END` (Preview names the measure and the column): a
   Metric View measure must aggregate every column it reads. Move the condition inside the
   aggregate, or keep that view in Cube.
-- Two dimensions that each read the other's name, where one of them is named `source` or like a
-  join: a Metric View dimension reads the dimensions before it by name, so Preview places a
-  dimension named `source` or like a join after the dimensions that read that name, and no order
-  works for two that read each other. Rename one of them.
+- Two dimensions that each read the other's name, where one of them is named `source` or has the
+  same name as a join: a Metric View dimension reads the dimensions before it by name, so Preview
+  must place such a dimension after every dimension that reads its name, and no order works for
+  two that read each other. Rename one of them.
 
 A measure of the view's root cube publishes when every join the view projects is many-to-one or
 one-to-one, even when it reads a joined cube, such as
@@ -698,7 +699,9 @@ one-to-one, even when it reads a joined cube, such as
 of the root cube, so each row counts once, as in Cube. A measure that can over-count is withheld:
 a measure such as `sum` or `avg` of a joined cube, a calculated measure that references another
 cube's measure, and a root-cube `sum` or `avg` that reads a joined cube in a view that projects a
-one-to-many join or has a root-source override.
+one-to-many join or has a root-source override. A one-to-many join on the view's join path blocks
+the view; one that only member SQL or a hidden dependency pulls in lets the view publish without
+these measures.
 
 A withheld measure can be **left out while the rest of its view is published**. That view
 may show **Created**, **Updated**, or **Unchanged**, and the run may show **Completed**, even
