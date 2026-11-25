@@ -65,7 +65,59 @@ newest is at the bottom, next to the **Start a thread…** box. Replies inside a
 thread are in the order they were posted, oldest first. A new reply does not
 move its thread.
 
-Comments are plain text. Markdown and other formatting are shown as typed.
+To format a comment, use the toolbar above the box. See
+[Formatting](#formatting).
+
+## Formatting
+
+The comment box shows formatting as you type, like Slack: bold text looks bold,
+and a list looks like a list. You never see markdown markers in the box. Every
+comment box has the same toolbar: for a new thread, for a reply, and when you
+edit a comment. The toolbar is dimmed until you click in the box.
+
+{/* TODO: video — formatting a dashboard comment with the toolbar, hotkeys, a link and a mention in bold (GTM-235) */}
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/dashboards/comments/formatting.png"
+    alt="Comments panel composer with the formatting toolbar: Bold, Italic, Link, lists, Quote, Code and Code block"
+  />
+</Frame>
+
+Select text and click a button to format it, or click a button and start typing.
+Click the button again to remove the formatting. Hover a button to see its
+shortcut:
+
+| Button | macOS | Windows and Linux |
+| --- | --- | --- |
+| **Bold** | ⌘B | Ctrl+B |
+| **Italic** | ⌘I | Ctrl+I |
+| **Link** | ⌘⇧U | Ctrl+Shift+U |
+| **Numbered list** | ⌘⇧7 | Ctrl+Shift+7 |
+| **Bulleted list** | ⌘⇧8 | Ctrl+Shift+8 |
+| **Quote** | ⌘⇧9 | Ctrl+Shift+9 |
+| **Code** | ⌘⇧C or ⌘E | Ctrl+Shift+C or Ctrl+E |
+| **Code block** | ⌘⌥⇧C | Ctrl+Alt+Shift+C |
+
+**Link** opens the **Add link** form, or **Edit link** when the text is already a
+link. Enter the link's **Text** and its address in **Link**, then click
+**Save**. The address must be a web or an email address. To remove a link, edit
+it and clear its address.
+
+In a list, press Shift+Enter to add the next item. Enter posts the comment, as
+everywhere else in the box.
+
+A posted comment shows bold and italic text, numbered and bulleted lists,
+quotes, inline code, code blocks, and links. A web address in the text becomes
+a link too. Links open in a new tab. Other markdown, such as headings, tables,
+images, task boxes, and HTML, shows as typed.
+
+This also applies to comments posted before the toolbar was available. A
+comment with markdown in it, such as `*word*` or a line that starts with `> `,
+shows formatted.
+
+Notifications in the [inbox][ref-inbox] and in email show the comment's text
+without formatting.
 
 ## Resolving threads
 
@@ -188,6 +240,9 @@ The person you mention gets a notification in their [inbox][ref-inbox], with a
 link to the comment. They also get an email with the same link, unless they
 turned off **Mentions in comments** under [Notifications][ref-preferences-notifications]
 on the **Preferences** page.
+
+A mention works inside formatted text too, for example in bold text, in
+inline code, or in the text of a link.
 
 Only a person you choose from the list is mentioned. If you type `@` and a name
 without choosing from the list, it stays plain text and sends no notification.
