@@ -759,6 +759,13 @@ dashboard?"* The agent works on the dashboard's published version.
 - Some agents can also **Send now** or **Check condition** when you ask for it
   now, for example *"check the condition of my Orders alert now"*, and tell you
   what came of it. Where the agent can't, use the buttons in the sidebar.
+- Some agents can also refresh a published dashboard you can open, for example
+  *"refresh the Sales dashboard now"*. The agent re-runs every chart's query as
+  you, the way a scheduled refresh does, and notifies nobody. It
+  waits up to 5 minutes, then names the charts whose query failed; a refresh
+  that takes longer keeps running, and the agent tells you so. After two
+  refreshes that fail in one reply, the agent stops refreshing until your next
+  message.
 - The agent can set a schedule's [control values](#control-values) for filters,
   time granularities, and field switchers, for example *"refresh the Sales
   dashboard every day, filtered to completed orders"*. A field with a control of
@@ -777,7 +784,8 @@ dashboard?"* The agent works on the dashboard's published version.
   owner is told the values its alert's last check read, and only those who can
   edit a schedule are told who it is sent to; anyone else is told the recipients
   are hidden.
-- The chat on a published dashboard and embedded chat can't manage schedules.
+- The chat on a published dashboard and embedded chat can't manage schedules
+  or refresh a dashboard.
 
 ## Run phases
 
