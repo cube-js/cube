@@ -72,16 +72,16 @@ On a published dashboard, **Inspect** in a chart's settings menu (`⋮`) opens a
 
 The dialog's title is the chart's title. When filters reach the chart, a line under the title lists them, worded as on the dashboard's filter chips, such as **Status is completed**. Cross-filters come last, as **Filtered by** and the names of the cross-filtered fields.
 
-The query is shown on the same tabs as in a workbook's [SQL panel][ref-inspecting-queries], with a button to copy it:
+The query is shown on the **Semantic SQL** and **Generated SQL** tabs, as in a workbook's [SQL panel][ref-inspecting-queries], with a button to copy it:
 
 - **Semantic SQL** is shown to everyone who can view the dashboard.
 - **Generated SQL** is shown only to roles with the [**Access SQL Runner**][ref-custom-roles-actions] permission. Without it, the dialog shows only Semantic SQL.
 
-A chart built on [source SQL][ref-source-sql] shows its SQL as written, without tabs, and only to roles with **Access SQL Runner**. Dashboard filters do not apply to source SQL, so the dialog lists none.
+A chart built on [source SQL][ref-source-sql] shows its SQL as written, without tabs, and only to roles with **Access SQL Runner**. For other viewers, such a chart has no **Inspect**. Dashboard filters do not apply to source SQL, so the dialog lists none.
 
 If a chart's query fails, **Inspect** also appears as an icon button next to the error, so you can read the query that failed.
 
-Every viewer who can inspect a chart gets its settings menu. For a viewer who can't use the [Dashboard Agent][ref-dashboard-agent], the menu holds **Inspect** and any other item their role allows.
+A viewer whose role allows no other item in the settings menu, for example one who can't use the [Dashboard Agent][ref-dashboard-agent], still gets the menu with **Inspect** in it.
 
 **Inspect** is not available on Python charts, on [embedded][ref-embedding] dashboards, in printed or PDF dashboards, or in a dashboard's version history.
 
