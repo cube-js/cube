@@ -11,6 +11,7 @@ import {
 import {
   getEnv,
   assertDataSource,
+  buildObjectShape,
   extractRequestUUID,
   formatAnsi,
   isValidRequestId,
@@ -428,8 +429,11 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
   }
 
   public normalizeResultOverColumns(data: any[], columns: string[]): PinotRow[] {
+    // Cloning a shape that already holds every column keeps the rows in fast-properties mode.
+    const objectShape = buildObjectShape(columns);
+
     return (data || []).map((values) => {
-      const row: PinotRow = {};
+      const row: PinotRow = objectShape === null ? {} : { ...objectShape };
 
       for (let i = 0; i < columns.length; i++) {
         row[columns[i]] = values[i];
