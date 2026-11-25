@@ -1,7 +1,7 @@
 /* eslint-disable arrow-body-style,no-restricted-syntax */
-import { createKeyHash } from './hash';
 import { LRUCache } from 'lru-cache';
 
+import { createKeyHash } from './hash';
 import { Optional } from './type-helpers';
 
 export type PromiseLock = {
