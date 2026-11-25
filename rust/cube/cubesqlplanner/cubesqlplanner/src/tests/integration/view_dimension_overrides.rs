@@ -903,3 +903,56 @@ async fn test_two_roles_by_time_dimension_without_date_range() {
         insta::assert_snapshot!(result);
     }
 }
+
+// A view's own measure over multi-stage cube measures of two legs: cancelled
+// so far by cancel month (1, 3, 3) per purchased by purchase month (1, 1, -):
+// 2026-01: 1.0, 2026-02: 3.0, 2026-03: NULL.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_composite_over_rolling_and_plain_legs() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cumulative_cancellations_per_purchase
+          - biz.cancellations_cancellations_cumulative
+          - biz.purchases_count
+        time_dimensions:
+          - dimension: biz.dt_ts
+            granularity: month
+            dateRange:
+              - "2026-01-01"
+              - "2026-03-31"
+        order:
+          - id: biz.dt_ts
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Two multi-stage leaves: cancelled a year before by cancel year (2025: -,
+// 2026: 1) per purchased in the purchase year (2 each): 2025: NULL, 2026: 0.5.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_composite_over_two_multi_stage_legs() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.prev_year_cancellations_per_yearly_purchase
+        time_dimensions:
+          - dimension: biz.dt_ts
+            granularity: year
+            dateRange:
+              - "2025-01-01"
+              - "2026-12-31"
+        order:
+          - id: biz.dt_ts
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

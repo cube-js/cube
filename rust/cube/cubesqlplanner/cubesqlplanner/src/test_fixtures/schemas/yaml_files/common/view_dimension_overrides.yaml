@@ -124,6 +124,12 @@ views:
       - name: cancellations_per_purchase_single_stage
         type: number
         sql: "{cancellations_cancellations} * 1.0 / NULLIF({purchases_count}, 0)"
+      - name: cumulative_cancellations_per_purchase
+        type: number
+        sql: "{cancellations_cancellations_cumulative} * 1.0 / NULLIF({purchases_count}, 0)"
+      - name: prev_year_cancellations_per_yearly_purchase
+        type: number
+        sql: "{cancellations_cancellations_prev_year} * 1.0 / NULLIF({purchases_count_per_year}, 0)"
     dimensions:
       - name: dt_label
         type: string

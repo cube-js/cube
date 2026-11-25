@@ -45,9 +45,15 @@ impl QueryAnalysis {
         // join reaches them all.
         let composites_need_legs = !view_composites.is_empty()
             && match partitions.as_slice() {
-                [single] => !Self::has_single_join(&*single.apply(&request)?, &view_composites),
+                [single] => !Self::has_single_join(&*single.apply(&request)?, &view_composites)?,
                 _ => true,
             };
+        if composites_need_legs && request.ungrouped() {
+            return Err(CubeError::user(format!(
+                "An ungrouped query can't compute {}: its measures can't be read in one query",
+                view_composites.iter().map(|m| m.full_name()).join(", ")
+            )));
+        }
         let (request, override_legs) = match partitions.as_slice() {
             [single] if single.has_overrides() && !composites_need_legs => {
                 (single.apply(&request)?, vec![])
@@ -269,29 +275,40 @@ impl QueryAnalysis {
         Ok(cell.get_or_init(move || computed))
     }
 
-    fn has_single_join(query: &QueryProperties, measures: &[Rc<MemberSymbol>]) -> bool {
-        let Ok(groups) = Self::compute_join_groups(query) else {
-            return false;
+    // Only a missing join path means no single join; any other failure is the
+    // query's own error.
+    fn has_single_join(
+        query: &QueryProperties,
+        measures: &[Rc<MemberSymbol>],
+    ) -> Result<bool, CubeError> {
+        let hints = Self::measures_join_hints(query)?;
+        let Ok(groups) =
+            MultiFactJoinGroups::try_new_if_joinable(query.query_tools().clone(), hints)?
+        else {
+            return Ok(false);
         };
-        measures.iter().all(|measure| {
-            matches!(
-                groups
-                    .for_measures(std::slice::from_ref(measure))
-                    .and_then(|groups| groups.single_join()),
-                Ok(Some(_))
-            )
-        })
+        for measure in measures {
+            let measure_groups = groups.for_measures(std::slice::from_ref(measure))?;
+            if !matches!(measure_groups.single_join(), Ok(Some(_))) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
-    fn compute_join_groups(query: &QueryProperties) -> Result<MultiFactJoinGroups, CubeError> {
-        let measures_join_hints = MeasuresJoinHints::builder(query.query_join_hints())
+    fn measures_join_hints(query: &QueryProperties) -> Result<MeasuresJoinHints, CubeError> {
+        MeasuresJoinHints::builder(query.query_join_hints())
             .add_dimensions(query.dimensions())
             .add_dimensions(&query.extract_dimensions_from_order())
             .add_dimensions(query.time_dimensions())
             .add_filters(query.time_dimensions_filters())
             .add_filters(query.dimensions_filters())
             .add_filters(query.segments())
-            .build(&query.all_used_measures()?)?;
+            .build(&query.all_used_measures()?)
+    }
+
+    fn compute_join_groups(query: &QueryProperties) -> Result<MultiFactJoinGroups, CubeError> {
+        let measures_join_hints = Self::measures_join_hints(query)?;
         let query_tools = query.query_tools().clone();
         // A pre-aggregation query describes the rollup to build, and matching
         // compares its groups against the query's, so both sides have to be

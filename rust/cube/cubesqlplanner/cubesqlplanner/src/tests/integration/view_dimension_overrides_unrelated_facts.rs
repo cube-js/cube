@@ -162,3 +162,23 @@ async fn test_balance_by_branch() {
         insta::assert_snapshot!(result);
     }
 }
+
+// No overridden dimension in the query, yet no join reaches both facts.
+#[test]
+fn test_ungrouped_balance_is_rejected() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - finance.balance
+        ungrouped: true
+    "#};
+
+    let error = ctx.build_sql(query).unwrap_err();
+    assert!(
+        error.message.contains(
+            "An ungrouped query can't compute finance.balance: its measures can't be read in one query"
+        ),
+        "{}",
+        error.message
+    );
+}
