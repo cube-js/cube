@@ -3,12 +3,15 @@ import {
   StreamTableData,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
+  QueryOptions,
   BaseDriver
 } from '@cubejs-backend/base-driver';
 import {
   getEnv,
   assertDataSource,
+  extractRequestUUID,
   formatAnsi,
+  isValidRequestId,
   Required,
 } from '@cubejs-backend/shared';
 
@@ -141,8 +144,8 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       });
   }
 
-  public query(query: string, values: unknown[]): Promise<any[]> {
-    return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values));
+  public query(query: string, values: unknown[], options?: QueryOptions): Promise<any[]> {
+    return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values), options?.requestId);
   }
 
   protected prepareQueryWithParams(query: string, values: unknown[]) {
@@ -169,7 +172,18 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     return { Authorization: `Basic ${encodedCredentials}` };
   }
 
-  protected async request(query: string): Promise<PinotResponse> {
+  protected queryOptions(requestId?: string): string {
+    const options = `useMultistageEngine=true;enableNullHandling=${this.config.nullHandling};timeoutMs=${this.config.queryTimeout * 1000}`;
+
+    const clientQueryId = requestId && extractRequestUUID(requestId);
+    if (!clientQueryId || !isValidRequestId(clientQueryId) || clientQueryId.includes('=')) {
+      return options;
+    }
+
+    return `${options};clientQueryId=${clientQueryId}`;
+  }
+
+  protected async request(query: string, requestId?: string): Promise<PinotResponse> {
     const toError = (error: any) => new Error(error.error ? `${error.message}\n${error.error}` : error.message);
 
     const request: Request = new Request(this.url, {
@@ -180,7 +194,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       }),
       body: JSON.stringify({
         sql: query,
-        queryOptions: `useMultistageEngine=true;enableNullHandling=${this.config.nullHandling};timeoutMs=${this.config.queryTimeout * 1000}`
+        queryOptions: this.queryOptions(requestId)
       })
     });
 
@@ -205,17 +219,17 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     return result;
   }
 
-  public async queryPromised(query: string): Promise<any[] | StreamTableData> {
-    const { resultTable } = await this.request(query);
+  public async queryPromised(query: string, requestId?: string): Promise<any[] | StreamTableData> {
+    const { resultTable } = await this.request(query, requestId);
     return this.normalizeResultOverColumns(resultTable.rows, resultTable.dataSchema.columnNames);
   }
 
   public async downloadQueryResults(
     query: string,
     values: unknown[],
-    _options: DownloadQueryResultsOptions,
+    options: DownloadQueryResultsOptions,
   ): Promise<DownloadQueryResultsResult> {
-    const { resultTable } = await this.request(this.prepareQueryWithParams(query, values));
+    const { resultTable } = await this.request(this.prepareQueryWithParams(query, values), options?.requestId);
     const { rows, dataSchema } = resultTable;
 
     return {
