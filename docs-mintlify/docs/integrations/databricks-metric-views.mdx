@@ -89,7 +89,7 @@ also needs **Access SQL Runner** (`SqlRunnerRead`); see [Jinja templates](#jinja
     Select **Publish now**. Review the result for **each view** in run history. **Created**,
     **Updated**, and **Unchanged** are successful outcomes; **Blocked**, **Rejected by Databricks**,
     and **Write failed** need investigation. A run can be **Partial** if some views succeeded and
-    others did not. A view that Databricks rejected or failed to write also shows Databricks' error
+    others did not. A view that Databricks rejected or failed to write can also show Databricks' error
     class, such as `UNRESOLVED_COLUMN.WITH_SUGGESTION`, and a **Statement ID**. Look up that
     statement in Databricks Query History to see the full error.
   </Step>
