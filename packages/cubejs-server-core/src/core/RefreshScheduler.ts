@@ -1,8 +1,7 @@
 import R from 'ramda';
 import pLimit from 'p-limit';
 import { v4 as uuidv4 } from 'uuid';
-import crypto from 'crypto';
-import { Required } from '@cubejs-backend/shared';
+import { Required, createKeyHash } from '@cubejs-backend/shared';
 import type { PreAggregationInfo } from '@cubejs-backend/schema-compiler';
 import type { NormalizedQuery } from '@cubejs-backend/api-gateway';
 import {
@@ -150,11 +149,10 @@ function getPreAggsJobsList(
 }
 
 /**
- * Returns SHA-256 hash token of the job object.
+ * Returns MD5 hash token of the job object.
  */
 function getPreAggJobToken(job: PreAggJob) {
-  return crypto
-    .createHash('sha256')
+  return createKeyHash()
     .update(JSON.stringify(job))
     .digest('hex');
 }

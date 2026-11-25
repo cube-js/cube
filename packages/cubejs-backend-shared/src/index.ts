@@ -18,6 +18,7 @@ export * from './errors';
 export * from './promises';
 export * from './convert';
 export * from './helpers';
+export * from './hash';
 export * from './machine-id';
 export * from './type-helpers';
 export * from './shared-types';

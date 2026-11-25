@@ -1,5 +1,5 @@
 /* eslint-disable arrow-body-style,no-restricted-syntax */
-import crypto from 'crypto';
+import { createKeyHash } from './hash';
 import { LRUCache } from 'lru-cache';
 
 import { Optional } from './type-helpers';
@@ -282,7 +282,7 @@ export const asyncDebounceFn = <Ret, Arguments>(
   });
 
   return async (...args: Arguments[]) => {
-    const key = crypto.createHash('sha256')
+    const key = createKeyHash()
       .update(args.map((v) => JSON.stringify(v)).join(','))
       .digest('hex');
 

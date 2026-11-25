@@ -471,7 +471,7 @@ describe('QueryOrchestrator', () => {
     console.log(await queryOrchestrator.queryStage(query));
     const result = await promise;
     console.log(result.data[0]);
-    expect(result.data[0]).toMatch(/orders_number_and_count20191101_sk2dz2lz_rscmxq14/);
+    expect(result.data[0]).toMatch(/orders_number_and_count20191101_kjypcoio_5yftl5il/);
     expect(result.lastRefreshTime.getTime()).toEqual(12345000);
   });
 
@@ -498,8 +498,8 @@ describe('QueryOrchestrator', () => {
     };
     const result = await queryOrchestrator.fetchQuery(query);
     console.log(result.data[0]);
-    expect(result.data[0]).toMatch(/orders_number_and_count20191101_k3i0chl3_xb1au4ds/);
-    expect(mockDriver.executedQueries.join(',')).toMatch(/CREATE INDEX orders_number_and_count_week20191101_k3i0chl3_xb1au4ds/);
+    expect(result.data[0]).toMatch(/orders_number_and_count20191101_l3kvjcmu_khbemovd/);
+    expect(mockDriver.executedQueries.join(',')).toMatch(/CREATE INDEX orders_number_and_count_week20191101_l3kvjcmu_khbemovd/);
   });
 
   test('index is part of query key', async () => {
@@ -542,7 +542,7 @@ describe('QueryOrchestrator', () => {
       requestId: 'index is part of query key'
     });
     console.log(result.data[0]);
-    expect(result.data[0]).toMatch(/orders_number_and_count20191102_uy3m3hkp_dtcefv3y/);
+    expect(result.data[0]).toMatch(/orders_number_and_count20191102_c2mipl2c_n0ns2o1y/);
   });
 
   test('external indexes', async () => {
@@ -569,8 +569,8 @@ describe('QueryOrchestrator', () => {
     };
     const result = await queryOrchestrator.fetchQuery(query);
     console.log(result.data[0]);
-    expect(result.data[0]).toMatch(/orders_number_and_count20191101_k3i0chl3_xb1au4ds/);
-    expect(externalMockDriver.executedQueries.join(',')).toMatch(/CREATE INDEX orders_number_and_count_week20191101_k3i0chl3_xb1au4ds/);
+    expect(result.data[0]).toMatch(/orders_number_and_count20191101_l3kvjcmu_khbemovd/);
+    expect(externalMockDriver.executedQueries.join(',')).toMatch(/CREATE INDEX orders_number_and_count_week20191101_l3kvjcmu_khbemovd/);
   });
 
   test('external join', async () => {
@@ -783,8 +783,8 @@ describe('QueryOrchestrator', () => {
         requestId: 'save structure versions'
       });
     }
-    expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_1wpugwjf_ocrszzad/));
-    expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_1gry3kri_bs4m10l2/));
+    expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_f5v4jw3p_4eysppzt/));
+    expect(mockDriver.tables).toContainEqual(expect.stringMatching(/orders_mjooke4_ezlvkhjl/));
   });
 
   test('intermittent empty rollup', async () => {
@@ -1100,15 +1100,15 @@ describe('QueryOrchestrator', () => {
     expect(versionEntriesByTableName).toMatchObject({
       'stb_pre_aggregations.orders': [{
         table_name: 'stb_pre_aggregations.orders',
-        content_version: '1gry3kri',
-        structure_version: 'bs4m10l2',
+        content_version: 'mjooke4',
+        structure_version: 'ezlvkhjl',
         naming_version: 2
       }]
     });
 
     expect(Object.keys(structureVersionsByTableName).length).toBe(1);
     expect(structureVersionsByTableName).toMatchObject({
-      'stb_pre_aggregations.orders': 'bs4m10l2'
+      'stb_pre_aggregations.orders': 'ezlvkhjl'
     });
   });
 
@@ -1447,7 +1447,7 @@ describe('QueryOrchestrator', () => {
     expect(result.data[0]).toMatch(/orders_d20210501/);
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
-    expect(result.data[0]).toMatch(/orders_h2021060100_4mzuvtre_o5svsem0/);
+    expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
 
     result = await queryOrchestrator.fetchQuery(query('lambda partitions', ['2021-05-31T00:00:00.000', '2021-05-31T23:59:59.999']));
     console.log(JSON.stringify(result, null, 2));
@@ -1458,7 +1458,7 @@ describe('QueryOrchestrator', () => {
     expect(result.data[0]).toMatch(/orders_d20210501/);
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
-    expect(result.data[0]).toMatch(/orders_h2021060100_4mzuvtre_o5svsem0/);
+    expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
   });
 
   test('lambda partitions week', async () => {
@@ -1546,7 +1546,7 @@ describe('QueryOrchestrator', () => {
     console.log(JSON.stringify(result, null, 2));
     expect(result.data[0]).not.toMatch(/orders_h2021053000/);
     expect(result.data[0]).toMatch(/orders_h2021053100/);
-    expect(result.data[0]).toMatch(/orders_h2021060100_4mzuvtre_o5svsem0/);
+    expect(result.data[0]).toMatch(/orders_h2021060100_uozkyaur_d004iq51/);
   });
 
   test('real-time sealing partitions', async () => {
@@ -1679,7 +1679,7 @@ describe('QueryOrchestrator', () => {
     };
     const promise = queryOrchestrator.fetchQuery(query);
     const result = await promise;
-    expect(result.data[0]).toMatch(/orders_number_and_count20191101_sk2dz2lz_rscmxq14/);
+    expect(result.data[0]).toMatch(/orders_number_and_count20191101_kjypcoio_5yftl5il/);
   });
 
   test('streaming source tables are not dropped', async () => {
@@ -1705,7 +1705,7 @@ describe('QueryOrchestrator', () => {
       requestId: 'basic'
     };
     await queryOrchestrator.fetchQuery(query);
-    expect(streamingSourceMockDriver.tables[0]).toMatch(/orders_number_and_count20191101_sk2dz2lz_rscmxq14/);
+    expect(streamingSourceMockDriver.tables[0]).toMatch(/orders_number_and_count20191101_kjypcoio_5yftl5il/);
   });
 
   test('streaming receives stream offset', async () => {

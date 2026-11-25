@@ -26,7 +26,7 @@ import { GraphQLSchema } from 'graphql';
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid';
 import { LRUCache } from 'lru-cache';
 import { NativeInstance } from '@cubejs-backend/native';
-import { disposedProxy, getEnv, memoizeByObject } from '@cubejs-backend/shared';
+import { disposedProxy, getEnv, memoizeByObject, createKeyHash } from '@cubejs-backend/shared';
 import type { SchemaFileRepository } from '@cubejs-backend/shared';
 import { NormalizedQuery, MemberExpression } from '@cubejs-backend/api-gateway';
 import { DriverCapabilities } from '@cubejs-backend/base-driver';
@@ -279,7 +279,7 @@ export class CompilerApi {
 
     if (this.options.devServer || this.options.fastReload) {
       const files = await this.repository.dataSchemaFiles();
-      compilerVersion += `_${crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex')}`;
+      compilerVersion += `_${createKeyHash().update(JSON.stringify(files)).digest('hex')}`;
     }
 
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
@@ -542,7 +542,7 @@ export class CompilerApi {
 
   protected hashRequestContext(context: Context): string {
     if (!context.__hash) {
-      context.__hash = crypto.createHash('sha256').update(JSON.stringify(context)).digest('hex');
+      context.__hash = createKeyHash().update(JSON.stringify(context)).digest('hex');
     }
     return context.__hash;
   }

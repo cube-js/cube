@@ -12,8 +12,7 @@ import isDocker from 'is-docker';
 import type { Application as ExpressApplication, NextFunction, Request, Response } from 'express';
 import type { ChildProcess } from 'child_process';
 import type { ServerResponse } from 'http';
-import { executeCommand, getAnonymousId, getEnv, keyByDataSource, packageExists } from '@cubejs-backend/shared';
-import crypto from 'crypto';
+import { executeCommand, getAnonymousId, getEnv, keyByDataSource, packageExists, createKeyHash } from '@cubejs-backend/shared';
 
 import type { BaseDriver } from '@cubejs-backend/query-orchestrator';
 
@@ -651,7 +650,7 @@ export class DevServer {
   }
 
   protected getIdentifier(apiSecret: string): string {
-    return crypto.createHash('sha256')
+    return createKeyHash()
       .update(apiSecret)
       .digest('hex')
       .replace(/[^\d]/g, '')

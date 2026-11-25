@@ -1,6 +1,5 @@
 import R from 'ramda';
-import crypto from 'crypto';
-import { getEnv, MaybeCancelablePromise, LoggerFn, LoggerFnParams } from '@cubejs-backend/shared';
+import { getEnv, MaybeCancelablePromise, LoggerFn, LoggerFnParams, createKeyHash } from '@cubejs-backend/shared';
 import {
   cancelCombinator,
   DownloadQueryResultsResult,
@@ -77,7 +76,7 @@ function nowTimestamp(client: DriverInterface) {
 }
 
 /**
- * Computes SHA-256 hash of the query key. The `queryKeyMd5` name is kept for existing consumers.
+ * Computes MD5 hash of the query key.
  * Special handling for FETCH_TABLES_FOR queries - returns the original string instead of hash.
  */
 function queryKeyMd5(queryKey: PreAggregationQueryKey): string {
@@ -95,8 +94,8 @@ function queryKeyMd5(queryKey: PreAggregationQueryKey): string {
     return jsonStr;
   }
 
-  // Otherwise, return SHA-256 hash
-  return crypto.createHash('sha256').update(jsonStr).digest('hex');
+  // Otherwise, return MD5 hash
+  return createKeyHash().update(jsonStr).digest('hex');
 }
 
 export class PreAggregationLoader {
