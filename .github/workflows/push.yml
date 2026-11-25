@@ -633,8 +633,8 @@ jobs:
       id-token: write
       attestations: write
     env:
-      # Fork PRs get no OIDC token or package write, so only same-repo builds push and attest.
-      ATTEST_CI_IMAGE: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+      # Fork and Dependabot PRs get a read-only token, so only other same-repo builds push and attest.
+      ATTEST_CI_IMAGE: ${{ github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') }}
     services:
       registry:
         image: registry:2
