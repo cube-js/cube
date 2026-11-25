@@ -1917,7 +1917,9 @@ pre-aggregations in Cube Store. A [pushed down][ref-sql-api-pushdown] query read
 only when a `LIMIT` at or below that limit bounds its whole result: a `LIMIT` below a
 join or grouping sets doesn't, and the rows of each query in a `UNION` add up. With
 [`CUBEJS_ROLLUP_ONLY`](#cubejs_rollup_only), which doesn't allow querying the data source,
-a streamed query fails unless a pre-aggregation stored in the data source serves it.
+a streamed query fails unless a pre-aggregation stored in the data source serves it; for
+clients that can't add such a `LIMIT`, turn off the streaming mode, which caps results at
+that limit.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |

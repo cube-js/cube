@@ -232,7 +232,8 @@ export class QueryOrchestrator {
         'A streamed query can\'t read Cube Store pre-aggregations, and rollup only mode ' +
         'doesn\'t allow querying the data source. To read a Cube Store pre-aggregation, ' +
         'add a LIMIT at or below CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT to the outermost ' +
-        'query, outside any join.'
+        'query, outside any join, or turn off CUBESQL_STREAM_MODE, which caps results at ' +
+        'that limit.'
       );
     }
     query.values = values || query.values;
