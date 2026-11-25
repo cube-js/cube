@@ -15,6 +15,13 @@ cubes:
       - name: dt_year_month
         type: string
         sql: dt_year_month
+      - name: dt_quarter
+        type: string
+        sql: "dt_year || '-Q' || extract(quarter from dt_ts)"
+      - name: dt_year_hidden
+        type: string
+        sql: dt_year
+        mask: hidden
 
   - name: subscriptions
     sql_table: vdo_subscriptions
@@ -70,12 +77,26 @@ cubes:
 
 views:
   - name: biz
+    measures:
+      - name: cancellations_per_purchase
+        type: number
+        multi_stage: true
+        sql: "{cancellations_cancellations} * 1.0 / NULLIF({purchases_count}, 0)"
+      - name: cancellations_per_purchase_single_stage
+        type: number
+        sql: "{cancellations_cancellations} * 1.0 / NULLIF({purchases_count}, 0)"
+    dimensions:
+      - name: dt_label
+        type: string
+        sql: "'Y' || {dt_year}"
     cubes:
       - join_path: calendar
         includes:
           - dt_ts
           - dt_year
           - dt_year_month
+          - dt_quarter
+          - dt_year_hidden
       - join_path: subscriptions
         alias: purchases
         prefix: true
@@ -96,6 +117,7 @@ views:
           dt_ts: subscriptions.cancel_cal.dt_ts
           dt_year: subscriptions.cancel_cal.dt_year
           dt_year_month: subscriptions.cancel_cal.dt_year_month
+          dt_year_hidden: subscriptions.cancel_cal.dt_year
       - join_path: subscriptions
         alias: subs
         prefix: true
@@ -104,5 +126,6 @@ views:
       - join_path: carts
         prefix: true
         includes:
+          - id
           - count
           - count_cumulative

@@ -438,3 +438,182 @@ async fn test_rolling_measure_next_to_overridden_measure() {
         insta::assert_snapshot!(result);
     }
 }
+
+// A view dimension built on an overridden one is overridden with it, alone:
+// Y2025: 1 cancellation (2), Y2026: 2 (1, 3); subscription 4, never
+// cancelled, has no cancel year: NULL, 0.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_dimension_built_on_overridden_dimension() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_cancellations
+        dimensions:
+          - biz.dt_label
+        order:
+          - id: biz.dt_label
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The same view dimension under two roles. Y2025: 2 purchases (1, 2),
+// 1 cancellation (2); Y2026: 2 purchases (3, 4), 2 cancellations (1, 3);
+// no cancel year: 0 cancellations (4).
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_dimension_built_on_overridden_dimension_two_roles() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.cancellations_cancellations
+        dimensions:
+          - biz.dt_label
+        order:
+          - id: biz.dt_label
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// A fact dimension next to overridden ones, two roles. Purchased in 2026:
+// basic 1 (4), pro 1 (3). Cancelled in 2026: pro 2 (1, 3).
+#[tokio::test(flavor = "multi_thread")]
+async fn test_plain_dimension_next_to_two_roles() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.cancellations_cancellations
+        dimensions:
+          - biz.subs_plan
+        filters:
+          - member: biz.dt_year
+            operator: equals
+            values: ["2026"]
+        order:
+          - id: biz.subs_plan
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[test]
+fn test_dimension_of_overridden_cube_left_without_override_is_rejected() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_cancellations
+        dimensions:
+          - biz.dt_quarter
+        filters:
+          - member: biz.dt_year
+            operator: equals
+            values: ["2026"]
+    "#};
+
+    let error = ctx.build_sql(query).unwrap_err();
+    assert!(
+        error.message.contains(
+            "Dimension biz.dt_quarter is not overridden for measure biz.cancellations_cancellations, which overrides other dimensions of calendar"
+        ),
+        "{}",
+        error.message
+    );
+}
+
+// Overrides don't make another fact's dimension reachable.
+#[test]
+fn test_dimension_of_another_fact_has_no_join_path() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_cancellations
+        dimensions:
+          - biz.carts_id
+        filters:
+          - member: biz.dt_year
+            operator: equals
+            values: ["2026"]
+    "#};
+
+    let error = ctx.build_sql(query).unwrap_err();
+    assert!(
+        error.message.contains("Can't find join path"),
+        "{}",
+        error.message
+    );
+}
+
+#[test]
+fn test_measure_built_on_overridden_measures_is_rejected() {
+    let ctx = create_context();
+    for measure in [
+        "biz.cancellations_per_purchase",
+        "biz.cancellations_per_purchase_single_stage",
+    ] {
+        let query = format!(
+            "measures:\n  - {measure}\nfilters:\n  - member: biz.dt_year\n    operator: equals\n    values: [\"2026\"]\n"
+        );
+        let error = ctx.build_sql(&query).unwrap_err();
+        assert!(
+            error
+                .message
+                .starts_with(&format!("Measure {measure} is built on biz."))
+                && error
+                    .message
+                    .contains("whose dimension overrides apply to this query"),
+            "{}",
+            error.message
+        );
+    }
+}
+
+// Without an overridden dimension in the query nothing is overridden: 3
+// cancellations of 4 purchases.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_measure_built_on_overridden_measures_without_their_dimensions() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_per_purchase_single_stage
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[test]
+fn test_masked_dimension_override_is_rejected() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_cancellations
+        dimensions:
+          - biz.dt_year_hidden
+    "#};
+
+    let error = ctx.build_sql(query).unwrap_err();
+    assert!(
+        error
+            .message
+            .contains("Masked dimension biz.dt_year_hidden can't be overridden yet"),
+        "{}",
+        error.message
+    );
+}

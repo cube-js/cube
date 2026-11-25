@@ -105,6 +105,7 @@ struct YamlViewDefaultFilter {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum YamlIncludes {
+    #[allow(dead_code)]
     All(String),
     List(Vec<YamlInclude>),
 }
@@ -220,9 +221,10 @@ impl YamlSchema {
             }
 
             for view_cube in view.cubes {
+                // `*`, like no includes, includes every member.
                 let list = match view_cube.includes {
                     Some(YamlIncludes::List(list)) => list,
-                    _ => vec![],
+                    Some(YamlIncludes::All(_)) | None => vec![],
                 };
                 let mut includes = vec![];
                 let mut include_aliases = HashMap::new();

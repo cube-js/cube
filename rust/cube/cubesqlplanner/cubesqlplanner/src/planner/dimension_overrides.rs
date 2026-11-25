@@ -50,17 +50,27 @@ impl AppliedOverrides {
     /// `query` with each overridden view dimension standing for its override,
     /// under its own name, wherever the query groups, filters or orders by it.
     pub fn apply(&self, query: &QueryProperties) -> Result<Rc<QueryProperties>, CubeError> {
+        let used = used_dimensions(query);
         let mut replacements = HashMap::new();
         for ((dimension, _), target) in self.items.iter().zip(&self.targets) {
-            let replacement = query_dimension(query, dimension)
-                .map(|symbol| symbol.as_ref_symbol())
-                .transpose()?
-                .map(|reference| MemberSymbol::new_ref(reference.with_target(target.clone())));
-            if let Some(replacement) = replacement {
-                replacements.insert(dimension.clone(), replacement);
+            let Some(symbol) = used.iter().find(|symbol| symbol.id() == dimension) else {
+                continue;
+            };
+            let reference = symbol.as_ref_symbol()?;
+            if reference.mask_sql().is_some() {
+                return Err(CubeError::user(format!(
+                    "Masked dimension {} can't be overridden yet",
+                    symbol.full_name()
+                )));
             }
+            let replacement = MemberSymbol::new_ref(reference.with_target(target.clone()));
+            replacements.insert(dimension.clone(), replacement);
         }
         query.map_dimension_symbols(&|symbol| transforms::substitute_by_name(symbol, &replacements))
+    }
+
+    fn has_dimension(&self, dimension: &MemberId) -> bool {
+        self.items.iter().any(|(d, _)| d == dimension)
     }
 }
 
@@ -95,12 +105,20 @@ impl OverridePartition {
 pub fn partition_by_dimension_overrides(
     query: &QueryProperties,
 ) -> Result<Vec<OverridePartition>, CubeError> {
-    let used = used_dimensions(query)
-        .into_iter()
+    let used_symbols = used_dimensions(query);
+    let used = used_symbols
+        .iter()
         .map(|symbol| symbol.id().clone())
         .collect::<HashSet<_>>();
     let mut partitions: Vec<OverridePartition> = Vec::new();
     for measure in query.all_used_measures()? {
+        if let Some(nested) = nested_overridden_measure(&measure, &used) {
+            return Err(CubeError::user(format!(
+                "Measure {} is built on {}, whose dimension overrides apply to this query, which is not supported yet",
+                measure.full_name(),
+                nested.full_name()
+            )));
+        }
         let overrides = AppliedOverrides::for_measure(&measure, &used);
         if !overrides.is_empty() && has_multi_stage_members(&measure.peel_refs(), false)? {
             return Err(CubeError::user(format!(
@@ -108,6 +126,7 @@ pub fn partition_by_dimension_overrides(
                 measure.full_name()
             )));
         }
+        check_no_dimension_left_behind(&measure, &overrides, &used_symbols)?;
         match partitions.iter_mut().find(|p| p.overrides == overrides) {
             Some(partition) => partition.measures.push(measure),
             None => partitions.push(OverridePartition {
@@ -131,10 +150,7 @@ pub fn are_overrides_applied(
     measures: &[Rc<MemberSymbol>],
     dimensions: &[Rc<MemberSymbol>],
 ) -> bool {
-    let dimensions = dimensions
-        .iter()
-        .map(time_dimension_base)
-        .collect::<Vec<_>>();
+    let dimensions = dimension_trees(dimensions.to_vec());
     let used = dimensions
         .iter()
         .map(|symbol| symbol.id().clone())
@@ -160,8 +176,9 @@ pub fn are_overrides_applied(
     })
 }
 
-// The view dimensions a query groups, filters or orders by. A time dimension
-// counts as the dimension it is a granularity of.
+// The dimensions a query groups, filters or orders by, with the dimensions
+// they are built on: a dimension a view declares over an overridden one is
+// overridden with it.
 fn used_dimensions(query: &QueryProperties) -> Vec<Rc<MemberSymbol>> {
     let mut members = query.dimensions().clone();
     members.extend(query.time_dimensions().iter().cloned());
@@ -173,18 +190,83 @@ fn used_dimensions(query: &QueryProperties) -> Vec<Rc<MemberSymbol>> {
         item.find_all_member_evaluators(&mut members);
     }
     members.extend(query.extract_dimensions_from_order());
-    members.iter().map(time_dimension_base).collect()
+    dimension_trees(members)
 }
 
-fn time_dimension_base(member: &Rc<MemberSymbol>) -> Rc<MemberSymbol> {
-    match member.as_time_dimension() {
-        Ok(time_dimension) => time_dimension.base_symbol().clone(),
-        Err(_) => member.clone(),
+// A view dimension's reference is not walked: the model member behind it can't
+// name a view dimension.
+fn dimension_trees(roots: Vec<Rc<MemberSymbol>>) -> Vec<Rc<MemberSymbol>> {
+    let mut result = Vec::new();
+    let mut seen = HashSet::new();
+    let mut pending = roots;
+    while let Some(member) = pending.pop() {
+        if !seen.insert(member.id().clone()) {
+            continue;
+        }
+        if !matches!(member.as_ref(), MemberSymbol::Ref(_)) {
+            pending.extend(
+                member
+                    .get_dependencies()
+                    .into_iter()
+                    .filter(|dependency| dependency.peel_refs().as_measure().is_err()),
+            );
+        }
+        result.push(member);
     }
+    result
 }
 
-fn query_dimension(query: &QueryProperties, id: &MemberId) -> Option<Rc<MemberSymbol>> {
-    used_dimensions(query)
-        .into_iter()
-        .find(|symbol| symbol.id() == id)
+// A view measure with overrides applying to the query, found under another
+// measure: its overrides would be lost there.
+fn nested_overridden_measure(
+    measure: &Rc<MemberSymbol>,
+    used: &HashSet<MemberId>,
+) -> Option<Rc<MemberSymbol>> {
+    let mut seen = HashSet::new();
+    let mut pending = measure.get_dependencies();
+    while let Some(member) = pending.pop() {
+        if !seen.insert(member.id().clone()) {
+            continue;
+        }
+        if !AppliedOverrides::for_measure(&member, used).is_empty() {
+            return Some(member);
+        }
+        pending.extend(member.get_dependencies());
+    }
+    None
+}
+
+// A dimension of the cube whose other dimensions a measure overrides would be
+// read over the default join: on another date, say, than the overridden ones.
+fn check_no_dimension_left_behind(
+    measure: &Rc<MemberSymbol>,
+    overrides: &AppliedOverrides,
+    used: &[Rc<MemberSymbol>],
+) -> Result<(), CubeError> {
+    let referenced_cube = |symbol: &Rc<MemberSymbol>| {
+        symbol
+            .as_ref_symbol()
+            .ok()
+            .and_then(|reference| reference.target_member().cloned())
+            .map(|target| target.cube_id())
+    };
+    let overridden_cubes = used
+        .iter()
+        .filter(|symbol| overrides.has_dimension(symbol.id()))
+        .filter_map(referenced_cube)
+        .collect::<Vec<_>>();
+    for symbol in used.iter() {
+        if overrides.has_dimension(symbol.id()) {
+            continue;
+        }
+        if let Some(cube) = referenced_cube(symbol).filter(|cube| overridden_cubes.contains(cube)) {
+            return Err(CubeError::user(format!(
+                "Dimension {} is not overridden for measure {}, which overrides other dimensions of {}",
+                symbol.full_name(),
+                measure.full_name(),
+                cube
+            )));
+        }
+    }
+    Ok(())
 }

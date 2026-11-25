@@ -1125,9 +1125,17 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     const result: Record<string, string> = {};
 
     for (const [name, target] of Object.entries(overrides)) {
-      const viewDimension = view.dimensions?.[name];
+      const viewDimension = view.dimensions?.[name] as (CubeSymbolDefinition & { included?: boolean }) | undefined;
       if (!viewDimension) {
         errorReporter.error(`Dimension override '${name}' of '${joinPath}' names no dimension of view '${view.name}'`);
+        continue;
+      }
+      // A dimension the view declares itself is not a reference to override;
+      // one built on an included dimension follows that dimension's override
+      if (!viewDimension.included) {
+        errorReporter.error(
+          `Dimension override '${name}' of '${joinPath}': '${view.name}.${name}' is declared by the view, only included dimensions can be overridden`
+        );
         continue;
       }
 
@@ -1144,17 +1152,23 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         continue;
       }
 
+      const missingGranularities = Object.keys(viewDimension.granularities || {})
+        .filter(granularity => !(dimension.granularities || {})[granularity]);
+      if (missingGranularities.length) {
+        errorReporter.error(
+          `Dimension override '${name}' of '${joinPath}': '${target}' has no granularities ${missingGranularities.join(', ')} of '${view.name}.${name}'`
+        );
+        continue;
+      }
+
       result[name] = target;
     }
 
     return result;
   }
 
-  /**
-   * The dimension a full override path names, or why it names none. The path
-   * starts with the include's join path and then follows joins, by alias or
-   * cube name, to a dimension of the cube it reaches.
-   */
+  // The dimension a path from the include's join path, through joins by alias
+  // or cube name, names; or why it names none.
   protected resolveOverrideTarget(target: string, joinPath: string): CubeSymbolDefinition | string {
     if (!target.startsWith(`${joinPath}.`)) {
       return `'${target}' must start with the join path '${joinPath}'`;

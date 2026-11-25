@@ -3114,8 +3114,7 @@ export class BaseQuery {
 
   protected usesOverriddenDimension(view: string, overrides: Record<string, string>): boolean {
     const used = new Set(
-      this.allMembersConcat(false)
-        .flatMap((member: any) => member.getMembers())
+      R.flatten(this.allMembersConcat(false).map((member: any) => member.getMembers()))
         .map((member: any) => member.path()?.join('.'))
     );
     return Object.keys(overrides).some(name => used.has(`${view}.${name}`));

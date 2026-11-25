@@ -193,8 +193,17 @@ impl FromSchema {
                 self.by_member.insert(member.id().clone(), *position);
                 return Ok(());
             }
-            Some(_) => {
+            Some(Some(_)) => {
                 self.by_chain.insert(chain, None);
+            }
+            Some(None) => {
+                let same = self.columns.iter().position(|column| {
+                    column.provider == provider && chain_id(&column.member) == chain
+                });
+                if let Some(position) = same {
+                    self.by_member.insert(member.id().clone(), position);
+                    return Ok(());
+                }
             }
             None => {
                 self.by_chain.insert(chain, Some(self.columns.len()));

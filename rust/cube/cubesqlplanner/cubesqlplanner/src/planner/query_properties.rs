@@ -183,8 +183,8 @@ impl QueryProperties {
             if order_item
                 .member_evaluator
                 .peel_refs()
-                .as_dimension()
-                .is_ok()
+                .as_measure()
+                .is_err()
             {
                 order_item.member_evaluator = f(&order_item.member_evaluator)?;
             }

@@ -10,6 +10,10 @@ cubes:
         sql: dt_ts
         type: time
         primary_key: true
+        granularities:
+          - name: fiscal_year
+            interval: 1 year
+            offset: 3 months
       - name: dt_year
         sql: dt_year
         type: string
@@ -36,6 +40,9 @@ cubes:
       - name: cancel_year
         sql: "to_char(cancel_date, 'YYYY')"
         type: string
+      - name: cancel_date
+        sql: cancel_date
+        type: time
     measures:
       - name: count
         type: count
@@ -214,6 +221,54 @@ describe('View dimension overrides', () => {
   ])('rejects %s', async (_name, overrides, error) => {
     const { compiler } = prepareYamlCompiler(cubes + view(overrides));
     await expect(compiler.compile()).rejects.toThrow(error);
+  });
+
+  it('rejects a dimension the view declares itself', async () => {
+    const { compiler } = prepareYamlCompiler(`${cubes}
+views:
+  - name: biz
+    dimensions:
+      - name: year_label
+        sql: "{calendar.dt_year}"
+        type: string
+    cubes:
+      - join_path: calendar
+        includes: [dt_year]
+      - join_path: subscriptions
+        includes: [count]
+        dimension_overrides:
+          year_label: subscriptions.cancel_cal.dt_year
+`);
+    await expect(compiler.compile()).rejects.toThrow(
+      /Dimension override 'year_label' of 'subscriptions': 'biz.year_label' is declared by the view, only included dimensions can be overridden/
+    );
+  });
+
+  it('rejects a time dimension without the granularities of the view dimension', async () => {
+    const { compiler } = prepareYamlCompiler(cubes + view(`
+          dt_ts: subscriptions.cancel_date`));
+    await expect(compiler.compile()).rejects.toThrow(
+      /Dimension override 'dt_ts' of 'subscriptions': 'subscriptions.cancel_date' has no granularities fiscal_year of 'biz.dt_ts'/
+    );
+  });
+
+  it('rejects an overridden dimension in a filter group under the legacy planner', async () => {
+    const compilers = prepareYamlCompiler(cubes + view(cancelCalendar));
+    await compilers.compiler.compile();
+
+    expect(() => compilers.createQuery(PostgresQuery, {
+      measures: ['biz.cancellations_count'],
+      filters: [{
+        or: [
+          { member: 'biz.dt_year', operator: 'equals', values: ['2026'] },
+          { member: 'biz.dt_year_month', operator: 'equals', values: ['2025-09'] },
+        ],
+      }],
+      timezone: 'UTC',
+      useNativeSqlPlanner: false,
+    }).buildSqlAndParams()).toThrow(
+      /Measure 'biz.cancellations_count' has dimension overrides for dimensions of this query/
+    );
   });
 
   it('rejects overrides on a split include', async () => {
