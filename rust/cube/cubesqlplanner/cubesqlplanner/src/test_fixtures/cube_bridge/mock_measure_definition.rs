@@ -14,6 +14,7 @@ use crate::test_fixtures::cube_bridge::{
 };
 use cubenativeutils::CubeError;
 use std::any::Any;
+use std::collections::HashMap;
 use std::rc::Rc;
 use typed_builder::TypedBuilder;
 
@@ -53,6 +54,8 @@ pub struct MockMeasureDefinition {
     resolved_mask_sql: Option<String>,
     #[builder(default)]
     included: Option<bool>,
+    #[builder(default)]
+    dimension_overrides: Option<HashMap<String, String>>,
 }
 
 impl_static_data!(
@@ -66,7 +69,8 @@ impl_static_data!(
     group_by_references,
     time_shift_references,
     rolling_window,
-    included
+    included,
+    dimension_overrides
 );
 
 impl MockMeasureDefinition {

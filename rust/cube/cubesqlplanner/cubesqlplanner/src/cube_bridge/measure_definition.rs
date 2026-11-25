@@ -13,6 +13,7 @@ use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -55,6 +56,9 @@ pub struct MeasureDefinitionStatic {
     pub rolling_window: Option<RollingWindow>,
     /// Re-exported by a view from its `includes`, rather than declared by it.
     pub included: Option<bool>,
+    /// View dimension name -> full path of the dimension it means for this view measure.
+    #[serde(rename = "dimensionOverrides")]
+    pub dimension_overrides: Option<HashMap<String, String>>,
 }
 
 #[nativebridge::native_bridge(MeasureDefinitionStatic, with_static_meta)]

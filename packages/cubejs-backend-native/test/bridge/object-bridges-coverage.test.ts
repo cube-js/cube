@@ -196,6 +196,7 @@ const BRIDGES: BridgeSpec[] = [
     expected: [
       'add_group_by_references',
       'case',
+      'dimension_overrides',
       'drill_filters',
       'filter',
       'filters',

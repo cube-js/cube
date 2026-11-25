@@ -1,3 +1,4 @@
+import { PostgresQuery } from '../../src';
 import { prepareJsCompiler, prepareYamlCompiler } from './PrepareCompiler';
 
 const cubes = `
@@ -100,6 +101,17 @@ describe('View dimension overrides', () => {
       dt_year_month: 'subscriptions.cancel_cal.dt_year_month',
     });
     expect(measures.carts_count.dimensionOverrides).toBeUndefined();
+  });
+
+  it('passes the overrides of a view measure to the SQL planner', async () => {
+    const compilers = prepareYamlCompiler(cubes + view(cancelCalendar));
+    await compilers.compiler.compile();
+
+    const [sql] = compilers.createQuery(PostgresQuery, {
+      measures: ['biz.cancellations_count'],
+      timezone: 'UTC',
+    }).buildSqlAndParams();
+    expect(sql).toMatch(/FROM\s+subscriptions/);
   });
 
   it('overrides with a dimension of the included cube itself', async () => {
