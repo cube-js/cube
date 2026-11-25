@@ -9,7 +9,7 @@ Unlike [source SQL in Explore](/docs/explore-analyze/explore#querying-source-dat
 Source SQL tabs are saved with the workbook and can feed charts on dashboards.
 
 <Frame>
-  <img src="https://lgo0ecceic.ucarecd.net/103fafdb-783c-46d0-9d5d-a4879bc11a9d/" />
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/source-sql-tabs/source-sql-tab.png" alt="Source SQL tab with the data source pane, the SQL editor, the Row limit and Run buttons in the toolbar, and the results table" />
 </Frame>
 
 ## Adding a Source SQL tab
@@ -74,10 +74,15 @@ toolbar and enter a number.
 
 {/* TODO: video — setting a row limit on a Source SQL tab (GTM-332) */}
 
+<Frame>
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/source-sql-tabs/row-limit-popover.png" alt="Row limit popover with the info icon, the Reset button, and a row limit of 2,500" />
+</Frame>
+
 - **Empty** — The query runs with the deployment's
   [default row limit](/docs/data-modeling/configuration#default-row-limit),
   10,000 rows unless it's changed. The field shows the default as its
-  placeholder. A tab saved without a row limit runs with the default, too.
+  placeholder. Click **Reset** to clear a number. A tab saved without a row
+  limit runs with the default, too.
 - **A number** — The query returns up to that many rows. A number above the
   deployment's [maximum row limit](/docs/data-modeling/configuration#maximum-row-limit)
   is reduced to the maximum. Hover over the info icon next to **Row limit** to
