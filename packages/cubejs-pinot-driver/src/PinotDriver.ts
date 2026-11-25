@@ -15,6 +15,7 @@ import {
   Required,
 } from '@cubejs-backend/shared';
 
+import querystring from 'node:querystring';
 import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 
 import {
@@ -34,6 +35,18 @@ export type PinotDriverConfiguration = {
   dataSource?: string;
   queryTimeout?: number;
   nullHandling?: boolean;
+  /**
+   * Sent as the `applicationName` query option, which puts the queries under that
+   * application's QPS quota. Queries without it are exempt from application quotas.
+   * @see https://docs.pinot.apache.org/build-with-pinot/querying-and-sql/query-execution-controls/query-quotas
+   */
+  applicationName?: string;
+  /**
+   * Sent as the `workloadName` query option, which charges the queries to that
+   * workload's CPU and memory budget when query workload isolation is enabled.
+   * @see https://docs.pinot.apache.org/operate-pinot/tuning/workload-query-isolation
+   */
+  workloadName?: string;
   preAggregations?: boolean;
 };
 
@@ -123,6 +136,9 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       ...config
     };
 
+    this.assertQueryOptionValue('applicationName', this.config.applicationName);
+    this.assertQueryOptionValue('workloadName', this.config.workloadName);
+
     const useSsl = getEnv('dbSsl', { dataSource, preAggregations });
     const rawHost = this.config.host || '';
     const host = /^https?:\/\//i.test(rawHost)
@@ -172,15 +188,40 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     return { Authorization: `Basic ${encodedCredentials}` };
   }
 
-  protected queryOptions(requestId?: string): string {
-    const options = `useMultistageEngine=true;enableNullHandling=${this.config.nullHandling};timeoutMs=${this.config.queryTimeout * 1000}`;
+  /**
+   * The queryOptions string has no escaping, so a value with `;` or `=` would
+   * be parsed by Pinot as extra options.
+   */
+  protected assertQueryOptionValue(name: string, value?: unknown): void {
+    if (value !== undefined && (typeof value !== 'string' || value.trim() === '' || /[;=]/.test(value))) {
+      throw new TypeError(
+        `Pinot ${name} must be a non-empty string without ';' and '=', got: ${JSON.stringify(value)}`
+      );
+    }
+  }
 
-    const clientQueryId = requestId && extractRequestUUID(requestId);
-    if (!clientQueryId || !isValidRequestId(clientQueryId) || clientQueryId.includes('=')) {
-      return options;
+  protected queryOptions(requestId?: string): string {
+    const options: Record<string, string | number | boolean> = {
+      useMultistageEngine: true,
+      enableNullHandling: Boolean(this.config.nullHandling),
+      timeoutMs: this.config.queryTimeout * 1000,
+    };
+
+    if (this.config.applicationName) {
+      options.applicationName = this.config.applicationName;
     }
 
-    return `${options};clientQueryId=${clientQueryId}`;
+    if (this.config.workloadName) {
+      options.workloadName = this.config.workloadName;
+    }
+
+    const clientQueryId = requestId && extractRequestUUID(requestId);
+    if (clientQueryId && isValidRequestId(clientQueryId) && !clientQueryId.includes('=')) {
+      options.clientQueryId = clientQueryId;
+    }
+
+    // Pinot splits the string on ';' and '=' without decoding it, so the values are not escaped.
+    return querystring.stringify(options, ';', '=', { encodeURIComponent: (value) => value });
   }
 
   protected async request(query: string, requestId?: string): Promise<PinotResponse> {

@@ -4722,6 +4722,7 @@ impl WrappedSelectNode {
                     Some(data_source),
                 )
                 .await?;
+                merge_pre_aggregations(&mut pre_aggregations, subq_sql.pre_aggregations);
                 // Join subquery SQL was generated independently, so its placeholders
                 // reference its own values and must be remapped to the combined values
                 let (subq_sql_string, new_values) = subq_sql.sql.unpack();

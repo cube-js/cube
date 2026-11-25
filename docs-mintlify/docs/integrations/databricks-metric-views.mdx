@@ -670,9 +670,10 @@ run a new **Preview** after a Cube upgrade.
 
 - **Supported** — a view with a clear root source and representable dimensions, measures,
   and joins. Review the generated YAML, then test access and sync.
-- **Warning** — behavior-neutral metadata Databricks cannot represent, or a fan-out-unsafe measure
-  withheld as `CUBE_MEMBER_WITHHELD`. Review the exact difference before accepting publication;
-  for a withheld measure, publish it from a view rooted at its own cube.
+- **Warning** — behavior-neutral metadata Databricks cannot represent, or a measure withheld as
+  `CUBE_MEMBER_WITHHELD` because it can over-count. Review the exact difference before accepting
+  publication; for a withheld measure, apply the fix for its case under
+  [withheld measures](#withheld-measures).
 
 Preview **blocks** a view when it finds any of these conditions:
 
@@ -687,10 +688,10 @@ Preview **blocks** a view when it finds any of these conditions:
 - A two-part `schema.table` source without a default catalog: set `CUBEJS_DB_DATABRICKS_CATALOG`
   for the selected Databricks data source, or the **Default catalog** of a publication target with
   its own connection, and preview again.
-- Cyclic or one-to-many joins, a join condition that reads a measure, or one that reads a cube other
-  than the two it joins outside the nested case under **Joins** above, including a `table.column`
-  whose table is neither of them: simplify the join. For
-  a one-to-many join (`CUBE_VIEW_JOIN_NOT_REPRESENTABLE`), root the view at the many-side cube.
+- Cyclic joins, a one-to-many join on the view's join path, a join condition that reads a measure,
+  or one that reads a cube other than the two it joins outside the nested case under **Joins**
+  above, including a `table.column` whose table is neither of them: simplify the join. For a
+  one-to-many join (`CUBE_VIEW_JOIN_NOT_REPRESENTABLE`), root the view at the many-side cube.
 - A many-to-one or one-to-one join whose condition reads no column of the joined cube, such as
   `1 = 1` or `{CUBE}.status = 'open'` (Preview names the join): Cube keeps every row such a join
   matches, and a Metric View keeps one. This includes a cube the view reaches only through member
@@ -711,14 +712,42 @@ Preview **blocks** a view when it finds any of these conditions:
   subquery, or keep that view in Cube.
 - Unsupported expressions or types, or multi-stage, window, or ranking calculations: simplify
   the model or keep that view in Cube.
-- An aggregate measure, such as `count_distinct` or `max`, that reads a measure which itself
-  aggregates: SQL can't nest aggregates, so reference a dimension instead.
+- A measure that reads a column outside any aggregate, such as
+  `CASE WHEN {layout.idx} = 1 THEN {count} END` (Preview names the measure and the column): a
+  Metric View measure must aggregate every column it reads. Move the condition inside the
+  aggregate, or keep that view in Cube.
+- Two dimensions that each read the other's name, where one of them is named `source` or has the
+  same name as a join: a Metric View dimension reads the dimensions before it by name, so Preview
+  must place such a dimension after every dimension that reads its name, and no order works for
+  two that read each other. Rename one of them.
 
-An unsafe joined measure can be **withheld while the rest of its view is published**. That view
-may show **Created**, **Updated**, or **Unchanged**, and the run may show **Completed**, even
-though some measures are missing in Databricks. Check **Measures not published** in Preview and
-beside each view in run history before treating a run as complete. There is no opt-in gate for
-incomplete publication yet.
+### Withheld measures
+
+A view's joins are the joins on its join path plus any joins that member SQL reaches, such as
+`{CUBE.users.country}`. That includes the SQL of a member the view doesn't list but one of its
+members references. A one-to-many join on the join path blocks the view, as listed above, and so
+does a dimension that reads a cube behind one. Otherwise, a one-to-many join that member SQL
+reaches doesn't block the view, but it can withhold some of the view's measures.
+
+A measure of the view's root cube that reads a joined cube, such as
+`SUM(CASE WHEN {products.family} = 'CX' THEN {CUBE}.events END)`, publishes when all of the
+view's joins are many-to-one or one-to-one and the view has no root-source override: such joins
+can't repeat a row of the root cube, so each row counts once, as in Cube.
+
+A measure that can over-count is withheld: a non-idempotent aggregate, such as `sum`, `avg`, or a
+`count` of an expression, or a calculated measure built on one. It is withheld in these cases:
+
+- A measure of a joined cube: publish it from a view rooted at its own cube.
+- A calculated measure that references another cube's measure: keep that view in Cube.
+- A root-cube measure that reads a joined cube, in a view where member SQL reaches a one-to-many
+  join, or in a view with a root-source override: remove the member reference that reaches that
+  join, or the override, or keep that view in Cube.
+
+A view with a withheld measure is **still published without it**. That view may show
+**Created**, **Updated**, or **Unchanged**, and the run may show **Completed**, even though some
+measures are missing in Databricks. Check **Measures not published** in Preview and beside each
+view in run history before treating a run as complete. There is no opt-in gate for incomplete
+publication yet.
 
 ### References and subqueries in SQL
 

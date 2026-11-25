@@ -1673,6 +1673,7 @@ ORDER BY \"COUNT(count)\" DESC"
             DatabaseProtocol::PostgreSQL,
         ).await;
 
+        // Sunday-start week: Cube `week` granularity starts on Monday
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
             logical_plan.find_cube_scan().request,
@@ -1682,7 +1683,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 dimensions: Some(vec![]),
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("week".to_string()),
+                    granularity: Some("day".to_string()),
                     date_range: None,
                 }]),
                 order: Some(vec![]),
