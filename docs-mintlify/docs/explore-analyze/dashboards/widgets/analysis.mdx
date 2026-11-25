@@ -33,10 +33,10 @@ In the builder, the leaf is always shown and a run is saved to the dashboard's d
 
 ### What re-runs an analysis
 
-An analysis runs again only when someone clicks **Refresh** on the widget's own leaf or **Run** in its prompt box, or on a published dashboard in [live mode][ref-live-mode]:
+An analysis runs again only when someone clicks **Refresh** on the widget's own leaf or **Run** in its prompt box, or on a published dashboard with [auto-refresh][ref-auto-refresh] on:
 
 - **Refresh all charts** on the dashboard's [freshness][ref-freshness] leaf refreshes the charts and leaves every Analysis widget as it is.
-- Each live-mode refresh also re-runs every Analysis widget that has already run. The new analysis stays in that browser tab and is not published. A widget that has never run is not run by live mode.
+- Each refresh that auto-refresh runs also re-runs every Analysis widget that has already run. The new analysis stays in that browser tab and is not published. A widget that has never run is not run by auto-refresh.
 
 ## Outdated warning
 
@@ -56,13 +56,13 @@ The widget stores a reference to the chat thread that produced its analysis. Vie
 
 A viewer's **Refresh** or **Run** publishes the new analysis for everyone when that viewer can edit the workbook; in an embed, only a [Creator Mode][ref-creator-mode] session can. For any other viewer, the new analysis shows in their browser tab only, and everyone else keeps seeing the published one.
 
-In an embed with **Allow AI summary widgets in embeds** (`showAiWidgets`, see [Feature visibility][ref-feature-visibility]) turned off, and in [PNG and PDF downloads][ref-downloads] and [deliveries][ref-deliveries], the widget shows its stored analysis with no **Run** or **Refresh**, and live mode doesn't re-run it.
+In an embed with **Allow AI summary widgets in embeds** (`showAiWidgets`, see [Feature visibility][ref-feature-visibility]) turned off, and in [PNG and PDF downloads][ref-downloads] and [deliveries][ref-deliveries], the widget shows its stored analysis with no **Run** or **Refresh**, and auto-refresh doesn't re-run it.
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
 [ref-agents]: /admin/ai
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-insert-menu]: /docs/explore-analyze/dashboards/widgets#adding-a-widget-at-a-spot-on-the-canvas
-[ref-live-mode]: /docs/explore-analyze/dashboards#live-mode
+[ref-auto-refresh]: /docs/explore-analyze/dashboards#auto-refresh
 [ref-freshness]: /docs/explore-analyze/dashboards#data-freshness
 [ref-which-agent]: /docs/explore-analyze/dashboards/dashboard-agent#which-agent-answers
 [ref-creator-mode]: /embedding/iframe/creator-mode

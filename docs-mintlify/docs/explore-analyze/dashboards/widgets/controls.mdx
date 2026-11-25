@@ -221,7 +221,7 @@ When the next values fail to load, the ones already listed stay, and the bottom 
 
 ### When the value list fails to load
 
-When the query behind a filter's value list fails, a warning sign appears inside the filter, left of its value. Hover it, or open the filter, to read *Couldn't load this filter's values:* followed by the reason; the open list shows that message instead of values. This applies whether the list failed when the dashboard opened or during a refresh, on a published dashboard and in the dashboard builder alike, and the sign goes away once the list loads. A dashboard refresh — with **Refresh** on the dashboard's [freshness][ref-data-freshness] leaf or in [live mode][ref-live-mode] — in which only filter value lists failed reads **Couldn't load filter values** and points to the filter marked with the warning; when a chart's query fails too, it reads **Failed to refresh dashboard**.
+When the query behind a filter's value list fails, a warning sign appears inside the filter, left of its value. Hover it, or open the filter, to read *Couldn't load this filter's values:* followed by the reason; the open list shows that message instead of values. This applies whether the list failed when the dashboard opened or during a refresh, on a published dashboard and in the dashboard builder alike, and the sign goes away once the list loads. A dashboard refresh — with **Refresh** on the dashboard's [freshness][ref-data-freshness] leaf or by [auto-refresh][ref-auto-refresh] — in which only filter value lists failed reads **Couldn't load filter values** and points to the filter marked with the warning; when a chart's query fails too, it reads **Failed to refresh dashboard**.
 
 ### Faceted filters
 
@@ -855,4 +855,4 @@ The controls icon on a chart counts these filters along with the other controls,
 [ref-drill-through-landing]: /docs/explore-analyze/dashboards/drill-through#how-the-target-applies-the-values
 [ref-cross-filters-combine]: /docs/explore-analyze/dashboards/cross-filtering#how-cross-filters-combine
 [ref-data-freshness]: /docs/explore-analyze/dashboards#data-freshness
-[ref-live-mode]: /docs/explore-analyze/dashboards#live-mode
+[ref-auto-refresh]: /docs/explore-analyze/dashboards#auto-refresh
