@@ -15,7 +15,7 @@ import {
   Required,
 } from '@cubejs-backend/shared';
 
-import querystring from 'querystring';
+import querystring from 'node:querystring';
 import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 
 import {
