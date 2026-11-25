@@ -31,7 +31,7 @@
     "@cubejs-backend/shared": "1.6.78",
     "@types/node": "^20",
     "moment": "^2.29.1",
-    "mysql2": "^3.11.5"
+    "mysql2": "^3.16.1"
   },
   "license": "Apache-2.0",
   "publishConfig": {
