@@ -897,7 +897,14 @@ export class QueryCache {
           let logged = false;
           Promise
             .all([clientFactory()])
-            .then(([client]) => (<DriverInterface>client).stream(traceFn(req), req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark'), requestId: req.requestId }))
+            .then(([client]) => {
+              const driver = <DriverInterface>client;
+              if (!driver.stream) {
+                throw new Error(`${driver.constructor.name} does not implement streaming: stream() method is missing`);
+              }
+
+              return driver.stream(traceFn(req), req.values, { highWaterMark: getEnv('dbQueryStreamHighWaterMark'), requestId: req.requestId });
+            })
             .then((source) => {
               const cleanup = async (error?: Error) => {
                 if (source.release) {
