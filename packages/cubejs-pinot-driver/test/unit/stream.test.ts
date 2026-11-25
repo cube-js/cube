@@ -15,6 +15,8 @@ type BrokerOptions = {
   failDeleteWith?: { status: number, body: string },
   // Accepts the page request and never answers it.
   hangResults?: boolean,
+  // Rejects the `LIMIT 0` query that reads the schema of an empty result.
+  failSchemaQuery?: boolean,
   // Reported as the broker that ran the query.
   owner?: { host: string, port: number },
 };
@@ -93,6 +95,10 @@ class FakeBroker {
     };
 
     if (req.method === 'POST' && url.pathname === '/query/sql') {
+      if (this.options.failSchemaQuery && JSON.parse(body).sql.endsWith('LIMIT 0')) {
+        return json({ exceptions: [{ message: 'QueryPlanningError', errorCode: 150 }] });
+      }
+
       if (this.options.exception) {
         return json({ exceptions: [this.options.exception], numRowsResultSet: 0, requestId: CURSOR_ID });
       }
@@ -236,7 +242,7 @@ describe('PinotDriver stream', () => {
     expect(calls(requests)).toEqual(['POST /query/sql?getCursor=true&numRows=2']);
   });
 
-  it('reads the column types of an empty result from a plain response', async () => {
+  it('reads the column types of an empty result without running the query again', async () => {
     const { driver, requests } = await start({ rows: [] });
 
     const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 2 });
@@ -246,11 +252,50 @@ describe('PinotDriver stream', () => {
 
     await source.release?.();
 
-    expect(calls(requests)).toEqual([
-      'POST /query/sql?getCursor=true&numRows=2',
+    expect(calls(requests)[0]).toBe('POST /query/sql?getCursor=true&numRows=2');
+    // The schema query and the delete are sent together.
+    expect(calls(requests).slice(1).sort()).toEqual([
       `DELETE /responseStore/${CURSOR_ID}`,
       'POST /query/sql',
     ]);
+    expect(requests.filter(({ body }) => body).map(({ body }) => body.sql)).toEqual([
+      'SELECT id, name FROM t',
+      'SELECT * FROM (SELECT id, name FROM t) LIMIT 0',
+    ]);
+  });
+
+  it('runs an empty query again when its schema cannot be read with LIMIT 0', async () => {
+    const { driver, requests } = await start({ rows: [], failSchemaQuery: true });
+
+    const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 2 });
+
+    expect(source.types).toEqual(TYPES);
+    expect(await streamToArray(<any> source.rowStream)).toEqual([]);
+    expect(requests.filter(({ body }) => body).map(({ body }) => body.sql)).toEqual([
+      'SELECT id, name FROM t',
+      'SELECT * FROM (SELECT id, name FROM t) LIMIT 0',
+      'SELECT id, name FROM t',
+    ]);
+  });
+
+  it('deletes the cursor of a single-page result without waiting for the consumer', async () => {
+    const { driver, requests } = await start({ rows: ROWS });
+
+    const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 5 });
+
+    while (requests.length < 2) {
+      await new Promise((resolve) => { setTimeout(resolve, 5); });
+    }
+
+    expect(calls(requests)).toEqual([
+      'POST /query/sql?getCursor=true&numRows=5',
+      `DELETE /responseStore/${CURSOR_ID}`,
+    ]);
+    // The rows of the first page are already in memory.
+    expect(await streamToArray(<any> source.rowStream)).toEqual(EXPECTED);
+
+    await source.release?.();
+    expect(requests).toHaveLength(2);
   });
 
   it('downloads query results as a stream for a stream import', async () => {
@@ -310,7 +355,7 @@ describe('PinotDriver stream', () => {
   it('deletes the cursor once the stream has been read to the end', async () => {
     const { driver, requests } = await start({ rows: ROWS });
 
-    const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 5 });
+    const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 2 });
     const rowStream = <Readable> source.rowStream;
     const closed = new Promise((resolve) => {
       rowStream.once('close', resolve);

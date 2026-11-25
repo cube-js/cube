@@ -390,6 +390,24 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     return brokerResponse;
   }
 
+  /**
+   * Answers a query that is known to return no rows. Pinot plans `LIMIT 0` without
+   * scanning anything, so the schema comes at the price of planning instead of a
+   * second execution. A query that cannot be wrapped is executed as is.
+   */
+  protected async requestEmptyResult(query: string, requestId?: string): Promise<PinotResponse> {
+    try {
+      const response = await this.request(`SELECT * FROM (${query}) LIMIT 0`, requestId);
+      if (response.resultTable) {
+        return response;
+      }
+    } catch {
+      // Falls through to the query itself, which reports its own error if it has one.
+    }
+
+    return this.request(query, requestId);
+  }
+
   protected async fetchCursorPage(
     cursor: PinotCursor,
     offset: number,
@@ -486,8 +504,10 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     if (isCursorResponse(first) && !first.resultTable) {
       // An empty cursor result carries no schema, while a pre-aggregation build needs the
       // column types even for an empty table. A plain response always has them.
-      await this.deleteCursor(this.createCursor(first));
-      first = await this.request(sql, requestId);
+      [first] = await Promise.all([
+        this.requestEmptyResult(sql, requestId),
+        this.deleteCursor(this.createCursor(first)),
+      ]);
     }
 
     // The closures below outlive the first page, so they hold the cursor fields they need
@@ -528,6 +548,12 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
 
       return released;
     };
+
+    if (cursor !== null && nextOffset >= totalRows) {
+      // The first page holds the whole result, so the cursor is dropped right away,
+      // in the background, instead of costing the consumer a round trip at the end.
+      release();
+    }
 
     return {
       // The stream releases the cursor itself when it closes, so a consumer that never
