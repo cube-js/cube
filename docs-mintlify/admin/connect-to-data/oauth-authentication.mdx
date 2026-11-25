@@ -326,10 +326,10 @@ module.exports = {
    error message. The hint names the OAuth app and links to
    **Connected accounts**, so a user who gets a permission error from the
    service account knows to connect or reconnect their account. SQL API
-   and MCP clients show the hint as part of the message. The REST API
-   error response also includes `userCredentials`, with an entry for each
-   such credential, so API clients can handle the case without parsing
-   the message:
+   and MCP clients show the hint as part of the message. The REST (JSON)
+   API error response also includes `userCredentials`, with an entry for
+   each such credential, so API clients can handle the case without
+   parsing the message:
 
    ```json
    {
