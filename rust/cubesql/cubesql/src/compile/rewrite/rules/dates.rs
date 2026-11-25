@@ -4,7 +4,7 @@ use crate::{
         alias_expr,
         analysis::{ConstantFolding, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
-        literal_int, literal_string, negative_expr, original_expr_name, rewrite,
+        literal_int, literal_string, original_expr_name, rewrite,
         rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         rules::utils::DeltaTimeUnitToken,
         to_day_interval_expr, transform_original_expr_to_alias, transforming_rewrite,
@@ -272,36 +272,6 @@ impl RewriteRules for DateRules {
                     "?alias",
                 ),
                 transform_original_expr_to_alias("?alias"),
-            ),
-            transforming_rewrite_with_root(
-                "tableau-week",
-                binary_expr(
-                    alias_expr(
-                        self.fun_expr(
-                            "DateTrunc",
-                            vec!["?granularity".to_string(), column_expr("?column")],
-                        ),
-                        "?date_trunc_alias",
-                    ),
-                    "+",
-                    binary_expr(
-                        negative_expr(self.fun_expr(
-                            "DatePart",
-                            vec![literal_string("dow"), column_expr("?column")],
-                        )),
-                        "*",
-                        // TODO match
-                        literal_expr("?interval_one_day"),
-                    ),
-                ),
-                alias_expr(
-                    self.fun_expr(
-                        "DateTrunc",
-                        vec![literal_string("week"), column_expr("?column")],
-                    ),
-                    "?alias",
-                ),
-                self.transform_root_alias("?alias"),
             ),
             rewrite(
                 "metabase-interval-date-range",

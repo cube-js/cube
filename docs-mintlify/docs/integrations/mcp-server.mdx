@@ -496,6 +496,7 @@ console.log(tools.map((tool) => tool.name));
 | `error` | Status | Cause |
 | --- | --- | --- |
 | `invalid_client` | 401 | `client_id` isn't `cube-api-key`, or the secret isn't a valid Cube API key. |
+| `unauthorized_client` | 400 | The key is valid, but the single endpoint is turned off for your account. Use a [region-specific endpoint](#authenticate-with-an-api-key) with the host from **Admin → MCP Server**. |
 | `invalid_request` | 400 | `subject_token` is missing or unknown, or `subject_token_type` is wrong. |
 | `invalid_scope` | 400 | `scope` was sent more than once. |
 | `access_denied` | 403 | The request isn't allowed — for example, a non-admin key naming a user, a key limited to particular deployments or to specific endpoints, or a deactivated user. |
@@ -727,6 +728,14 @@ measure such as a sum or a count reads `0`, and other measures read `null`.
 
 If a comparison can't be computed, `runQuery` still returns the rows, without that comparison's
 columns, and explains why in `periodComparisonErrors`.
+
+A call can have up to 8 distinct comparisons. Each distinct pair of `timeDimension` and `offset`
+counts once, so measures that share a time dimension and an offset count as one comparison.
+Spell the time dimension the same way in every entry: a member name and its alias count as two.
+A call with more than 8 is rejected; use fewer distinct time dimension and offset pairs, or split them across calls.
+
+Cube runs the comparisons one after another, and they share the query's time budget. A
+comparison that has no time left isn't run, and `periodComparisonErrors` says so.
 
 ### Dashboard authoring
 

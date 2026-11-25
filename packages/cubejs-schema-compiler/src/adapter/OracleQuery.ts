@@ -112,7 +112,7 @@ export class OracleQuery extends BaseQuery {
 
   /**
    * Oracle uses ADD_MONTHS for year/month/quarter intervals
-   * and NUMTODSINTERVAL for day/hour/minute/second intervals
+   * and NUMTODSINTERVAL for week/day/hour/minute/second intervals
    */
   public addInterval(date: string, interval: string): string {
     const intervalParsed = parseSqlInterval(interval);
@@ -134,9 +134,10 @@ export class OracleQuery extends BaseQuery {
       res = `ADD_MONTHS(${res}, ${totalMonths})`;
     }
 
-    // Handle day/hour/minute/second using NUMTODSINTERVAL
-    if (intervalParsed.day) {
-      res = `${res} + NUMTODSINTERVAL(${intervalParsed.day}, 'DAY')`;
+    // Handle week/day/hour/minute/second using NUMTODSINTERVAL
+    const totalDays = this.intervalDays(intervalParsed);
+    if (totalDays) {
+      res = `${res} + NUMTODSINTERVAL(${totalDays}, 'DAY')`;
     }
     if (intervalParsed.hour) {
       res = `${res} + NUMTODSINTERVAL(${intervalParsed.hour}, 'HOUR')`;
@@ -172,12 +173,13 @@ export class OracleQuery extends BaseQuery {
     }
 
     if (totalMonths !== 0) {
-      res = `ADD_MONTHS(${res}, -${totalMonths})`;
+      res = `ADD_MONTHS(${res}, ${-totalMonths})`;
     }
 
-    // Handle day/hour/minute/second using NUMTODSINTERVAL with subtraction
-    if (intervalParsed.day) {
-      res = `${res} - NUMTODSINTERVAL(${intervalParsed.day}, 'DAY')`;
+    // Handle week/day/hour/minute/second using NUMTODSINTERVAL with subtraction
+    const totalDays = this.intervalDays(intervalParsed);
+    if (totalDays) {
+      res = `${res} - NUMTODSINTERVAL(${totalDays}, 'DAY')`;
     }
     if (intervalParsed.hour) {
       res = `${res} - NUMTODSINTERVAL(${intervalParsed.hour}, 'HOUR')`;
@@ -190,6 +192,11 @@ export class OracleQuery extends BaseQuery {
     }
 
     return res;
+  }
+
+  // NUMTODSINTERVAL has no week unit
+  protected intervalDays(interval: ReturnType<typeof parseSqlInterval>): number {
+    return (interval.week || 0) * 7 + (interval.day || 0);
   }
 
   public dateBin(interval: string, source: string, origin: string): string {

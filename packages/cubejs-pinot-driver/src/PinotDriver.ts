@@ -3,15 +3,19 @@ import {
   StreamTableData,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
+  QueryOptions,
   BaseDriver
 } from '@cubejs-backend/base-driver';
 import {
   getEnv,
   assertDataSource,
+  extractRequestUUID,
   formatAnsi,
+  isValidRequestId,
   Required,
 } from '@cubejs-backend/shared';
 
+import querystring from 'node:querystring';
 import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 
 import {
@@ -31,6 +35,18 @@ export type PinotDriverConfiguration = {
   dataSource?: string;
   queryTimeout?: number;
   nullHandling?: boolean;
+  /**
+   * Sent as the `applicationName` query option, which puts the queries under that
+   * application's QPS quota. Queries without it are exempt from application quotas.
+   * @see https://docs.pinot.apache.org/build-with-pinot/querying-and-sql/query-execution-controls/query-quotas
+   */
+  applicationName?: string;
+  /**
+   * Sent as the `workloadName` query option, which charges the queries to that
+   * workload's CPU and memory budget when query workload isolation is enabled.
+   * @see https://docs.pinot.apache.org/operate-pinot/tuning/workload-query-isolation
+   */
+  workloadName?: string;
   preAggregations?: boolean;
 };
 
@@ -120,6 +136,9 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       ...config
     };
 
+    this.assertQueryOptionValue('applicationName', this.config.applicationName);
+    this.assertQueryOptionValue('workloadName', this.config.workloadName);
+
     const useSsl = getEnv('dbSsl', { dataSource, preAggregations });
     const rawHost = this.config.host || '';
     const host = /^https?:\/\//i.test(rawHost)
@@ -141,8 +160,8 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       });
   }
 
-  public query(query: string, values: unknown[]): Promise<any[]> {
-    return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values));
+  public query(query: string, values: unknown[], options?: QueryOptions): Promise<any[]> {
+    return <Promise<any[]>> this.queryPromised(this.prepareQueryWithParams(query, values), options?.requestId);
   }
 
   protected prepareQueryWithParams(query: string, values: unknown[]) {
@@ -169,7 +188,43 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     return { Authorization: `Basic ${encodedCredentials}` };
   }
 
-  protected async request(query: string): Promise<PinotResponse> {
+  /**
+   * The queryOptions string has no escaping, so a value with `;` or `=` would
+   * be parsed by Pinot as extra options.
+   */
+  protected assertQueryOptionValue(name: string, value?: unknown): void {
+    if (value !== undefined && (typeof value !== 'string' || value.trim() === '' || /[;=]/.test(value))) {
+      throw new TypeError(
+        `Pinot ${name} must be a non-empty string without ';' and '=', got: ${JSON.stringify(value)}`
+      );
+    }
+  }
+
+  protected queryOptions(requestId?: string): string {
+    const options: Record<string, string | number | boolean> = {
+      useMultistageEngine: true,
+      enableNullHandling: Boolean(this.config.nullHandling),
+      timeoutMs: this.config.queryTimeout * 1000,
+    };
+
+    if (this.config.applicationName) {
+      options.applicationName = this.config.applicationName;
+    }
+
+    if (this.config.workloadName) {
+      options.workloadName = this.config.workloadName;
+    }
+
+    const clientQueryId = requestId && extractRequestUUID(requestId);
+    if (clientQueryId && isValidRequestId(clientQueryId) && !clientQueryId.includes('=')) {
+      options.clientQueryId = clientQueryId;
+    }
+
+    // Pinot splits the string on ';' and '=' without decoding it, so the values are not escaped.
+    return querystring.stringify(options, ';', '=', { encodeURIComponent: (value) => value });
+  }
+
+  protected async request(query: string, requestId?: string): Promise<PinotResponse> {
     const toError = (error: any) => new Error(error.error ? `${error.message}\n${error.error}` : error.message);
 
     const request: Request = new Request(this.url, {
@@ -180,7 +235,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       }),
       body: JSON.stringify({
         sql: query,
-        queryOptions: `useMultistageEngine=true;enableNullHandling=${this.config.nullHandling};timeoutMs=${this.config.queryTimeout * 1000}`
+        queryOptions: this.queryOptions(requestId)
       })
     });
 
@@ -205,17 +260,17 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     return result;
   }
 
-  public async queryPromised(query: string): Promise<any[] | StreamTableData> {
-    const { resultTable } = await this.request(query);
+  public async queryPromised(query: string, requestId?: string): Promise<any[] | StreamTableData> {
+    const { resultTable } = await this.request(query, requestId);
     return this.normalizeResultOverColumns(resultTable.rows, resultTable.dataSchema.columnNames);
   }
 
   public async downloadQueryResults(
     query: string,
     values: unknown[],
-    _options: DownloadQueryResultsOptions,
+    options: DownloadQueryResultsOptions,
   ): Promise<DownloadQueryResultsResult> {
-    const { resultTable } = await this.request(this.prepareQueryWithParams(query, values));
+    const { resultTable } = await this.request(this.prepareQueryWithParams(query, values), options?.requestId);
     const { rows, dataSchema } = resultTable;
 
     return {

@@ -273,6 +273,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             global_aggregate_unique_key_keeps_merge,
         ),
         t("prefilter_chunks_shared_scan", prefilter_chunks_shared_scan),
+        t(
+            "merged_in_memory_chunks_dedup",
+            merged_in_memory_chunks_dedup,
+        ),
         t("divide_by_zero", divide_by_zero),
         t(
             "filter_multiple_in_for_decimal",
@@ -477,6 +481,7 @@ lazy_static::lazy_static! {
         "limit_pushdown_group_null_appended",
         "limit_pushdown_group_null_order_first",
         "prefilter_chunks_shared_scan",
+        "merged_in_memory_chunks_dedup",
         "planning_topk_hash_aggregate",
         "topk_hash_aggregate_trim",
         "queue_add_and_retrieve",
@@ -8554,6 +8559,42 @@ async fn prefilter_chunks_shared_scan(service: Box<dyn SqlClient>) -> Result<(),
     let r = service.exec_query(query).await?;
     assert_eq!(to_rows(&r), rows(&[(130)]));
 
+    Ok(())
+}
+
+async fn merged_in_memory_chunks_dedup(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.Events (k int, ts int, val text) unique key (k)")
+        .await?;
+    // Each insert is a separate in-memory chunk of the same partition; newer versions of a key
+    // land in later chunks, some with a smaller `ts` than the version they replace.
+    service
+        .exec_query(
+            "INSERT INTO s.Events (k, ts, val, __seq) VALUES (1, 100, 'a1', 1), (2, 200, 'b1', 2), (3, 300, 'c1', 3)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.Events (k, ts, val, __seq) VALUES (2, 50, 'b2', 4), (4, 400, 'd1', 5)",
+        )
+        .await?;
+    service
+        .exec_query(
+            "INSERT INTO s.Events (k, ts, val, __seq) VALUES (1, 500, 'a2', 6), (3, 10, 'c2', 7), (5, 250, 'e1', 8)",
+        )
+        .await?;
+
+    let r = service
+        .exec_query("SELECT count(*), sum(ts) FROM s.Events")
+        .await?;
+    assert_eq!(to_rows(&r), rows(&[(5, 1210)]));
+
+    // Stale versions (3, 300, 'c1') and (2, 200, 'b1') would win this top-k if they survived.
+    let r = service
+        .exec_query("SELECT k, val FROM s.Events WHERE ts > 40 ORDER BY ts DESC LIMIT 3")
+        .await?;
+    assert_eq!(to_rows(&r), rows(&[(1, "a2"), (4, "d1"), (5, "e1")]));
     Ok(())
 }
 

@@ -1196,6 +1196,9 @@ struct TestConnectionTransport {
     // description of that pre-aggregation; `None` matches every query
     cube_store_pre_aggregation_mocks:
         tokio::sync::Mutex<Vec<(Option<TransportLoadRequestQuery>, serde_json::Value)>>,
+    // Cubes that Cube would serve from a pre-aggregation in the data source, with the
+    // description of that pre-aggregation
+    source_pre_aggregation_mocks: tokio::sync::Mutex<Vec<(String, serde_json::Value)>>,
     sql_calls: tokio::sync::Mutex<Vec<TestTransportSqlCall>>,
     // The batches of Cube queries the rewrite asked about, in order
     pre_aggregation_match_calls: tokio::sync::Mutex<Vec<Vec<TransportLoadRequestQuery>>>,
@@ -1210,6 +1213,7 @@ impl TestConnectionTransport {
             load_mocks: tokio::sync::Mutex::new(vec![]),
             load_calls: tokio::sync::Mutex::new(vec![]),
             cube_store_pre_aggregation_mocks: tokio::sync::Mutex::new(vec![]),
+            source_pre_aggregation_mocks: tokio::sync::Mutex::new(vec![]),
             sql_calls: tokio::sync::Mutex::new(vec![]),
             pre_aggregation_match_calls: tokio::sync::Mutex::new(vec![]),
             load_state_events: tokio::sync::Mutex::new(vec![]),
@@ -1278,6 +1282,43 @@ impl TestConnectionTransport {
             .push((req, pre_aggregation));
     }
 
+    async fn source_pre_aggregations_for(
+        &self,
+        query: &TransportLoadRequestQuery,
+    ) -> Vec<serde_json::Value> {
+        // A member is a path or, pushed to Cube, an expression naming its cube
+        let cubes = query
+            .measures
+            .iter()
+            .chain(query.dimensions.iter())
+            .flatten()
+            .filter_map(
+                |member| match serde_json::from_str::<serde_json::Value>(member) {
+                    Ok(expr) => expr.get("cubeName")?.as_str().map(str::to_string),
+                    Err(_) => member.split('.').next().map(str::to_string),
+                },
+            )
+            .collect::<std::collections::HashSet<_>>();
+        self.source_pre_aggregation_mocks
+            .lock()
+            .await
+            .iter()
+            .filter(|(cube, _)| cubes.contains(cube))
+            .map(|(_, pre_aggregation)| pre_aggregation.clone())
+            .collect()
+    }
+
+    pub async fn add_source_pre_aggregation_mock(
+        &self,
+        cube: String,
+        pre_aggregation: serde_json::Value,
+    ) {
+        self.source_pre_aggregation_mocks
+            .lock()
+            .await
+            .push((cube, pre_aggregation));
+    }
+
     pub async fn add_cube_load_mock(
         &self,
         req: TransportLoadRequestQuery,
@@ -1334,10 +1375,15 @@ impl TransportService for TestConnectionTransport {
                 serde_json::to_string_pretty(&inputs).unwrap()
             ),
         };
+        let external = pre_aggregation.is_some();
+        let pre_aggregations = match pre_aggregation {
+            Some(pre_aggregation) => vec![pre_aggregation],
+            None => self.source_pre_aggregations_for(&query).await,
+        };
         Ok(SqlResponse {
             sql: SqlQuery::new(sql, expression_params.unwrap_or_default()),
-            external: pre_aggregation.is_some(),
-            pre_aggregations: pre_aggregation.into_iter().collect(),
+            external,
+            pre_aggregations,
         })
     }
 
@@ -1614,6 +1660,18 @@ impl TestContext {
     ) {
         self.transport
             .add_cube_store_pre_aggregation_mock(None, pre_aggregation)
+            .await
+    }
+
+    /// Makes the transport answer `sql()` for a query over `cube` with the pre-aggregation
+    /// in the data source described by `pre_aggregation`
+    pub async fn add_source_pre_aggregation_mock(
+        &self,
+        cube: &str,
+        pre_aggregation: serde_json::Value,
+    ) {
+        self.transport
+            .add_source_pre_aggregation_mock(cube.to_string(), pre_aggregation)
             .await
     }
 

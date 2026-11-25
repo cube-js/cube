@@ -18,7 +18,7 @@ account, apply across all devices, and don't affect other users in the account.
 | New message scrolling | Automatically scroll to new messages in chat | On |
 | Alternating row colors | Highlight alternating rows in data tables | Off |
 | Default deployment | Open this deployment when you go to Cube without one in the URL | Account default |
-| Notifications | Choose whether comment, sharing and access-request notifications also arrive by email | On |
+| Notifications | Choose whether comment, sharing, access-request, dashboard review and dbt sync review notifications also arrive by email | On |
 
 ## Language
 
@@ -84,17 +84,27 @@ deployment. The control is hidden on accounts with only one reachable deployment
 
 ## Notifications
 
-These switches control email only. Mentions, replies, shares and access requests
-arrive in your [inbox][ref-inbox] whatever you choose here. In the **Notifications**
-section of the **Preferences** page, choose which of them also arrive by email:
-choose which of them also arrive by email:
+These switches control email only. Mentions, replies, shares, access requests,
+dashboard reviews and dbt syncs ready to review arrive in your [inbox][ref-inbox]
+whatever you choose here. In the **Notifications** section of the **Preferences**
+page, choose which of them also arrive by email. Only admins see the **Model
+syncs** switch, since only admins get these notifications:
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/preferences/notifications/notifications-section-v2.png"
+    alt="Notifications section of the Preferences page with email switches for mentions, replies, model syncs, shares, access requests and dashboard reviews, and the Skip email if already read switch"
+  />
+</Frame>
 
 | Switch | You get an email when | Default |
 | --- | --- | --- |
 | Mentions in comments | Someone [mentions you][ref-mentions] in a dashboard comment | On |
 | Replies to comments | Someone replies [in a comment thread][ref-replies] you wrote in | On |
+| Model syncs | A [dbt sync][ref-dbt-review] that a webhook started has changes ready to review, and the dbt project has no notification list. Admins only | On |
 | Shared with you | Someone [shares][ref-sharing] a workbook, a folder, or a chat with you, or approves your access request | On |
 | Access requests | Someone [requests access][ref-request-access] to an item you can share, or declines your request | On |
+| Dashboard reviews | Someone [requests your review][ref-reviews] of a dashboard, or comments on, approves, requests changes to, or publishes a review you take part in | On |
 
 A switch saves as soon as you change it. Turning a switch off stops the email
 only; the notification still arrives in your inbox.
@@ -106,10 +116,12 @@ unsubscribe offer the same action next to the sender. To get the emails again,
 turn the switch back on here.
 
 The email is in the language you set under [Language](#language) and links to the
-comment or the item. Cube doesn't email you about a comment or a shared item you
-can no longer open. An email about a declined request doesn't name the item.
+comment, the item, the review or the changes. Cube doesn't email you about a
+comment, a shared item or a dashboard you can no longer open, or about a dbt sync
+once you're no longer an admin. An email about a declined request doesn't name
+the item.
 
-Alerts, budgets, end-of-support notices, dashboard reviews, scheduled tasks and
+Alerts, budgets, end-of-support notices, scheduled tasks and
 [report deliveries][ref-report-deliveries] send their own email, as set up on
 each of them, and have no switch here.
 
@@ -118,4 +130,6 @@ each of them, and have no switch here.
 [ref-replies]: /docs/explore-analyze/dashboards/comments#reply-notifications
 [ref-sharing]: /docs/organize-content/sharing
 [ref-request-access]: /docs/organize-content/sharing#requesting-access
+[ref-reviews]: /docs/explore-analyze/dashboards/reviews#notifications
+[ref-dbt-review]: /docs/integrations/dbt#review-notifications
 [ref-report-deliveries]: /docs/explore-analyze/report-deliveries#notifications

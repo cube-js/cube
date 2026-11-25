@@ -44,7 +44,7 @@ impl<'a> LeafStagePlanner<'a> {
             alias,
             &member,
             &state,
-            self.query_properties.ungrouped(),
+            state.ungrouped(),
             false,
             false,
             scope,
@@ -69,7 +69,7 @@ impl<'a> LeafStagePlanner<'a> {
             alias,
             &member,
             &state,
-            self.query_properties.ungrouped(),
+            state.ungrouped(),
             false,
             true,
             scope,
@@ -99,7 +99,7 @@ impl<'a> LeafStagePlanner<'a> {
             alias,
             &member,
             &state,
-            self.query_properties.ungrouped() || ungrouped,
+            state.ungrouped() || ungrouped,
             true,
             false,
             scope,
@@ -184,13 +184,16 @@ impl<'a> LeafStagePlanner<'a> {
         let query = scope.with_evaluation_context(evaluation_context.clone(), |scope| {
             query_planner.plan(scope)
         })?;
-        // An ungrouped leaf feeds a stage that aggregates its rows, so its
-        // measures render as row-level values.
+        // A raw value (a count's primary key, a distinct count's column) is
+        // meaningful only to a stage that re-applies the measure's own
+        // aggregation; any other stage reads it as the row's value.
         let query = if evaluation_context.measure_for_ungrouped {
-            logical_transforms::measures_render_modifier_in_query(
-                &query,
-                &MeasureRenderModifier::RawValue,
-            )?
+            let modifier = if has_aggregates_on_top {
+                MeasureRenderModifier::RawValue
+            } else {
+                MeasureRenderModifier::UngroupedFinal
+            };
+            logical_transforms::measures_render_modifier_in_query(&query, &modifier)?
         } else {
             query
         };

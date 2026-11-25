@@ -1,5 +1,6 @@
 import { splitSqlInterval } from '@cubejs-backend/shared';
 import { allDialects, dialect } from './allDialects';
+import { prepareJsCompiler } from './PrepareCompiler';
 
 // A custom granularity whose origin sits off its unit's boundary is rendered as
 // `DATE_TRUNC(unit, x - offset) + offset`, and that offset can carry several units at once —
@@ -85,6 +86,13 @@ describe('interval rendering across dialects', () => {
       // Snowflake separates the components with commas
       '3 month 14 day': 'x - interval \'3 month, 14 day\'',
     }],
+    ['OracleQuery', {
+      '3 month 14 day': 'ADD_MONTHS(x, -3) - NUMTODSINTERVAL(14, \'DAY\')',
+      // NUMTODSINTERVAL has no week unit, so a week is spelled as seven days
+      '1 week': 'x - NUMTODSINTERVAL(7, \'DAY\')',
+      '1 week 1 day': 'x - NUMTODSINTERVAL(8, \'DAY\')',
+      '2 week 1 day 6 hour': 'x - NUMTODSINTERVAL(15, \'DAY\') - NUMTODSINTERVAL(6, \'HOUR\')',
+    }],
     ['SqliteQuery', {
       '3 month': 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-3 month\')',
       // A strftime modifier carries one unit, so each becomes its own argument
@@ -94,6 +102,69 @@ describe('interval rendering across dialects', () => {
     it.each(Object.entries(expected))('subtracts %s', (interval, sql) => {
       expect(query(dialect(name)).subtractInterval('x', interval)).toEqual(sql);
     });
+  });
+
+  // SQLite answers a modifier with a unit it does not know with NULL, not an error.
+  describe('SqliteQuery modifiers', () => {
+    const SQLITE_MODIFIER_UNITS = ['year', 'month', 'day', 'hour', 'minute', 'second'];
+
+    it.each([...SINGLE_SHAPES, ...COMPOUND_SHAPES, '2 week', '1 quarter', '1 year 1 quarter 2 week 1 day'])(
+      'renders %s with units SQLite knows',
+      interval => {
+        const q = query(dialect('SqliteQuery'));
+
+        for (const rendered of [q.subtractInterval('x', interval), q.addInterval('x', interval)]) {
+          const units = [...rendered.matchAll(/'[-+]?\d+ (\w+)'/g)].map(m => m[1]);
+          expect({ rendered, units: units.filter(u => !SQLITE_MODIFIER_UNITS.includes(u)) })
+            .toEqual({ rendered, units: [] });
+        }
+      }
+    );
+
+    it.each([
+      ['subtractInterval', '2 week', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-14 day\')'],
+      ['subtractInterval', '2 week 1 day', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-15 day\')'],
+      ['subtractInterval', '1 quarter', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-3 month\')'],
+      ['subtractInterval', '1 quarter 1 month', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-4 month\')'],
+      ['addInterval', '1 week', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'7 day\')'],
+      // A negative offset, e.g. a custom granularity starting a day early, moves the other way
+      ['subtractInterval', '-1 day', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'1 day\')'],
+      ['addInterval', '-1 week', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-7 day\')'],
+      ['subtractInterval', '1 month -1 day', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'-1 month\', \'1 day\')'],
+      ['subtractInterval', '0 week', 'strftime(\'%Y-%m-%dT%H:%M:%f\', x)'],
+      ['addInterval', '1 year 2 quarter 1 week 6 hour',
+        'strftime(\'%Y-%m-%dT%H:%M:%f\', x, \'1 year\', \'6 month\', \'7 day\', \'6 hour\')'],
+    ])('%s %s', (method, interval, sql) => {
+      expect(query(dialect('SqliteQuery'))[method]('x', interval)).toEqual(sql);
+    });
+  });
+
+  // A granularity offset such as `-1 day` reaches the helpers as is. Negating it by prefixing
+  // `-` gives `--1`, which most SQL dialects read as a line comment swallowing the rest of it.
+  it.each(allDialects())('%s renders a negative interval without a `--`', (_name, QueryClass) => {
+    const q = query(QueryClass);
+
+    for (const interval of ['-1 day', '-3 month', '-1 year', '-3 month -14 day']) {
+      for (const rendered of [q.subtractInterval('x', interval), q.addInterval('x', interval)]) {
+        expect({ interval, rendered: String(rendered).includes('--') ? rendered : null })
+          .toEqual({ interval, rendered: null });
+      }
+    }
+  });
+
+  it.each([
+    ['RedshiftQuery', '-1 day', 'DATEADD(day, 1, x)'],
+    ['OracleQuery', '-3 month', 'ADD_MONTHS(x, 3)'],
+  ])('%s subtracts %s by adding its magnitude', (name, interval, sql) => {
+    expect(query(dialect(name)).subtractInterval('x', interval)).toEqual(sql);
+  });
+
+  it.each([
+    ['1 week', 'x + NUMTODSINTERVAL(7, \'DAY\')'],
+    ['1 week 1 day', 'x + NUMTODSINTERVAL(8, \'DAY\')'],
+    ['2 week 1 day 6 hour', 'x + NUMTODSINTERVAL(15, \'DAY\') + NUMTODSINTERVAL(6, \'HOUR\')'],
+  ])('OracleQuery adds %s', (interval, sql) => {
+    expect(query(dialect('OracleQuery')).addInterval('x', interval)).toEqual(sql);
   });
 
   // Trino and Athena take their interval handling from Presto, so the fix has to reach them too.
@@ -140,5 +211,45 @@ describe('splitSqlInterval', () => {
   it('keeps a unit outside the known set', () => {
     expect(splitSqlInterval('5 millisecond')).toEqual(['5 millisecond']);
     expect(splitSqlInterval('1 day 5 millisecond')).toEqual(['1 day', '5 millisecond']);
+  });
+});
+
+describe('custom granularity with a negative offset', () => {
+  const compilers = prepareJsCompiler(`
+cube('orders', {
+  sql: \`SELECT 1 AS id, DATE '2026-01-07' AS event_ts, 100 AS amount\`,
+  dimensions: {
+    id: { sql: 'id', type: 'number', primaryKey: true },
+    event_ts: {
+      sql: \`\${CUBE}.event_ts\`,
+      type: 'time',
+      granularities: {
+        sunday_week: { interval: '1 week', offset: '-1 day' },
+      },
+    },
+  },
+  measures: {
+    total: { sql: \`\${CUBE}.amount\`, type: 'sum' },
+  },
+});
+`);
+
+  it('renders a Redshift query with no `--` in it', async () => {
+    await compilers.compiler.compile();
+    const RedshiftQuery = dialect('RedshiftQuery');
+
+    const redshiftQuery = new RedshiftQuery(compilers, {
+      measures: ['orders.total'],
+      timeDimensions: [{
+        dimension: 'orders.event_ts',
+        granularity: 'sunday_week',
+        dateRange: ['2026-01-01', '2026-02-01'],
+      }],
+      timezone: 'UTC',
+    });
+    const [sql] = redshiftQuery.buildSqlAndParams();
+
+    expect(sql).toContain('DATEADD(day, 1,');
+    expect(sql).not.toContain('--');
   });
 });

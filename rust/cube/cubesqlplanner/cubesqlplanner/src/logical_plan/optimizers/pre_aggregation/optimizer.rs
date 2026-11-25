@@ -165,16 +165,17 @@ impl PreAggregationOptimizer {
         std::mem::take(&mut self.usages)
     }
 
-    // A leaf rendering row-level values feeds an aggregate over them, e.g. a
-    // non-additive rolling window, so only a rollup keeping those rows serves it.
+    // A leaf of an ungrouped stage emits one value per source row, so only a
+    // rollup keeping those rows serves it.
     fn reads_row_values(leaf: &Query) -> bool {
         leaf.evaluation_context()
             .as_ref()
             .is_some_and(|context| context.measure_for_ungrouped)
     }
 
-    // A non-additive measure's row value is its input, e.g. the user id under
-    // a distinct count, which no stored aggregate holds.
+    // Under a rolling-window base a non-additive measure's row value is its
+    // input, e.g. the user id under a distinct count, which no stored aggregate
+    // holds. Other ungrouped leaves are refused too, conservatively.
     fn has_non_additive_measure(leaf: &Query) -> bool {
         leaf.schema().measures.iter().any(|measure| {
             measure
@@ -332,6 +333,11 @@ impl PreAggregationOptimizer {
         root: &Rc<RootQuery>,
         compiled_pre_aggregations: &[Rc<CompiledPreAggregation>],
     ) -> Result<Option<Rc<RootQuery>>, CubeError> {
+        // Its subqueries served by rollups would mix stored values with live
+        // rows of the source tables, so such a root is served from source only.
+        if Self::reads_source_tables(root.query()) {
+            return Ok(None);
+        }
         match self.match_subqueries(root, compiled_pre_aggregations)? {
             SubqueryMatch::Matched(rewritten) => return Ok(Some(rewritten)),
             SubqueryMatch::UnmatchedSubquery => return Ok(None),
@@ -368,6 +374,14 @@ impl PreAggregationOptimizer {
         }
 
         Ok(None)
+    }
+
+    fn reads_source_tables(query: &Query) -> bool {
+        let from = query.from();
+        from.root()
+            .into_iter()
+            .chain(from.joins().iter().map(|join| join.relation()))
+            .any(|relation| matches!(relation, Relation::Cube { .. } | Relation::RawSql { .. }))
     }
 
     fn match_subqueries(

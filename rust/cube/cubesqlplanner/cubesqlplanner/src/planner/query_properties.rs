@@ -15,7 +15,8 @@ use crate::logical_plan::LogicalSubqueryJoinItem;
 use crate::planner::collectors::has_multi_stage_members;
 use crate::planner::filter::tree_ops;
 use crate::planner::filter::{
-    map_filter_items, BaseFilter, Filter, FilterGroup, FilterItem, FilterOperator,
+    map_filter_items, BaseFilter, Filter, FilterGroup, FilterGroupOperator, FilterItem,
+    FilterOperator,
 };
 use crate::planner::join_hints::JoinHints;
 use crate::planner::planners::multi_stage::TimeShiftState;
@@ -74,7 +75,7 @@ pub fn member_chain_eq(a: &Rc<MemberSymbol>, b: &Rc<MemberSymbol>) -> bool {
 ///
 /// Two equality flavours: [`PartialEq`] compares all semantic fields;
 /// [`eq_as_state`](Self::eq_as_state) compares only members, filters,
-/// segments and time-shifts.
+/// segments, time-shifts and the ungrouped flag.
 #[derive(Clone, TypedBuilder)]
 #[builder(build_method(into = Result<Rc<QueryProperties>, CubeError>))]
 pub struct QueryProperties {
@@ -399,6 +400,10 @@ impl QueryProperties {
         self.time_dimensions = time_dimensions;
     }
 
+    pub fn set_ungrouped(&mut self, ungrouped: bool) {
+        self.ungrouped = ungrouped;
+    }
+
     /// Append `dimensions` to the existing list, deduplicating by
     /// reference-chain-resolved full name. A dimension the grain already
     /// carries as a time dimension is dropped rather than appended: a time
@@ -596,29 +601,47 @@ impl QueryProperties {
         self.measures_filters.extend(items);
     }
 
+    // The member's own conditions are taken as true, which only widens the rows.
     fn extract_filters_exclude_member(
         member_name: &MemberId,
         filters: &[FilterItem],
     ) -> Vec<FilterItem> {
-        let mut result = Vec::new();
-        for item in filters.iter() {
-            match item {
-                FilterItem::Group(group) => {
-                    let new_group = FilterItem::Group(Rc::new(FilterGroup::new(
-                        group.operator.clone(),
-                        Self::extract_filters_exclude_member(member_name, &group.items),
-                    )));
-                    result.push(new_group);
-                }
-                FilterItem::Item(itm) => {
-                    if &itm.member_id() != member_name {
-                        result.push(FilterItem::Item(itm.clone()));
+        filters
+            .iter()
+            .filter_map(|item| Self::exclude_member_from_filter(member_name, item))
+            .collect()
+    }
+
+    // None when `item` is always true once the member's conditions are.
+    fn exclude_member_from_filter(member_name: &MemberId, item: &FilterItem) -> Option<FilterItem> {
+        match item {
+            FilterItem::Group(group) => {
+                let mut items = Vec::new();
+                for child in group.items.iter() {
+                    match Self::exclude_member_from_filter(member_name, child) {
+                        Some(child) => items.push(child),
+                        None if group.operator == FilterGroupOperator::Or => return None,
+                        None => {}
                     }
                 }
-                FilterItem::Segment(_) => {}
+                if items.is_empty() {
+                    None
+                } else {
+                    Some(FilterItem::Group(Rc::new(FilterGroup::new(
+                        group.operator.clone(),
+                        items,
+                    ))))
+                }
             }
+            FilterItem::Item(itm) => {
+                if &itm.member_id() == member_name {
+                    None
+                } else {
+                    Some(item.clone())
+                }
+            }
+            FilterItem::Segment(_) => None,
         }
-        result
     }
 
     pub fn has_filters_for_member(&self, member_name: &MemberId) -> bool {
@@ -867,8 +890,8 @@ impl QueryProperties {
     }
 
     /// Equality over members (chain-resolved), the three filter slots,
-    /// segments and time-shifts. Excludes ordering, limits, planner flags
-    /// and join hints; for those fields use the full [`PartialEq`].
+    /// segments, time-shifts and the ungrouped flag. Excludes ordering, limits,
+    /// other planner flags and join hints; for those fields use the full [`PartialEq`].
     ///
     /// Filters are compared with [`tree_ops::eq_with_member`] rather than with
     /// `FilterItem`'s own equality, which looks at a filter's operator and
@@ -886,6 +909,7 @@ impl QueryProperties {
             && Self::filters_equivalent(&self.measures_filters, &other.measures_filters)
             && Self::filters_equivalent(&self.segments, &other.segments)
             && self.time_shifts == other.time_shifts
+            && self.ungrouped == other.ungrouped
     }
 
     fn filters_equivalent(a: &[FilterItem], b: &[FilterItem]) -> bool {

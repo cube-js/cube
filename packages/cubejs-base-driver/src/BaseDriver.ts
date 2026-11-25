@@ -41,7 +41,7 @@ import {
 
 // Import only types, because these SDKs are quite large and should be loaded lazily
 import type { AzureStorageClientConfig } from './storage-fs/azure.fs';
-import type { S3StorageClientConfig } from './storage-fs/aws.fs';
+import type { S3Credentials, S3StorageClientConfig } from './storage-fs/aws.fs';
 import type { GoogleStorageClientConfig } from './storage-fs/gcs.fs';
 
 export type ParsedBucketUrl = {
@@ -689,6 +689,13 @@ export abstract class BaseDriver implements DriverInterface {
   ): Promise<string[]> {
     // Lazy loading, because it's using azure SDK, which is quite heavy.
     return (await import('./storage-fs/aws.fs.js')).extractUnloadedFilesFromS3(clientOptions, bucketName, prefix);
+  }
+
+  /**
+   * Resolves AWS credentials from the SDK default provider chain.
+   */
+  protected async resolveS3Credentials(clientOptions: S3StorageClientConfig): Promise<S3Credentials> {
+    return (await import('./storage-fs/aws.fs.js')).resolveS3Credentials(clientOptions);
   }
 
   /**

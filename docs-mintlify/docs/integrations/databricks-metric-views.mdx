@@ -37,10 +37,12 @@ Databricks definitions into Cube. You start it from Console or the public REST A
   [Data sources served by `driver_factory`](#data-sources-served-by-driver_factory).
 - If a Cube source uses a two-part `schema.table` name, set
   [`CUBEJS_DB_DATABRICKS_CATALOG`](/reference/configuration/environment-variables#cubejs_db_databricks_catalog)
-  for that data source so Preview can resolve its catalog. Without it, those views are blocked.
+  for that data source so Preview can resolve its catalog, or the **Default catalog** of a
+  [publication target with its own connection](#publish-to-another-workspace). Without it, those
+  views are blocked.
 - Ask your Databricks administrator for a **dedicated target catalog and schema** for the
   published Metric Views.
-  The Databricks identity Cube publishes with (the data source's, or the integration's own
+  The Databricks identity Cube publishes with (the data source's, or a publication target's own
   service principal) needs `CAN USE` on its SQL warehouse,
   `USE CATALOG` and `USE SCHEMA` on the target and source namespaces, `SELECT` on source
   relations, and `CREATE TABLE` on the target schema. The same identity must own any existing
@@ -68,7 +70,7 @@ also needs **Access SQL Runner** (`SqlRunnerRead`); see [Jinja templates](#jinja
 <Steps>
   <Step title="Configure publication">
     Open your deployment's **Settings → Data Sources** and edit the Databricks data source.
-    Expand **Databricks Metric Views**. Enter the target catalog and schema. Choose all public
+    Expand **Databricks Metric View sync**. Enter the target catalog and schema. Choose all
     views, selected views, or a name pattern; optionally add a target-name prefix. Choose what
     happens when a view leaves the scope (see [Removed views](#removed-views)). Turn publication
     on and save. This alone does not start a write.
@@ -86,26 +88,41 @@ also needs **Access SQL Runner** (`SqlRunnerRead`); see [Jinja templates](#jinja
   <Step title="Publish and inspect each result">
     Select **Publish now**. Review the result for **each view** in run history. **Created**,
     **Updated**, and **Unchanged** are successful outcomes; **Blocked**, **Rejected by Databricks**,
-    and **Write failed** need investigation. A run can be **Partial** if some views succeeded and
-    others did not.
+    and **Write failed** need investigation. A run is **Partial** if some views succeeded and others
+    did not, or if a drop of an obsolete Metric View was held or failed (see
+    [Removed views](#removed-views)); if no view succeeded, it is **Failed**. A view that
+    Databricks rejected or failed to write can also show Databricks' error class, such as
+    `UNRESOLVED_COLUMN.WITH_SUGGESTION`, and a **Statement ID**. Look up that statement in
+    Databricks Query History to see the full error.
   </Step>
 </Steps>
 
 Preview and sync each resolve the latest successful deployed build when started. If a new build
-lands between them, preview again before syncing. Each Databricks data source currently has one
-saved target; there is no named staging-to-production promotion or pinned-build publication.
+lands between them, preview again before syncing. To test Metric Views in a staging catalog and
+then publish that same build to production, see
+[Publish to staging, then production](#publish-to-staging-then-production) or the
+[Cube CLI](/reference/cli#databricks-metric-views).
 
 Scope rules:
 
 - The name pattern supports literals, `^`, `$`, a bare `.` that matches any single character, and
   at most one `.*` wildcard. It is not a general regular expression and is limited to 128
   characters. Review the matched views in Preview before syncing.
-- Each preview or sync resolves at most 128 views per data source, whether the scope is **all**,
-  **selected**, or **pattern**. If **all** or **pattern** resolves more, preview and sync reject
-  the request; narrow the scope and try again.
+- **All views** (`all` in the API) takes every view in the deployed YAML model, including
+  views with `public: false` and views over another data source's cubes. Preview and sync block
+  the latter with `CUBE_DATA_SOURCE_MISMATCH`, so when the model has such views, every **all** run
+  ends **Partial** or **Failed**, which the [CI recipe](#trigger-publication-from-ci) and
+  [promotion](#publish-to-staging-then-production) don't accept. Scope such a data source with
+  **selected** or **pattern** instead.
+- Each preview or sync resolves at most 128 views, whether the scope is **all**, **selected**, or
+  **pattern**. **all** and **pattern** count the views of every data source in the model; if they
+  resolve more, preview and sync reject the request. Narrow the scope and try again.
 - A newly deployed view enters an **all** or matching **pattern** scope on the next sync: the
   deployment's own run when you [publish after each deployment](#publish-after-each-deployment).
   A **selected** scope changes only when you edit it.
+- A selected view you remove from the data model or rename stays selected: preview and sync block
+  it with `CUBE_VIEW_NOT_FOUND`, every run ends **Partial** or **Failed**, and its Metric View is
+  never dropped. Deselect it.
 - Renaming a view or target creates a new target. The old one is kept, or dropped under
   **Delete the Metric View Cube created** (see [Removed views](#removed-views)).
 - Per-view target-name and root-source overrides are available through the configuration API,
@@ -131,8 +148,10 @@ A save that omits it stores `retain`, even when `delete-managed` was stored befo
 
 Publication can't use a connection that
 [`driver_factory`](/reference/configuration/config#driver_factory) creates: Preview, Test access,
-and sync run without a user for the factory to act for. Give the integration its own Databricks
-service principal instead. Your users' queries keep going through `driver_factory`.
+and sync run without a user for the factory to act for. So every
+[publication target](#publish-to-staging-then-production) of such a data source needs a Databricks
+service principal connection of its own: the card requires its fields, with no
+**Use a separate connection** switch. Your users' queries keep going through `driver_factory`.
 
 <Warning>
 
@@ -149,11 +168,11 @@ Databricks driver prefers a data source's OAuth client variables over the per-us
 2. In **Settings → Data Sources**, select **Set up Metric View sync for a cube.py data source**.
    Enter the data source name your cubes set in `data_source` (`default` for cubes that set none)
    and select **Continue**.
-3. In **Databricks Metric Views**, under **Databricks connection**, enter the SQL warehouse's
+3. In **Databricks Metric View sync**, under **Databricks connection**, enter the SQL warehouse's
    **Server hostname** and **HTTP path** and the service principal's **OAuth client ID** and
    **OAuth client secret**. If a cube uses a two-part `schema.table` name, also enter the
-   **Default catalog** it resolves in; it replaces `CUBEJS_DB_DATABRICKS_CATALOG` for this data
-   source.
+   **Default catalog** it resolves in; it replaces `CUBEJS_DB_DATABRICKS_CATALOG` for this
+   publication target.
 4. Configure and run publication as in [Publish a view](#publish-a-view). Preview is available
    once the credential is saved.
 
@@ -171,12 +190,13 @@ Omit it to keep the stored credential, or pass `null` to remove it.
 Cube can publish every time a build of the deployment succeeds, so Databricks follows your Cube
 model without a manual sync or a CI step. Set up publication as in [Publish a view](#publish-a-view),
 including **Preview**, **Test access**, and a first sync. Then turn on **Publish after each
-deployment** in the **Databricks Metric Views** card and save. Through the API, save
+deployment** in the **Databricks Metric View sync** card and save. Through the API, save
 `syncOnDeploy: true`. The setting is off by default, and a save that omits it turns it off.
 
-After each successful build, Cube starts a run for every Databricks data source of the deployment
-that has publication and this setting turned on. Changes in development mode publish nothing until
-they are deployed. Each run:
+After each successful build, Cube starts a run for every Databricks data source of the deployment,
+and for every [publication target](#publish-to-staging-then-production) of such a data source, that
+has publication and this setting turned on. Changes in development mode publish nothing until they
+are deployed. Each run:
 
 - Converts the build that just succeeded, with the saved settings: scope, target, and what happens
   when a view leaves the scope. Under **Delete the Metric View Cube created**, a deployment that
@@ -194,8 +214,8 @@ the run retries for about 30 minutes. If a newer build succeeds first, only the 
 publishes.
 
 A run that can't start leaves no entry in run history. This happens when no user can render the
-model's Jinja templates, when the data source has no Databricks connection, or when the retry runs
-out. Databricks then keeps the Metric Views of an earlier build, and the card
+model's Jinja templates, when the publication target has no Databricks connection to use, or when
+the retry runs out. Databricks then keeps the Metric Views of an earlier build, and the card
 [warns that Databricks is behind](#databricks-behind-the-deployed-model).
 
 A run that completes sends no notification. A run that fails, ends **Partial**, or withholds a
@@ -203,38 +223,58 @@ measure notifies its user in the [Inbox](/docs/inbox).
 
 ## Trigger publication from CI
 
+The [Cube CLI](/reference/cli#databricks-metric-views) can start a run and wait for it with
+`cube dbx-mv sync --wait`, and publish a tested staging build to production. Unlike the recipe
+below, it doesn't retry a start refused with `409`, and it checks only that the run is `COMPLETED`
+with an `incompleteViewCount` of 0.
+
 Run publication from CI after a successful Cube deployment when CI should check the result. To
 just publish after each deployment, [turn on the setting](#publish-after-each-deployment) instead;
-don't do both for one deployment, or each build starts two runs. First, configure **All views**, a
-dedicated target catalog and schema, and publication enabled in **Settings → Data Sources**. With
+don't do both for one publication target, or each build starts two runs there. First, configure
+the scope (see the scope rules under [Publish a view](#publish-a-view)), a dedicated target catalog
+and schema, and publication enabled in **Settings → Data Sources**. With
 **When a view leaves the scope** set to **Delete the Metric View Cube created**, each CI run also
 drops the Metric Views the deployment made obsolete (see [Removed views](#removed-views)). Run
 **Preview** and **Test access** before the first write. CI uses these saved settings; the API call
 does not override the scope or destination.
+For a [publication target](#publish-to-staging-then-production) other than `default`, pick it under
+**Publication target** in the card first.
 
 Store a [Platform API key](/api-reference/authentication) with deployment `SchemaUpdate` access as
 a CI secret. The recipe reads the saved settings, starts a run with their `configurationVersion`,
 then polls the returned `statusUrl`. The start endpoint returns `202` with a `runId`, `buildJobId`,
-optional `commit`, and root-relative `statusUrl`. It accepts an optional UUID `idempotencyKey` for
-safe retries. A start returns `409` while another run is active, while a
-[take-over](#take-over-an-existing-metric-view) runs in your account, and, for a data model with
-[Jinja templates](#jinja-templates), while the deployment is still rolling out the new build. The
-recipe retries a `409` for up to `MAX_START_ATTEMPTS` attempts, 10 seconds apart (default: 30).
+optional `commit`, root-relative `statusUrl`, and `reused`. It accepts an optional UUID
+`idempotencyKey` for safe retries: a repeated key returns the earlier run with `reused: true`, but
+`buildJobId` and `commit` name the build this request resolved, not the reused run's. The run's
+status response carries the run's own `buildJobId`, which the recipe checks. A start returns `409`
+while another run of that publication target is active,
+while a [take-over](#take-over-an-existing-metric-view) runs in your account, and, for a data model
+with [Jinja templates](#jinja-templates), while the deployment is still rolling out the new build.
+The recipe retries a `409` for up to `MAX_START_ATTEMPTS` attempts, 10 seconds apart (default: 30).
+A stale `configurationVersion` also returns `409` ("The integration changed after it was loaded");
+retrying can't clear it, so the recipe stops. Run it again to read the saved settings.
 Run statuses are `QUEUED`, `RUNNING`, `CANCELLING`, `COMPLETED`, `PARTIAL`, `FAILED`, and `CANCELLED`.
 
 To reject incompatible changes before writing, CI can [preview](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview)
-with `{"dataSourceName": "default", "selectionMode": "all"}` and [inspect the result](/api-reference/databricks-metric-view-publication/get-a-completed-databricks-metric-view-preview-result).
+with the saved scope and any saved `sourceOverrides`, such as
+`{"dataSourceName": "default", "selectionMode": "all"}` (or `selected` with `viewNames`, or
+`pattern` with `viewNameRegex`), plus `"target": "<name>"` for a
+[publication target](#publish-to-staging-then-production) other than `default`, and
+[inspect the result](/api-reference/databricks-metric-view-publication/get-a-completed-databricks-metric-view-preview-result).
 Require eligible views with no `withheldMembers`; avoid overlapping deployments because preview
 and sync can resolve different builds.
 
 This Bash step requires `curl` and `jq`. Set `CUBE_API_URL` to your tenant host without a trailing
 slash, `DEPLOYMENT_ID` to the deployment that just succeeded, and `CUBE_API_TOKEN` to the CI secret.
 Set `EXPECTED_BUILD_JOB_ID` if the deployment step returns one. The example uses the `default`
-data source; URL-encode a different name in the path. Set `SYNC_IDEMPOTENCY_KEY` to a UUID unique
-to this CI publication attempt and keep it unchanged across retries of that attempt. Do not reuse
-it for a later pipeline run: the API would return the earlier run without publishing again. Set
-`MAX_POLLS` to scale the wait for your view count and warehouse start-up time (default: 180
-attempts, 10 seconds apart, plus request time).
+data source; URL-encode a different name in the path. For a
+[publication target](#publish-to-staging-then-production) other than `default`, request
+`"$integration?target=<name>"` for the settings and `"$integration/syncs?target=<name>"` to start
+the run; the status poll needs no change. Set `SYNC_IDEMPOTENCY_KEY` to a UUID unique to this CI
+publication attempt and keep it unchanged across retries of that attempt. Do not reuse it for a
+later pipeline run: the API would return the earlier run without publishing again. Set `MAX_POLLS`
+to scale the wait for your view count and warehouse start-up time (default: 180 attempts, 10
+seconds apart, plus request time).
 
 ```bash
 set -euo pipefail
@@ -244,8 +284,8 @@ auth_header="Authorization: Bearer $CUBE_API_TOKEN"
 : "${SYNC_IDEMPOTENCY_KEY:?Set a unique UUID for this publication attempt}"
 settings=$(curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
   -H "$auth_header" "$integration")
-if ! jq -e '.configuration.enabled == true and .configuration.selectionMode == "all"' <<<"$settings" >/dev/null; then
-  echo 'Enable publication with All views before running CI.' >&2
+if ! jq -e '.configuration.enabled == true' <<<"$settings" >/dev/null; then
+  echo 'Enable publication before running CI.' >&2
   exit 1
 fi
 version=$(jq -r '.configurationVersion' <<<"$settings")
@@ -262,17 +302,11 @@ for ((attempt=1; ; attempt++)); do
   start=${response%$'\n'*}
   [[ "$http_code" == 202 ]] && break
   echo "Starting the run returned HTTP $http_code: $start" >&2
-  [[ "$http_code" == 409 ]] && ((attempt < max_start_attempts)) || exit 1
+  [[ "$http_code" == 409 && "$start" != *'changed after it was loaded'* ]] &&
+    ((attempt < max_start_attempts)) || exit 1
   sleep 10
 done
 status_url=$(jq -r '.statusUrl' <<<"$start")
-if [[ -n "${EXPECTED_BUILD_JOB_ID:-}" ]]; then
-  if ! jq -e --argjson expected "$EXPECTED_BUILD_JOB_ID" '.buildJobId == $expected' <<<"$start" >/dev/null; then
-    jq '{runId, buildJobId, commit, statusUrl}' <<<"$start" >&2
-    echo 'Run started against a different build; inspect or cancel it before retrying.' >&2
-    exit 1
-  fi
-fi
 
 max_polls=${MAX_POLLS:-180}
 [[ "$max_polls" =~ ^[1-9][0-9]*$ ]] || { echo 'MAX_POLLS must be a positive integer.' >&2; exit 1; }
@@ -290,6 +324,12 @@ for ((attempt=0; attempt<max_polls; attempt++)); do
       continue ;;
     *) echo "Status poll returned HTTP $http_code: $CUBE_API_URL$status_url" >&2; exit 1 ;;
   esac
+  if [[ -n "${EXPECTED_BUILD_JOB_ID:-}" ]] &&
+    ! jq -e --argjson expected "$EXPECTED_BUILD_JOB_ID" '.buildJobId == $expected' <<<"$run" >/dev/null; then
+    jq '{runId, buildJobId, commit}' <<<"$run" >&2
+    echo "Run started against a different build; inspect or cancel it before retrying: $CUBE_API_URL$status_url" >&2
+    exit 1
+  fi
   case "$(jq -r '.status' <<<"$run")" in
     QUEUED|RUNNING|CANCELLING) sleep 10 ;;
     *) break ;;
@@ -328,17 +368,27 @@ yourself; or switch **When a view leaves the scope** to **Keep its Metric View i
 which reports obsolete targets without a `detail`. Publication-run `views[].outcome` values are
 `unchanged`, `created`, `updated`, `blocked`, `validation_failed`, `publish_failed`,
 `retained_obsolete`, and `deleted_obsolete`; these differ from preview outcomes. The recipe
-accepts only the successful outcomes.
+accepts only the successful outcomes. A `validation_failed` or `publish_failed` view carries
+`errorClass`, Databricks' error class such as `UNRESOLVED_COLUMN.WITH_SUGGESTION`, and
+`statementId`, the Databricks statement the failed publish ended on. Each is `null` when Databricks
+named no error class or no statement ran, and both are `null` in older runs. Cube does not return
+Databricks' error message; look up the statement in Databricks Query History to read it. Such a
+view's `detail` is a failure code such as `STATEMENT_FAILED`. On a `publish_failed` view,
+`AUTHENTICATION_FAILED`, `PERMISSION_DENIED`, `WAREHOUSE_UNAVAILABLE`, or `TIMEOUT` means Cube
+couldn't use Databricks, not that Databricks rejected the definition.
 Each `views[]` entry carries its destination as `target` (`catalog.schema.name`, or `null` when
 conversion blocked the view), and a run carries the `takeOverTargets` it was started with. A
-`blocked` view whose `detail` is `unmanaged-target` or `ownership-conflict` collides with an object
-Cube does not manage, and a `detail` of `taken-over` marks a view a take-over published. After
-you confirm that a blocked destination should belong to this data source, a CI job can pass its
-`target` in `takeOverTargets` to [take it over](#take-over-an-existing-metric-view). A `detail` of
-`metastore-changed` means the data source
-[moved to another metastore](#move-to-another-metastore) during the run; start another run.
-`incompleteViewCount` counts published views whose `withheldMembers` list is nonempty; requiring
-zero rejects definitions missing measures.
+`blocked` view whose `detail` is `conversion-blocked` didn't convert: Preview lists its issues. One
+whose `detail` is
+`unmanaged-target` or `ownership-conflict` collides with an object this publication target does
+not manage, and a `detail` of `taken-over` marks a view a take-over published. After you confirm
+that a blocked destination should belong to this publication target, a CI job can pass its
+`target` in `takeOverTargets` to
+[take it over](#take-over-an-existing-metric-view). A `detail` of `metastore-changed` means the
+data source [moved to another metastore](#move-to-another-metastore) during the run; start
+another run.
+`incompleteViewCount` counts `created`, `updated`, and `unchanged` views whose `withheldMembers`
+list is nonempty; requiring zero rejects definitions missing measures.
 
 Failed checks do not roll back writes. Inspect `views[]` for errors or `withheldMembers`. List
 older runs with
@@ -346,6 +396,144 @@ older runs with
 and request cancellation of an active run with `DELETE {statusUrl}`. Cancellation stops further
 writes but does not undo completed ones. `curl --fail` exits with code 22 and omits the response
 body on HTTP errors.
+
+## Publish to staging, then production {#publish-to-staging-then-production}
+
+A data source can have several publication targets, such as `staging` and `production`. Each has
+its own settings (target catalog and schema, scope, target-name overrides, `deletionPolicy`,
+`syncOnDeploy`, and a [Databricks connection](#publish-to-another-workspace) of its own, if any),
+its own run history, and its own Metric Views. What this page says about a data source's settings,
+runs, and Metric Views holds for each publication target. Give each one its own catalog or schema:
+a Metric View belongs to one publication target, so another that publishes to the same name is
+blocked with `ownership-conflict`.
+
+{/* TODO: video — publication targets: add staging and production, promote a staging run (GTM-324) */}
+
+The card always lists the `default` publication target, but it exists only once its settings are
+saved; until then, reading its settings or starting a run returns `404`. In the
+**Databricks Metric View sync** card, pick one under
+**Publication target**: the settings, **Preview**, **Test access**, and run history below it are
+that target's own. To create one, select **Add target**, enter its name, then save its
+settings. Through the API, add `?target=<name>` when
+[reading settings](/api-reference/databricks-metric-view-integration/get-databricks-metric-view-publication-settings),
+[saving settings](/api-reference/databricks-metric-view-integration/create-or-update-databricks-metric-view-publication-settings),
+[starting a run](/api-reference/databricks-metric-view-integration/start-a-databricks-metric-view-publication-run),
+or [listing runs](/api-reference/databricks-metric-view-integration/list-databricks-metric-view-publication-runs),
+and pass `target` in a [preview](/api-reference/databricks-metric-view-publication/start-a-databricks-metric-view-publication-preview)
+request body. Without it, a request uses `default`. Reading or cancelling a run by its `runId`
+needs no `target`.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/integrations/databricks-metric-views/publication-target-picker-v2.png"
+    alt="Databricks Metric View sync card with the Publication target picker open, listing default, production and staging, next to the Add target and Delete target buttons"
+  />
+</Frame>
+
+- **Names:** a name starts with a letter and has up to 63 letters, digits, `_`, and `-`; Cube
+  lower-cases it.
+- **Creating:** through the API, only saving with `expectedConfigurationVersion: 0` creates a
+  publication target, `default` included, so a misspelled name there creates a new one. Reading
+  settings, starting or listing runs, or previewing with a name that doesn't exist returns `404`.
+- **Listing:**
+  `GET /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}/targets`
+  returns every saved publication target of the data source, sorted by name (`404` if none): its
+  `targetName`, `enabled`, `syncOnDeploy`, `targetCatalog`, `targetSchema`, `configurationVersion`,
+  and `lastRun` (its newest run's `runId` and `status`, or `null` if it never ran). Use it to find
+  one created by a misspelled name.
+- **Turning off:** saving `enabled: false` drops nothing, and the publication target keeps its
+  Metric Views: another that publishes to the same names is blocked with `ownership-conflict`
+  until it [takes them over](#take-over-an-existing-metric-view).
+- **Deleting:** turn off **Publish to Databricks** and save, then select **Delete target**, or send
+  `DELETE /api/v1/deployments/{deploymentId}/databricks-metric-view-integrations/{dataSourceName}?target=<name>&expectedConfigurationVersion=<n>`.
+  `default` can't be deleted (`400`), and an unknown name returns `404`. A delete returns `409`
+  while the target is enabled, while it has an active run or one that ended `CANCELLED` or `FAILED`
+  in the last 10 minutes, or when the version is stale. The deleted target's Metric Views stay in
+  Databricks, managed by no publication target, and the card lists them, as does the response's
+  `retainedMetricViews`: drop them, or name them in another target's `takeOverTargets` before it
+  publishes there. The deleted target's runs stay readable by `runId` and keep their `targetName`,
+  but can't be promoted from. Its name can be used for a new publication target.
+
+To publish to production the build you tested in staging:
+
+1. Create `staging` and `production` with **Add target**, each with its own catalog or schema and
+   **Publish to Databricks** on, and run **Test access** for each. Through the API, save each with
+   `?target=<name>`, `expectedConfigurationVersion: 0`, and `enabled: true`. Leave
+   `syncOnDeploy` off for production, so that no deployment publishes there untested.
+2. Publish to staging: turn on [Publish after each deployment](#publish-after-each-deployment)
+   for it with `syncOnDeploy: true`, or start its runs yourself.
+3. Once a staging run is **Completed**, run your own checks against the staging Metric Views. Cube
+   doesn't know whether they passed.
+4. Promote the staging run: in staging's run history, select **Promote run to…** on that run,
+   choose `production`, and confirm, which switches the card to production. The menu lists only
+   the other publication targets with **Publish to Databricks** on.
+
+   <Frame>
+     <img
+       src="https://static.cube.dev/docs/integrations/databricks-metric-views/promote-run-v2.png"
+       alt="Run history of the staging publication target with a completed run expanded and its Promote run to… menu open, listing production"
+     />
+   </Frame>
+
+   Through the API, start a production run with production's `configurationVersion` and
+   `promoteFromRunId` set to the staging run's `runId`, here `STAGING_RUN_ID`. Set
+   `PROMOTION_IDEMPOTENCY_KEY` to a UUID unique to this promotion, so that retrying the step
+   doesn't start a second run:
+
+```bash
+set -euo pipefail
+
+integration="$CUBE_API_URL/api/v1/deployments/$DEPLOYMENT_ID/databricks-metric-view-integrations/default"
+auth_header="Authorization: Bearer $CUBE_API_TOKEN"
+version=$(curl --fail --silent --show-error -H "$auth_header" \
+  "$integration?target=production" | jq -r '.configurationVersion')
+request=$(jq -n --argjson version "$version" --arg source "$STAGING_RUN_ID" \
+  --arg key "$PROMOTION_IDEMPOTENCY_KEY" \
+  '{configurationVersion: $version, promoteFromRunId: $source, idempotencyKey: $key}')
+curl --fail-with-body -X POST -H "$auth_header" -H 'Content-Type: application/json' \
+  --data-binary "$request" "$integration/syncs?target=production"
+```
+
+The request returns once the run starts: poll its `statusUrl` and check the result as the
+[CI recipe](#trigger-publication-from-ci) does. The promoted run converts the staging run's build
+with production's settings. Starting it fails when:
+
+- the source run is one of production's own (`400`) or of another data source (`404`);
+- the source run didn't end `COMPLETED`, or a view in production's scope didn't publish in it as
+  `created`, `updated`, or `unchanged` with no `withheldMembers` (`409`);
+- a newer build has succeeded since (`409`): publish it to staging and test it;
+- Cube would convert other model files, or with another converter version, than the source run
+  did (`409`), as after a Cube update or with Jinja that renders differently: publish to staging
+  again. A converter change found only during conversion fails the run before it writes to
+  Databricks.
+
+A promotion can also get a temporary `409`, such as while a production run is active; a staging
+run doesn't block it (see [Trigger publication from CI](#trigger-publication-from-ci)). Only the
+message in the response body, which `--fail-with-body` prints, tells a temporary `409` from a
+refusal, so read it before you retry.
+
+A run returns its `targetName` and, when promoted, `promotedFromRunId`, which run history shows as
+**Promoted from run**. Its `sourceSha256` hashes the model files it converted, and `runtime` names
+the converter version it used.
+
+### Publish to another workspace {#publish-to-another-workspace}
+
+On a data source with a Databricks connection in its environment variables, a publication target
+uses that connection unless it has one of its own, so one data source can publish to several
+workspaces, such as staging to one and production to another. Create a
+[service principal with an OAuth secret](https://docs.databricks.com/aws/en/dev-tools/auth/oauth-m2m)
+for the other workspace and grant it the privileges listed in [Before you start](#before-you-start).
+Then pick the target in the card, turn on **Use a separate connection** under
+**Databricks connection**, enter the connection as in
+[Data sources served by `driver_factory`](#data-sources-served-by-driver_factory), and save. That
+target's Preview, Test access, and runs use this connection; targets without one, and your users'
+queries, keep using the data source's.
+
+A target with its own connection doesn't read `CUBEJS_DB_DATABRICKS_CATALOG`: if a cube uses a
+two-part `schema.table` name, enter its **Default catalog**. To go back to the data source's
+connection, turn **Use a separate connection** off and save, which removes the target's connection
+and deletes its secret. Through the API, send `connection` as for a data source
+[served by `driver_factory`](#data-sources-served-by-driver_factory).
 
 ## Check a pull request before it merges
 
@@ -369,11 +557,13 @@ Preview such a data model after it's deployed.
 This Bash step requires `curl` 7.76 and `jq` 1.6 or later. Set `CUBE_API_URL` to your tenant host
 without a trailing slash, `DEPLOYMENT_ID` to the production deployment, `CUBE_API_TOKEN` to a
 [Platform API key](/api-reference/authentication) with deployment `SchemaRead` access, and
-`MODEL_DIR` to the data model folder in your checkout. The example previews every view of the
-`default` data source; send the same selection in both previews. To preview a deployed data
-model with Jinja templates, the key also needs `SqlRunnerRead`. Set `MAX_POLLS` to scale the wait
+`MODEL_DIR` to the data model folder in your checkout. The example previews every view in the
+model for the `default` data source; past 128 views, send the saved scope instead. Send the same
+selection in both previews. To preview a deployed data model with Jinja templates, the key also
+needs `SqlRunnerRead`. Set `MAX_POLLS` to scale the wait
 for your view count and warehouse start-up time (default: 60 attempts per preview, 10 seconds
-apart, plus request time).
+apart, plus request time). Starting a preview returns `429` with a `Retry-After` header while
+Cube's preview capacity is exhausted; run the step again after that many seconds.
 
 ```bash
 set -euo pipefail
@@ -450,19 +640,41 @@ fi
 The **Preview** result is the authority for your deployed model. This preview release supports
 YAML models, [Jinja-templated](#jinja-templates) ones included, `extends` between YAML cubes,
 one Databricks data source per published view, scalar dimensions, common aggregates and supported
-calculated measures, and many-to-one and one-to-one joins. A join condition that is not a plain
-column equality, such as an SCD2 date range, an expression like `CAST(...)` or `date_trunc(...)`,
-or a comparison with a literal, is published as written in the Metric View join's `on`. The target
-uses Databricks Metric View YAML 1.1.
+calculated measures, and many-to-one and one-to-one joins. Beyond that:
+
+- **Joins:** a join condition that is not a plain column equality, such as an SCD2 date range, an
+  expression like `CAST(...)` or `date_trunc(...)`, or a comparison with a literal, is published
+  as written in the Metric View join's `on`, as long as it reads a column of the joined cube. A
+  Metric View join keeps at most one match per source row: if the condition matches several rows
+  of the joined cube, the Metric View keeps one of them where Cube keeps all, and Preview does not
+  flag it. Make sure such a condition matches one row. A condition that compares the joined cube
+  with another cube joined from the same cube, such as `{accounts}.plan = {plans}.plan_name` on the
+  `deals` → `plans` join, is published with `plans` nested under `accounts`
+  (`accounts.plans.list_price`) when both joins are many-to-one or one-to-one and the condition
+  reads no column of `deals`. A view that also reaches `plans` another way is blocked, and Preview
+  names both paths.
+- **Dimensions:** a dimension can read a cube joined through many-to-one or one-to-one joins, such
+  as `sql: "{users.name}"` on `orders`, a `{users}.name` column, or `coalesce({users.score}, 0)`.
+  It is published through its join path, as `users.name`, or `a.b.column` for nested joins.
+- **Measures:** a measure can read a joined cube through a join path from its own cube, such as
+  `{CUBE.users.tier}` on `orders`, and is published with that cube joined along the path. Measure
+  SQL can contain a subquery, such as
+  `{CUBE}.id IN (SELECT order_id FROM returns WHERE returned_on = {CUBE}.created_at)` or a
+  `GROUP BY ... HAVING` subquery.
+- **Cube `sql`:** a cube's `sql` can read another cube's SQL with `{other_cube.sql()}`: it is
+  expanded as Cube compiles it, so the published `source` is plain SQL.
+
+The target uses Databricks Metric View YAML 1.1.
 
 These categories reflect the current preview release. Capabilities may change between releases, so
 run a new **Preview** after a Cube upgrade.
 
 - **Supported** — a view with a clear root source and representable dimensions, measures,
   and joins. Review the generated YAML, then test access and sync.
-- **Warning** — behavior-neutral metadata Databricks cannot represent, or a fan-out-unsafe measure
-  withheld as `CUBE_MEMBER_WITHHELD`. Review the exact difference before accepting publication;
-  for a withheld measure, publish it from a view rooted at its own cube.
+- **Warning** — behavior-neutral metadata Databricks cannot represent, or a measure withheld as
+  `CUBE_MEMBER_WITHHELD` because it can over-count. Review the exact difference before accepting
+  publication; for a withheld measure, apply the fix for its case under
+  [withheld measures](#withheld-measures).
 
 Preview **blocks** a view when it finds any of these conditions:
 
@@ -474,23 +686,91 @@ Preview **blocks** a view when it finds any of these conditions:
   `extends`: keep that governed view in Cube; the policy cannot be transferred to a Databricks
   Metric View.
 - Mixed data sources or an ambiguous root dataset: use one data source and a clear root.
-- A two-part `schema.table` source without `CUBEJS_DB_DATABRICKS_CATALOG`: set that variable for
-  the selected Databricks data source, or the credential's **Default catalog** for a data source
-  served by `driver_factory`, and preview again.
-- Cyclic or one-to-many joins, or a join condition that reads a measure or a cube other than the
-  two it joins, including a `table.column` whose table is neither of them: simplify the join. For
-  `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube.
+- A two-part `schema.table` source without a default catalog: set `CUBEJS_DB_DATABRICKS_CATALOG`
+  for the selected Databricks data source, or the **Default catalog** of a publication target with
+  its own connection, and preview again.
+- Cyclic joins, a one-to-many join on the view's join path, a join condition that reads a measure,
+  or one that reads a cube other than the two it joins outside the nested case under **Joins**
+  above, including a `table.column` whose table is neither of them: simplify the join. For a
+  one-to-many join (`CUBE_VIEW_JOIN_NOT_REPRESENTABLE`), root the view at the many-side cube.
+- A many-to-one or one-to-one join whose condition reads no column of the joined cube, such as
+  `1 = 1` or `{CUBE}.status = 'open'` (Preview names the join): Cube keeps every row such a join
+  matches, and a Metric View keeps one. This includes a cube the view reaches only through member
+  SQL, such as `{layout.label}` in a dimension of the root cube, and a join to a single-row cube.
+  Add a condition on a column of the joined cube, such as `{users}.id`, `users.id`, or
+  `{settings}.id = 1` for a single-row cube, or leave that cube and the members that read it out
+  of the view.
+- A dimension that reads a cube behind a one-to-many join (Preview names that join): a Metric View
+  dimension needs one value per source row, so root the view at the many-side cube.
 - A cube `sql` that reads [context variables](/reference/data-modeling/context-variables), such
   as `{FILTER_PARAMS…}`, `{SECURITY_CONTEXT…}`, or `{COMPILE_CONTEXT…}` (`CUBE_CONTEXT_IN_SQL`):
   only Cube can fill them in, so remove them from the cube's `sql` or keep that view in Cube.
+- An aggregate measure, such as `count_distinct` or `max`, that reads a measure which itself
+  aggregates, such as `{users.score_max}`: SQL cannot nest one aggregate in another, so read a
+  dimension instead, through a join path such as `{CUBE.users.score}`.
+- A measure subquery that reads a joined cube or a measure: a Metric View subquery can read only
+  columns of the measure's own source row, so select from the joined cube's table inside the
+  subquery, or keep that view in Cube.
 - Unsupported expressions or types, or multi-stage, window, or ranking calculations: simplify
   the model or keep that view in Cube.
+- A measure that reads a column outside any aggregate, such as
+  `CASE WHEN {layout.idx} = 1 THEN {count} END` (Preview names the measure and the column): a
+  Metric View measure must aggregate every column it reads. Move the condition inside the
+  aggregate, or keep that view in Cube.
+- Two dimensions that each read the other's name, where one of them is named `source` or has the
+  same name as a join: a Metric View dimension reads the dimensions before it by name, so Preview
+  must place such a dimension after every dimension that reads its name, and no order works for
+  two that read each other. Rename one of them.
 
-An unsafe joined measure can be **withheld while the rest of its view is published**. That view
-may show **Created** or **Updated**, and the run may show **Completed**, even though some measures
-are missing in Databricks. Check **Measures not published** in Preview and beside each view in
-run history before treating a run as complete. There is no opt-in gate for incomplete publication
-yet.
+### Withheld measures
+
+A view's joins are the joins on its join path plus any joins that member SQL reaches, such as
+`{CUBE.users.country}`. That includes the SQL of a member the view doesn't list but one of its
+members references. A one-to-many join on the join path blocks the view, as listed above, and so
+does a dimension that reads a cube behind one. Otherwise, a one-to-many join that member SQL
+reaches doesn't block the view, but it can withhold some of the view's measures.
+
+A measure of the view's root cube that reads a joined cube, such as
+`SUM(CASE WHEN {products.family} = 'CX' THEN {CUBE}.events END)`, publishes when all of the
+view's joins are many-to-one or one-to-one and the view has no root-source override: such joins
+can't repeat a row of the root cube, so each row counts once, as in Cube.
+
+A measure that can over-count is withheld: a non-idempotent aggregate, such as `sum`, `avg`, or a
+`count` of an expression, or a calculated measure built on one. It is withheld in these cases:
+
+- A measure of a joined cube: publish it from a view rooted at its own cube.
+- A calculated measure that references another cube's measure: keep that view in Cube.
+- A root-cube measure that reads a joined cube, in a view where member SQL reaches a one-to-many
+  join, or in a view with a root-source override: remove the member reference that reaches that
+  join, or the override, or keep that view in Cube.
+
+A view with a withheld measure is **still published without it**. That view may show
+**Created**, **Updated**, or **Unchanged**, and the run may show **Completed**, even though some
+measures are missing in Databricks. Check **Measures not published** in Preview and beside each
+view in run history before treating a run as complete. There is no opt-in gate for incomplete
+publication yet.
+
+### References and subqueries in SQL
+
+Preview publishes these as Cube compiles them, within the limits each one lists:
+
+- A cube `sql` that reads another cube's SQL, such as `SELECT * FROM {orders_base.sql()}`,
+  publishes with that SQL expanded, so the Metric View `source` is plain SQL. Preview blocks a
+  reference that forms a cycle, names a cube outside the YAML model, goes through a join path
+  (`{orders.users.sql()}`), or reads a cube whose own `sql` holds any other Cube reference, such
+  as `{CUBE}` or a member.
+- A member reference through a join path from the cube that holds the reference, such as
+  `{CUBE.users.tier}` in an `orders` member, publishes as `users.tier`, joined along that path.
+  Preview blocks the view if its own `join_path` entries reach that cube another way, since a
+  Metric View joins each cube once.
+  A plain `{users.tier}` names no path, so `users` needs exactly one join path from the view's
+  root, or a view `join_path` entry that picks one (`includes: []` is enough).
+- A measure's `sql` or `filters` can contain a subquery, such as this filter:
+  `{CUBE}.account_id IN (SELECT account_id FROM raw.usage WHERE metric_ts = {CUBE}.metric_ts)`.
+  Databricks doesn't resolve `source` columns inside a subquery, so each outer column it reads is
+  added to the Metric View `source` under a generated name, such as `__cube_outer_0__`. Preview
+  blocks a subquery that reads a joined cube, a measure, or a dimension whose SQL has a column
+  without a `{CUBE}.` prefix. A subquery in dimension or join SQL is blocked too.
 
 ### Jinja templates
 
@@ -522,30 +802,33 @@ converted from a mix of the two. Try again once the rollout finishes.
 ## Ownership, failures, and rollback
 
 Cube records ownership after a confirmed write. It refuses a view whose destination already
-holds an object this data source does not manage. Resolve the collision with the owner of the
+holds an object this publication target does not manage. Resolve the collision with the owner of the
 Databricks object, by [taking over the destination](#take-over-an-existing-metric-view), or with
 [Cube support](/admin/account-billing/support). Cube never deletes or overwrites an object it does
 not manage unless you take over that exact destination. Cube does not compare a Metric View it
 manages with its current definition in Databricks: a sync skips the view while its generated
-definition is unchanged and otherwise replaces it, edits made in Databricks included. A failed
-conversion, validation, or write leaves that view's previous Databricks definition in place.
+definition is unchanged and otherwise replaces it, edits made in Databricks included. A Metric
+View you drop in Databricks stays dropped until its generated definition changes, such as after a
+change to the view or a cube it reads. A failed conversion, validation, or write leaves that view's
+previous Databricks definition in place.
 Other views in the same run may still publish.
 
 You can request cancellation of an active run. It prevents further writes but does not undo
-views already published. To roll back a bad definition, restore the desired Cube model and
+views already published. Saving the settings while a run is active, even to turn publication off,
+fails that run before its next write. To roll back a bad definition, restore the desired Cube model and
 deploy it. Then preview and sync again or, with [Publish after each deployment](#publish-after-each-deployment)
 on, wait for that build's run to finish, then check that the card shows no
 [Databricks is behind](#databricks-behind-the-deployed-model) warning, and select **Publish now**
 if it does. Inspect run history and the Databricks target
 afterward.
 If publication is unavailable, contact [Cube support](/admin/account-billing/support) with
-the deployment, data source, run ID, and per-view issue codes. Do not send credentials or
-sensitive source data.
+the deployment, data source, run ID, and each failed view's issue code, error class, and statement
+ID. Do not send credentials or sensitive source data.
 
 ### Databricks behind the deployed model {#databricks-behind-the-deployed-model}
 
 Databricks serves the Metric Views of the last build that a **Completed** or **Partial** run
-published. When the deployment runs a newer build, the **Databricks Metric Views** card shows
+published. When the deployment runs a newer build, the **Databricks Metric View sync** card shows
 **Databricks is behind the deployed model**. The warning names the commit Databricks was last
 published from and the commit the deployment runs. When both builds share a commit, as after a
 redeploy, it names their build numbers instead. Select **Publish now** in the warning to publish
@@ -572,21 +855,23 @@ rule.
 ### Take over an existing Metric View
 
 A sync labels a view **Blocked**, with one of these codes, when its destination already holds an
-object this data source's publication does not manage:
+object this publication target does not manage:
 
-- `unmanaged-target`: an object Cube did not create, such as a Metric View made by hand or one
-  your own pipeline writes to Databricks directly.
-- `ownership-conflict`: the publication of another Databricks data source in your Cube account,
-  in this or another deployment, manages it.
+- `unmanaged-target`: an object no publication in your Cube account manages, such as a Metric View
+  made by hand, one your own pipeline writes to Databricks directly, or one a deleted
+  [publication target](#publish-to-staging-then-production) left.
+- `ownership-conflict`: another publication in your Cube account manages it: another
+  [publication target](#publish-to-staging-then-production) of this data source, or another
+  Databricks data source in this or another deployment.
 
-To hand that destination to this data source, take it over, which needs the same `SchemaUpdate`
-access as any sync. The run replaces the object at that exact destination with the view's Metric
-View and records it as managed by this data source. The object's current definition is lost.
-Later runs treat it like any other Metric View Cube manages. A data source that managed it before
-stops managing it, and its next sync reports that view **Blocked** with `ownership-conflict`:
-remove the view from that data source's scope or change where it publishes. There is no option
-to take over everything: each take-over names its destinations, and without one Cube overwrites
-nothing it does not manage.
+To hand that destination to this publication target, take it over, which needs the same
+`SchemaUpdate` access as any sync. The run replaces the object at that exact destination with the
+view's Metric View and records it as managed by this publication target. The object's current
+definition is lost. Later runs treat it like any other Metric View Cube manages. A publication
+target that managed it before stops managing it, and its next sync reports that view **Blocked**
+with `ownership-conflict`: remove the view from that target's scope or change where it publishes.
+There is no option to take over everything: each take-over names its destinations, and without one
+Cube overwrites nothing it does not manage.
 
 - **In Console**: in the newest run in run history, select **Take over** next to the blocked view.
   The **Take over this destination?** confirmation names the destination; select
@@ -607,27 +892,29 @@ it; otherwise the view ends **Write failed** and the object keeps its definition
 object may not keep its Databricks grants, so check afterward that its consumers can still query
 it.
 
-A take-over runs alone in your Cube account. Starting one returns `409` while another data
-source's run is in flight, and starting another data source's run returns `409` while a take-over
+A take-over runs alone in your Cube account. Starting one returns `409` while a run of another data
+source or publication target is in flight, and starting such a run returns `409` while a take-over
 is in flight. A run that ended `CANCELLED` or `FAILED` in the last 10 minutes counts as in flight,
-because a write it sent may still land. A [deployment's run](#publish-after-each-deployment)
-retries a `409` for about 30 minutes. The [CI recipe](#trigger-publication-from-ci) retries for
-about 5 minutes by default; if CI may start while a take-over runs, raise `MAX_START_ATTEMPTS`,
-for example to 90 (about 15 minutes).
+because a write it sent may still land. A [deployment's run](#publish-after-each-deployment) retries
+a `409` for about 30 minutes. The [CI recipe](#trigger-publication-from-ci) retries for about 5
+minutes by default; if CI may start while a take-over runs, raise `MAX_START_ATTEMPTS`, for example
+to 90 (about 15 minutes).
 
 A failed take-over holds the run's drops, as a failed creation does (see
 [Removed views](#removed-views)). Cancelling a take-over does not stop a write already sent to
 Databricks. If that write lands, the new definition is live but Cube's record does not change: the
-destination stays unmanaged, or stays managed by the other data source, which skips it while
-that view's model is unchanged and replaces it with its own definition once the model changes.
-Run the take-over again to record it.
+destination stays unmanaged, or stays managed by the other publication target, which skips it
+while that view's model is unchanged and replaces it with its own definition once the model
+changes. Run the take-over again to record it.
 
 ### Removed views
 
-A Metric View becomes obsolete when its view leaves the scope (you remove the view from the data
-model, rename it, deselect it, or edit the pattern so it no longer matches) or the view's target
-name changes (a target-name override or prefix change). By default an obsolete Metric View stays in
-Databricks, and run history labels it **Obsolete, kept**. To have syncs drop obsolete Metric Views,
+A Metric View becomes obsolete when its view leaves the scope (you deselect it, edit the pattern
+so it no longer matches, or remove or rename it under **all** or **pattern**; a selected view you
+remove or rename stays in scope, see the scope rules under [Publish a view](#publish-a-view)) or the
+view's target name changes (a target-name override or prefix change). By default an obsolete
+Metric View stays in Databricks, and run history labels it **Obsolete, kept**. To have syncs drop
+obsolete Metric Views,
 choose **Delete the Metric View Cube created** under **When a view leaves the scope**, or save
 `deletionPolicy: delete-managed` through the API. The next sync drops each one and labels it
 **Obsolete, deleted**. A dropped Metric View loses its Databricks grants; if its target comes back,
@@ -635,11 +922,11 @@ the next sync creates it again without them.
 
 Cube drops a Metric View only when all of these hold:
 
-- Cube created it and still records it as its own, in the catalog and schema the data source
-  publishes to now, in the same Unity Catalog metastore. After you change the target catalog or
-  schema, the Metric Views in the old location stay in Databricks and every sync labels them
-  **Obsolete, kept** without a `detail`, so CI still passes. Drop them in Databricks yourself;
-  run history keeps listing them.
+- Cube created it and still records it as its own, in the catalog and schema its publication
+  target publishes to now, in the same Unity Catalog metastore. After you change the target
+  catalog or schema, the Metric Views in the old location stay in Databricks and every sync
+  labels them **Obsolete, kept** without a `detail`, so CI still passes. Drop them in Databricks
+  yourself; run history keeps listing them.
 - It is obsolete: its Cube view left the scope, or the view now publishes to another target
   name. A view still in scope whose conversion or write failed keeps its Metric View.
 - The object at that name is still a view, owned by the Databricks principal Cube publishes with.
@@ -652,9 +939,10 @@ A sync drops nothing, and labels each Metric View it would have dropped **Obsole
 reason, when:
 
 - `no-views`: no view in the sync converted to a Metric View definition;
-- `create-failed`: Databricks rejected or failed the creation of a new view's Metric View, or a
-  [take-over](#take-over-an-existing-metric-view), so a renamed view would otherwise lose both
-  names;
+- `create-failed`: a new view's Metric View or a
+  [take-over](#take-over-an-existing-metric-view) wasn't written (Databricks rejected or failed it,
+  or an object Cube doesn't manage holds its name: `unmanaged-target`), so a renamed view would
+  otherwise lose both names;
 - `deletion-cap-exceeded`: it would drop more than 20 Metric Views. Remove views in batches of
   at most 20 per sync. The hold repeats on every sync while more than 20 are obsolete, and
   dropping them in Databricks yourself does not clear it. Restore views or revert the target-name
@@ -668,8 +956,9 @@ needs the same Databricks privileges on the target schema as replacing a view.
 
 ### Move to another metastore
 
-After you point the data source at a workspace on another Unity Catalog metastore, the next sync
-creates its Metric Views there, or labels a view **Blocked** with `unmanaged-target` when an object
-there already holds its name; if that object should belong to this data source,
-[take it over](#take-over-an-existing-metric-view). The Metric Views in the old metastore stay, and
-syncs no longer list them: drop them in Databricks yourself.
+After you point the data source, or a publication target's own connection, at a workspace on
+another Unity Catalog metastore, the next sync creates its Metric Views there, or labels a view
+**Blocked** with `unmanaged-target` when an object there already holds its name; if that object
+should belong to this publication target, [take it over](#take-over-an-existing-metric-view). The
+Metric Views in the old metastore stay, and syncs no longer list them: drop them in Databricks
+yourself.

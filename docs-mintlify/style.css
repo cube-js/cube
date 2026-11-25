@@ -106,3 +106,38 @@ html.dark .cube-consent :focus-visible {
   line-height: 1;
   cursor: pointer;
 }
+
+/*
+ * Images in <Frame>: show the image as one card with a thin border, without
+ * the frame's padding and fill. Light screenshots otherwise blend into the
+ * frame and the page.
+ */
+.frame:has([data-ramka-trigger] img) {
+  padding: 0;
+  background: transparent;
+  border-radius: 6px;
+}
+
+.frame:has([data-ramka-trigger] img) > div {
+  border-radius: 6px;
+}
+
+.frame [data-ramka-trigger] img {
+  border: 1px solid rgb(0 0 0 / 0.1);
+  border-radius: 6px !important;
+}
+
+.dark .frame [data-ramka-trigger] img {
+  border-color: rgb(255 255 255 / 0.1);
+}
+
+/* Zoomed images: the same edge on the lightbox backdrop */
+.zoom-image-content [data-ramka-media] img {
+  border: 1px solid rgb(0 0 0 / 0.1);
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.12);
+}
+
+.dark .zoom-image-content [data-ramka-media] img {
+  border-color: rgb(255 255 255 / 0.1);
+}

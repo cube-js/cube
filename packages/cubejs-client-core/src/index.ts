@@ -124,6 +124,33 @@ export type MetaMethodOptions = LoadMethodOptions & {
   onlyViews?: boolean;
 };
 
+/**
+ * How the SQL API binds a parameter value: as a literal of that type, or with
+ * `expr`, as a SQL expression given in a string. An `expr` value is SQL, not
+ * data, so untrusted input belongs in a literal type.
+ */
+export type CubeSqlParamType = 'number' | 'string' | 'time' | 'boolean' | 'expr';
+
+/**
+ * A value for one `:name` placeholder in a SQL API query.
+ */
+export type CubeSqlParam = {
+  /** The placeholder's name, without the leading colon. */
+  name: string;
+  value: string | number | boolean | null;
+  type: CubeSqlParamType;
+};
+
+/**
+ * One `:name` placeholder of a SQL API query, with the type its surroundings
+ * expect. `unknown` when nothing around it settles the type; never `expr`,
+ * which is a binding choice rather than something a query implies.
+ */
+export type CubeSqlParamDescription = {
+  name: string;
+  type: Exclude<CubeSqlParamType, 'expr'> | 'unknown';
+};
+
 export type CubeSqlOptions = LoadMethodOptions & {
   /**
    * Query timeout in milliseconds
@@ -135,6 +162,12 @@ export type CubeSqlOptions = LoadMethodOptions & {
    * verbatim. When omitted, the deployment's default time zone is used.
    */
   timezone?: string;
+  /**
+   * Values for the query's `:name` placeholders, bound by the server rather
+   * than spliced into the SQL text. Servers older than 1.8.23 reject a request
+   * that carries this field, so it is sent only when set.
+   */
+  params?: CubeSqlParam[];
 };
 
 export type CubeSqlSchemaColumn = {
@@ -819,6 +852,29 @@ class CubeApi {
     );
   }
 
+  public cubeSqlParams(sqlQuery: string, options?: LoadMethodOptions): Promise<CubeSqlParamDescription[]>;
+
+  public cubeSqlParams(sqlQuery: string, options: LoadMethodOptions, callback?: LoadMethodCallback<CubeSqlParamDescription[]>): UnsubscribeObj;
+
+  /**
+   * List the `:name` placeholders of a SQL API query in the order they first
+   * appear, each with the type its surroundings expect. Plans the query without
+   * running it. Needs a server of 1.8.23 or later.
+   */
+  public cubeSqlParams(sqlQuery: string, options?: LoadMethodOptions, callback?: LoadMethodCallback<CubeSqlParamDescription[]>): Promise<CubeSqlParamDescription[]> | UnsubscribeObj {
+    return this.loadMethod(
+      () => this.request('cubesql/params', {
+        query: sqlQuery,
+        method: 'POST',
+        signal: options?.signal,
+        baseRequestId: options?.baseRequestId,
+      }),
+      (response: { params: CubeSqlParamDescription[] }) => response.params,
+      options,
+      callback
+    );
+  }
+
   public cubeSql(sqlQuery: string, options?: CubeSqlOptions): Promise<CubeSqlResult>;
 
   public cubeSql(sqlQuery: string, options?: CubeSqlOptions, callback?: LoadMethodCallback<CubeSqlResult>): UnsubscribeObj;
@@ -844,6 +900,10 @@ class CubeApi {
 
         if (options?.timezone) {
           cubesqlParams.timezone = options.timezone;
+        }
+
+        if (options?.params) {
+          cubesqlParams.params = options.params;
         }
 
         const request = this.request('cubesql', cubesqlParams);
@@ -939,6 +999,7 @@ class CubeApi {
         query: sqlQuery,
         cache: options?.cache,
         timezone: options?.timezone,
+        params: options?.params,
       }
     });
 

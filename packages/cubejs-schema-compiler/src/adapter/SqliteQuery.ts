@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { splitSqlInterval } from '@cubejs-backend/shared';
+import { parseSqlInterval, splitSqlInterval } from '@cubejs-backend/shared';
 
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
@@ -57,22 +57,30 @@ export class SqliteQuery extends BaseQuery {
   }
 
   public subtractInterval(date: string, interval: string) {
-    return this.applyInterval(
-      date,
-      splitSqlInterval(interval).map(part => part.replace('-', '+').replace(/(^\+|^)/, '-'))
-    );
+    return this.applyInterval(date, interval, -1);
   }
 
   public addInterval(date: string, interval: string) {
-    return this.applyInterval(date, splitSqlInterval(interval));
+    return this.applyInterval(date, interval, 1);
   }
 
-  /**
-   * A strftime modifier carries a single unit, so a compound interval becomes one modifier
-   * argument per unit, coarsest first.
-   */
-  private applyInterval(date: string, parts: string[]): string {
-    const modifiers = parts.map(part => `'${part}'`).join(', ');
+  // A strftime modifier carries a single unit, so a compound interval becomes one modifier per
+  // unit. SQLite has no week or quarter modifier and yields NULL for one, so those fold into
+  // days and months.
+  protected applyInterval(date: string, interval: string, sign: 1 | -1): string {
+    const { week, quarter, ...parsed } = parseSqlInterval(interval);
+    if (week) {
+      parsed.day = (parsed.day ?? 0) + week * 7;
+    }
+    if (quarter) {
+      parsed.month = (parsed.month ?? 0) + quarter * 3;
+    }
+
+    const signed = Object.entries(parsed).map(([unit, value]) => `${value * sign} ${unit}`).join(' ');
+    if (!signed) {
+      return this.timeStampCast(date);
+    }
+    const modifiers = splitSqlInterval(signed).map(part => `'${part}'`).join(', ');
 
     return `strftime('%Y-%m-%dT%H:%M:%f', ${date}, ${modifiers})`;
   }

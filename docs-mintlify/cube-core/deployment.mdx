@@ -249,6 +249,11 @@ All Cube Store nodes (both router and workers) should only be accessible to Cube
 API instances and refresh workers. To do this with Docker Compose, we simply
 need to make sure that none of the Cube Store services have any exposed
 
+The Cube Store image runs as the non-root `cubestore` user and takes ownership
+of its data directories on start, including host bind mounts such as
+`.cubestore:/cube/data`. See [running as a non-root
+user](/cube-core/running-in-production#running-as-a-non-root-user).
+
 ## Monitoring
 
 All Cube logs can be found by through the Docker Compose CLI:

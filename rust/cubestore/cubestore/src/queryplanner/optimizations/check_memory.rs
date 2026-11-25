@@ -1,4 +1,5 @@
 use crate::queryplanner::check_memory::CheckMemoryExec;
+use crate::queryplanner::in_memory_chunks::InMemoryChunksExec;
 use crate::queryplanner::query_executor::ClusterSendExec;
 use crate::util::memory::MemoryHandler;
 use datafusion::datasource::source::DataSourceExec;
@@ -22,6 +23,7 @@ pub fn add_check_memory_exec(
         || p_any.is::<ParquetExec>()
         || p_any.is::<MemoryExec>()
         || p_any.is::<ClusterSendExec>()
+        || p_any.is::<InMemoryChunksExec>()
     {
         let memory_check = Arc::new(CheckMemoryExec::new(p, mem_handler.clone()));
         Ok(memory_check)

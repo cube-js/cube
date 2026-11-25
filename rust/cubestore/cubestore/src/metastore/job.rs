@@ -90,6 +90,47 @@ pub enum JobStatus {
     Orphaned,
 }
 
+impl JobStatus {
+    /// The variant without its payload, which can be a node address or an error message.
+    pub fn name(&self) -> &'static str {
+        match self {
+            JobStatus::Scheduled(_) => "Scheduled",
+            JobStatus::ProcessingBy(_) => "ProcessingBy",
+            JobStatus::Completed => "Completed",
+            JobStatus::Timeout => "Timeout",
+            JobStatus::Error(_) => "Error",
+            JobStatus::Orphaned => "Orphaned",
+        }
+    }
+}
+
+/// Error message of a job that exceeded its timeout.
+pub const JOB_TIMED_OUT_MESSAGE: &str = "timed out";
+/// Error message of a job interrupted by the process shutting down.
+pub const JOB_SHUTTING_DOWN_MESSAGE: &str = "shutting down";
+
+/// A bounded label for a job failure message, for metrics.
+pub fn job_error_class(message: &str, is_panic: bool) -> &'static str {
+    if message.contains("offset overflow") {
+        "offset_overflow"
+    } else if message.contains("partition is not active") {
+        // Checked first: the message prints the partition's bounds, which may contain "chunk".
+        "partition_not_active"
+    } else if message.contains("chunk") && message.contains("is not active") {
+        "source_chunk_not_active"
+    } else if message.contains("Stale stream timeout") {
+        "stale_stream"
+    } else if message == JOB_TIMED_OUT_MESSAGE {
+        "timeout"
+    } else if message == JOB_SHUTTING_DOWN_MESSAGE {
+        "shutdown"
+    } else if is_panic {
+        "panic"
+    } else {
+        "other"
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, Hash)]
 pub struct Job {
     row_reference: RowKey,
@@ -281,6 +322,46 @@ impl RocksSecondaryIndex<Job, JobIndexKey> for JobRocksIndex {
 mod tests {
     use super::*;
     use serde::Serialize;
+
+    #[test]
+    fn job_error_classes() {
+        for (message, is_panic, class) in [
+            ("Reason: offset overflow", true, "offset_overflow"),
+            (
+                "Source chunk 1 is not active when swapping of (1, 2) to (3) chunks",
+                false,
+                "source_chunk_not_active",
+            ),
+            (
+                "Current chunk is not active: 5",
+                false,
+                "source_chunk_not_active",
+            ),
+            (
+                "Current partition is not active: 5",
+                false,
+                "partition_not_active",
+            ),
+            (
+                "Current partition is not active: Partition { min_value: Some(Row { values: [String(\"chunk\")] }) }",
+                false,
+                "partition_not_active",
+            ),
+            (JOB_TIMED_OUT_MESSAGE, false, "timeout"),
+            ("S3 request: operation timed out", false, "other"),
+            (
+                "Stale stream timeout: deadline has elapsed",
+                false,
+                "stale_stream",
+            ),
+            (JOB_SHUTTING_DOWN_MESSAGE, false, "shutdown"),
+            ("Reason: index out of bounds", true, "panic"),
+            ("Panic in a message is not a panic", false, "other"),
+            ("No such file", false, "other"),
+        ] {
+            assert_eq!(job_error_class(message, is_panic), class, "{}", message);
+        }
+    }
 
     fn job(job_type: JobType) -> Job {
         Job::new(

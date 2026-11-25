@@ -378,6 +378,53 @@ Cube Store does not have any in-built authentication mechanisms. For this reason
 we recommend running your Cube Store cluster with a network configuration that
 only allows access from the Cube deployment.
 
+### Running as a non-root user
+
+The Cube Store Docker image runs `cubestored` as the `cubestore` user (UID and
+GID `10001`).
+
+Older images ran as `root`, so existing volumes are owned by `root`. To keep
+upgrades working, a container started as `root` changes the owner of the
+directories set by `CUBESTORE_DATA_DIR`, `CUBESTORE_REMOTE_DIR`, and
+`CUBESTORE_DUMP_DIR` to `cubestore` on every start, and then drops privileges.
+
+<Warning>
+
+For a host bind mount, such as `.cubestore:/cube/data`, the owner changes on the
+host as well. You will need `sudo` to modify or delete that directory from the
+host afterwards.
+
+</Warning>
+
+If the owner can't be changed, e.g., on NFS with root squashing, on a read-only
+mount, or when capabilities are dropped with `--cap-drop ALL`, the container
+exits with an error. In that case, make the directories writable by UID `10001`
+yourself and start the container as that user:
+
+```bash
+docker run --user 10001:10001 -p 3030:3030 cubejs/cubestore
+```
+
+In Kubernetes, set it in the pod's security context. `fsGroup` makes mounted
+volumes writable by the `cubestore` group:
+
+```yaml
+securityContext:
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+```
+
+The image also works under an arbitrary UID with GID `0`, as assigned by
+OpenShift.
+
+<Info>
+
+Changing the owner on start is a transitional step. A future release will always
+start as `cubestore` and leave volume ownership to you.
+
+</Info>
+
 ### Data-at-rest encryption
 
 [Persistent storage](#persistent-storage) is secured using the standard AWS S3,

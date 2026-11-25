@@ -7,11 +7,18 @@ Chart widgets display a report from the source [workbook][ref-workbooks] as a vi
 
 ## Adding a chart
 
-In the [dashboard builder][ref-workbooks], open the **Charts** picker, the first item in the toolbar, and select one or more reports from the workbook. A chart is added to the canvas for each selected report, inheriting the report's query, configured visualization, and styling. The picker lists every workbook tab that has a query, the ones already on the dashboard first. A name too long for the list shows in full when you hover it; on a phone it wraps instead.
+In the [dashboard builder][ref-workbooks], open the **Charts** picker, the first item in the toolbar, and select one or more reports from the workbook. A chart is added to the canvas for each selected report, inheriting the report's query, configured visualization, and styling. The picker lists every workbook tab that has a query, the ones already on the dashboard first. It has a search field once the workbook has five or more such tabs; with fewer, it lists them without one. A name too long for the list shows in full when you hover it; on a phone it wraps instead.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/charts/charts-picker-search-v2.png"
+    alt="Charts picker in the dashboard builder with the search field and the Create in workbook row"
+  />
+</Frame>
 
 ### Creating a chart from the builder
 
-The first row of the **Charts** picker, directly below its search field, is **Create in workbook**. It stays there whatever you type in the search, and it is the picker's only row when the workbook has no tab with a query yet, or when no chart matches the search.
+The first row of the **Charts** picker, directly below the search field when the picker has one, is **Create in workbook**. It stays there whatever you type in the search, and it is the picker's only row when the workbook has no tab with a query yet, or when no chart matches the search.
 
 Click **Create in workbook** to switch to the workbook on a new tab, added at the end of its tabs and opened on the [new tab page][ref-new-tab-page]. It is named like any new tab, **Tab** and a number such as **Tab 3**, until its first query [names it][ref-tab-names]. Build the chart's query there, then return to the builder (click the **Builder** tab, or press the browser's back button) and pick the tab in the **Charts** picker to add it. Creating the tab doesn't change the charts on the dashboard.
 
@@ -28,6 +35,12 @@ If some controls are incompatible with a chart's query, the chart skips them and
 ## Updating charts
 
 Charts on a published dashboard reflect the most recent published version of the workbook. To change the query, switch the chart type, or restyle the visualization, edit the underlying report in the workbook and publish a new version of the dashboard.
+
+The chart's settings menu (`⋮`) groups its items by what they do: **Inspect** and **Ask a follow up question**, then **Add comment** and **Create alert**, then **Edit in workbook**.
+
+**Inspect** in the chart's settings menu shows the chart's query — see [Inspecting a chart's query](#inspecting-a-charts-query).
+
+**Ask a follow up question** in the chart's settings menu starts a [chat][ref-chart-follow-up] about this chart.
 
 **Add comment** in the chart's settings menu opens the [comments][ref-comments] panel with only this chart's threads.
 
@@ -51,6 +64,34 @@ When the report already filters the same field, both filters apply — exactly a
 
 Only filters are carried. A [time granularity switcher or field switcher][ref-controls] on the dashboard does not follow into the workbook, so a report opened this way shows its own granularity and its own fields.
 
+## Inspecting a chart's query
+
+On a published dashboard, **Inspect** in a chart's settings menu (`⋮`) opens a dialog with the query behind the chart. The query has the dashboard's current state applied: the values of its [controls][ref-controls] and any [cross-filters][ref-cross-filtering]. It is the query that produced the data on screen, so change a filter and reopen the dialog to see the query change with it.
+
+{/* TODO: video — inspecting a dashboard chart's query (GTM-330) */}
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/dashboards/charts/inspect-dialog.png"
+    alt="Inspect dialog for a filtered chart, with the applied filters under the title and the Semantic SQL and Generated SQL tabs"
+  />
+</Frame>
+
+The dialog's title is the chart's title. When filters reach the chart, a line under the title lists them, worded as on the dashboard's filter chips, such as **Status is completed**. Cross-filters come last, as **Filtered by** and the names of the cross-filtered fields.
+
+The query is shown on the **Semantic SQL** and **Generated SQL** tabs, as in a workbook's [SQL panel][ref-inspecting-queries], with a button to copy it:
+
+- **Semantic SQL** is shown to everyone who can view the dashboard.
+- **Generated SQL** is shown only to roles with the [**Access SQL Runner**][ref-custom-roles-actions] permission. Without it, the dialog shows only Semantic SQL.
+
+A chart built on [source SQL][ref-source-sql] shows its SQL as written, without tabs, and only to roles with **Access SQL Runner**. For other viewers, such a chart has no **Inspect**. Dashboard filters do not apply to source SQL, so the dialog lists none.
+
+If a chart's query fails, **Inspect** also appears as an icon button next to the error, so you can read the query that failed.
+
+A viewer whose role allows no other item in the settings menu, for example one who can't use the [Dashboard Agent][ref-dashboard-agent], still gets the menu with **Inspect** in it.
+
+**Inspect** is not available on Python charts, on [embedded][ref-embedding] dashboards, in printed or PDF dashboards, or in a dashboard's version history.
+
 ## Title
 
 Each chart shows the name of the underlying workbook tab as its title. To rename it, open the tab in the workbook, rename the tab, and republish the dashboard — the new name flows through to every chart backed by that tab.
@@ -67,3 +108,10 @@ Use **Hide title** in the widget's settings menu to suppress the title on the da
 [ref-comments]: /docs/explore-analyze/dashboards/comments
 [ref-data-alerts]: /docs/explore-analyze/alerts
 [ref-data-alerts-menu]: /docs/explore-analyze/alerts#from-a-charts-menu
+[ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
+[ref-inspecting-queries]: /docs/explore-analyze/workbooks/querying-data#inspecting-queries
+[ref-custom-roles-actions]: /admin/users-and-permissions/custom-roles#deployment-permissions
+[ref-source-sql]: /docs/explore-analyze/workbooks/source-sql-tabs
+[ref-dashboard-agent]: /docs/explore-analyze/dashboards/dashboard-agent
+[ref-chart-follow-up]: /docs/explore-analyze/dashboards/dashboard-agent#focusing-on-a-specific-chart
+[ref-embedding]: /embedding

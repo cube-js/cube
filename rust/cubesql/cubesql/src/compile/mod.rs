@@ -1673,6 +1673,7 @@ ORDER BY \"COUNT(count)\" DESC"
             DatabaseProtocol::PostgreSQL,
         ).await;
 
+        // Sunday-start week: Cube `week` granularity starts on Monday
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
             logical_plan.find_cube_scan().request,
@@ -1682,7 +1683,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 dimensions: Some(vec![]),
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("week".to_string()),
+                    granularity: Some("day".to_string()),
                     date_range: None,
                 }]),
                 order: Some(vec![]),
@@ -19597,6 +19598,21 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         assert!(error.to_string().contains("required to be pushed down"));
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_union_with_different_column_counts_returns_error() {
+        init_testing_logger();
+
+        let error = execute_query(
+            "SELECT 1 UNION ALL SELECT 1, 2".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .expect_err("Query should return an error");
+        assert!(error
+            .to_string()
+            .contains("UNION queries must have the same number of columns (left: 1, right: 2)"));
     }
 
     #[tokio::test]

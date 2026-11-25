@@ -52,6 +52,22 @@ A `between` filter picks a range. **Presets** lists **Today**, **Yesterday**, **
 
 The filter shows the range's name, such as "Last month, up to now", with its dates in a tooltip.
 
+A `between` filter also reads a range typed in the search field. Each reading is a row with its dates, listed above the presets that match the text. Enter applies the highlighted row, and a click applies any row. Nothing applies on its own. The search field reads English:
+
+- The ranges that **Presets** and **Relative** offer, such as "past 5 years", "last 3 full quarters", "ytd", "next 2 weeks", "next month from now" or "past 90 days until now". A phrase that names now keeps it; otherwise the **Up to now** box decides.
+- A past or to-date range moved back, such as "past 30 days, 1 year earlier". Its name says so, as in **Past 30 days, 1 year earlier**, and it cannot end now. Only typing moves a range back.
+- Dates, such as "2026-01-01 to 2026-03-31", "Q1 2026", "march 2026" or "since 2026-01-01".
+
+A phrase with two common meanings gives two rows: "last 3 months" reads as **Past 3 months** and **Last 3 whole months**.
+
+When neither these rules nor the presets read the text, and AI features are available for your account, Cube asks the Auto agent's [small LLM][ref-small-llm], or the [default agent][ref-default-agent]'s when Auto is turned off. It reads phrases such as "Q3", "H1 2026", "since Black Friday" or "same 30 days last year", and gives at most two readings. They are rows like any other reading, with their dates, and Enter or a click applies one. While Cube is asking, the list reads "Reading “…”…". A named period, such as a quarter, a month or a holiday, is stored as specific dates, so "Q3" typed in 2026 stays Q3 2026 after the year turns. Without AI features, the search field reads only the phrases above, and no text is sent to a model.
+
+<Frame>
+![Date range popover with "Q3" typed in the search field and two readings, Jul 1 – Sep 30 and Jul 1 – Sep 30, 2025, above the Up to now box](https://static.cube.dev/docs/explore-analyze/dashboards/widgets/controls/date-range-filter-model-readings.png)
+</Frame>
+
+Text that nothing reads, the small LLM included, shows "Can't read … as dates." with examples to try; click one to type it.
+
 `after`, `after or on`, `before`, `before or on`, `is` and `is not` pick one value, and they have no now box. **Presets** lists **Now**, **Today**, **Yesterday**, **7 days ago**, **30 days ago**, **Start of this month**, **Start of last month**, **3 months ago**, **Start of this year** and **1 year ago**. **Relative** offers moments such as **Start of last month**, **Start of 3 months ago** and **2 weeks from now**. **Fixed** picks one date in a sentence, such as "Before \[date\]" or "On \[date\]". On **Presets** and **Relative**, `is` and `is not` take a day rather than a moment, so they list only values that name a day: **Today**, **Yesterday**, **Tomorrow**, **7 days ago**, **30 days ago** and **1 year ago** on **Presets**, and *N* units ago or from now on **Relative**.
 
 **Presets** and **Relative** store the [relative date values][ref-relative-date-values] that `default_ui_filters` accept, such as `start of 1 month ago`, so the value resolves again every time the query runs. On a time dimension with [custom granularities][ref-granularities], the popover offers only calendar dates, because relative values resolve on the Gregorian calendar.
@@ -352,7 +368,18 @@ Viewers can still switch granularities unless the control's [visibility](#visibi
 
 ### Charts with a period comparison {#time-granularity-period-comparisons}
 
-A chart with a [period comparison][ref-period-comparison] keeps the granularity it was built with. The comparison presets depend on that granularity, so a different granularity would break the match between the current and the comparison rows. Time granularity switchers don't affect such a chart, and it shows a crossed-out clock icon with the notice **"Time granularity controls don't affect this chart — period comparisons pin it to its original granularity."** Other charts on the dashboard still switch.
+A chart with a [period comparison][ref-period-comparison] follows the switcher like any other chart, and each comparison follows the new granularity. A comparison is saved as a preset, such as **Previous period** or **Same period previous year**, so it keeps meaning the same thing at the granularity the viewer picks. A chart saved at month with **Previous period** compares each week with the week before when the viewer picks week, and each quarter with the quarter before at quarter. **Same period previous year** becomes 52 weeks earlier at week.
+
+Not every preset exists at every granularity. When the granularity a viewer picks doesn't offer a chart's comparison, the comparison's columns stay in their place under their saved names, every cell is empty, and the header says why. For example, **Same period previous quarter** isn't offered at week, so its column reads **Count (1 quarter earlier, n/a at Week)**. The chart also shows a crossed-out adjustments icon, and its tooltip names the empty columns and the granularity that fills them again: **"Count (1 quarter earlier) isn't available at Week granularity. Switch to Month to see it."** Switch back to that granularity and the columns fill again, since the saved chart doesn't change. A [custom granularity][ref-granularities] or a sub-day granularity, such as **hour**, offers no presets, so every comparison on the chart shows as an empty column. At year, **Same period previous year** is the same as **Previous period**, so the two show as one column.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/period-comparison-unavailable-at-week.png"
+    alt="Table chart switched to Week with a Count (1 week earlier) column, an empty Count (1 quarter earlier, n/a at Week) column, and the crossed-out adjustments icon's tooltip"
+  />
+</Frame>
+
+Column widths, formats and series colors set on a comparison column carry over to its new name, such as from *1 month earlier* to *1 quarter earlier*. They also apply to an empty column, which keeps its saved name.
 
 ## Field switcher
 
@@ -755,9 +782,9 @@ The chart displays a warning icon to indicate the problem:
 | Icon | Meaning |
 |---|---|
 | Crossed-out filter | Filters were skipped for this chart |
-| Crossed-out clock | Time granularity override was skipped for this chart, or the chart's [period comparison](#time-granularity-period-comparisons) keeps its granularity |
+| Crossed-out clock | Time granularity override was skipped for this chart |
 
-Hover over the icon for details. Click it to open the chart's [Controls mapping](#controls-mapping) and fix the issue — remap the control to a compatible dimension or disable it for this chart. For a chart with a period comparison, remove the comparison if the chart should follow the switcher.
+Hover over the icon for details. Click it to open the chart's [Controls mapping](#controls-mapping) and fix the issue — remap the control to a compatible dimension or disable it for this chart.
 
 ### Controls mapping
 
@@ -802,6 +829,8 @@ The controls icon on a chart counts these filters along with the other controls,
 
 [ref-embed-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
 [ref-relative-date-values]: /reference/data-modeling/view#default_ui_filters
+[ref-small-llm]: /admin/ai/bring-your-own-model#small-llm
+[ref-default-agent]: /admin/ai/multi-agent#default-agent-and-auto
 [ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
 [ref-advanced-queries]: /docs/explore-analyze/workbooks/querying-data#advanced-semantic-queries
 [ref-print-version]: /docs/explore-analyze/dashboards#print-version

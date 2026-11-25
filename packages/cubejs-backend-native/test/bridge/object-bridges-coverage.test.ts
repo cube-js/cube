@@ -166,7 +166,7 @@ const BRIDGES: BridgeSpec[] = [
       'get_allocated_params',
       'hll_cardinality_merge',
       'hll_init',
-      'hll_merge',
+      'hll_merge_only',
       'in_db_time_zone',
       'interval_and_minimal_time_unit',
       'interval_string',

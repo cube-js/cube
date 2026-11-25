@@ -372,6 +372,22 @@ In that case the `CASE WHEN` is unnecessary and the member is **unmasked**. This
 also lets a conditionally-masked _aggregate measure_ render its real value
 instead of being masked, even without grouping by the filter's member.
 
+This does not apply when the query reads, directly or through another member,
+a member that reads rows outside the query filters:
+
+- a measure with a [`time_shift`](/reference/data-modeling/measures#time_shift),
+  which shifts the query's time filters;
+- a multi-stage measure or dimension whose
+  [`filter`](/reference/data-modeling/measures#filter) has `exclude` or
+  `keep_only`, which drops query filters from its inner stage. This holds
+  whatever members it lists. A `filter` with only `include` only adds filters
+  and lets the mask lift.
+
+The query filters then no longer prove that every row matches the mask's row
+filter, so conditional masks stay in place for all members of the query. For
+example, a prior-period comparison or an all-time total shows the conditional
+or masked value even when the query filters match the mask's row filter.
+
 #### Conditional masking on measures
 
 Conditional masking is evaluated **per row**, which works naturally for

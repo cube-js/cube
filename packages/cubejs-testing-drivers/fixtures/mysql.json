@@ -132,6 +132,7 @@
     ]
   },
   "skip": [
+    "SQL API: BTRIM filters with default and explicit spaces",
     "---------------------------------------",
     "No native approximate distinct count   ",
     "---------------------------------------",
@@ -229,6 +230,7 @@
     "filtering ECommerce: equals a whole number with leading zeros"
   ],
   "tesseractSkip": [
+    "SQL API: BTRIM filters with default and explicit spaces",
     "---------------------------------------",
     "No native approximate distinct count   ",
     "---------------------------------------",

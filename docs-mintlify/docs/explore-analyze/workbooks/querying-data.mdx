@@ -128,7 +128,10 @@ On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
 - A date value is picked in a popover with a search field and the
   **Presets**, **Relative** and **Fixed** tabs. **between** picks a range, such
   as **Last month** or **Past 30 days**, and its **Up to now** or **From now**
-  box ends or starts the range now instead of at midnight. **after**,
+  box ends or starts the range now instead of at midnight. Its search field
+  also [reads a typed range][ref-time-filter-values], such as "past 5 years" or
+  "Q1 2026". With AI features, it also reads ranges such as "Q3" or "since
+  Black Friday" with a small LLM. **after**,
   **before** and the "or on" variants pick one moment, such as **Now** or
   **Start of last month**, and **is** and **is not** pick a day, such as
   **Yesterday**. A preset or relative value resolves
@@ -446,8 +449,14 @@ comparison values with a companion query whose date filters are shifted back
 by the comparison offset; you can [inspect it](#inspecting-queries) to check
 the math.
 
-On a dashboard, a chart with a comparison keeps its granularity: [time
-granularity switchers][ref-time-granularity-period-comparisons] don't change it.
+A comparison follows the granularity of its time dimension. When you change
+that granularity, each comparison keeps its preset: **Previous period** at
+month becomes the previous week at week. A comparison the new granularity
+doesn't offer is removed, such as **Same period previous quarter** at week.
+On a dashboard, [time granularity
+switchers][ref-time-granularity-period-comparisons] remap comparisons the same
+way, for the current view only, and show a comparison the granularity
+doesn't offer as an empty column marked *n/a*.
 
 You can also ask the agent for a comparison in chat, e.g., *"Revenue by month
 compared with the previous year"*. The answer has the same derived columns,

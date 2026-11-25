@@ -39,16 +39,26 @@ RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
 
 FROM debian:trixie-slim
 
-WORKDIR /cube
-
+# /cube is group 0 writable for platforms that run the image under an arbitrary
+# UID with GID 0, such as OpenShift.
 RUN set -ex; \
     apt-get update; \
-    apt-get install -y libssl3t64 ca-certificates
+    apt-get install -y libssl3t64 ca-certificates; \
+    rm -rf /var/lib/apt/lists/*; \
+    groupadd --gid 10001 cubestore; \
+    useradd --uid 10001 --gid cubestore --no-create-home --shell /usr/sbin/nologin cubestore; \
+    mkdir -p /cube/.cubestore/data /cube/data; \
+    chown -R cubestore:0 /cube; \
+    chmod -R g=u /cube
+
+WORKDIR /cube
 
 COPY --from=builder /build/cubestore/target/release/cubestored .
+COPY cubestore/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 3306
 
 ENV RUST_BACKTRACE=true
 
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["./cubestored"]

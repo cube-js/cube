@@ -57,6 +57,7 @@ use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
 use mockall::automock;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use simple_logger::SimpleLogger;
 use std::fmt::Display;
@@ -72,6 +73,14 @@ use tokio::time::{timeout_at, Duration, Instant};
 
 const LOST_IN_MEMORY_CHUNKS_CLEANUP_ATTEMPTS: usize = 40;
 const LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY: Duration = Duration::from_secs(15);
+// Also refreshes the held in-memory chunk gauge, so a restarted process overwrites the value its
+// previous incarnation left in the metrics exporter.
+const IN_MEMORY_CHUNK_STATES_INTERVAL: Duration = Duration::from_secs(60);
+
+// Spreads the workers' lookups on the main node instead of keeping them aligned from boot.
+fn jittered(interval: Duration) -> Duration {
+    interval.mul_f64(rand::thread_rng().gen_range(0.8..1.2))
+}
 
 #[derive(Clone)]
 pub struct CubeServices {
@@ -222,6 +231,29 @@ impl CubeServices {
                     tokio::select! {
                         _ = stop_token.cancelled() => return,
                         _ = tokio::time::sleep(LOST_IN_MEMORY_CHUNKS_CLEANUP_RETRY_DELAY) => {}
+                    }
+                }
+            });
+        }
+
+        if self
+            .injector
+            .has_service_typed::<dyn ChunkDataStore>()
+            .await
+        {
+            let chunk_store = self
+                .injector
+                .get_service_typed::<dyn ChunkDataStore>()
+                .await;
+            let stop_token = self.cluster.stop_token();
+            cube_ext::spawn(async move {
+                loop {
+                    if let Err(e) = chunk_store.report_memory_chunk_states().await {
+                        log::error!("Error reporting in-memory chunk states: {}", e);
+                    }
+                    tokio::select! {
+                        _ = stop_token.cancelled() => return,
+                        _ = tokio::time::sleep(jittered(IN_MEMORY_CHUNK_STATES_INTERVAL)) => {}
                     }
                 }
             });
@@ -626,6 +658,10 @@ pub trait ConfigObj: DIService {
     /// Off by default; when disabled, chunks are sent whole and filtered only in the subprocess.
     fn prefilter_in_memory_chunks_enabled(&self) -> bool;
 
+    /// When enabled, a scan reads each partition's in-memory chunks through one plan node that
+    /// merges them at execution, instead of one merge input per chunk. Off by default.
+    fn merge_in_memory_chunks_enabled(&self) -> bool;
+
     /// When enabled (default), a merge group's chunk parquets (PerPartition / Range strategies)
     /// are downloaded concurrently before building the merge inputs, instead of one at a time.
     /// The group is already bounded by repartition_merge_max_input_files and the download
@@ -851,6 +887,7 @@ pub struct ConfigObjImpl {
     pub push_partial_aggregate_below_merge_enabled: bool,
     pub compaction_split_by_total_file_size_enabled: bool,
     pub prefilter_in_memory_chunks_enabled: bool,
+    pub merge_in_memory_chunks_enabled: bool,
     pub repartition_concurrent_download: bool,
     pub repartition_strategy: RepartitionStrategy,
     pub repartition_merge_max_input_files: usize,
@@ -1217,6 +1254,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn prefilter_in_memory_chunks_enabled(&self) -> bool {
         self.prefilter_in_memory_chunks_enabled
+    }
+    fn merge_in_memory_chunks_enabled(&self) -> bool {
+        self.merge_in_memory_chunks_enabled
     }
     fn repartition_concurrent_download(&self) -> bool {
         self.repartition_concurrent_download
@@ -2164,13 +2204,13 @@ impl Config {
                     .ok()
                     .unwrap_or("localhost".to_string()),
                 upload_to_remote: !env::var("CUBESTORE_NO_UPLOAD").ok().is_some(),
-                location_allow_local_fs: env_flag("CUBESTORE_LOCATION_ALLOW_LOCAL_FS", false),
+                location_allow_local_fs: env_bool("CUBESTORE_LOCATION_ALLOW_LOCAL_FS", false),
                 location_allow_hosts: env_parse_list(
                     "CUBESTORE_LOCATION_ALLOW_HOSTS",
                     vec!["*".to_string()],
                     |h| LocationHostFilter::validate_entry(h).map_err(|e| e.message),
                 ),
-                location_deny_private_ips: env_flag("CUBESTORE_LOCATION_DENY_PRIVATE_IPS", false),
+                location_deny_private_ips: env_bool("CUBESTORE_LOCATION_DENY_PRIVATE_IPS", false),
                 enable_topk: env_bool("CUBESTORE_ENABLE_TOPK", true),
                 load_aware_import_placement_enabled: env_flag(
                     "CUBESTORE_LOAD_AWARE_IMPORT_PLACEMENT",
@@ -2192,6 +2232,7 @@ impl Config {
                     "CUBESTORE_PREFILTER_IN_MEMORY_CHUNKS",
                     false,
                 ),
+                merge_in_memory_chunks_enabled: env_flag("CUBESTORE_MERGE_IN_MEMORY_CHUNKS", false),
                 repartition_concurrent_download: env_flag(
                     "CUBESTORE_REPARTITION_CONCURRENT_DOWNLOAD",
                     true,
@@ -2485,6 +2526,7 @@ impl Config {
                 // Production default is off; kept on in tests so prefilter_chunks_shared_scan
                 // and the rest of the suite keep exercising the worker-side trim path.
                 prefilter_in_memory_chunks_enabled: true,
+                merge_in_memory_chunks_enabled: false,
                 repartition_concurrent_download: true,
                 repartition_strategy: RepartitionStrategy::Range,
                 repartition_merge_max_input_files: 50,

@@ -8682,3 +8682,38 @@ async fn test_wrapper_pre_aggregation_unconvertible_candidate() {
     .await;
     assert!(!wrapped_sql.external);
 }
+
+/// A cube query joined with a grouped subquery over another cube, both over pre-aggregations
+/// in the data source: the pushed down query carries the pre-aggregations of both
+#[tokio::test]
+async fn test_wrapper_join_subquery_source_pre_aggregations() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context(false, vec![]).await;
+    let kibana = json!({ "tableName": "dev_pre_aggregations.kibana_sample_data_ecommerce_main" });
+    let logs = json!({ "tableName": "dev_pre_aggregations.logs_main" });
+    context
+        .add_source_pre_aggregation_mock("KibanaSampleDataEcommerce", kibana.clone())
+        .await;
+    context
+        .add_source_pre_aggregation_mock("Logs", logs.clone())
+        .await;
+
+    let wrapped_sql = wrapped_sql(
+        &context,
+        "SELECT k.customer_gender, l.content \
+         FROM KibanaSampleDataEcommerce k \
+         JOIN (SELECT content FROM Logs GROUP BY 1) l ON k.customer_gender = l.content \
+         GROUP BY 1, 2",
+    )
+    .await;
+    assert!(
+        wrapped_sql.sql.contains("subqueryJoins"),
+        "{}",
+        wrapped_sql.sql
+    );
+    assert_eq!(wrapped_sql.pre_aggregations, vec![logs, kibana]);
+}

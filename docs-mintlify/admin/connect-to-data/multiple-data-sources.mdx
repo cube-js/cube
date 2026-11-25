@@ -65,8 +65,8 @@ isn't in the list, such as one no cube uses yet, add its name to `CUBEJS_DATASOU
 Don't give a data source that `driver_factory` serves a connection of its own with
 **+ Add data source** or **Edit**. Its driver reads those variables too, and a Databricks
 service principal saved there takes precedence over the per-user `token` the factory returns.
-To publish Databricks Metric Views from such a data source, give the integration its own
-credential instead: see
+To publish Databricks Metric Views from such a data source, give each of its publication targets
+a Databricks connection of its own instead: see
 [Data sources served by `driver_factory`](/docs/integrations/databricks-metric-views#data-sources-served-by-driver_factory).
 
 ## Source name rules

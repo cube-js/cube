@@ -38,12 +38,18 @@ admin panel:
 1. Navigate to **Admin > Models**
 2. Click **Add model**
 3. Provide a **name** for the model
-4. Select the **model type** (LLM or Embedding)
+4. Select the **model type**: LLM, [Small LLM](#small-llm) or Embedding model
 5. Choose a **provider** and **model**. Custom OpenAI-compatible and Custom
    Anthropic-compatible have no model list: you enter the model name with the
    endpoint settings instead
-6. Optionally, pick a [small model](#small-model)
-7. Enter the required credentials for the provider
+6. Enter the required credentials for the provider
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/admin/ai/bring-your-own-model/add-model-dialog.png"
+    alt="Add model dialog with the name, the LLM model type, the Anthropic provider, the Claude Opus 5.5 model, the Enable thinking toggle and the API Key field"
+  />
+</Frame>
 
 ### Step 2: Assign the model to an agent
 
@@ -56,6 +62,9 @@ agents:
     llm:
       byom:
         name: "my-anthropic-model"
+    small_llm:
+      byom:
+        name: "my-anthropic-haiku"
     embedding_llm:
       byom:
         name: "my-bedrock-embeddings"
@@ -72,24 +81,102 @@ embedding model that created them.
 
 </Warning>
 
-## Small model
+## Small LLM
 
-The agent runs short tasks, such as suggested questions and memory, on a
-small model. For an LLM on Anthropic, AWS Bedrock, GCP Vertex AI or OpenAI, pick
-it in the **Small model** field under **Model**; other providers run these
-tasks on the main model. The small model uses the same provider, region and
-credentials as the main model.
+The agent runs short tasks, such as chat titles, suggested questions, memory
+and [reading a typed date range](/docs/explore-analyze/dashboards/widgets/controls#operators-by-dimension-type),
+on a small LLM. A small LLM is a model of type **Small LLM**, so it can
+come from a different provider or account than the agent's LLM. For example,
+an agent can answer questions with GLM through a Custom OpenAI-compatible
+model and run short tasks on Claude Haiku 5.5 through Anthropic.
 
-| Provider | Default small model |
+{/* TODO: video — small LLMs: add a Small LLM model and assign it to an agent (GTM-316) */}
+
+### Adding a small LLM
+
+Add a small LLM the same way as any other model: in **Admin > Models**, click
+**Add model**, select the **Small LLM** model type, and choose a provider,
+model and credentials.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/admin/ai/bring-your-own-model/add-small-llm-model-v2.png"
+    alt="Add model dialog with the Small LLM model type, the Anthropic provider, the Claude Haiku 5.5 model, thinking enabled and the API Key field"
+  />
+</Frame>
+
+### Assigning a small LLM to an agent
+
+Set the agent's small LLM with the `small_llm` property in the agents YAML
+configuration. It accepts `auto`, a built-in model (`claude-haiku-5-5`,
+`gpt-6-luna`, `kimi_k3` or `glm_5_3`), or a BYOM reference to a model of type
+**Small LLM**:
+
+```yaml
+agents:
+  - name: sales-analyst
+    llm:
+      byom:
+        name: "glm-gateway"
+    small_llm:
+      byom:
+        name: "anthropic-haiku"
+```
+
+The built-in Claude and GPT small LLM ids use hyphens, unlike the
+[`llm`](/admin/ai#llm) names: write `claude-haiku-5-5`, not
+`claude_5_5_haiku`. `kimi_k3` and `glm_5_3` are the same names as in `llm`.
+
+With `small_llm: auto`, the default, an agent whose `llm` is `auto`, a Claude
+model, `glm_5_3` or `kimi_k3` runs short tasks on `claude-haiku-5-5`. Any other
+built-in LLM runs them on `gpt-6-luna`. To run short tasks on GLM 5.3 or Kimi K3
+instead, set the small LLM to the same model:
+
+```yaml
+agents:
+  - name: sales-analyst
+    llm: glm_5_3
+    small_llm: glm_5_3
+```
+
+The small LLM doesn't change embeddings: the agent calls the
+[embedding model](/admin/ai#embedding-models) set in `embedding_llm`.
+
+An agent on a BYOM LLM uses a small LLM from the same provider, region and
+credentials as its LLM:
+
+| Provider | Small LLM with `auto` |
 | --- | --- |
 | **Anthropic**, **AWS Bedrock**, **GCP Vertex AI** | Claude Haiku 5.5 |
 | **OpenAI** | `gpt-6-luna` |
+| Other providers | The LLM itself |
 
-If your account cannot use the small model (for example, it is not enabled in
-your region), the agent runs these tasks on the main model instead.
+<Tip>
 
-On AWS Bedrock, the inference profile applies to the main model only; the
-small model is called on demand in the configured region.
+If the agent's LLM is a BYOM model, keep its small LLM on BYOM too. A built-in
+small LLM consumes Cube AI tokens (see [Billing](#billing)).
+
+</Tip>
+
+The **Small LLM** field of the agent's settings shows the agent's small LLM. It
+warns you when an agent on a BYOM LLM runs its short tasks on a built-in small
+LLM:
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/admin/ai/bring-your-own-model/agent-small-llm-setting-v2.png"
+    alt="Agent settings with the LLM, Small LLM and Embedding model fields, and a warning that the agent's short tasks run on Cube-hosted Claude Haiku 5.5 and use Cube AI tokens"
+  />
+</Frame>
+
+If the provider refuses a BYOM small LLM (for example, the model is not enabled
+for your account or region), the agent falls back to `auto`. If the provider
+refuses the `auto` small LLM of a BYOM LLM too, the agent runs these tasks on
+the LLM itself.
+
+On AWS Bedrock with `auto`, the small LLM is called on demand in the LLM's
+region; the LLM's inference profile does not apply to it. A Bedrock model of
+type **Small LLM** uses its own region and inference profile.
 
 ## Network configuration
 
@@ -102,7 +189,9 @@ region's own egress IPs.
 ## Billing
 
 When using a BYOM model, **Cube AI tokens are not consumed**. You are billed
-directly by your model provider based on their pricing.
+directly by your model provider based on their pricing. The exception is an
+agent with a built-in [small LLM](#small-llm): its short tasks consume Cube AI
+tokens.
 
 This means:
 
@@ -126,20 +215,48 @@ with the **Enable thinking** toggle in the model settings. The toggle is on by
 default when you add a model. With thinking on, the agent's reasoning shows in
 the chat. For the Chat API, see its [`thinking` field][ref-chat-api-thinking].
 
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/admin/ai/bring-your-own-model/enable-thinking-toggle.png"
+    alt="Add model dialog for a GCP Vertex AI model with the Enable thinking toggle on"
+  />
+</Frame>
+
 ### Anthropic
 
 Requires an API key.
 
 ### AWS Bedrock
 
-- Credentials are optional — if left empty, the default AWS credential chain
-  is used (e.g., workload identity)
-- Supports assume-role configuration for cross-account access
-- Supports inference profiles
+Requires a **Region**. Choose one of three ways to authenticate:
+
+- **Access keys** — enter an **Access Key ID** and a **Secret Access Key**.
+- **Assume role** — enter an **Assume Role ARN** for cross-account access,
+  and optionally an **Assume Role External ID**. Access keys, if set, are
+  used to assume the role.
+- **OIDC workload identity** — turn on **Use OIDC workload identity** and
+  enter the **Assume Role ARN** of an IAM role that trusts your Cube tenant.
+  No access keys are stored. See
+  [Bedrock for bring-your-own LLM][ref-oidc-aws-bedrock] for the AWS setup.
+
+Optionally, set an **Inference Profile ID** to call the model through an
+inference profile.
 
 ### GCP Vertex AI
 
-Requires a service account JSON key for authentication.
+Requires a **Region** and a **Project ID**. Choose one of two ways to
+authenticate:
+
+- **Service account key** — upload a service account JSON key.
+- **OIDC workload identity** — turn on **Use OIDC workload identity** and
+  enter the **Workload Identity Pool Audience**, the resource path of a
+  Workload Identity Federation provider that trusts your Cube tenant. Cube
+  then calls Vertex AI with short-lived tokens, and no service account key is
+  stored. Optionally, set an **Impersonated Service Account**; leave it blank
+  to grant Vertex AI access to the federated principal directly. Use this
+  option when your organization policy blocks service account keys.
+
+See [Vertex AI for bring-your-own LLM][ref-oidc-gcp-vertex] for the GCP setup.
 
 ### Databricks
 
@@ -150,7 +267,11 @@ Requires a workspace URL and access token.
 Supports two authentication methods:
 
 - JWT authentication
-- Key-pair authentication (requires an encrypted PKCS#8 PEM private key)
+- Key-pair authentication with a PKCS#8 PEM private key, either unencrypted
+  (`-----BEGIN PRIVATE KEY-----`) or encrypted
+  (`-----BEGIN ENCRYPTED PRIVATE KEY-----`). Set **Private Key Passphrase**
+  only for an encrypted key. When you edit a model, leave the private key
+  blank to keep the stored one
 
 ### Custom OpenAI-compatible
 
@@ -161,7 +282,8 @@ API — for example, an internal LLM gateway.
   `https` and may not target a loopback or link-local host
 - The base URL is the API root, including the version segment: requests go
   to `<base URL>/chat/completions`, so use e.g. `https://gateway.acme.com/v1`
-- [Small-model tasks](#small-model) run on the main model
+- A [small LLM](#small-llm) on this provider takes any model id, so it can
+  use a smaller model behind the same endpoint
 - **API key** is optional — leave it blank if your endpoint authenticates
   requests some other way, such as a custom header
 - You can add custom HTTP headers sent with every request. Header values may
@@ -178,9 +300,6 @@ Points an agent at any endpoint that implements the Anthropic messages API.
 Configuration is the same as [Custom OpenAI-compatible](#custom-openai-compatible):
 a free-text model and base URL, an optional API key, and optional custom
 headers with the same placeholders.
-
-As with Custom OpenAI-compatible, [small-model tasks](#small-model) run on
-the main model.
 
 Unlike the OpenAI-compatible provider, requests go to `<base URL>/v1/messages`,
 so leave out the version segment — use `https://gateway.acme.com`, not
@@ -199,6 +318,13 @@ A mode that doesn't match the model makes every request fail: adaptive models
 reject a thinking budget, and older models don't support adaptive thinking.
 If the model doesn't support extended thinking at all, turn **Enable thinking**
 off. Small-model tasks run without thinking.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/admin/ai/bring-your-own-model/custom-anthropic-thinking-mode.png"
+    alt="Add model dialog for a Custom Anthropic-compatible model with Enable thinking on and the Thinking mode picker open on the Adaptive and Budgeted options"
+  />
+</Frame>
 
 ## Troubleshooting
 
@@ -220,3 +346,5 @@ provider. Model availability may vary by region.
 [ref-ai-tokens]: /admin/account-billing/ai-tokens
 [ref-usage-analytics]: /admin/monitoring/usage-analytics
 [ref-chat-api-thinking]: /reference/embed-apis/chat-api#response-fields
+[ref-oidc-aws-bedrock]: /admin/deployment/oidc/aws#bedrock-for-bring-your-own-llm
+[ref-oidc-gcp-vertex]: /admin/deployment/oidc/gcp#vertex-ai-for-bring-your-own-llm

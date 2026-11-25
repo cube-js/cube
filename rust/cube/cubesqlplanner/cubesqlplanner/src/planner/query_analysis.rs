@@ -129,6 +129,49 @@ impl QueryAnalysis {
         )
     }
 
+    /// Whether the query's filters need the base rows next to its multi-stage
+    /// dimensions: an OR group mixes them with members only base rows carry,
+    /// and every multi-stage dimension it filters on is selected.
+    pub fn filters_need_base_rows(&self) -> Result<bool, CubeError> {
+        let multi_stage_members = self.multi_stage_filter_members()?;
+        if multi_stage_members.is_empty() {
+            return Ok(false);
+        }
+        let selected = self
+            .query
+            .dimensions()
+            .iter()
+            .chain(self.query.time_dimensions().iter())
+            .map(|d| d.clone().resolve_reference_chain().full_name())
+            .collect::<HashSet<_>>();
+        if !multi_stage_members.is_subset(&selected) {
+            return Ok(false);
+        }
+        Ok(self
+            .dimension_filter_items()
+            .any(|item| has_mixed_or_group(item, &multi_stage_members)))
+    }
+
+    fn dimension_filter_items(&self) -> impl Iterator<Item = &FilterItem> {
+        self.query
+            .time_dimensions_filters()
+            .iter()
+            .chain(self.query.dimensions_filters().iter())
+            .chain(self.query.segments().iter())
+    }
+
+    fn multi_stage_filter_members(&self) -> Result<HashSet<String>, CubeError> {
+        let mut multi_stage_members = HashSet::new();
+        for item in self.dimension_filter_items() {
+            for member in item.all_member_evaluators() {
+                if has_multi_stage_members(&member, true)? {
+                    multi_stage_members.insert(member.resolve_reference_chain().full_name());
+                }
+            }
+        }
+        Ok(multi_stage_members)
+    }
+
     // Over the multi-stage dimension subquery alone the select applies, besides
     // the measure filters, the filters on its selected multi-stage dimensions.
     fn filter_on_dimension_subquery(
@@ -140,21 +183,7 @@ impl QueryAnalysis {
             .iter()
             .map(|d| d.clone().resolve_reference_chain().full_name())
             .collect::<HashSet<_>>();
-        let all_items = self
-            .query
-            .time_dimensions_filters()
-            .iter()
-            .chain(self.query.dimensions_filters().iter())
-            .chain(self.query.segments().iter())
-            .collect_vec();
-        let mut multi_stage_members = HashSet::new();
-        for item in all_items.iter() {
-            for member in item.all_member_evaluators() {
-                if has_multi_stage_members(&member, true)? {
-                    multi_stage_members.insert(member.resolve_reference_chain().full_name());
-                }
-            }
-        }
+        let multi_stage_members = self.multi_stage_filter_members()?;
         if multi_stage_members.is_empty() {
             return Ok(DimensionSubqueryFilter::Applies(LogicalFilter {
                 measures_filter,
@@ -173,11 +202,15 @@ impl QueryAnalysis {
                 member
             )));
         }
-        if let Some(reason) = all_items
-            .iter()
-            .find_map(|item| mixed_or_group(item, &multi_stage_members))
+        // Over this subquery alone the plain branches of such a group would be
+        // dropped silently; `QueryPlanner` plans these queries over base rows.
+        if self
+            .dimension_filter_items()
+            .any(|item| has_mixed_or_group(item, &multi_stage_members))
         {
-            return Ok(DimensionSubqueryFilter::Unrenderable(reason));
+            return Err(CubeError::internal(
+                "An OR group mixing multi-stage dimensions with other members must be planned over base rows".to_string(),
+            ));
         }
         let targets = multi_stage_members.iter().collect_vec();
         let on_targets = |items: &[FilterItem]| {
@@ -239,11 +272,9 @@ impl QueryAnalysis {
     }
 }
 
-// Why an OR group mixing multi-stage dimensions with other members can't be
-// applied over the multi-stage dimension subquery, if `item` holds one.
-fn mixed_or_group(item: &FilterItem, multi_stage_members: &HashSet<String>) -> Option<String> {
+fn has_mixed_or_group(item: &FilterItem, multi_stage_members: &HashSet<String>) -> bool {
     let FilterItem::Group(group) = item else {
-        return None;
+        return false;
     };
     if group.operator == FilterGroupOperator::Or {
         let members = item.all_member_evaluators();
@@ -253,18 +284,12 @@ fn mixed_or_group(item: &FilterItem, multi_stage_members: &HashSet<String>) -> O
                 multi_stage_members.contains(&(*m).clone().resolve_reference_chain().full_name())
             })
             .count();
-        if multi_stage_count > 0 && multi_stage_count < members.len() {
-            return Some(format!(
-                "An OR filter group can't mix multi-stage dimensions with other members: {}",
-                members.iter().map(|m| m.full_name()).join(", ")
-            ));
-        }
-        return None;
+        return multi_stage_count > 0 && multi_stage_count < members.len();
     }
     group
         .items
         .iter()
-        .find_map(|child| mixed_or_group(child, multi_stage_members))
+        .any(|child| has_mixed_or_group(child, multi_stage_members))
 }
 
 enum DimensionSubqueryFilter {
