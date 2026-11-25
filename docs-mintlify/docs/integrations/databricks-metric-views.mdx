@@ -683,8 +683,6 @@ Preview **blocks** a view when it finds any of these conditions:
   subquery, or keep that view in Cube.
 - Unsupported expressions or types, or multi-stage, window, or ranking calculations: simplify
   the model or keep that view in Cube.
-- An aggregate measure, such as `count_distinct` or `max`, that reads a measure which itself
-  aggregates: SQL can't nest aggregates, so reference a dimension instead.
 - A measure that reads a column outside any aggregate, such as
   `CASE WHEN {layout.idx} = 1 THEN {count} END` (Preview names the measure and the column): a
   Metric View measure must aggregate every column it reads. Move the condition inside the
