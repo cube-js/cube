@@ -242,9 +242,10 @@ impl PreAggregationOptimizer {
     // own evaluation context its inputs would not be matched alike.
     fn is_view_measures_leg(query: &Query) -> bool {
         let schema = query.schema();
-        let plain_context = query.evaluation_context().as_ref().map_or(true, |context| {
-            context.time_shifts.is_empty() && !context.measure_for_ungrouped
-        });
+        let plain_context = query
+            .evaluation_context()
+            .as_ref()
+            .is_none_or(|context| context.time_shifts.is_empty() && !context.measure_for_ungrouped);
         let view_measures = !schema.measures.is_empty()
             && schema.measures.iter().all(|measure| {
                 measure
