@@ -1,6 +1,7 @@
 import {
   DriverInterface,
   StreamTableData,
+  DownloadStreamTableData,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
   QueryOptions,
@@ -363,9 +364,17 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     query: string,
     values: unknown[],
     { highWaterMark, requestId }: StreamOptions,
-  ): Promise<StreamTableData> {
+  ): Promise<DownloadStreamTableData> {
     const pageSize = highWaterMark || getEnv('dbQueryStreamHighWaterMark');
-    const first = await this.request(this.prepareQueryWithParams(query, values), requestId, pageSize);
+    const sql = this.prepareQueryWithParams(query, values);
+    let first = await this.request(sql, requestId, pageSize);
+
+    if (isCursorResponse(first) && !first.resultTable) {
+      // An empty cursor result carries no schema, while a pre-aggregation build needs the
+      // column types even for an empty table. A plain response always has them.
+      await this.deleteCursor(first.requestId);
+      first = await this.request(sql, requestId);
+    }
 
     const cursor = isCursorResponse(first) ? first : null;
     let pending: PinotResponse | null = first;
@@ -412,6 +421,10 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     values: unknown[],
     options: DownloadQueryResultsOptions,
   ): Promise<DownloadQueryResultsResult> {
+    if (options?.streamImport) {
+      return this.stream(query, values, options);
+    }
+
     const { resultTable } = await this.request(this.prepareQueryWithParams(query, values), options?.requestId);
 
     return {

@@ -213,12 +213,12 @@ describe('PinotDriver stream', () => {
     expect(calls(requests)).toEqual(['POST /query/sql?getCursor=true&numRows=2']);
   });
 
-  it('streams an empty result', async () => {
+  it('reads the column types of an empty result from a plain response', async () => {
     const { driver, requests } = await start({ rows: [] });
 
     const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 2 });
 
-    expect(source.types).toEqual([]);
+    expect(source.types).toEqual(TYPES);
     expect(await streamToArray(<any> source.rowStream)).toEqual([]);
 
     await source.release?.();
@@ -226,7 +226,25 @@ describe('PinotDriver stream', () => {
     expect(calls(requests)).toEqual([
       'POST /query/sql?getCursor=true&numRows=2',
       `DELETE /responseStore/${CURSOR_ID}`,
+      'POST /query/sql',
     ]);
+  });
+
+  it('downloads query results as a stream for a stream import', async () => {
+    const { driver, requests } = await start({ rows: ROWS });
+
+    const streamed: any = await driver.downloadQueryResults('SELECT id, name FROM t', [], { highWaterMark: 2, streamImport: true });
+
+    expect(streamed.rows).toBeUndefined();
+    expect(streamed.types).toEqual(TYPES);
+    expect(await streamToArray(streamed.rowStream)).toEqual(EXPECTED);
+    await streamed.release();
+
+    const buffered: any = await driver.downloadQueryResults('SELECT id, name FROM t', [], { highWaterMark: 2 });
+
+    expect(buffered.rows).toEqual(EXPECTED);
+    expect(buffered.types).toEqual(TYPES);
+    expect(calls(requests).at(-1)).toBe('POST /query/sql');
   });
 
   it('rejects when the query fails', async () => {
