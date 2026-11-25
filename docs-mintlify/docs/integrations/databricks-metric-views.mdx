@@ -588,17 +588,22 @@ fi
 The **Preview** result is the authority for your deployed model. This preview release supports
 YAML models, [Jinja-templated](#jinja-templates) ones included, `extends` between YAML cubes,
 one Databricks data source per published view, scalar dimensions, common aggregates and supported
-calculated measures, and many-to-one and one-to-one joins. A join condition that is not a plain
-column equality, such as an SCD2 date range, an expression like `CAST(...)` or `date_trunc(...)`,
-or a comparison with a literal, is published as written in the Metric View join's `on`. A
-dimension can read a cube joined through many-to-one or one-to-one joins, such as
-`sql: "{users.name}"` on `orders`, a `{users}.name` column, or `coalesce({users.score}, 0)`. It is
-published through its join path, as `users.name`, or `a.b.column` for nested joins. A measure
-can read a joined cube through a join path from its own cube, such as `{CUBE.users.tier}` on
-`orders`, and is published with that cube joined along the path. Measure SQL can contain a
-subquery, such as `{CUBE}.id IN (SELECT order_id FROM returns WHERE returned_on = {CUBE}.created_at)`
-or a `GROUP BY ... HAVING` subquery. A cube's `sql` can read another cube's SQL with
-`{other_cube.sql()}`: it is expanded as Cube compiles it, so the published `source` is plain SQL.
+calculated measures, and many-to-one and one-to-one joins. Beyond that:
+
+- **Joins:** a join condition that is not a plain column equality, such as an SCD2 date range, an
+  expression like `CAST(...)` or `date_trunc(...)`, or a comparison with a literal, is published
+  as written in the Metric View join's `on`.
+- **Dimensions:** a dimension can read a cube joined through many-to-one or one-to-one joins, such
+  as `sql: "{users.name}"` on `orders`, a `{users}.name` column, or `coalesce({users.score}, 0)`.
+  It is published through its join path, as `users.name`, or `a.b.column` for nested joins.
+- **Measures:** a measure can read a joined cube through a join path from its own cube, such as
+  `{CUBE.users.tier}` on `orders`, and is published with that cube joined along the path. Measure
+  SQL can contain a subquery, such as
+  `{CUBE}.id IN (SELECT order_id FROM returns WHERE returned_on = {CUBE}.created_at)` or a
+  `GROUP BY ... HAVING` subquery.
+- **Cube `sql`:** a cube's `sql` can read another cube's SQL with `{other_cube.sql()}`: it is
+  expanded as Cube compiles it, so the published `source` is plain SQL.
+
 The target uses Databricks Metric View YAML 1.1.
 
 These categories reflect the current preview release. Capabilities may change between releases, so
@@ -633,7 +638,7 @@ Preview **blocks** a view when it finds any of these conditions:
   only Cube can fill them in, so remove them from the cube's `sql` or keep that view in Cube.
 - An aggregate measure, such as `count_distinct` or `max`, that reads a measure which itself
   aggregates, such as `{users.score_max}`: SQL cannot nest one aggregate in another, so read a
-  dimension instead, such as `{users.score}`.
+  dimension instead, through a join path such as `{CUBE.users.score}`.
 - A measure subquery that reads a joined cube or a measure: a Metric View subquery can read only
   columns of the measure's own source row, so select from the joined cube's table inside the
   subquery, or keep that view in Cube.
