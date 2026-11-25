@@ -23,6 +23,7 @@ outputs:
 runs:
   using: composite
   steps:
+    # Provenance goes before the slow SBOM scan, so a caller's step timeout cannot cost both.
     - name: Install crane
       id: crane
       continue-on-error: true
@@ -50,6 +51,17 @@ runs:
           echo "sbom=${RUNNER_TEMP}/sbom-${digest#sha256:}.spdx.json"
         } >> "$GITHUB_OUTPUT"
 
+    - name: Attest build provenance
+      id: provenance
+      if: steps.resolve.outputs.digest != ''
+      continue-on-error: true
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+      with:
+        subject-name: ${{ inputs.image }}
+        subject-digest: ${{ steps.resolve.outputs.digest }}
+        push-to-registry: true
+        create-storage-record: false
+
     - name: Generate SBOM
       id: sbom
       if: steps.resolve.outputs.digest != ''
@@ -61,17 +73,6 @@ runs:
         output-file: ${{ steps.resolve.outputs.sbom }}
         upload-artifact: false
         upload-release-assets: false
-
-    - name: Attest build provenance
-      id: provenance
-      if: steps.resolve.outputs.digest != ''
-      continue-on-error: true
-      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-      with:
-        subject-name: ${{ inputs.image }}
-        subject-digest: ${{ steps.resolve.outputs.digest }}
-        push-to-registry: true
-        create-storage-record: false
 
     - name: Attest SBOM
       id: sbom-attest
