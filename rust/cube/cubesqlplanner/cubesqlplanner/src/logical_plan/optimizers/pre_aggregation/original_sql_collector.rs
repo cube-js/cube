@@ -14,7 +14,13 @@ impl OriginalSqlCollector {
         Self { query_tools }
     }
 
-    pub fn collect(&mut self, plan: &Rc<RootQuery>) -> Result<HashMap<CubeId, String>, CubeError> {
+    /// With `disable_external_pre_aggregations`, an `originalSql` stored in Cube Store is
+    /// skipped, as the query runs on the data source where its table doesn't exist
+    pub fn collect(
+        &mut self,
+        plan: &Rc<RootQuery>,
+        disable_external_pre_aggregations: bool,
+    ) -> Result<HashMap<CubeId, String>, CubeError> {
         let cube_names = collect_cube_names_from_node(&plan)?;
         let mut result = HashMap::new();
         for cube_name in cube_names.iter() {
@@ -22,9 +28,14 @@ impl OriginalSqlCollector {
                 .query_tools
                 .cube_evaluator()
                 .pre_aggregations_for_cube_as_array(cube_name.target().to_string())?;
+            // Only a cube's first `originalSql` is built, as on the JS side, so an external one
+            // is skipped rather than replaced by a later one
             if let Some(found_pre_aggregation) = pre_aggregations
                 .iter()
                 .find(|p| p.static_data().pre_aggregation_type == "originalSql")
+                .filter(|p| {
+                    !(disable_external_pre_aggregations && p.static_data().external == Some(true))
+                })
             {
                 let name = if let Some(alias) = &found_pre_aggregation.static_data().sql_alias {
                     alias.clone()
