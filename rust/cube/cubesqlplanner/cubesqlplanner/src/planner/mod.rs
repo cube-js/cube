@@ -4,6 +4,7 @@ pub mod base_query;
 pub mod collectors;
 pub mod compiler;
 pub mod cube_id;
+pub mod dimension_map;
 pub mod filter;
 pub mod input_id;
 pub mod join_hints;

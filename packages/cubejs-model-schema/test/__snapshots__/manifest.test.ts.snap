@@ -965,6 +965,15 @@ Object {
       ],
       "type": "object",
     },
+    "cube_dimension_map": Object {
+      "description": "Maps dimensions of the view to the dimensions they stand for in this cube's measures: view dimension name -> full path of that dimension, starting with join_path",
+      "patternProperties": Object {
+        ".*": Object {
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
     "cube_join_path": Object {
       "description": "The path to the cube, including any joins. Use cube name for direct access (e.g., 'Events') or dot notation for joined cubes (e.g., 'Events.Users')",
       "items": Object {
@@ -12219,6 +12228,14 @@ Object {
         },
       ],
       "patternProperties": Object {
+        "^dimensionMap$": Object {
+          "allOf": Array [
+            Object {
+              "$ref": "#/definitions/cube_dimension_map",
+            },
+          ],
+          "deprecated": true,
+        },
         "^joinPath$": Object {
           "allOf": Array [
             Object {
@@ -12232,6 +12249,9 @@ Object {
         "alias": Object {
           "description": "Name of the cube in this view: the prefix of its members when prefix is true, and the end of a split view's name. Defaults to the last part of join_path",
           "type": "string",
+        },
+        "dimension_map": Object {
+          "$ref": "#/definitions/cube_dimension_map",
         },
         "excludes": Object {
           "description": "Members to exclude from the cube",

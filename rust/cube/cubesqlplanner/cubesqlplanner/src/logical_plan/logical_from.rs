@@ -151,6 +151,8 @@ pub struct FromColumn {
 pub struct FromSchema {
     columns: Vec<FromColumn>,
     by_member: HashMap<MemberId, usize>,
+    // `None` once two members of different inputs share the referenced member.
+    by_chain: HashMap<MemberId, Option<usize>>,
 }
 
 impl FromSchema {
@@ -160,13 +162,20 @@ impl FromSchema {
 
     pub fn column(&self, member: &Rc<MemberSymbol>) -> Option<&FromColumn> {
         self.by_member
-            .get(&chain_id(member))
+            .get(member.id())
+            .or_else(|| {
+                self.by_chain
+                    .get(&chain_id(member))
+                    .and_then(|p| p.as_ref())
+            })
             .map(|position| &self.columns[*position])
     }
 
+    // Members referencing one member are one column, unless different inputs
+    // provide them: view measures over one cube measure under different
+    // dimension mappings compute different values.
     fn add(&mut self, member: &Rc<MemberSymbol>, provider: Provider) -> Result<(), CubeError> {
-        let id = chain_id(member);
-        if let Some(position) = self.by_member.get(&id) {
+        if let Some(position) = self.by_member.get(member.id()) {
             let existing = &self.columns[*position].provider;
             if *existing == provider {
                 return Ok(());
@@ -178,7 +187,30 @@ impl FromSchema {
                 provider
             )));
         }
-        self.by_member.insert(id, self.columns.len());
+        let chain = chain_id(member);
+        match self.by_chain.get(&chain) {
+            Some(Some(position)) if self.columns[*position].provider == provider => {
+                self.by_member.insert(member.id().clone(), *position);
+                return Ok(());
+            }
+            Some(Some(_)) => {
+                self.by_chain.insert(chain, None);
+            }
+            Some(None) => {
+                let same = self.columns.iter().position(|column| {
+                    column.provider == provider && chain_id(&column.member) == chain
+                });
+                if let Some(position) = same {
+                    self.by_member.insert(member.id().clone(), position);
+                    return Ok(());
+                }
+            }
+            None => {
+                self.by_chain.insert(chain, Some(self.columns.len()));
+            }
+        }
+        self.by_member
+            .insert(member.id().clone(), self.columns.len());
         self.columns.push(FromColumn {
             member: member.clone(),
             provider,

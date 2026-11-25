@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_map_airport_traffic.rs
+expression: result
+---
+airport_traffic__code | airport_traffic__departures_count | airport_traffic__arrivals_count
+----------------------+-----------------------------------+--------------------------------
+JFK                   | 2                                 | 2                              
+SFO                   | 3                                 | 2

@@ -4,10 +4,11 @@ use crate::test_fixtures::cube_bridge::yaml::{
 };
 use crate::test_fixtures::cube_bridge::{
     MockCubeDefinition, MockJoinItemDefinition, MockSchema, MockSchemaBuilder,
-    MockViewFilterDefinition,
+    MockViewFilterDefinition, ViewCube,
 };
 use cubenativeutils::CubeError;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug, Deserialize)]
@@ -104,8 +105,16 @@ struct YamlViewDefaultFilter {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum YamlIncludes {
+    #[allow(dead_code)]
     All(String),
-    List(Vec<String>),
+    List(Vec<YamlInclude>),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum YamlInclude {
+    Name(String),
+    Aliased { name: String, alias: String },
 }
 
 #[derive(Debug, Deserialize)]
@@ -115,6 +124,10 @@ struct YamlViewCube {
     includes: Option<YamlIncludes>,
     #[serde(default)]
     prefix: Option<bool>,
+    #[serde(default)]
+    alias: Option<String>,
+    #[serde(default)]
+    dimension_map: Option<HashMap<String, String>>,
 }
 
 impl YamlSchema {
@@ -208,14 +221,30 @@ impl YamlSchema {
             }
 
             for view_cube in view.cubes {
-                let includes = match view_cube.includes {
-                    Some(YamlIncludes::All(ref s)) if s == "*" => vec![],
+                // `*`, like no includes, includes every member.
+                let list = match view_cube.includes {
                     Some(YamlIncludes::List(list)) => list,
-                    _ => vec![],
+                    Some(YamlIncludes::All(_)) | None => vec![],
                 };
-                let prefix = view_cube.prefix.unwrap_or(false);
-                view_builder =
-                    view_builder.include_cube_with_prefix(view_cube.join_path, includes, prefix);
+                let mut includes = vec![];
+                let mut include_aliases = HashMap::new();
+                for include in list {
+                    match include {
+                        YamlInclude::Name(name) => includes.push(name),
+                        YamlInclude::Aliased { name, alias } => {
+                            include_aliases.insert(name.clone(), alias);
+                            includes.push(name);
+                        }
+                    }
+                }
+                view_builder = view_builder.include_view_cube(ViewCube {
+                    join_path: view_cube.join_path,
+                    includes,
+                    include_aliases,
+                    prefix: view_cube.prefix.unwrap_or(false),
+                    alias: view_cube.alias,
+                    dimension_map: view_cube.dimension_map,
+                });
             }
 
             for filter in view.default_filters {
@@ -376,6 +405,85 @@ mod tests {
 
         assert!(schema.get_dimension("orders_view", "id").is_some());
         assert!(schema.get_measure("orders_view", "count").is_some());
+    }
+
+    #[test]
+    fn test_parse_view_dimension_map() {
+        let yaml = indoc! {r#"
+            cubes:
+              - name: calendar
+                sql: "SELECT * FROM calendar"
+                dimensions:
+                  - name: dt_ts
+                    type: time
+                    sql: dt_ts
+                    primary_key: true
+                  - name: dt_year
+                    type: string
+                    sql: dt_year
+              - name: subscriptions
+                sql: "SELECT * FROM subscriptions"
+                joins:
+                  - name: calendar
+                    alias: purchase_cal
+                    relationship: many_to_one
+                    sql: "{CUBE}.purchase_date = {purchase_cal.dt_ts}"
+                  - name: calendar
+                    alias: cancel_cal
+                    relationship: many_to_one
+                    sql: "{CUBE}.cancel_date = {cancel_cal.dt_ts}"
+                dimensions:
+                  - name: id
+                    type: number
+                    sql: id
+                    primary_key: true
+                measures:
+                  - name: count
+                    type: count
+            views:
+              - name: biz
+                cubes:
+                  - join_path: calendar
+                    includes: [dt_year]
+                  - join_path: subscriptions
+                    alias: purchases
+                    prefix: true
+                    includes: [count]
+                    dimension_map:
+                      dt_year: subscriptions.purchase_cal.dt_year
+                  - join_path: subscriptions
+                    alias: cancellations
+                    prefix: true
+                    includes: [count]
+                    dimension_map:
+                      dt_year: subscriptions.cancel_cal.dt_year
+        "#};
+
+        let yaml_schema: YamlSchema = serde_yaml::from_str(yaml).unwrap();
+        let schema = yaml_schema.build().unwrap();
+
+        let mappings = |measure: &str| {
+            schema
+                .get_measure("biz", measure)
+                .unwrap()
+                .static_data()
+                .dimension_map
+                .clone()
+        };
+        assert_eq!(
+            mappings("purchases_count"),
+            Some(HashMap::from([(
+                "dt_year".to_string(),
+                "subscriptions.purchase_cal.dt_year".to_string()
+            )]))
+        );
+        assert_eq!(
+            mappings("cancellations_count"),
+            Some(HashMap::from([(
+                "dt_year".to_string(),
+                "subscriptions.cancel_cal.dt_year".to_string()
+            )]))
+        );
     }
 
     #[test]

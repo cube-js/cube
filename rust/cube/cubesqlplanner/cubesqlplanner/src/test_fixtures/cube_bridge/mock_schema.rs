@@ -458,10 +458,16 @@ impl MockCubeBuilder {
     }
 }
 
+#[derive(Default)]
 pub struct ViewCube {
     pub join_path: String,
     pub includes: Vec<String>,
+    /// Included member -> the name the view gives it.
+    pub include_aliases: HashMap<String, String>,
     pub prefix: bool,
+    /// Prefix of the members when `prefix` is set; defaults to the last segment of `join_path`.
+    pub alias: Option<String>,
+    pub dimension_map: Option<HashMap<String, String>>,
 }
 
 pub struct MockViewBuilder {
@@ -494,22 +500,13 @@ impl MockViewBuilder {
         self.view_cubes.push(ViewCube {
             join_path: join_path.into(),
             includes,
-            prefix: false,
+            ..Default::default()
         });
         self
     }
 
-    pub fn include_cube_with_prefix(
-        mut self,
-        join_path: impl Into<String>,
-        includes: Vec<String>,
-        prefix: bool,
-    ) -> Self {
-        self.view_cubes.push(ViewCube {
-            join_path: join_path.into(),
-            includes,
-            prefix,
-        });
+    pub fn include_view_cube(mut self, view_cube: ViewCube) -> Self {
+        self.view_cubes.push(view_cube);
         self
     }
 
@@ -598,9 +595,15 @@ impl MockViewBuilder {
                     view_cube.includes.clone()
                 };
 
+                let member_prefix = view_cube.alias.as_deref().unwrap_or(target_cube_name);
                 let make_view_name = |member_name: &str| -> String {
+                    let member_name = view_cube
+                        .include_aliases
+                        .get(member_name)
+                        .map(|alias| alias.as_str())
+                        .unwrap_or(member_name);
                     if view_cube.prefix {
-                        format!("{}_{}", target_cube_name, member_name)
+                        format!("{}_{}", member_prefix, member_name)
                     } else {
                         member_name.to_string()
                     }
@@ -671,6 +674,7 @@ impl MockViewBuilder {
                                     .order_by(measure.raw_order_by())
                                     .resolved_mask_sql_opt(measure.raw_mask_sql())
                                     .included(Some(true))
+                                    .dimension_map(view_cube.dimension_map.clone())
                                     .build(),
                             ),
                         );

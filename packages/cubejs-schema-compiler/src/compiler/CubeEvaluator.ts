@@ -176,6 +176,8 @@ export type MeasureDefinition = {
   patchedFrom?: { cubeName: string; name: string };
   aliasMember?: string;
   case?: MemberCaseDefinition;
+  /** View dimension name -> full path of the dimension it means for this view measure */
+  dimensionMap?: Record<string, string>;
 };
 
 export type CaseLabel = string | SqlDefinition;

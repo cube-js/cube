@@ -1,3 +1,4 @@
+use crate::physical_plan::Schema;
 use crate::physical_plan::{
     CalcGroupsJoin, From, FromSource, Join, QualifiedColumnName, SingleAliasedSource, SingleSource,
 };
@@ -221,12 +222,22 @@ impl ReferencesBuilder {
         }
     }
 
+    /// A source providing the member itself wins over one providing another
+    /// member that references the same one.
     pub fn find_reference_for_member(
         &self,
         member: &Rc<MemberSymbol>,
         strict_source: &Option<String>,
     ) -> Option<QualifiedColumnName> {
-        self.find_reference_column_for_member_in_from(&self.source, member, strict_source)
+        self.find_reference_column_for_member_in_from(&self.source, member, strict_source, true)
+            .or_else(|| {
+                self.find_reference_column_for_member_in_from(
+                    &self.source,
+                    member,
+                    strict_source,
+                    false,
+                )
+            })
     }
 
     fn find_reference_column_for_member_in_from(
@@ -234,6 +245,7 @@ impl ReferencesBuilder {
         from: &Rc<From>,
         member: &Rc<MemberSymbol>,
         strict_source: &Option<String>,
+        by_own_id: bool,
     ) -> Option<QualifiedColumnName> {
         match &from.source {
             FromSource::Empty => None,
@@ -241,15 +253,20 @@ impl ReferencesBuilder {
                 &source,
                 member,
                 strict_source,
+                by_own_id,
             ),
-            FromSource::Join(join) => {
-                self.find_reference_column_for_member_in_join(&join, member, strict_source)
-            }
+            FromSource::Join(join) => self.find_reference_column_for_member_in_join(
+                &join,
+                member,
+                strict_source,
+                by_own_id,
+            ),
             FromSource::CalcGroupsJoin(calc_groups) => self
                 .find_reference_column_for_member_in_calc_groups(
                     calc_groups,
                     member,
                     strict_source,
+                    by_own_id,
                 ),
         }
     }
@@ -259,16 +276,24 @@ impl ReferencesBuilder {
         source: &SingleAliasedSource,
         member: &Rc<MemberSymbol>,
         strict_source: &Option<String>,
+        by_own_id: bool,
     ) -> Option<QualifiedColumnName> {
         if let Some(strict_source) = strict_source {
             if strict_source != &source.alias {
                 return None;
             }
         }
+        let resolve = |schema: &Schema| {
+            if by_own_id {
+                schema.resolve_member_reference_by_id(member)
+            } else {
+                schema.resolve_member_reference(member)
+            }
+        };
         let column_name = match &source.source {
-            SingleSource::Subquery(_, schema) => schema.resolve_member_reference(member),
+            SingleSource::Subquery(_, schema) => resolve(schema),
             SingleSource::Cube(_) => None,
-            SingleSource::TableReference(_, schema) => schema.resolve_member_reference(member),
+            SingleSource::TableReference(_, schema) => resolve(schema),
             // Opaque pre-rendered SQL: members are referenced via the alias as
             // literals in the ON/projection SQL, not resolved against a schema.
             SingleSource::RawSubquerySql(_) => None,
@@ -281,11 +306,13 @@ impl ReferencesBuilder {
         join: &Rc<Join>,
         member: &Rc<MemberSymbol>,
         strict_source: &Option<String>,
+        by_own_id: bool,
     ) -> Option<QualifiedColumnName> {
         if let Some(root_ref) = self.find_reference_column_for_member_in_single_source(
             &join.root,
             member,
             strict_source,
+            by_own_id,
         ) {
             return Some(root_ref);
         }
@@ -294,6 +321,7 @@ impl ReferencesBuilder {
                 &item.from,
                 member,
                 strict_source,
+                by_own_id,
             )
         })
     }
@@ -303,6 +331,7 @@ impl ReferencesBuilder {
         calc_groups: &Rc<CalcGroupsJoin>,
         member: &Rc<MemberSymbol>,
         strict_source: &Option<String>,
+        by_own_id: bool,
     ) -> Option<QualifiedColumnName> {
         if strict_source.is_none() {
             if let Some(group_itm) = calc_groups.calc_groups().iter().find_map(|itm| {
@@ -318,7 +347,12 @@ impl ReferencesBuilder {
                 return Some(group_itm);
             }
         }
-        self.find_reference_column_for_member_in_from(&calc_groups.from(), member, strict_source)
+        self.find_reference_column_for_member_in_from(
+            &calc_groups.from(),
+            member,
+            strict_source,
+            by_own_id,
+        )
     }
 }
 

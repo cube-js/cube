@@ -29,6 +29,9 @@ const camelizeKey = memoizeString((key) => camelize(key, true));
 const IGNORE_CAMELIZE: Record<number, Record<string, boolean>> = {
   1: {
     granularities: true,
+    // Keys are view dimension names
+    dimension_map: true,
+    dimensionMap: true,
   }
 };
 

@@ -30,11 +30,12 @@ export interface JoiDescription {
 }
 
 // What `CubeValidator` says about a key with `.meta()`: `hidden` keys are accepted but not offered;
-// `setByCompiler` ones are overwritten after the file is read, so any value is accepted, and a
-// function the compiler adds is left out.
+// `setByCompiler` ones take any value, and a function the compiler adds is left out. A `yamlMap`
+// object keyed by names is written as a YAML map, not as a list of items with `name`.
 interface KeyMeta {
   hidden?: boolean;
   setByCompiler?: boolean;
+  yamlMap?: boolean;
 }
 
 const hasMeta = (d: JoiDescription, key: keyof KeyMeta) => d.metas?.some((m) => m[key]) ?? false;
@@ -459,6 +460,8 @@ class ModelSchemaConverter {
           this.inListItem = false;
           s = this.object(d);
           this.inListItem = outer;
+        } else if (d.patterns && hasMeta(d, 'yamlMap')) {
+          s = { type: 'object', patternProperties: { '.*': this.convert(d.patterns[0].rule) } };
         } else if (d.patterns) {
           s = this.namedList(d.patterns[0].rule);
         } else {

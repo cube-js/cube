@@ -3,6 +3,7 @@ use super::symbol_classification::{FullKeyAggregateMeasures, SymbolClassificatio
 use super::MemberSymbol;
 use crate::logical_plan::{FilterPlacement, LogicalFilter};
 use crate::planner::collectors::has_multi_stage_members;
+use crate::planner::dimension_map::{self, partition_by_dimension_map};
 use crate::planner::filter::{FilterGroupOperator, FilterItem};
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::symbols::transforms;
@@ -26,15 +27,65 @@ pub struct QueryAnalysis {
     classification: SymbolClassification,
     select_measures: Vec<Rc<MemberSymbol>>,
     is_simple: bool,
+    // Planned on their own and merged when the query's measures need
+    // different dimensions; empty otherwise.
+    mapped_legs: Vec<Rc<QueryProperties>>,
 }
 
 impl QueryAnalysis {
     pub fn try_new(request: Rc<QueryProperties>) -> Result<Rc<Self>, CubeError> {
+        let partitions = partition_by_dimension_map(&request)?;
+        let view_composites = request
+            .all_used_measures()?
+            .into_iter()
+            .filter(dimension_map::is_view_composite)
+            .collect_vec();
+        // A view composite is computed over legs only when it can't be planned
+        // as one measure: its leaves need different mappings, or no single
+        // join reaches them all.
+        let composites_need_legs = !view_composites.is_empty()
+            && match partitions.as_slice() {
+                [single] => !Self::has_single_join(&*single.apply(&request)?, &view_composites)?,
+                _ => true,
+            };
+        if composites_need_legs && request.ungrouped() {
+            return Err(CubeError::user(format!(
+                "An ungrouped query can't compute {}: its measures can't be read in one query",
+                view_composites.iter().map(|m| m.full_name()).join(", ")
+            )));
+        }
+        let (request, mapped_legs) = match partitions.as_slice() {
+            [single] if single.has_mappings() && !composites_need_legs => {
+                (single.apply(&request)?, vec![])
+            }
+            [_, ..] if composites_need_legs || partitions.len() > 1 => {
+                let legs = partitions
+                    .iter()
+                    .map(|partition| partition.leg(&request))
+                    .collect::<Result<Vec<_>, _>>()?;
+                (request, legs)
+            }
+            _ => (request, vec![]),
+        };
         let specializer = transforms::Specializer::for_query(&request, request.allow_multi_stage());
         let query = request.map_symbols(&|symbol| specializer.specialize(symbol))?;
+        // Over legs the query only reads their measures' columns.
+        let classified = if mapped_legs.is_empty() {
+            query.clone()
+        } else {
+            query.leg_for_measures(vec![])
+        };
         let join_groups = OnceCell::new();
-        let mut classification = SymbolClassification::try_new(&query, |measure| {
-            Self::join_groups_in(&query, &join_groups)?
+        let leg_join_groups = mapped_legs.iter().map(|_| OnceCell::new()).collect_vec();
+        let mut classification = SymbolClassification::try_new(&classified, |measure| {
+            let groups = match mapped_legs
+                .iter()
+                .position(|leg| leg.measures().iter().any(|m| m.id() == measure.id()))
+            {
+                Some(leg) => Self::join_groups_in(&mapped_legs[leg], &leg_join_groups[leg])?,
+                None => Self::join_groups_in(&query, &join_groups)?,
+            };
+            groups
                 .for_measures(std::slice::from_ref(measure))?
                 .single_join()?
                 .ok_or_else(|| {
@@ -54,7 +105,8 @@ impl QueryAnalysis {
         for dim in query.dimensions().iter().chain(query.time_dimensions()) {
             has_multi_stage_dimensions |= classification.has_multi_stage(dim, true)?;
         }
-        let is_simple = measures.multiplied_measures.is_empty()
+        let is_simple = mapped_legs.is_empty()
+            && measures.multiplied_measures.is_empty()
             && (measures.multi_stage_measures.is_empty() || !query.allow_multi_stage())
             && !Self::join_groups_in(&query, &join_groups)?.is_multi_fact()
             && (!has_multi_stage_dimensions || !query.allow_multi_stage());
@@ -62,7 +114,7 @@ impl QueryAnalysis {
         // as stages once the query is not simple, so they are not leaves too.
         if !is_simple && query.allow_multi_stage() {
             let mut stages = Vec::new();
-            for measure in query.all_used_measures()? {
+            for measure in classified.all_used_measures()? {
                 if classification.has_multi_stage(&measure, false)? {
                     stages.push(measure);
                 }
@@ -76,7 +128,14 @@ impl QueryAnalysis {
             classification,
             select_measures,
             is_simple,
+            mapped_legs,
         }))
+    }
+
+    /// The queries computing the measures that need different dimensions, to
+    /// be merged; empty when the measures agree on their dimensions.
+    pub fn mapped_legs(&self) -> &[Rc<QueryProperties>] {
+        &self.mapped_legs
     }
 
     /// The query as requested, before specialization.
@@ -249,15 +308,42 @@ impl QueryAnalysis {
         Ok(cell.get_or_init(move || computed))
     }
 
-    fn compute_join_groups(query: &QueryProperties) -> Result<MultiFactJoinGroups, CubeError> {
-        let measures_join_hints = MeasuresJoinHints::builder(query.query_join_hints())
+    // Only a missing join path means no single join; any other failure is the
+    // query's own error.
+    fn has_single_join(
+        query: &QueryProperties,
+        measures: &[Rc<MemberSymbol>],
+    ) -> Result<bool, CubeError> {
+        let hints = Self::measures_join_hints(query)?;
+        let Ok(groups) =
+            MultiFactJoinGroups::try_new_if_joinable(query.query_tools().clone(), hints)?
+        else {
+            return Ok(false);
+        };
+        // A measure without groups computes its leaves as stages, which need
+        // no join of their own.
+        for measure in measures {
+            let measure_groups = groups.for_measures(std::slice::from_ref(measure))?;
+            if measure_groups.single_join().is_err() {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    fn measures_join_hints(query: &QueryProperties) -> Result<MeasuresJoinHints, CubeError> {
+        MeasuresJoinHints::builder(query.query_join_hints())
             .add_dimensions(query.dimensions())
             .add_dimensions(&query.extract_dimensions_from_order())
             .add_dimensions(query.time_dimensions())
             .add_filters(query.time_dimensions_filters())
             .add_filters(query.dimensions_filters())
             .add_filters(query.segments())
-            .build(&query.all_used_measures()?)?;
+            .build(&query.all_used_measures()?)
+    }
+
+    fn compute_join_groups(query: &QueryProperties) -> Result<MultiFactJoinGroups, CubeError> {
+        let measures_join_hints = Self::measures_join_hints(query)?;
         let query_tools = query.query_tools().clone();
         // A pre-aggregation query describes the rollup to build, and matching
         // compares its groups against the query's, so both sides have to be

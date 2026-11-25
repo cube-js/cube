@@ -3,6 +3,7 @@ use super::*;
 use crate::logical_plan::visitor::{LogicalPlanRewriter, NodeRewriteResult};
 use crate::logical_plan::*;
 use crate::planner::collectors::{collect_cube_names_from_symbols, has_multi_stage_members};
+use crate::planner::dimension_map::{are_mappings_applied, has_mappings_for};
 use crate::planner::filter::operators::date_range::DateRangeKind;
 use crate::planner::filter::typed_filter::resolve_base_symbol;
 use crate::planner::filter::FilterItem;
@@ -236,6 +237,25 @@ impl PreAggregationOptimizer {
             .map(|item| (&item.table.cube_name, &item.table.name))
     }
 
+    // A leg of view measures, planned on its own and merged with the other
+    // legs: under dimension mappings, or of a view's own measure. Under its
+    // own evaluation context its inputs would not be matched alike.
+    fn is_view_measures_leg(query: &Query) -> bool {
+        let schema = query.schema();
+        let plain_context = query
+            .evaluation_context()
+            .as_ref()
+            .is_none_or(|context| context.time_shifts.is_empty() && !context.measure_for_ungrouped);
+        let view_measures = !schema.measures.is_empty()
+            && schema.measures.iter().all(|measure| {
+                measure
+                    .as_ref_symbol()
+                    .is_ok_and(|reference| !reference.is_terminal())
+            });
+        let dimensions = schema.all_dimensions().cloned().collect::<Vec<_>>();
+        plain_context && (view_measures || has_mappings_for(&schema.measures, &dimensions))
+    }
+
     fn try_rewrite_simple_query(
         &mut self,
         query: &Rc<Query>,
@@ -450,6 +470,11 @@ impl PreAggregationOptimizer {
                             if let Some(rewritten) = rewritten {
                                 let new_member = member.with_body(SubqueryBody::Query(rewritten));
                                 NodeRewriteResult::rewritten(new_member.as_plan_node())
+                            } else if leaf.from().as_merge().is_some()
+                                && Self::is_view_measures_leg(leaf)
+                            {
+                                // Not a leaf: it merges subqueries matched on their own.
+                                NodeRewriteResult::pass()
                             } else {
                                 has_unrewritten_leaf = true;
                                 NodeRewriteResult::stop()
@@ -887,11 +912,23 @@ impl PreAggregationOptimizer {
         row_grain: RowGrain,
     ) -> Result<Option<PreAggregationMatch>, CubeError> {
         let helper = OptimizerHelper::new();
+        let all_measures = helper.all_measures(schema, filters);
+
+        let mut dimensions = schema.all_dimensions().cloned().collect::<Vec<_>>();
+        for item in filters
+            .dimensions_filters
+            .iter()
+            .chain(filters.time_dimensions_filters.iter())
+        {
+            item.find_all_member_evaluators(&mut dimensions);
+        }
+        if !are_mappings_applied(&all_measures, &dimensions) {
+            return Ok(None);
+        }
 
         let (match_state, read_time_dimensions) =
             self.match_dimensions(schema, filters, pre_aggregation)?;
 
-        let all_measures = helper.all_measures(schema, filters);
         if match_state == MatchState::NotMatched {
             return Ok(None);
         }
@@ -906,9 +943,10 @@ impl PreAggregationOptimizer {
             }
         }
 
-        // The query's join groups answer both the multiplicativity gate
-        // and the join-path comparison below, so build them once.
-        let query_groups = self.query_join_groups(schema, filters, &all_measures)?;
+        // No single join (a view measure over unrelated facts): served per leg.
+        let Ok(query_groups) = self.query_join_groups(schema, filters, &all_measures)? else {
+            return Ok(None);
+        };
 
         // A measure sitting under a row-multiplying join can't be rolled
         // up from a partially matching pre-aggregation.
@@ -1205,7 +1243,7 @@ impl PreAggregationOptimizer {
         schema: &Rc<LogicalSchema>,
         filters: &Rc<LogicalFilter>,
         measures: &[Rc<MemberSymbol>],
-    ) -> Result<MultiFactJoinGroups, CubeError> {
+    ) -> Result<Result<MultiFactJoinGroups, CubeError>, CubeError> {
         // The query is planned with its filters: their members' join hints pick
         // the path to a cube, can multiply measures, or be the only link between cubes.
         let hints = MeasuresJoinHints::builder(&self.query_join_hints)
@@ -1215,7 +1253,7 @@ impl PreAggregationOptimizer {
             .add_filters(&filters.time_dimensions_filters)
             .add_filters(&filters.segments)
             .build(measures)?;
-        MultiFactJoinGroups::try_new(self.query_tools.clone(), hints)
+        MultiFactJoinGroups::try_new_if_joinable(self.query_tools.clone(), hints)
     }
 
     fn are_join_paths_matching(

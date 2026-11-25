@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_map.rs
+expression: result
+---
+biz__dt_ts_month    | biz__purchases_count | biz__cancellations_cancellations
+--------------------+----------------------+---------------------------------
+2026-01-01 00:00:00 | 1                    | NULL                            
+2026-02-01 00:00:00 | 1                    | 2

@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_map.rs
+expression: result
+---
+biz__dt_year_month | biz__carts_count
+-------------------+-----------------
+2025-09            | 1               
+2026-02            | 2

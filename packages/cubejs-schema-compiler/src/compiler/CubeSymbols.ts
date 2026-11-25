@@ -246,6 +246,8 @@ export type ViewCubeInclude = {
   alias?: string;
   includes: '*' | (string | ViewCubeIncludeMember)[];
   excludes?: string[];
+  // View dimension name -> full path of the dimension it means for the measures of this include
+  dimensionMap?: Record<string, string>;
 };
 
 export interface CubeDefinition {
@@ -309,6 +311,7 @@ type ViewResolvedMember = {
   // The cube the member is defined on, which the join path reaches
   cube: string;
   name: string;
+  dimensionMap?: Record<string, string>;
 };
 
 type ViewExcludedMember = {
@@ -1074,6 +1077,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         excludes
       );
 
+      if (cubeInclude.split && cubeInclude.dimensionMap && type === 'measures') {
+        errorReporter.error(`The dimension map of '${fullPath}' can't be used together with split`);
+      }
+
       if (cubeInclude.split) {
         const viewName = `${parentCube.name}_${cubeName}`;
         let splitViewDef = splitViews[viewName];
@@ -1091,17 +1098,96 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         const includeMembers = this.generateIncludeMembers(finalIncludes, type, splitViewDef, viewAllMembers);
         this.applyIncludeMembers(includeMembers, splitViewDef, type, errorReporter);
       } else {
+        // Dimensions are applied to the view before measures, so the mapping keys can be checked
+        const dimensionMap = type === 'measures' && cubeInclude.dimensionMap ?
+          this.resolveDimensionMap(parentCube, cubeInclude.dimensionMap, fullPath, errorReporter) :
+          undefined;
+
         for (const member of finalIncludes) {
           const key = `${member.member}|${member.name}`;
           if (!seen.has(key)) {
             seen.add(key);
-            result.push(member);
+            result.push(dimensionMap ? { ...member, dimensionMap } : member);
           }
         }
       }
     }
 
     return result;
+  }
+
+  protected resolveDimensionMap(
+    view: CubeDefinition,
+    mappings: Record<string, string>,
+    joinPath: string,
+    errorReporter: ErrorReporter
+  ): Record<string, string> {
+    const result: Record<string, string> = {};
+
+    for (const [name, target] of Object.entries(mappings)) {
+      const error = this.dimensionMappingError(view, name, target, joinPath);
+      if (error) {
+        errorReporter.error(error);
+      } else {
+        result[name] = target;
+      }
+    }
+
+    return result;
+  }
+
+  protected dimensionMappingError(view: CubeDefinition, name: string, target: string, joinPath: string): string | undefined {
+    const viewDimension = view.dimensions?.[name] as (CubeSymbolDefinition & { included?: boolean }) | undefined;
+    if (!viewDimension) {
+      return `Dimension mapping '${name}' of '${joinPath}' names no dimension of view '${view.name}'`;
+    }
+    const prefix = `Dimension mapping '${name}' of '${joinPath}'`;
+    // A dimension the view declares itself is not a reference to map;
+    // one built on an included dimension follows that dimension's mapping
+    if (!viewDimension.included) {
+      return `${prefix}: '${view.name}.${name}' is declared by the view, only included dimensions can be mapped`;
+    }
+
+    const dimension = this.resolveMappingTarget(target, joinPath);
+    if (typeof dimension === 'string') {
+      return `${prefix}: ${dimension}`;
+    }
+
+    if (dimension.type !== viewDimension.type) {
+      return `${prefix}: '${target}' is of type '${dimension.type}' but '${view.name}.${name}' is of type '${viewDimension.type}'`;
+    }
+
+    const missingGranularities = Object.keys(viewDimension.granularities || {})
+      .filter(granularity => !(dimension.granularities || {})[granularity]);
+    if (missingGranularities.length) {
+      return `${prefix}: '${target}' has no granularities ${missingGranularities.join(', ')} of '${view.name}.${name}'`;
+    }
+
+    return undefined;
+  }
+
+  // The dimension a path from the include's join path, through joins by alias
+  // or cube name, names; or why it names none.
+  protected resolveMappingTarget(target: string, joinPath: string): CubeSymbolDefinition | string {
+    if (!target.startsWith(`${joinPath}.`)) {
+      return `'${target}' must start with the join path '${joinPath}'`;
+    }
+
+    const steps = target.slice(joinPath.length + 1).split('.');
+    const memberName = steps.pop() as string;
+    let cubeName = this.resolveJoinPathTarget(joinPath.split('.'));
+
+    for (const step of steps) {
+      const joins = this.symbols[cubeName]?.cubeObj()?.joins;
+      const join = Array.isArray(joins) ? joins.find(j => (j.alias ?? j.name) === step) : undefined;
+      if (!join) {
+        return `'${cubeName}' has no join '${step}' in '${target}'`;
+      }
+      cubeName = join.name;
+    }
+
+    return this.getResolvedMember('dimensions', cubeName, memberName) ??
+      `'${target}' names no dimension of '${cubeName}'`;
   }
 
   protected diffByMember(includes: ViewResolvedMember[], excludes: ViewExcludedMember[]) {
@@ -1203,6 +1289,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           ...(processedDrillMembers && { drillMembers: processedDrillMembers }),
           ...(resolvedMember.drillMembersGrouped && { drillMembersGrouped: resolvedMember.drillMembersGrouped }),
           ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
+          ...(memberRef.dimensionMap && { dimensionMap: memberRef.dimensionMap }),
         };
       } else if (type === 'dimensions') {
         memberDefinition = {

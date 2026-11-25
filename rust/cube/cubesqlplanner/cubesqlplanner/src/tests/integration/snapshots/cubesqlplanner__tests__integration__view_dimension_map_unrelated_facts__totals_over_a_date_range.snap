@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_map_unrelated_facts.rs
+expression: result
+---
+finance__income | finance__expenses
+----------------+------------------
+270             | 135

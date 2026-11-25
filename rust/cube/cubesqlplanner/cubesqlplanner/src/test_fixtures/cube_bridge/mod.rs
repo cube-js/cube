@@ -76,7 +76,7 @@ pub use mock_pre_aggregation_description::{
     MockPreAggregationDescription, MockPreAggregationIndex,
 };
 pub use mock_pre_aggregation_time_dimension::MockPreAggregationTimeDimension;
-pub use mock_schema::{MockSchema, MockSchemaBuilder};
+pub use mock_schema::{MockSchema, MockSchemaBuilder, ViewCube};
 pub use mock_security_context::MockSecurityContext;
 pub use mock_segment_definition::MockSegmentDefinition;
 pub use mock_sql_templates_render::MockSqlTemplatesRender;

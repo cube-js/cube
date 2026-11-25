@@ -3112,6 +3112,14 @@ export class BaseQuery {
     return this.collectFrom(membersToCollectFrom, fn, methodName);
   }
 
+  protected usesMappedDimension(view: string, mappings: Record<string, string>): boolean {
+    const used = new Set(
+      R.flatten(this.allMembersConcat(false).map((member: any) => member.getMembers()))
+        .map((member: any) => member.path()?.join('.'))
+    );
+    return Object.keys(mappings).some(name => used.has(`${view}.${name}`));
+  }
+
   public allMembersConcat(excludeTimeDimensions: boolean): Array<BaseMeasure | BaseDimension | BaseSegment> {
     return (this.measures as any[])
       .concat(this.dimensions)
@@ -3633,6 +3641,10 @@ export class BaseQuery {
       if (type === 'measure') {
         if (!this.useNativeSqlPlanner && symbol.case?.when?.some((item: { context?: unknown }) => item.context)) {
           throw new UserError(`Measure '${cubeName}.${name}' uses QUERY_CONTEXT conditions, which require the Tesseract SQL planner`);
+        }
+        if (!this.useNativeSqlPlanner && symbol.dimensionMap &&
+          this.usesMappedDimension(cubeName, symbol.dimensionMap)) {
+          throw new UserError(`Measure '${cubeName}.${name}' maps dimensions of this query, which requires the Tesseract SQL planner`);
         }
         let parentMeasure;
         if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||

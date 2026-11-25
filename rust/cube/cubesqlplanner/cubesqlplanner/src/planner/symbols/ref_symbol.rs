@@ -1,7 +1,7 @@
 use super::common::CompiledMemberPath;
 use super::deps::{self, symbol_deps, DepVisitor, DepVisitorMut, SymbolDeps};
 use super::MemberSymbol;
-use crate::planner::SqlCall;
+use crate::planner::{MemberId, SqlCall};
 use crate::utils::debug::DebugSql;
 use cubenativeutils::CubeError;
 use std::ops::ControlFlow;
@@ -52,6 +52,16 @@ pub struct RefSymbol {
     pub(super) compiled_path: CompiledMemberPath,
     pub(super) target: RefTarget,
     pub(super) mask_sql: Option<Rc<SqlCall>>,
+    pub(super) dimension_map: Vec<DimensionMapping>,
+}
+
+/// A view dimension that means another dimension for the view measure that
+/// declares it.
+#[derive(Clone)]
+pub struct DimensionMapping {
+    /// The view dimension's own id, not the id of the member it references.
+    pub dimension: MemberId,
+    pub target: Rc<MemberSymbol>,
 }
 
 symbol_deps! {
@@ -59,6 +69,9 @@ symbol_deps! {
         target: dep,
         mask_sql: dep,
         compiled_path: skip,
+        // Not dependencies: a measure joins a mapping's target only when the
+        // query uses the view dimension it maps.
+        dimension_map: skip,
     }
 }
 
@@ -80,7 +93,23 @@ impl RefSymbol {
             compiled_path,
             target: RefTarget::Member(target),
             mask_sql,
+            dimension_map: vec![],
         }))
+    }
+
+    pub fn with_dimension_map(&self, dimension_map: Vec<DimensionMapping>) -> Rc<Self> {
+        Rc::new(Self {
+            dimension_map,
+            ..self.clone()
+        })
+    }
+
+    /// The same member, under its own name and mask, standing for `target`.
+    pub fn with_target(&self, target: Rc<MemberSymbol>) -> Rc<Self> {
+        Rc::new(Self {
+            target: RefTarget::Member(target),
+            ..self.clone()
+        })
     }
 
     /// A reference reading `origin` from `name` of `source`.
@@ -93,6 +122,7 @@ impl RefSymbol {
                 origin: origin.clone(),
             },
             mask_sql: None,
+            dimension_map: vec![],
         })
     }
 
@@ -105,6 +135,7 @@ impl RefSymbol {
                 origin: origin.clone(),
             },
             mask_sql: None,
+            dimension_map: vec![],
         })
     }
 
@@ -147,6 +178,10 @@ impl RefSymbol {
 
     pub fn mask_sql(&self) -> &Option<Rc<SqlCall>> {
         &self.mask_sql
+    }
+
+    pub fn dimension_map(&self) -> &[DimensionMapping] {
+        &self.dimension_map
     }
 
     pub fn get_dependencies(&self) -> Vec<Rc<MemberSymbol>> {

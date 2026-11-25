@@ -20,6 +20,7 @@ import {
   QueryPlan,
   QueryPlanner,
   TransformedQuery,
+  UserError,
   ViewIncludedMember,
 } from '@cubejs-backend/schema-compiler';
 import { GraphQLSchema } from 'graphql';
@@ -606,6 +607,70 @@ export class CompilerApi {
     return result;
   }
 
+  // Row filters hold only on the measure's own rows, the same in every leg; an
+  // mapped dimension is read from another instance. Masks follow member
+  // names, which the mapping target doesn't carry.
+  protected async rejectMappedDimensionsUnderPolicies(
+    queryMemberNames: Set<string>,
+    cubeEvaluator: any,
+    context: Context,
+    compilers: Compilers,
+  ) {
+    for (const memberName of queryMemberNames) {
+      const [viewName, name, ...rest] = memberName.split('.');
+      const view = rest.length ? undefined : cubeEvaluator.cubeFromPath(viewName);
+      const mappings: Record<string, string> = (view?.isView && view.measures?.[name]?.dimensionMap) || {};
+      const included = (type: string, viewMember: string): ViewIncludedMember | undefined => (view?.includedMembers || [])
+        .find((m: ViewIncludedMember) => m.type === type && m.name === viewMember);
+      const ownCube = included('measures', name)?.memberPath.split('.')[0];
+      const used = Object.entries(mappings)
+        .filter(([dimension]) => queryMemberNames.has(`${viewName}.${dimension}`));
+
+      for (const [dimension, target] of used) {
+        const viewDimension = included('dimensions', dimension);
+        const resolvedTarget = cubeEvaluator.resolveMemberPath(target);
+        // A cube instance reached through an alias is other rows than the
+        // measure's own, even when it is the same cube
+        const instances = [
+          { cubeName: viewDimension?.memberPath.split('.')[0], aliased: !!viewDimension?.path },
+          { cubeName: resolvedTarget?.targetCube, aliased: !!resolvedTarget?.aliased },
+        ];
+
+        for (const { cubeName, aliased } of instances) {
+          if (cubeName && await this.policiesConflictWithMapping(
+            cubeEvaluator.cubeFromPath(cubeName),
+            !aliased && cubeName === ownCube,
+            context,
+            compilers,
+          )) {
+            throw new UserError(
+              `Measure '${memberName}' maps '${viewName}.${dimension}', whose cube restricts rows or masks members by access policies, which dimension mappings don't support yet`
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // No policy applying to the user leaves the cube unreadable, which the
+  // mapping legs would not enforce either.
+  protected async policiesConflictWithMapping(
+    cube: any,
+    ownRows: boolean,
+    context: Context,
+    compilers: Compilers,
+  ): Promise<boolean> {
+    if (!compilers.cubeEvaluator.isRbacEnabledForCube(cube)) {
+      return false;
+    }
+    const policies = await this.getApplicablePolicies(cube, context, compilers);
+    const filtersRows = (policy: any) => !!(
+      policy.rowLevel && !policy.rowLevel.allowAll && policy.rowLevel.filters?.length > 0
+    );
+    return policies.length === 0 ||
+      policies.some((policy: any) => !!policy.memberMasking || (!ownRows && filtersRows(policy)));
+  }
+
   /**
    * This method rewrites the query according to RBAC row level security policies.
    *
@@ -631,6 +696,7 @@ export class CompilerApi {
     const memberNames = await this.getQueryMemberNames(evaluatedQuery, context?.requestId);
     const queryMemberNames = new Set(memberNames);
     const queryCubes = new Set(memberNames.map(memberName => memberName.split('.')[0]));
+    await this.rejectMappedDimensionsUnderPolicies(queryMemberNames, cubeEvaluator, context, compilers);
 
     // A member reached through a join alias belongs to a cube instance: the
     // policies of the cube it instantiates apply to it, and they constrain that

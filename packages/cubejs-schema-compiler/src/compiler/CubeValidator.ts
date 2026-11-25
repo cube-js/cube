@@ -1380,6 +1380,8 @@ const viewSchema = inherit(baseSchema, {
         ]))
       ]).required().description("Specify which members to include from the cube. Use '*' for all members, or an array of member names/objects with aliases"),
       excludes: Joi.array().items(Joi.string().required()).description('Members to exclude from the cube'),
+      dimensionMap: Joi.object().pattern(identifier, Joi.string().required()).meta({ yamlMap: true })
+        .description("Maps dimensions of the view to the dimensions they stand for in this cube's measures: view dimension name -> full path of that dimension, starting with join_path"),
     }).oxor('split', 'prefix').messages({
       'object.oxor': 'Using split together with prefix is not supported'
     })
