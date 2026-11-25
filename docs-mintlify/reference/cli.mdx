@@ -1021,7 +1021,8 @@ cube dbx-mv sync DEPLOYMENT_ID default --target production \
   --promote-from "$(jq -r .runId staging.json)" --wait
 ```
 
-`--wait` prints each view's outcome, or the run as the API returns it with `--json`. It exits
+`--wait` prints each view's outcome, with the Databricks error class and statement ID a failed
+view ended on, or the run as the API returns it with `--json`. It exits
 non-zero unless the run is `COMPLETED` with an `incompleteViewCount` of 0: every view in scope
 published with all its measures, which is also what promoting the run requires. It doesn't apply
 the other checks of the [CI recipe](/docs/integrations/databricks-metric-views#trigger-publication-from-ci),

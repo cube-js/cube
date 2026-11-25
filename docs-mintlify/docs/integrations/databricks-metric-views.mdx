@@ -356,6 +356,9 @@ named no error class or no statement ran, and both are `null` in older runs. Cub
 Databricks' error message; look up the statement in Databricks Query History to read it.
 Each `views[]` entry carries its destination as `target` (`catalog.schema.name`, or `null` when
 conversion blocked the view), and a run carries the `takeOverTargets` it was started with. A
+`validation_failed` or `publish_failed` view also carries Databricks' `errorClass`, such as
+`UNRESOLVED_COLUMN.WITH_SUGGESTION`, and the `statementId` it failed on, which you can look up in
+Databricks Query History; each is `null` when Databricks returned none. A
 `blocked` view whose `detail` is `unmanaged-target` or `ownership-conflict` collides with an object
 this publication target does not manage, and a `detail` of `taken-over` marks a view a take-over
 published. After you confirm that a blocked destination should belong to this publication target,
