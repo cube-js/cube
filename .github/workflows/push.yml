@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/actions/smoke.sh'
       - '.github/actions/integration/**'
+      - '.github/actions/attest-image/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
@@ -24,6 +25,7 @@ on:
     paths:
       - '.github/actions/smoke.sh'
       - '.github/actions/integration/**'
+      - '.github/actions/attest-image/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
@@ -625,6 +627,14 @@ jobs:
     name: Build & Test :dev for ${{ matrix.name }} without pushing
     runs-on: ubuntu-22.04
     timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      # Fork PRs get no OIDC token or package write, so only same-repo builds push and attest.
+      ATTEST_CI_IMAGE: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     services:
       registry:
         image: registry:2
@@ -698,6 +708,54 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
+      - name: Login to GitHub Container Registry
+        if: env.ATTEST_CI_IMAGE == 'true'
+        continue-on-error: true
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Install crane
+        if: env.ATTEST_CI_IMAGE == 'true'
+        continue-on-error: true
+        uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
+        with:
+          version: v0.22.1
+      - name: Push image to GHCR for attestation
+        id: ci-image
+        if: env.ATTEST_CI_IMAGE == 'true'
+        continue-on-error: true
+        env:
+          SOURCE: localhost:5000/cubejs/cube:${{ matrix.tag }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            TAG="pr-${PR_NUMBER}-${HEAD_SHA::7}"
+          else
+            TAG="master-${HEAD_SHA::7}"
+          fi
+          crane copy "$SOURCE" "ghcr.io/cube-js/cube-ci:${TAG}"
+          echo "Tested image: $(crane digest "$SOURCE")"
+          echo "Pushed image: $(crane digest "ghcr.io/cube-js/cube-ci:${TAG}")"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+      - name: Attest CI image
+        if: steps.ci-image.outcome == 'success'
+        continue-on-error: true
+        uses: ./.github/actions/attest-image
+        with:
+          image: ghcr.io/cube-js/cube-ci
+          ref: ":${{ steps.ci-image.outputs.tag }}"
+      - name: Prune old CI images
+        if: steps.ci-image.outcome == 'success'
+        continue-on-error: true
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: cube-ci
+          package-type: container
+          # Versions, not images: each build adds its manifests and attestations as separate versions.
+          min-versions-to-keep: 300
       - name: Testing CubeJS (container mode) via BirdBox
         run: |
           cd packages/cubejs-testing/

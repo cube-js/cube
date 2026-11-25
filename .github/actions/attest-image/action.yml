@@ -1,0 +1,112 @@
+name: Attest image
+description: >
+  Attests a pushed image by its registry digest with SLSA build provenance and
+  an SPDX SBOM, and pushes both to the image's registry. Never fails the job.
+
+inputs:
+  image:
+    description: Fully-qualified image name without tag or digest, e.g. docker.io/cubejs/cube
+    required: true
+  ref:
+    description: Tag (":v1.2.3") or digest ("@sha256:...") appended to image to resolve the digest
+    required: true
+
+outputs:
+  digest:
+    description: Digest the attestations were made for
+    value: ${{ steps.resolve.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install crane
+      id: crane
+      continue-on-error: true
+      uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
+      with:
+        version: v0.22.1
+
+    - name: Resolve digest from registry
+      id: resolve
+      continue-on-error: true
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        REF: ${{ inputs.ref }}
+      run: |
+        digest="$(crane digest "${IMAGE}${REF}")"
+        echo "Resolved ${IMAGE}${REF} to ${digest}"
+        {
+          echo "digest=${digest}"
+          echo "sbom=${RUNNER_TEMP}/sbom-${digest#sha256:}.spdx.json"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Generate SBOM
+      id: sbom
+      if: steps.resolve.outputs.digest != ''
+      continue-on-error: true
+      uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      with:
+        image: ${{ inputs.image }}@${{ steps.resolve.outputs.digest }}
+        format: spdx-json
+        output-file: ${{ steps.resolve.outputs.sbom }}
+        upload-artifact: false
+        upload-release-assets: false
+
+    - name: Attest build provenance
+      id: provenance
+      if: steps.resolve.outputs.digest != ''
+      continue-on-error: true
+      uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+      with:
+        subject-name: ${{ inputs.image }}
+        subject-digest: ${{ steps.resolve.outputs.digest }}
+        push-to-registry: true
+        create-storage-record: false
+
+    - name: Attest SBOM
+      id: sbom-attest
+      if: steps.sbom.outcome == 'success'
+      continue-on-error: true
+      uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+      with:
+        subject-name: ${{ inputs.image }}
+        subject-digest: ${{ steps.resolve.outputs.digest }}
+        sbom-path: ${{ steps.resolve.outputs.sbom }}
+        push-to-registry: true
+        create-storage-record: false
+
+    - name: Report attestation results
+      if: always()
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        REF: ${{ inputs.ref }}
+        DIGEST: ${{ steps.resolve.outputs.digest }}
+        CRANE: ${{ steps.crane.outcome }}
+        RESOLVE: ${{ steps.resolve.outcome }}
+        SBOM: ${{ steps.sbom.outcome }}
+        PROVENANCE: ${{ steps.provenance.outcome }}
+        PROVENANCE_URL: ${{ steps.provenance.outputs.attestation-url }}
+        SBOM_ATTEST: ${{ steps.sbom-attest.outcome }}
+        SBOM_ATTEST_URL: ${{ steps.sbom-attest.outputs.attestation-url }}
+      run: |
+        {
+          echo "### Attestations: ${IMAGE}${REF}"
+          echo ""
+          echo "Digest: \`${DIGEST:-unresolved}\`"
+          echo ""
+          echo "| Step | Outcome | Attestation |"
+          echo "| --- | --- | --- |"
+          echo "| Install crane | ${CRANE} | |"
+          echo "| Resolve digest | ${RESOLVE} | |"
+          echo "| Generate SBOM | ${SBOM} | |"
+          echo "| Build provenance | ${PROVENANCE} | ${PROVENANCE_URL} |"
+          echo "| SBOM attestation | ${SBOM_ATTEST} | ${SBOM_ATTEST_URL} |"
+        } >> "$GITHUB_STEP_SUMMARY"
+        for outcome in "$CRANE" "$RESOLVE" "$SBOM" "$PROVENANCE" "$SBOM_ATTEST"; do
+          if [ "$outcome" != "success" ]; then
+            echo "::warning title=Image attestation incomplete::${IMAGE}${REF}: see the job summary. The image was pushed; only its attestations are missing."
+            break
+          fi
+        done
