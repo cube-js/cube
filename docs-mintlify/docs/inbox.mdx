@@ -138,12 +138,12 @@ failing leaves only one notification about its latest failure:
   deletes it for everyone who got it.
 - **Model sync**: a newer failure of the same kind of sync on the deployment,
   for example a dbt pull, replaces the earlier failure notification, and a
-  successful sync of that kind deletes it.
+  finished sync of that kind deletes it.
 - **Report delivery**: a newer failure of the same delivery replaces the
   earlier failure notification, and the delivery starting to work again
   deletes it for everyone who got it.
 
-Notifications about finished runs, successful syncs, and recovered deliveries
+Notifications about finished runs and syncs, and recovered deliveries
 stay.
 
 [ref-preferences-notifications]: /docs/preferences#notifications
