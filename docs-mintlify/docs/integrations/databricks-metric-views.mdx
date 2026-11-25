@@ -671,9 +671,10 @@ run a new **Preview** after a Cube upgrade.
 
 - **Supported** — a view with a clear root source and representable dimensions, measures,
   and joins. Review the generated YAML, then test access and sync.
-- **Warning** — behavior-neutral metadata Databricks cannot represent, or a withheld measure
-  ([`CUBE_MEMBER_WITHHELD`](#cube-member-withheld)). Review the exact difference before accepting
-  publication.
+- **Warning** — behavior-neutral metadata Databricks cannot represent, or a measure
+  [withheld](#withheld-measures) as [`CUBE_MEMBER_WITHHELD`](#cube-member-withheld): a
+  fan-out-unsafe joined measure or a multi-stage measure a Metric View cannot represent. Review
+  the exact difference before accepting publication.
 
 Preview **blocks** a view it can't publish faithfully, and each blocking issue says what to
 change in the model. [Fix a blocked view](#fix-a-blocked-view) has a section for each issue
@@ -703,11 +704,26 @@ A measure that can over-count is withheld: a non-idempotent aggregate, such as `
   join, or in a view with a root-source override: remove the member reference that reaches that
   join, or the override, or keep that view in Cube.
 
+A [multi-stage](/reference/data-modeling/measures#multi_stage) measure that a Metric View cannot
+represent is withheld too: one with [`time_shift`](/reference/data-modeling/measures#time_shift),
+[`grain`](/reference/data-modeling/measures#grain), `group_by`, `reduce_by`, or `add_group_by`, or
+one of a type other than `number`, such as `rank`. So is a
+[`rolling_window`](/reference/data-modeling/measures#rolling_window) measure, and any measure that
+references one of these. These measures stay queryable in Cube. In Databricks, you can compute a
+prior period with a window function, such as `LAG`, over `MEASURE()` results. A view left with no
+measure to publish is blocked instead, as described under
+[Fix a blocked view](#fix-a-blocked-view).
+
+Preview lists each withheld measure, with its reason, under **Measures not published** and as a
+`CUBE_MEMBER_WITHHELD` warning. Each entry in `withheldMembers` names the member and its code:
+`FANOUT_UNSAFE_METRIC` for a measure that would over-count, `MULTI_STAGE_UNSUPPORTED` for a
+multi-stage or `rolling_window` measure.
+
 A view with a withheld measure is **still published without it**. That view may show
 **Created**, **Updated**, or **Unchanged**, and the run may show **Completed**, even though some
 measures are missing in Databricks. Check **Measures not published** in Preview and beside each
-view in run history before treating a run as complete. There is no opt-in gate for incomplete
-publication yet.
+view in run history before treating a run as complete. Such a view counts toward the run's
+`incompleteViewCount`. There is no opt-in gate for incomplete publication yet.
 
 ### References and subqueries in SQL
 
