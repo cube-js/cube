@@ -721,7 +721,8 @@ fn spell_between_apart(
 
 /// Removes a sole reported filter the query spells otherwise, by its column:
 /// one filter-shaped predicate there, or a time member's bounds the plan merges
-/// into a range. Anything else may not be a Cube filter at all, so none go.
+/// into a range (only those on the bare column when there are any). Anything
+/// else may not be a Cube filter at all, so none go.
 fn remove_reported_column_predicates(
     option_clause: &mut Option<ast::Expr>,
     clause: ast::Expr,
@@ -757,11 +758,16 @@ fn remove_reported_column_predicates(
         return 0;
     }
 
+    // A pushed-down query may send Cube only its bounds on the column itself,
+    // keeping the rest in SQL; then only those go
+    let only_column_bounds = on_column.len() > 1 && on_column.iter().any(|c| is_column_bound(c));
     let conjuncts = into_and_conjuncts(clause);
     let before = conjuncts.len();
     let kept = conjuncts
         .into_iter()
-        .filter(|conjunct| !on_needle_column(conjunct))
+        .filter(|conjunct| {
+            !on_needle_column(conjunct) || (only_column_bounds && !is_column_bound(conjunct))
+        })
         .collect::<Vec<_>>();
     let removed = before - kept.len();
     *option_clause = and_chain(kept);
@@ -785,6 +791,41 @@ fn is_bound(expr: &ast::Expr) -> bool {
         ast::Expr::Between { .. } => true,
         _ => false,
     }
+}
+
+/// An ordering comparison or a BETWEEN on the column itself, or on its cast
+/// to a date or timestamp: the bounds a pushed-down query sends Cube.
+fn is_column_bound(expr: &ast::Expr) -> bool {
+    let expr = unparenthesized(expr);
+    let is_bound = match expr {
+        ast::Expr::BinaryOp { op, .. } => matches!(
+            op,
+            ast::BinaryOperator::Lt
+                | ast::BinaryOperator::LtEq
+                | ast::BinaryOperator::Gt
+                | ast::BinaryOperator::GtEq
+        ),
+        ast::Expr::Between { negated, .. } => !negated,
+        _ => false,
+    };
+    let is_column = |expr: &ast::Expr| {
+        matches!(
+            expr,
+            ast::Expr::Identifier(_) | ast::Expr::CompoundIdentifier(_)
+        )
+    };
+    is_bound
+        && predicate_column(expr).is_some_and(|column| match unparenthesized(column) {
+            ast::Expr::Cast {
+                expr, data_type, ..
+            } => {
+                matches!(
+                    data_type,
+                    ast::DataType::Date | ast::DataType::Timestamp(..)
+                ) && is_column(unparenthesized(expr))
+            }
+            column => is_column(column),
+        })
 }
 
 /// The single column a filter expression stands on, as a comparison key.
