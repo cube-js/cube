@@ -428,6 +428,23 @@ fn run_lines(run: &Value) -> Vec<String> {
     lines
 }
 
+/// A view's DETAIL cell: its reason code, then the Databricks error class and statement a
+/// failed publish ended on, so a CI log says why without `--json`.
+fn view_detail(view: &Value) -> String {
+    let field = |path: &str| util::one_cell(&output::field(view, path));
+    let error_class = field("errorClass");
+    let statement = field("statementId");
+    let mut parts = vec![field("detail")];
+    if !util::is_blank(&error_class) {
+        parts.push(format!("[{error_class}]"));
+    }
+    if !util::is_blank(&statement) {
+        parts.push(format!("statement {statement}"));
+    }
+    parts.retain(|part| !util::is_blank(part));
+    parts.join(" ")
+}
+
 fn view_rows(run: &Value) -> Vec<Vec<String>> {
     output::items(run.get("views").unwrap_or(&Value::Null))
         .iter()
@@ -441,7 +458,7 @@ fn view_rows(run: &Value) -> Vec<Vec<String>> {
                 util::one_cell(&output::field(view, "cubeViewName")),
                 util::one_cell(&output::field(view, "outcome")),
                 util::one_cell(&output::field(view, "target")),
-                util::one_cell(&output::field(view, "detail")),
+                view_detail(view),
                 util::one_cell(&withheld),
             ]
         })
@@ -1099,6 +1116,39 @@ mod tests {
                     "",
                     "orders.a, orders.b"
                 ],
+            ]
+        );
+    }
+
+    #[test]
+    fn a_failed_view_names_its_databricks_error_class_and_statement() {
+        let run = json!({
+            "views": [
+                {"cubeViewName": "orders", "outcome": "validation_failed",
+                 "target": "main.prod.orders", "detail": "STATEMENT_FAILED",
+                 "errorClass": "UNRESOLVED_COLUMN.WITH_SUGGESTION",
+                 "statementId": "01ef0a1b-2c3d-4e5f-8a9b-0c1d2e3f4a5b", "withheldMembers": []},
+                {"cubeViewName": "sales", "outcome": "validation_failed", "target": null,
+                 "detail": null, "errorClass": null, "statementId": "01ef-only",
+                 "withheldMembers": []},
+                {"cubeViewName": "items", "outcome": "blocked", "target": null,
+                 "detail": "unmanaged-target", "errorClass": null, "statementId": null,
+                 "withheldMembers": []}
+            ]
+        });
+        assert_eq!(
+            view_rows(&run),
+            vec![
+                vec![
+                    "orders",
+                    "validation_failed",
+                    "main.prod.orders",
+                    "STATEMENT_FAILED [UNRESOLVED_COLUMN.WITH_SUGGESTION] statement \
+                     01ef0a1b-2c3d-4e5f-8a9b-0c1d2e3f4a5b",
+                    ""
+                ],
+                vec!["sales", "validation_failed", "", "statement 01ef-only", ""],
+                vec!["items", "blocked", "", "unmanaged-target", ""],
             ]
         );
     }
