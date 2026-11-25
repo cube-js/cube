@@ -87,12 +87,17 @@ Choose the channels in the dialog:
 | Channel | Default | Notes |
 | --- | --- | --- |
 | **Inbox** | On | A notification in the owner's Cube inbox. |
-| **Email** | Off | Sent to the owner's Cube email address. |
+| **Email** | Off | Sent to the owner's Cube email address. The notification also arrives in the inbox, even with **Inbox** off. |
 | **Slack** | Off | Posted to the channel you pick. Needs the [Cube Slack app][ref-slack]; invite the bot to a private channel first. |
 
 While the owner's Google account can't open the spreadsheet, Cube also notifies
 every admin by inbox and email, at most once a day, whatever channels the owner
 chose.
+
+To stop these emails and keep the inbox notifications, turn off **Report
+deliveries** under [Preferences → Notifications][ref-notification-email], or click
+**Unsubscribe from Report deliveries emails** at the bottom of a delivery email. With
+the switch off, a delivery's **Email** channel sends you nothing.
 
 How often it notifies depends on the schedule:
 
@@ -326,6 +331,7 @@ create a delivery; access problems show up on the first run.
 [ref-roles]: /admin/users-and-permissions/roles-and-permissions
 [ref-embedding]: /embedding
 [ref-slack]: /docs/integrations/slack
+[ref-notification-email]: /docs/preferences#notifications
 [ref-row-limit]: /docs/explore-analyze/workbooks/querying-data#limiting
 [ref-platform-api]: /api-reference/introduction#platform-api
 [ref-api-deliveries]: /api-reference/report-deliveries/list-report-deliveries
