@@ -100,7 +100,7 @@ JWT per user.
 | **Audience type**         | One of `AWS`, `GCP`, `Azure`, or `Custom`. `AWS` and `Azure` pre-fill the audience value.                               |
 | **Audience**              | The JWT `aud` claim value. Pre-set for `AWS` (`sts.amazonaws.com`) and `Azure` (`api://AzureADTokenExchange`). For `GCP` you supply the **Workload Identity Federation provider resource path** (`//iam.googleapis.com/projects/.../providers/...`) — there is no global GCP audience. User-supplied for `Custom`. |
 | **Name**                  | A short, filesystem-safe slug that becomes part of the token file name (`cube_cloud_token_<name>`), or the `oidcTokens` key for [per-user](#per-user-tokens) configs. |
-| **Subject claim format**  | Template for the JWT `sub` claim. Defaults to `cube:deployment:{deployment_id}` if left empty.                          |
+| **Subject claim format**  | Template for the JWT `sub` claim. If left empty, defaults to `cube:deployment:{deployment_id}`, or to `cube:component:{component}:deployment_id:{deployment_id}` for [tenant-scoped tokens](#subject-claim-format). |
 | **Custom claims**         | Optional extra JWT claims added to every minted token (per-user configs can template values from the user) — see [Custom claims](#custom-claims) below. |
 | **Token subject**         | `Deployment` (default) or `Signed-in user`. Set when the config is created. A signed-in-user config mints a token per user, delivered in the security context instead of as a file — see [Per-user tokens](#per-user-tokens) below. |
 | **Target env var**        | Custom audience type only: env var Cube populates with the token file path in every execution context — see [Custom token configs](#custom-token-configs) below. |
@@ -117,6 +117,15 @@ The `sub` claim is what the receiving cloud provider's trust policy matches
 on to decide which deployment or component is allowed to assume a role.
 Cube's default template is `cube:deployment:{deployment_id}` — sufficient if
 you only need to identify the deployment.
+
+Tenant-scoped tokens, which AI agents request for
+[Bring Your Own Model][ref-byom] authentication, use a different default:
+`cube:component:{component}:deployment_id:{deployment_id}`. Their `sub` claim
+is then `cube:component:ai_engineer:deployment_id:global`, which doesn't
+match trust policies or IAM bindings written for `cube:deployment:...`
+subjects. To make the AI agents' `sub` claim
+`cube:deployment:global:component:ai_engineer`, set the format to
+`cube:deployment:{deployment_id}:component:{component}`.
 
 To scope further — by component (Cube API vs. Cube Store vs. the AI Engineer)
 or by Cube Cloud region — override the template with one of the **Common
@@ -491,6 +500,7 @@ which resource and when, without ever issuing a long-lived credential.
 [ref-cube-cloud-region]: /admin/deployment/infrastructure#what-is-a-cube-cloud-region
 [ref-security-context]: /docs/data-modeling/access-control/context
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes
+[ref-byom]: /admin/ai/bring-your-own-model
 [ref-pre-aggs]: /docs/pre-aggregations/using-pre-aggregations
 [ref-access-policies]: /docs/data-modeling/data-access-policies
 [link-bq-rls]: https://cloud.google.com/bigquery/docs/row-level-security-intro

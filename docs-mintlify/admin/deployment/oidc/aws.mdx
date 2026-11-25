@@ -487,7 +487,21 @@ own AWS account. The AI engineer's `sub` claim ends in
 (every deployment's AI engineer assumes the same role and writes against
 the same Bedrock account).
 
+AI agents request a tenant-scoped token: its `{deployment_id}` is the literal
+`global`, and its `{component}` is `ai_engineer`. If the token config has no
+subject claim format, this token's `sub` claim is
+`cube:component:ai_engineer:deployment_id:global`, which the trust policy
+below doesn't match. Set a subject claim format as described below.
+
 <Steps>
+  <Step title="Set the subject claim format">
+    In **Admin → OIDC**, set the AWS token config's **Subject claim format**
+    to `cube:deployment:{deployment_id}:component:{component}`. The `sub`
+    claim of AI agents then is `cube:deployment:global:component:ai_engineer`.
+    This format also applies to your deployments' tokens, so update their
+    trust policies first, as described in
+    [Step 3](#step-3-build-the-trust-policy).
+  </Step>
   <Step title="Create the Bedrock IAM role">
     Trust policy — note the `StringLike` condition pinning the component:
 
