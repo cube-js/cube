@@ -498,15 +498,16 @@ Cube's own post-processing. The **Generated SQL** tab shows where each part runs
 </Frame>
 
 - A legend under the SQL names each place: a data source by its name, or
-  **Cube Store**. Data sources show their logo to users with the **Access SQL
-  Runner** permission, which [Source SQL tabs][ref-source-sql-tabs] also need.
-  Hover over or focus an item to see the pre-aggregations that serve it.
+  **Cube Store**. A data source shows its logo only to users with the
+  [**Access SQL Runner**][ref-custom-roles-deployment] permission. In workbooks,
+  chat, and dashboards, the tab itself needs that permission. Playground and
+  embedded apps can show the tab without it, with a generic database icon in place
+  of the logo. Hover over or focus an item to see the pre-aggregations that serve it.
 - When a query runs in more than one place, each part is tinted in the color of
   its place, and the parts Cube post-processes stay untinted. `default` is always
-  green and Cube Store always amber. Other data sources take four more colors in
-  name order. Two data sources in one query get different colors unless it uses
-  more than four of them, so a data source can take another color when its own is
-  already taken in that query.
+  green and Cube Store always amber. Other data sources get one of four more
+  colors, in name order. In one query, each data source gets a different color
+  until there are more than four, and then the colors repeat.
 - A query that runs entirely in one place is not tinted. The legend still names
   the place.
 - On Cube versions that don't report where a pushed-down SQL query runs, that
@@ -712,5 +713,5 @@ behaves as intended.
 [ref-auto-run]: /reference/data-modeling/view#auto_run
 [ref-configuration-auto-run]: /docs/data-modeling/configuration#auto-run
 [ref-cube-store]: /docs/pre-aggregations/running-in-production#architecture
-[ref-source-sql-tabs]: /docs/explore-analyze/workbooks/source-sql-tabs#adding-a-source-sql-tab
+[ref-custom-roles-deployment]: /admin/users-and-permissions/custom-roles#deployment-permissions
 
