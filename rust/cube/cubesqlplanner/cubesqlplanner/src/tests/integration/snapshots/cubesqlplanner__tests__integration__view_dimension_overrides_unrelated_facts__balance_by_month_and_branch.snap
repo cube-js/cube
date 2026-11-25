@@ -1,0 +1,11 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_overrides_unrelated_facts.rs
+expression: result
+---
+finance__branch | finance__date_month | finance__income | finance__expenses | finance__balance
+----------------+---------------------+-----------------+-------------------+-----------------
+North           | 2026-01-01 00:00:00 | 150             | 40                | 110             
+South           | 2026-01-01 00:00:00 | 70              | 25                | 45              
+East            | 2026-02-01 00:00:00 | NULL            | 10                | -10             
+North           | 2026-02-01 00:00:00 | 20              | NULL              | 20              
+South           | 2026-02-01 00:00:00 | 30              | 60                | -30

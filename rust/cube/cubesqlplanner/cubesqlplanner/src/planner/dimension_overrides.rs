@@ -123,7 +123,15 @@ pub fn partition_by_dimension_overrides(
         .map(|symbol| symbol.id().clone())
         .collect::<HashSet<_>>();
     let mut partitions: Vec<OverridePartition> = Vec::new();
+    let mut leaves: Vec<Rc<MemberSymbol>> = Vec::new();
     for measure in query.all_used_measures()? {
+        for leaf in view_composite_leaves(&measure) {
+            if !leaves.iter().any(|l| l.id() == leaf.id()) {
+                leaves.push(leaf);
+            }
+        }
+    }
+    for measure in leaves {
         if let Some(nested) = nested_overridden_measure(&measure, &used) {
             return Err(CubeError::user(format!(
                 "Measure {} is built on {}, whose dimension overrides apply to this query, which is not supported yet",
@@ -147,6 +155,34 @@ pub fn partition_by_dimension_overrides(
         ));
     }
     Ok(partitions)
+}
+
+/// A measure a view declares over view measures only, computed over the
+/// merged legs of its leaves rather than in one of them.
+pub fn is_view_composite(measure: &Rc<MemberSymbol>) -> bool {
+    let Ok(symbol) = measure.as_measure() else {
+        return false;
+    };
+    let dependencies = measure.get_dependencies();
+    symbol.is_view()
+        && !symbol.is_multi_stage()
+        && !dependencies.is_empty()
+        && dependencies
+            .iter()
+            .all(|d| d.peel_refs().as_measure().is_ok() && d.cube_id() == measure.cube_id())
+}
+
+// The measures `measure` is computed from: itself, or the leaves of the view
+// composites it is.
+fn view_composite_leaves(measure: &Rc<MemberSymbol>) -> Vec<Rc<MemberSymbol>> {
+    if !is_view_composite(measure) {
+        return vec![measure.clone()];
+    }
+    measure
+        .get_dependencies()
+        .iter()
+        .flat_map(view_composite_leaves)
+        .collect()
 }
 
 /// Whether every override of `measures` that applies to `dimensions` is

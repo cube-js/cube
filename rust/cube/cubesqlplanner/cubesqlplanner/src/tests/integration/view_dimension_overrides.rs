@@ -534,26 +534,75 @@ fn test_dimension_of_another_fact_has_no_join_path() {
 }
 
 #[test]
-fn test_measure_built_on_overridden_measures_is_rejected() {
+fn test_multi_stage_measure_built_on_overridden_measures_is_rejected() {
     let ctx = create_context();
-    for measure in [
-        "biz.cancellations_per_purchase",
-        "biz.cancellations_per_purchase_single_stage",
-    ] {
-        let query = format!(
-            "measures:\n  - {measure}\nfilters:\n  - member: biz.dt_year\n    operator: equals\n    values: [\"2026\"]\n"
-        );
-        let error = ctx.build_sql(&query).unwrap_err();
-        assert!(
-            error
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_per_purchase
+        filters:
+          - member: biz.dt_year
+            operator: equals
+            values: ["2026"]
+    "#};
+
+    let error = ctx.build_sql(query).unwrap_err();
+    assert!(
+        error
+            .message
+            .starts_with("Measure biz.cancellations_per_purchase is built on biz.")
+            && error
                 .message
-                .starts_with(&format!("Measure {measure} is built on biz."))
-                && error
-                    .message
-                    .contains("whose dimension overrides apply to this query"),
-            "{}",
-            error.message
-        );
+                .contains("whose dimension overrides apply to this query"),
+        "{}",
+        error.message
+    );
+}
+
+// A view's own measure over measures of two roles, computed over the merged
+// legs: cancelled per purchased by month, 2026-01: none cancelled (NULL),
+// 2026-02: 2 of 1.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_composite_over_two_roles() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_per_purchase_single_stage
+        dimensions:
+          - biz.dt_year_month
+        filters:
+          - member: biz.dt_year
+            operator: equals
+            values: ["2026"]
+        order:
+          - id: biz.dt_year_month
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The composite next to its own leaves, by year: 2025: 1 of 2, 2026: 2 of 2.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_composite_next_to_its_leaves() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_per_purchase_single_stage
+          - biz.purchases_count
+          - biz.cancellations_cancellations
+        dimensions:
+          - biz.dt_year
+        order:
+          - id: biz.dt_year
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
     }
 }
 

@@ -296,15 +296,19 @@ describe('Multi-fact derived measure defined on a view', () => {
     expect(sql).toContain('"sales_line_item".item_id = "items".id');
   });
 
-  // Current behaviour, pinned. Without `multi_stage` the ratio is planned as an
-  // ordinary calculated measure, so the planner looks for a single join tree
-  // covering both fact cubes and there is none - the two facts only meet
-  // through the shared dimensions.
-  it('cannot plan the ratio when the view measure is not multi_stage', () => {
-    expect(() => buildSql({
+  // No join tree covers both fact cubes, so the view's own measure is computed
+  // over the facts merged by the query's dimensions, as with `multi_stage`.
+  it('divides the two facts without multi_stage', () => {
+    const sql = buildSql({
       measures: ['retail_analysis.aov_basket_single_stage'],
       dimensions: ['retail_analysis.region'],
-    })).toThrow(/Can't find join path to join .*item_location_sales.*sales_line_item/);
+    });
+
+    expect(sql).toMatch(SALES_AMOUNT_AGGREGATE);
+    expect(sql).toMatch(TRANSACTIONS_AGGREGATE);
+    expect(sql).toMatch(
+      /"retail_analysis__sales_amount" \/ NULLIF\("[^"]+"\."retail_analysis__transactions_without_returns", 0\)/
+    );
   });
 
   // Current behaviour, pinned. A segment is the other place cube-owned filter

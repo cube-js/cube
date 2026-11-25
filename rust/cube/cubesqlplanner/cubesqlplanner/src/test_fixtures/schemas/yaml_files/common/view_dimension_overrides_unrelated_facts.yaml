@@ -40,6 +40,10 @@ cubes:
 
 views:
   - name: finance
+    measures:
+      - name: balance
+        type: number
+        sql: "COALESCE({income}, 0) - COALESCE({expenses}, 0)"
     cubes:
       - join_path: income
         includes:

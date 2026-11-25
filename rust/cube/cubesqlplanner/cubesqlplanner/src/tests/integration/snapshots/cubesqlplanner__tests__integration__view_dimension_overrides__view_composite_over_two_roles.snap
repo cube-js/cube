@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_overrides.rs
+expression: result
+---
+biz__dt_year_month | biz__cancellations_per_purchase_single_stage
+-------------------+---------------------------------------------
+2026-01            | NULL                                        
+2026-02            | 2.0000000000000000

@@ -112,3 +112,53 @@ async fn test_totals_over_a_date_range() {
         insta::assert_snapshot!(result);
     }
 }
+
+// Income minus expenses, computed over the two facts merged by month and
+// branch. 2026-01: North 110, South 45. 2026-02: East -10, North 20, South -30.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_balance_by_month_and_branch() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - finance.income
+          - finance.expenses
+          - finance.balance
+        dimensions:
+          - finance.branch
+        time_dimensions:
+          - dimension: finance.date
+            granularity: month
+            dateRange:
+              - "2026-01-01"
+              - "2026-02-28"
+        order:
+          - id: finance.date
+          - id: finance.branch
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The balance alone, by branch: East -10, North 130, South 15.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_balance_by_branch() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - finance.balance
+        dimensions:
+          - finance.branch
+        order:
+          - id: finance.branch
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}

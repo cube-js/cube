@@ -3,7 +3,7 @@ use super::symbol_classification::{FullKeyAggregateMeasures, SymbolClassificatio
 use super::MemberSymbol;
 use crate::logical_plan::{FilterPlacement, LogicalFilter};
 use crate::planner::collectors::has_multi_stage_members;
-use crate::planner::dimension_overrides::partition_by_dimension_overrides;
+use crate::planner::dimension_overrides::{self, partition_by_dimension_overrides};
 use crate::planner::filter::{FilterGroupOperator, FilterItem};
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::symbols::transforms;
@@ -35,9 +35,24 @@ pub struct QueryAnalysis {
 impl QueryAnalysis {
     pub fn try_new(request: Rc<QueryProperties>) -> Result<Rc<Self>, CubeError> {
         let partitions = partition_by_dimension_overrides(&request)?;
+        let view_composites = request
+            .all_used_measures()?
+            .into_iter()
+            .filter(dimension_overrides::is_view_composite)
+            .collect_vec();
+        // A view composite is computed over legs only when it can't be planned
+        // as one measure: its leaves need different overrides, or no single
+        // join reaches them all.
+        let composites_need_legs = !view_composites.is_empty()
+            && match partitions.as_slice() {
+                [single] => !Self::has_single_join(&*single.apply(&request)?, &view_composites),
+                _ => true,
+            };
         let (request, override_legs) = match partitions.as_slice() {
-            [single] if single.has_overrides() => (single.apply(&request)?, vec![]),
-            [_, _, ..] => {
+            [single] if single.has_overrides() && !composites_need_legs => {
+                (single.apply(&request)?, vec![])
+            }
+            [_, ..] if composites_need_legs || partitions.len() > 1 => {
                 let legs = partitions
                     .iter()
                     .map(|partition| partition.leg(&request))
@@ -48,9 +63,15 @@ impl QueryAnalysis {
         };
         let specializer = transforms::Specializer::for_query(&request, request.allow_multi_stage());
         let query = request.map_symbols(&|symbol| specializer.specialize(symbol))?;
+        // Over legs the query only reads their measures' columns.
+        let classified = if override_legs.is_empty() {
+            query.clone()
+        } else {
+            query.leg_for_measures(vec![])
+        };
         let join_groups = OnceCell::new();
         let leg_join_groups = override_legs.iter().map(|_| OnceCell::new()).collect_vec();
-        let mut classification = SymbolClassification::try_new(&query, |measure| {
+        let mut classification = SymbolClassification::try_new(&classified, |measure| {
             let groups = match override_legs
                 .iter()
                 .position(|leg| leg.measures().iter().any(|m| m.id() == measure.id()))
@@ -87,7 +108,7 @@ impl QueryAnalysis {
         // as stages once the query is not simple, so they are not leaves too.
         if !is_simple && query.allow_multi_stage() {
             let mut stages = Vec::new();
-            for measure in query.all_used_measures()? {
+            for measure in classified.all_used_measures()? {
                 if classification.has_multi_stage(&measure, false)? {
                     stages.push(measure);
                 }
@@ -246,6 +267,20 @@ impl QueryAnalysis {
         }
         let computed = Self::compute_join_groups(query)?;
         Ok(cell.get_or_init(move || computed))
+    }
+
+    fn has_single_join(query: &QueryProperties, measures: &[Rc<MemberSymbol>]) -> bool {
+        let Ok(groups) = Self::compute_join_groups(query) else {
+            return false;
+        };
+        measures.iter().all(|measure| {
+            matches!(
+                groups
+                    .for_measures(std::slice::from_ref(measure))
+                    .and_then(|groups| groups.single_join()),
+                Ok(Some(_))
+            )
+        })
     }
 
     fn compute_join_groups(query: &QueryProperties) -> Result<MultiFactJoinGroups, CubeError> {

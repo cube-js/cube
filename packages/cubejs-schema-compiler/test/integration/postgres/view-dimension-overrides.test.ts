@@ -368,6 +368,10 @@ cubes:
 
 views:
   - name: finance
+    measures:
+      - name: balance
+        type: number
+        sql: "COALESCE({CUBE.income}, 0) - COALESCE({CUBE.expenses}, 0)"
     cubes:
       - join_path: income
         includes:
@@ -394,6 +398,17 @@ views:
     { finance__branch: 'East', finance__date_month: '2026-02-01T00:00:00.000Z', finance__income: null, finance__expenses: '10' },
     { finance__branch: 'North', finance__date_month: '2026-02-01T00:00:00.000Z', finance__income: '20', finance__expenses: null },
     { finance__branch: 'South', finance__date_month: '2026-02-01T00:00:00.000Z', finance__income: '30', finance__expenses: '60' },
+  ], compilers));
+
+  it('computes a view measure over both facts', async () => dbRunner.runQueryTest({
+    measures: ['finance.balance'],
+    dimensions: ['finance.branch'],
+    order: [{ id: 'finance.branch' }],
+    timezone: 'UTC',
+  }, [
+    { finance__branch: 'East', finance__balance: '-10' },
+    { finance__branch: 'North', finance__balance: '130' },
+    { finance__branch: 'South', finance__balance: '15' },
   ], compilers));
 
   it('blends income and expenses of one branch by month', async () => dbRunner.runQueryTest({
