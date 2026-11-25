@@ -21,7 +21,7 @@ cubes:
       - name: dt_year_hidden
         type: string
         sql: dt_year
-        mask: hidden
+        mask: "'hidden'"
 
   - name: subscriptions
     sql_table: vdo_subscriptions
