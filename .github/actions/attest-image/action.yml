@@ -10,6 +10,10 @@ inputs:
   ref:
     description: Tag (":v1.2.3") or digest ("@sha256:...") appended to image to resolve the digest
     required: true
+  platform:
+    description: Attest this platform's manifest (e.g. linux/arm64) instead of the index ref resolves to
+    required: false
+    default: ''
 
 outputs:
   digest:
@@ -33,9 +37,14 @@ runs:
       env:
         IMAGE: ${{ inputs.image }}
         REF: ${{ inputs.ref }}
+        PLATFORM: ${{ inputs.platform }}
       run: |
-        digest="$(crane digest "${IMAGE}${REF}")"
-        echo "Resolved ${IMAGE}${REF} to ${digest}"
+        if [ -n "$PLATFORM" ]; then
+          digest="$(crane digest --platform "$PLATFORM" "${IMAGE}${REF}")"
+        else
+          digest="$(crane digest "${IMAGE}${REF}")"
+        fi
+        echo "Resolved ${IMAGE}${REF} ${PLATFORM} to ${digest}"
         {
           echo "digest=${digest}"
           echo "sbom=${RUNNER_TEMP}/sbom-${digest#sha256:}.spdx.json"
@@ -72,7 +81,7 @@ runs:
       with:
         subject-name: ${{ inputs.image }}
         subject-digest: ${{ steps.resolve.outputs.digest }}
-        sbom-path: /nonexistent/forced-failure.spdx.json
+        sbom-path: ${{ steps.resolve.outputs.sbom }}
         push-to-registry: true
         create-storage-record: false
 
@@ -82,6 +91,7 @@ runs:
       env:
         IMAGE: ${{ inputs.image }}
         REF: ${{ inputs.ref }}
+        PLATFORM: ${{ inputs.platform }}
         DIGEST: ${{ steps.resolve.outputs.digest }}
         CRANE: ${{ steps.crane.outcome }}
         RESOLVE: ${{ steps.resolve.outcome }}
@@ -92,7 +102,7 @@ runs:
         SBOM_ATTEST_URL: ${{ steps.sbom-attest.outputs.attestation-url }}
       run: |
         {
-          echo "### Attestations: ${IMAGE}${REF}"
+          echo "### Attestations: ${IMAGE}${REF} ${PLATFORM}"
           echo ""
           echo "Digest: \`${DIGEST:-unresolved}\`"
           echo ""

@@ -127,6 +127,7 @@ jobs:
       # No buildx builder here, so the build's digest output is not the registry digest; resolve the tag.
       - name: Attest image
         continue-on-error: true
+        timeout-minutes: 10
         uses: ./.github/actions/attest-image
         with:
           image: docker.io/cubejs/cube

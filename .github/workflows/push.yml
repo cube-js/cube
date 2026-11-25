@@ -624,7 +624,7 @@ jobs:
   docker-dev:
     needs: [latest-tag-sha, build-native-linux]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
-    name: Build & Test :dev for ${{ matrix.name }} without pushing
+    name: Build & Test :dev for ${{ matrix.name }}
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     permissions:
@@ -711,6 +711,7 @@ jobs:
       - name: Login to GitHub Container Registry
         if: env.ATTEST_CI_IMAGE == 'true'
         continue-on-error: true
+        timeout-minutes: 5
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
@@ -719,6 +720,7 @@ jobs:
       - name: Install crane
         if: env.ATTEST_CI_IMAGE == 'true'
         continue-on-error: true
+        timeout-minutes: 5
         uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
         with:
           version: v0.22.1
@@ -726,6 +728,7 @@ jobs:
         id: ci-image
         if: env.ATTEST_CI_IMAGE == 'true'
         continue-on-error: true
+        timeout-minutes: 10
         env:
           SOURCE: localhost:5000/cubejs/cube:${{ matrix.tag }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -743,6 +746,7 @@ jobs:
       - name: Attest CI image
         if: steps.ci-image.outcome == 'success'
         continue-on-error: true
+        timeout-minutes: 10
         uses: ./.github/actions/attest-image
         with:
           image: ghcr.io/cube-js/cube-ci
@@ -750,6 +754,7 @@ jobs:
       - name: Prune old CI images
         if: steps.ci-image.outcome == 'success'
         continue-on-error: true
+        timeout-minutes: 5
         uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
         with:
           package-name: cube-ci

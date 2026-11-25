@@ -423,10 +423,27 @@ jobs:
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
       - name: Attest image
         continue-on-error: true
+        timeout-minutes: 10
         uses: ./.github/actions/attest-image
         with:
           image: docker.io/cubejs/cube
           ref: "@${{ steps.build.outputs.digest }}"
+      - name: Attest image (linux/amd64)
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cube
+          ref: "@${{ steps.build.outputs.digest }}"
+          platform: linux/amd64
+      - name: Attest image (linux/arm64)
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cube
+          ref: "@${{ steps.build.outputs.digest }}"
+          platform: linux/arm64
 
   docker-debian-jdk:
     needs: [npm-wait, cubestore_linux, native_linux, detect_branch]
@@ -515,6 +532,7 @@ jobs:
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
       - name: Attest image
         continue-on-error: true
+        timeout-minutes: 10
         uses: ./.github/actions/attest-image
         with:
           image: docker.io/cubejs/cube
@@ -621,6 +639,7 @@ jobs:
           retention-days: 1
       - name: Attest image
         continue-on-error: true
+        timeout-minutes: 10
         uses: ./.github/actions/attest-image
         with:
           image: docker.io/cubejs/cubestore
@@ -705,6 +724,7 @@ jobs:
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
       - name: Attest image
         continue-on-error: true
+        timeout-minutes: 10
         uses: ./.github/actions/attest-image
         with:
           image: docker.io/cubejs/cubestore
@@ -776,12 +796,15 @@ jobs:
           docker buildx imagetools create $(printf -- '-t %s ' ${TAGS//,/ }) $(printf "${IMAGE}@sha256:%s " *)
       - name: Inspect image
         run: docker buildx imagetools inspect ${{ steps.prep.outputs.image }}:${{ needs.docker-cubestore-prepare.outputs.version }}${{ matrix.postfix }}
+      # The -arm64v8 leg tags the same index, so attest it once.
       - name: Attest image
+        if: matrix.postfix == ''
         continue-on-error: true
+        timeout-minutes: 10
         uses: ./.github/actions/attest-image
         with:
           image: docker.io/cubejs/cubestore
-          ref: ":${{ needs.docker-cubestore-prepare.outputs.version }}${{ matrix.postfix }}"
+          ref: ":${{ needs.docker-cubestore-prepare.outputs.version }}"
       - name: Update repo description
         if: matrix.postfix == ''
         uses: peter-evans/dockerhub-description@v5
