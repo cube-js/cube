@@ -480,7 +480,7 @@ deployment ID if you want isolation.
 
 ## Bedrock for bring-your-own LLM
 
-Bring-your-own LLM lets the AI engineer service call Bedrock through your
+Bring-your-own LLM lets AI agents call Bedrock through your
 own AWS account. AI agents request a tenant-scoped token: its
 `{deployment_id}` is the literal `global`, and its `{component}` is
 `ai_engineer`. One role serves the whole tenant: AI agents in every
@@ -571,7 +571,7 @@ subject claim format for Bedrock. If you use a different format, match the
       profile ID.
     - **Assume Role ARN** — the role you created above.
     - **Use OIDC workload identity** — toggle on. With this on, the AI
-      engineer authenticates via the deployment's OIDC token instead of
+      engineer authenticates via your tenant's OIDC token instead of
       static AWS credentials.
 
     <Frame>
