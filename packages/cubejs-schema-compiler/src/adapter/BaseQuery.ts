@@ -2996,9 +2996,12 @@ export class BaseQuery {
   }
 
   protected collectJoinHints(excludeTimeDimensions: boolean = false): Array<(Array<string> | string)> {
-    const allMembersJoinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(excludeTimeDimensions));
+    const membersJoinHints = this.collectJoinHintsFromMembers(this.allMembersConcat(excludeTimeDimensions));
     const queryJoinMaps = this.queryJoinMap();
     const customSubQueryJoinHints = this.collectJoinHintsFromMembers(this.joinMembersFromCustomSubQuery());
+    const allMembersJoinHints = membersJoinHints.length || customSubQueryJoinHints.length || this.queryLevelJoinHints.length ?
+      membersJoinHints :
+      this.memberExpressionCubeHints(excludeTimeDimensions);
     let newCollectedHints: any[] = [];
 
     // One cube may join the other cube via transitive joined cubes,
@@ -3047,6 +3050,39 @@ export class BaseQuery {
     }
 
     return constructJH();
+  }
+
+  /**
+   * Cubes to join from when no query member names one: a member expression that references no
+   * members, like the SQL API's `COUNT(*)`, reads its own cube, or the cube its view is rooted at.
+   */
+  protected memberExpressionCubeHints(excludeTimeDimensions: boolean): string[] {
+    const cubeNames: string[] = R.uniq(
+      R.flatten(this.allMembersConcat(excludeTimeDimensions).map((m: any) => m.getMembers()))
+        .map((m: any) => m.expressionCubeName)
+        .filter(Boolean)
+    );
+    return R.uniq(cubeNames.map(cubeName => this.rootCubeOf(cubeName)));
+  }
+
+  protected rootCubeOf(cubeName: string): string {
+    const cube = this.cubeEvaluator.cubeFromPath(cubeName);
+    if (!cube.isView) {
+      return cubeName;
+    }
+    const joinMap = cube.joinMap ?? [];
+    // A path head reached from another path is the tail of a longer walk, not a root
+    const reached = new Set(joinMap.flatMap(path => path.slice(1)));
+    const roots: string[] = R.uniq(joinMap.length ?
+      joinMap.map(path => path[0]).filter(head => !reached.has(head)) :
+      cube.directCubes ?? []);
+    if (roots.length !== 1) {
+      throw new UserError(
+        `Can't resolve the cube to query for a member expression of '${cubeName}' that references no members: ` +
+        `that view is not rooted at a single cube (${roots.join(', ')})`
+      );
+    }
+    return roots[0];
   }
 
   public joinMembersFromCustomSubQuery() {

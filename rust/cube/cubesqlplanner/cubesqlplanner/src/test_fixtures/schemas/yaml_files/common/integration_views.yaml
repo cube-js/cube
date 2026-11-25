@@ -155,6 +155,17 @@ views:
             includes:
                 - name
 
+    # Two cubes included directly, with no join path between them, so neither
+    # is the view's root.
+    - name: two_direct_cubes_view
+      cubes:
+          - join_path: orders
+            includes:
+                - status
+          - join_path: returns
+            includes:
+                - id
+
     - name: customer_overview
       cubes:
           - join_path: customers

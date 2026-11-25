@@ -262,6 +262,21 @@ describe('Member expressions on views', () => {
       ]
     });
 
+    view('two_direct_cubes_view', {
+      cubes: [
+        {
+          join_path: 'single_cube',
+          includes: ['dim'],
+          prefix: true,
+        },
+        {
+          join_path: 'one_to_many_root',
+          includes: ['dim'],
+          prefix: true,
+        },
+      ]
+    });
+
     `;
 
   let compilers: Compilers;
@@ -664,6 +679,46 @@ describe('Member expressions on views', () => {
       ],
     },
   ];
+
+  // The SQL API pushes `SELECT COUNT(*) FROM <cube or view>` down as a lone member expression
+  // that references no members, so the cube to count rows of comes from the cube or view alone
+  describe('COUNT(*) as the only member', () => {
+    const countStar = (cubeName: string) => ({
+      // eslint-disable-next-line no-new-func
+      expression: new Function(cubeName, 'return `COUNT(*)`;'),
+      name: 'count_star',
+      expressionName: 'count_star',
+      definition: 'COUNT(*)',
+      cubeName,
+    });
+
+    it.each([
+      ['single_cube', '3'],
+      ['single_view', '3'],
+      ['many_to_one_view', '4'],
+      ['one_to_many_view', '5'],
+    ])('%s', async (cubeName, count) => runQueryTest(
+      { measures: [countStar(cubeName)] },
+      [{ count_star: count }]
+    ));
+
+    it('is rejected on a view with two unrelated direct cubes', async () => {
+      expect(() => compilers.createQuery(PostgresQuery, { measures: [countStar('two_direct_cubes_view')] }).buildSqlAndParams())
+        .toThrow(/Can't resolve the cube to query/);
+    });
+
+    it('single_view grouped by a view dimension', async () => runQueryTest(
+      {
+        measures: [countStar('single_view')],
+        dimensions: ['single_view.dim'],
+        order: [{ id: 'single_view.dim', desc: false }],
+      },
+      [
+        { single_view__dim: 'bar', count_star: '1' },
+        { single_view__dim: 'foo', count_star: '2' },
+      ]
+    ));
+  });
 
   for (const { cubeName, baseQuery, baseExpectedResults, testMeasures } of configs) {
     describe(cubeName, () => {

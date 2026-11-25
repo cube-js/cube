@@ -23,6 +23,9 @@ pub struct CubeDefinitionStatic {
     pub is_calendar: Option<bool>,
     #[serde(rename = "joinMap")]
     pub join_map: Option<Vec<Vec<String>>>,
+    /// Cubes a view includes through a single-cube join path, which `join_map` leaves out.
+    #[serde(rename = "directCubes")]
+    pub direct_cubes: Option<Vec<String>>,
 }
 
 impl CubeDefinitionStatic {

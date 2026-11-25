@@ -279,6 +279,8 @@ export interface CubeDefinition {
   isSplitView?: boolean;
   includedMembers?: ViewIncludedMember[];
   joinMap?: string[][];
+  /** Cubes a view includes through a single-cube join path, which `joinMap` leaves out */
+  directCubes?: string[];
   fileName?: string;
 }
 
@@ -858,6 +860,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     const types = ['hierarchies', 'dimensions', 'measures', 'segments'];
 
     const joinMap: string[][] = [];
+    const directCubes = new Set<string>();
 
     const viewAllMembers: ViewResolvedMember[] = [];
 
@@ -876,6 +879,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         const plainPath = this.joinPathBeforeAlias(split);
         if (plainPath.length > 1) {
           joinMap.push(plainPath);
+        } else {
+          directCubes.add(plainPath[0]);
         }
 
         if (it.includes === '*') {
@@ -958,6 +963,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
     }
 
     cube.joinMap = joinMap;
+    cube.directCubes = [...directCubes];
 
     [...memberSets.allMembers].filter(it => !memberSets.resolvedMembers.has(it)).forEach(it => {
       errorReporter.error(`Member '${it}' is included in '${cube.name}' but not defined in any cube`);
