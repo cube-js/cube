@@ -123,6 +123,10 @@ On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
   [`default_ui_filters`][ref-default-ui-filters] for the exact rule.
 - **is null**, **is not null**, **is empty** and **is not empty** take no value.
   Empty means the empty string, which is not the same as null.
+
+Instead of a fixed value, a filter can take a workbook [SQL
+parameter][ref-sql-parameters-filter], so a dashboard filter or the report's
+parameter chip sets it.
 - The period operators take any date inside the period — **in the year** with
   `2026-03-14` matches all of 2026.
 - A date value is picked in a popover with a search field and the
@@ -522,6 +526,8 @@ The file holds the rows already loaded in the report, so a [row limit](#limiting
 
 You can edit the Semantic SQL directly in the editor to refine a query — for example, to add a `WHERE` clause, change `GROUP BY` order, or apply a different sort. After making changes, click **Save and run** to apply them to the query and refresh the results, or **Discard** to revert.
 
+The SQL can use the workbook's [SQL parameters][ref-sql-parameters] as `:name` placeholders.
+
 <iframe
   width="100%"
   height="400"
@@ -668,6 +674,8 @@ behaves as intended.
 [ref-time-filter-values]: /docs/explore-analyze/dashboards/widgets/controls#operators-by-dimension-type
 [ref-table-chart]: /docs/explore-analyze/charts/chart-types/table
 [ref-calculated-fields]: /docs/explore-analyze/workbooks/calculated-fields
+[ref-sql-parameters]: /docs/explore-analyze/workbooks/sql-parameters
+[ref-sql-parameters-filter]: /docs/explore-analyze/workbooks/sql-parameters#using-a-parameter-in-a-filter
 [ref-calculated-fields-top-n]: /docs/explore-analyze/workbooks/calculated-fields#top-n-fields
 [ref-auto-run]: /reference/data-modeling/view#auto_run
 [ref-configuration-auto-run]: /docs/data-modeling/configuration#auto-run

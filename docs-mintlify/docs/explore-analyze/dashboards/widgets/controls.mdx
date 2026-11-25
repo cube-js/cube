@@ -301,6 +301,41 @@ A [field switcher](#choosing-what-it-switches) with an alternative that became T
 
 Until you save each flagged control, the builder doesn't publish the dashboard or send it for [review][ref-reviews], and says which controls to save. A dashboard published through the API or by the [agent][ref-dashboard-agent], or copied along with its workbook, keeps such a control as it was saved, with the field's previous expression and type, so it runs as before the change.
 
+### Filling a SQL parameter
+
+A filter can fill a workbook [SQL parameter][ref-sql-parameters] instead of
+targeting a member. In **Configure filter**, switch from **Member** to
+**Parameter**, then pick the **Parameter**. If the workbook has none, the tab
+says *This workbook has no parameters yet. Create one in the data pane.*
+
+- For a **Date** parameter, **End of range** picks a second **Date** parameter.
+  It appears when the workbook has one. The filter then becomes a date range
+  that fills the first parameter with the range's start and the second with
+  its end. Cube fills **End of range** for you when the names pair up, such as
+  `start_date` and `end_date`, or `date_from` and `date_to`.
+- **Title** defaults to the parameter's title. For a range, it defaults to the
+  part the two titles share, such as *Date* for *Start date* and *End date*.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/controls/filter-by-parameter.png"
+    alt="Configure filter panel set to Parameter, with the Parameter, End of range and Title fields, next to a date range filter on the dashboard"
+  />
+</Frame>
+
+The filter looks like a member filter of the same type: a date or date range
+picker, a true/false select, or a text or number field. It fills every chart
+whose SQL uses the parameter, with no mapping. A chart can opt out in
+[Controls mapping](#parameter-filters).
+
+On those charts, the filter's value wins over the report's own value. Until a
+viewer picks a value, the filter fills the value you picked in the builder, or
+the parameter's default. On a published dashboard, a viewer's pick lasts for the
+session, and the URL carries it as `?p_<name>=<value>`, so a link opens the
+dashboard with the same values. A `p_` value applies only to a parameter that a
+filter fills. Publishing saves the parameters' defaults with the dashboard, so
+republish it after you change a default.
+
 ### Switch dimensions
 
 A filter on a [`switch` dimension][ref-switch-dimensions] lists the values the data model declares, in the order it declares them, rather than alphabetically. The list doesn't depend on the data, so [faceting](#faceted-filters) doesn't narrow it, and under the **Database** order the first and last values are the first and last declared ones. This needs Cube v1.8.19 or later; on an older version, the values are listed alphabetically.
@@ -800,7 +835,7 @@ For filter, time granularity, and field switcher controls — the three that map
 
 #### Filters that fill a parameter {#parameter-filters}
 
-A [filter](#filter) with **Parameter** picked under **Filter by** fills a workbook SQL parameter instead of targeting a member. It reaches every chart whose SQL uses that parameter (`:name`), whatever semantic view the chart is built on, so it needs no mapping. Its card in **Controls mapping** reads **Fills parameter** and the parameter, or **Fills parameters** and both of them for a filter that fills the start and the end of a range. Charts whose SQL doesn't use the parameter get no card.
+A [filter](#filling-a-sql-parameter) set to **Parameter** in **Configure filter** fills a workbook SQL parameter instead of targeting a member. It reaches every chart whose SQL uses that parameter (`:name`), whatever semantic view the chart is built on, so it needs no mapping. Its card in **Controls mapping** reads **Fills parameter** and the parameter, or **Fills parameters** and both of them for a filter that fills the start and the end of a range. Charts whose SQL doesn't use the parameter get no card.
 
 The card has no member picker. To opt the chart out, open the card's ⋮ menu and choose **Disable**: the chart runs with its own value of the parameter, and the card shows **Disabled**. **Enable** in the same menu brings the filter back. **Edit** opens the filter's settings.
 
@@ -812,6 +847,7 @@ The controls icon on a chart counts these filters along with the other controls,
 [ref-relative-date-values]: /reference/data-modeling/view#default_ui_filters
 [ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
 [ref-advanced-queries]: /docs/explore-analyze/workbooks/querying-data#advanced-semantic-queries
+[ref-sql-parameters]: /docs/explore-analyze/workbooks/sql-parameters
 [ref-print-version]: /docs/explore-analyze/dashboards#print-version
 
 [ref-workbooks]: /docs/explore-analyze/workbooks
