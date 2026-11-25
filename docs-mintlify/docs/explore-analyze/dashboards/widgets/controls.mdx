@@ -823,9 +823,26 @@ A [filter](#filter) with **Parameter** picked under **Filter by** fills a workbo
 
 The card has no member picker. To opt the chart out, open the card's ⋮ menu and choose **Disable**: the chart runs with its own value of the parameter, and the card shows **Disabled**. **Enable** in the same menu brings the filter back. **Edit** opens the filter's settings.
 
-On a chart built on an [advanced semantic query][ref-advanced-queries], member controls don't apply, and their cards are greyed out under the notice *Member filters are currently not supported for advanced query. Parameter filters still apply.* Cards of filters that fill a parameter stay usable there.
+Filters that fill a parameter also apply to charts built on an [advanced semantic query](#advanced-queries).
 
 The controls icon on a chart counts these filters along with the other controls, as in *1 of 2 controls apply to this report*. Clicking it opens the chart's **Controls mapping**.
+
+#### Charts on advanced queries {#advanced-queries}
+
+A chart built on an [advanced semantic query][ref-advanced-queries] takes filters when its query names exactly one semantic view. A [filter](#filter) reaches the chart under the same rules as on any other chart: it's mapped automatically when its member is on that view, you can map it onto another dimension of the view, and you can turn it off for the chart. This works in the dashboard builder and on published and embedded dashboards.
+
+<Frame>
+  <img src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/controls/controls-mapping-advanced-query-v2.png" alt="Controls mapping for a chart on an advanced query, with the Status filter mapped automatically and the chart showing only the selected statuses" />
+</Frame>
+
+Some controls don't apply to such a chart, and the controls icon counts them as not applied:
+
+- [Time granularity switchers](#time-granularity-switcher) and [field switchers](#field-switcher)
+- Filters on a [calculated dimension](#calculated-dimensions)
+
+A query that names several semantic views, or none, takes no filters that target a member. Their cards are greyed out under the notice *Member filters are currently not supported for advanced query. Parameter filters still apply.* [Filters that fill a parameter](#parameter-filters) apply to any advanced query that uses the parameter.
+
+Filtering an advanced query requires Cube Core 1.8.9 or newer on the deployment. On an older version, the chart runs unfiltered with the notice *Applying dashboard filters to an advanced query requires Cube Core 1.8.9 or newer.* If the filters can't be added to the query, the chart also runs unfiltered, with the notice *Dashboard filters couldn't be applied to this chart's query. It shows unfiltered results.* A single filter that can't be added is enough for this: the chart then runs without any of its filters.
 
 [ref-embed-url-filters]: /embedding/iframe/dashboards#pre-set-dashboard-filters-via-url
 [ref-relative-date-values]: /reference/data-modeling/view#default_ui_filters
