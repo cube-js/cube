@@ -106,7 +106,14 @@ struct YamlViewDefaultFilter {
 #[serde(untagged)]
 enum YamlIncludes {
     All(String),
-    List(Vec<String>),
+    List(Vec<YamlInclude>),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum YamlInclude {
+    Name(String),
+    Aliased { name: String, alias: String },
 }
 
 #[derive(Debug, Deserialize)]
@@ -213,14 +220,25 @@ impl YamlSchema {
             }
 
             for view_cube in view.cubes {
-                let includes = match view_cube.includes {
-                    Some(YamlIncludes::All(ref s)) if s == "*" => vec![],
+                let list = match view_cube.includes {
                     Some(YamlIncludes::List(list)) => list,
                     _ => vec![],
                 };
+                let mut includes = vec![];
+                let mut include_aliases = HashMap::new();
+                for include in list {
+                    match include {
+                        YamlInclude::Name(name) => includes.push(name),
+                        YamlInclude::Aliased { name, alias } => {
+                            include_aliases.insert(name.clone(), alias);
+                            includes.push(name);
+                        }
+                    }
+                }
                 view_builder = view_builder.include_view_cube(ViewCube {
                     join_path: view_cube.join_path,
                     includes,
+                    include_aliases,
                     prefix: view_cube.prefix.unwrap_or(false),
                     alias: view_cube.alias,
                     dimension_overrides: view_cube.dimension_overrides,

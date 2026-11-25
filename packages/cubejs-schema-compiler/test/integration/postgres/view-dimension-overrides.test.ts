@@ -211,3 +211,95 @@ views:
     );
   });
 });
+
+// One fact blended with itself: flights are departures by their origin and
+// arrivals by their destination. Departures: SFO 3, JFK 2, LHR 1; arrivals:
+// SFO 2, JFK 2, LHR 2.
+(tesseract ? describe : describe.skip)('View dimension overrides of one fact', () => {
+  jest.setTimeout(200000);
+
+  const compilers = prepareYamlCompiler(`
+cubes:
+  - name: airports
+    sql: >
+      SELECT * FROM (VALUES ('SFO', 'US'), ('JFK', 'US'), ('LHR', 'GB')) AS t(code, country)
+    dimensions:
+      - {name: code, sql: code, type: string, primary_key: true}
+      - {name: country, sql: country, type: string}
+
+  - name: flights
+    sql: >
+      SELECT * FROM (VALUES
+        (1, 'SFO', 'JFK'), (2, 'SFO', 'LHR'), (3, 'JFK', 'SFO'),
+        (4, 'LHR', 'SFO'), (5, 'JFK', 'LHR'), (6, 'SFO', 'JFK')
+      ) AS t(id, origin, destination)
+    joins:
+      - {name: airports, alias: origin_airport, relationship: many_to_one, sql: "{CUBE}.origin = {origin_airport.code}"}
+      - {name: airports, alias: destination_airport, relationship: many_to_one, sql: "{CUBE}.destination = {destination_airport.code}"}
+    dimensions:
+      - {name: id, sql: id, type: number, primary_key: true}
+      - {name: origin, sql: origin, type: string}
+      - {name: destination, sql: destination, type: string}
+    measures:
+      - {name: count, type: count}
+
+views:
+  - name: airport_traffic
+    cubes:
+      - join_path: airports
+        includes: [code, country]
+      - join_path: flights
+        alias: departures
+        prefix: true
+        includes: [count]
+        dimension_overrides:
+          code: flights.origin_airport.code
+          country: flights.origin_airport.country
+      - join_path: flights
+        alias: arrivals
+        prefix: true
+        includes: [count]
+        dimension_overrides:
+          code: flights.destination_airport.code
+          country: flights.destination_airport.country
+
+  - name: route_ends
+    cubes:
+      - join_path: flights
+        includes:
+          - name: origin
+            alias: airport
+      - join_path: flights
+        alias: departures
+        prefix: true
+        includes: [count]
+      - join_path: flights
+        alias: arrivals
+        prefix: true
+        includes: [count]
+        dimension_overrides:
+          airport: flights.destination
+`);
+
+  it('blends departures and arrivals by airport through a joined cube', async () => dbRunner.runQueryTest({
+    measures: ['airport_traffic.departures_count', 'airport_traffic.arrivals_count'],
+    dimensions: ['airport_traffic.code'],
+    filters: [{ member: 'airport_traffic.country', operator: 'equals', values: ['US'] }],
+    order: [{ id: 'airport_traffic.code' }],
+    timezone: 'UTC',
+  }, [
+    { airport_traffic__code: 'JFK', airport_traffic__departures_count: '2', airport_traffic__arrivals_count: '2' },
+    { airport_traffic__code: 'SFO', airport_traffic__departures_count: '3', airport_traffic__arrivals_count: '2' },
+  ], compilers));
+
+  it('blends departures and arrivals by the fact\'s own columns', async () => dbRunner.runQueryTest({
+    measures: ['route_ends.departures_count', 'route_ends.arrivals_count'],
+    dimensions: ['route_ends.airport'],
+    order: [{ id: 'route_ends.airport' }],
+    timezone: 'UTC',
+  }, [
+    { route_ends__airport: 'JFK', route_ends__departures_count: '2', route_ends__arrivals_count: '2' },
+    { route_ends__airport: 'LHR', route_ends__departures_count: '1', route_ends__arrivals_count: '2' },
+    { route_ends__airport: 'SFO', route_ends__departures_count: '3', route_ends__arrivals_count: '2' },
+  ], compilers));
+});

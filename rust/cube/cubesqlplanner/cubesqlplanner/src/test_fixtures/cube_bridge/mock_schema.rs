@@ -462,6 +462,8 @@ impl MockCubeBuilder {
 pub struct ViewCube {
     pub join_path: String,
     pub includes: Vec<String>,
+    /// Included member -> the name the view gives it.
+    pub include_aliases: HashMap<String, String>,
     pub prefix: bool,
     /// Prefix of the members when `prefix` is set; defaults to the last segment of `join_path`.
     pub alias: Option<String>,
@@ -595,6 +597,11 @@ impl MockViewBuilder {
 
                 let member_prefix = view_cube.alias.as_deref().unwrap_or(target_cube_name);
                 let make_view_name = |member_name: &str| -> String {
+                    let member_name = view_cube
+                        .include_aliases
+                        .get(member_name)
+                        .map(|alias| alias.as_str())
+                        .unwrap_or(member_name);
                     if view_cube.prefix {
                         format!("{}_{}", member_prefix, member_name)
                     } else {
