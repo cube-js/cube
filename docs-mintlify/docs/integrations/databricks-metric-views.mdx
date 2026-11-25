@@ -616,7 +616,10 @@ calculated measures, and many-to-one and one-to-one joins. Beyond that:
 
 - **Joins:** a join condition that is not a plain column equality, such as an SCD2 date range, an
   expression like `CAST(...)` or `date_trunc(...)`, or a comparison with a literal, is published
-  as written in the Metric View join's `on`.
+  as written in the Metric View join's `on`, as long as it reads a column of the joined cube. A
+  Metric View join keeps at most one match per source row: if the condition matches several rows
+  of the joined cube, the Metric View keeps one of them where Cube keeps all, and Preview does not
+  flag it. Make sure such a condition matches one row.
 - **Dimensions:** a dimension can read a cube joined through many-to-one or one-to-one joins, such
   as `sql: "{users.name}"` on `orders`, a `{users}.name` column, or `coalesce({users.score}, 0)`.
   It is published through its join path, as `users.name`, or `a.b.column` for nested joins.
@@ -654,7 +657,14 @@ Preview **blocks** a view when it finds any of these conditions:
   its own connection, and preview again.
 - Cyclic or one-to-many joins, or a join condition that reads a measure or a cube other than the
   two it joins, including a `table.column` whose table is neither of them: simplify the join. For
-  `CUBE_VIEW_JOIN_NOT_REPRESENTABLE`, root the view at the many-side cube.
+  a one-to-many join (`CUBE_VIEW_JOIN_NOT_REPRESENTABLE`), root the view at the many-side cube.
+- A many-to-one or one-to-one join whose condition reads no column of the joined cube, such as
+  `1 = 1` or `{CUBE}.status = 'open'` (Preview names the join): Cube keeps every row such a join
+  matches, and a Metric View keeps one. This includes a cube the view reaches only through member
+  SQL, such as `{layout.label}` in a dimension of the root cube, and a join to a single-row cube.
+  Add a condition on a column of the joined cube, such as `{users}.id`, `users.id`, or
+  `{settings}.id = 1` for a single-row cube, or leave that cube and the members that read it out
+  of the view.
 - A dimension that reads a cube behind a one-to-many join (Preview names that join): a Metric View
   dimension needs one value per source row, so root the view at the many-side cube.
 - A cube `sql` that reads [context variables](/reference/data-modeling/context-variables), such
