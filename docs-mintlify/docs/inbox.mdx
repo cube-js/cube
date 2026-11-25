@@ -60,7 +60,8 @@ New notifications appear as they arrive. You don't need to reload the page.
 | Access request | Someone [requests access][ref-request-access] to a workbook, a dashboard, a folder, or a chat | The owner and up to 9 users with direct **Full access**, 10 at most. For a chat, only its owner | The item, with its **Share** dialog open on the request |
 | Access request declined | Someone declines your [access request][ref-request-access] | The requester | The item's no-access page, where you can request access again |
 | Shared with you | Someone shares a workbook, a folder, or a chat with you, or gives you more access to one, directly or through a group | The user, or each member of the group, except the person who shared it | The workbook, or its dashboard if it is published. The folder or the chat. |
-| Model sync | A [dbt][ref-dbt] pull or push, a [Snowflake semantic view][ref-snowflake] pull or push, or a [Databricks metric view][ref-databricks] publish finishes or fails | The user who started the sync. For an automated dbt sync, the users on its notification list. Otherwise: admins | The [IDE][ref-ide]. If the sync made a branch to review, the changes on that branch. |
+| Model sync | A [dbt][ref-dbt] pull or push, a [Snowflake semantic view][ref-snowflake] pull or push, or a [Databricks metric view][ref-databricks] publish finishes or fails | The user who started the sync. For an automated dbt sync, the users whose email addresses are on its notification list. Otherwise: admins | The [IDE][ref-ide]. If the sync made a branch to review, the changes on that branch. |
+| dbt sync ready to review | A [dbt sync][ref-dbt-review] that a webhook started produces a branch that's ready to review, and the dbt project has no notification list | Admins. They get it alongside the **Model sync** notification for the same sync. With a notification list, nobody gets this notification. Every address on the list gets an email instead, and users on the list still get **Model sync** | The changes on the sync's branch in the [IDE][ref-ide] |
 | AI tokens | The account runs out of [AI tokens][ref-ai-tokens], or an automatic AI tokens top-up fails | Admins | The **Billing** page |
 | Invite accepted | A user [accepts your invite][ref-invites] and joins the account | The admin who sent the invite | The new user's page |
 | Report delivery | A [report delivery][ref-report-deliveries] fails or starts working again | The owner of the delivery, if the delivery has **Inbox** notifications on. While the owner's Google account can't open the spreadsheet, also admins, at most once a day, whatever the delivery's settings | The delivery |
@@ -85,8 +86,8 @@ alert check failed** when the run itself failed, **Sales: alert was not
 delivered**, or the same partial titles ending in "did not get the alert". For
 a refresh, it reads **Sales refresh failed**.
 
-Mentions and replies in comments, shared items, access requests, and dashboard
-reviews also arrive by email, unless you turn that off under
+Mentions and replies in comments, shared items, access requests, dashboard
+reviews, and dbt syncs ready to review also arrive by email, unless you turn that off under
 [Notifications][ref-preferences-notifications] on the **Preferences** page.
 The inbox does not send other notifications by email or Slack. Alerts and
 budgets send their own email, as set up on the alert or budget, and
@@ -158,6 +159,7 @@ stay.
 [ref-update-channels]: /admin/deployment#update-channels
 [ref-dashboard-deliveries]: /docs/explore-analyze/dashboard-deliveries
 [ref-dbt]: /docs/integrations/dbt
+[ref-dbt-review]: /docs/integrations/dbt#review-notifications
 [ref-snowflake]: /docs/integrations/snowflake-semantic-views
 [ref-databricks]: /docs/integrations/databricks-metric-views
 [ref-ide]: /docs/data-modeling/data-model-ide

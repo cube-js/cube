@@ -782,12 +782,16 @@ progress, opens the review branch it produces, and summarizes the generated cube
 
 ### Review notifications
 
-When an automated sync produces a branch that's ready to review, Cube emails the
-recipients you configure — a comma-separated list in the settings card — with a link
-straight to the review. No one has to poll the UI to notice that dbt changed. Recipients
-who can edit the data model land on the branch in [development
-mode](/docs/data-modeling/dev-mode), ready to make changes; recipients without edit access
-see a read-only diff instead.
+When a sync that a webhook started produces a branch that's ready to review, Cube
+emails the recipients you configure — a comma-separated list in the settings card — with
+a link straight to the changes on that branch. No one has to poll the UI to notice that
+dbt changed.
+
+With no list configured, Cube notifies the admins instead. Each admin gets a
+notification in the [inbox](/docs/inbox) and an email. To keep the inbox notification
+and stop the email, turn off **Model syncs** under [Preferences →
+Notifications](/docs/preferences#notifications), or click **Unsubscribe from Model syncs
+emails** at the bottom of the email.
 
 ## Review sync history
 
@@ -1216,6 +1220,11 @@ Check [sync history](#review-sync-history), or run
 `cube dbt history DEPLOYMENT_ID --trigger webhook`: an unchanged run has completed
 status and no branch. If no matching run appears, follow
 **A webhook push doesn't trigger a sync** above.
+
+If the branch exists but an admin got no email and the dbt project has no notification list,
+that admin may have turned off **Model syncs** under [Preferences →
+Notifications](/docs/preferences#notifications) or unsubscribed from the email. The
+notification is still in their [inbox](/docs/inbox).
 
 </Accordion>
 
