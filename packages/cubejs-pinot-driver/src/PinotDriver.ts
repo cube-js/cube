@@ -376,23 +376,27 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       first = await this.request(sql, requestId);
     }
 
-    const cursor = isCursorResponse(first) ? first : null;
-    let pending: PinotResponse | null = first;
-    let nextOffset = cursor ? cursor.offset + cursor.numRows : 0;
+    // The closures below outlive the first page, so they hold the cursor fields they need
+    // rather than the response, which would keep its rows in memory for the whole stream.
+    const cursorId = isCursorResponse(first) ? first.requestId : null;
+    const totalRows = isCursorResponse(first) ? first.numRowsResultSet : 0;
+    let nextOffset = isCursorResponse(first) ? first.offset + first.numRows : 0;
+    let pendingRows: PinotRow[] | null = this.resultTableRows(first.resultTable);
 
     const nextPage = async () => {
-      let page: PinotResponse | null = pending;
-      pending = null;
+      if (pendingRows) {
+        const rows = pendingRows;
+        pendingRows = null;
 
-      if (!page) {
-        if (!cursor || nextOffset >= cursor.numRowsResultSet) {
-          return null;
-        }
-
-        const fetched = await this.fetchCursorPage(cursor.requestId, nextOffset, pageSize);
-        nextOffset = fetched.offset + fetched.numRows;
-        page = fetched;
+        return rows;
       }
+
+      if (cursorId === null || nextOffset >= totalRows) {
+        return null;
+      }
+
+      const page = await this.fetchCursorPage(cursorId, nextOffset, pageSize);
+      nextOffset = page.offset + page.numRows;
 
       return this.resultTableRows(page.resultTable);
     };
@@ -403,9 +407,9 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       rowStream: new PinotRowStream(nextPage, pageSize),
       types: this.resultTableTypes(first.resultTable),
       release: async () => {
-        if (cursor && !released) {
+        if (cursorId !== null && !released) {
           released = true;
-          await this.deleteCursor(cursor.requestId);
+          await this.deleteCursor(cursorId);
         }
       },
     };
