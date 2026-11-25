@@ -388,6 +388,21 @@ filter, so conditional masks stay in place for all members of the query. For
 example, a prior-period comparison or an all-time total shows the conditional
 or masked value even when the query filters match the mask's row filter.
 
+A range filter (`gt`, `gte`, `lt`, `lte`) lifts the mask only on a dimension
+with `type: number` and bounds written as plain decimals. An inclusive query
+bound (`gte`, `lte`) never lifts a mask with an exclusive bound (`gt`, `lt`).
+
+<Warning>
+
+Cube compares range bounds as numbers because the dimension is declared with
+`type: number`; it does not see the type of the underlying column. If a `number`
+dimension is defined over a text column, the database orders its values as text
+(`'1000'` sorts below `'20'`), and a narrower query filter can unmask rows that
+the policy hides. Declare such a dimension with `type: string`, or cast the
+column to a numeric type in its `sql`.
+
+</Warning>
+
 #### Conditional masking on measures
 
 Conditional masking is evaluated **per row**, which works naturally for
