@@ -789,6 +789,8 @@ describe('Cube RBAC Engine', () => {
     // Lifting the mask on a narrower bound assumes the database compares the bounds as
     // numbers. Over a text column it orders them as text: '102' sorts below the policy
     // bound '20' and above the query bound '1000', so the row comes back unmasked.
+    // The model declares the wrong type here; Cube can't see the column type, so this
+    // pins the outcome of a data model error rather than a mask Cube is expected to keep.
     test('a narrower bound on a number dimension over a text column unmasks rows in text order', async () => {
       const client = cubejs(async () => tokenFor('conditional_text_number_mask_group'), {
         apiUrl: birdbox.configuration.apiUrl,
