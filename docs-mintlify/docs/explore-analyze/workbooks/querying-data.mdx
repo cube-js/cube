@@ -476,7 +476,7 @@ Every query in the Semantic Query tab can be inspected as code. Open the SQL pan
 The panel exposes two top-level tabs:
 
 - **Semantic SQL** — the query expressed against the Semantic Model (semantic views, measures, dimensions, and `MEASURE()` calls). This is the source of truth for the query and what the workbook stores.
-- **Generated SQL** — the SQL that Cube compiles from the Semantic SQL and sends to your data warehouse. Use it to understand exactly what runs against your database, debug performance, or share with a database administrator.
+- **Generated SQL** — the SQL that Cube compiles from the Semantic SQL and runs in your data sources, in Cube Store, or in its own post-processing; see [where each part runs](#where-each-part-runs). Use it to understand exactly what runs where, debug performance, or share with a database administrator.
 
 The **Semantic SQL** tab also has a dropdown for viewing the same query in the formats accepted by Cube's [Core Data APIs][ref-core-data-apis]:
 
@@ -484,6 +484,40 @@ The **Semantic SQL** tab also has a dropdown for viewing the same query in the f
 - **Semantic GraphQL** — the [GraphQL API][ref-graphql-api] query format
 
 These views are convenient when you want to take a query you've built interactively in a workbook and reuse it directly through one of the Core Data APIs from your own application.
+
+### Where each part runs
+
+A query can run in more than one place: part of it in a data source, part in
+[Cube Store][ref-cube-store] when a pre-aggregation serves it, and the rest in
+Cube's own post-processing. The **Generated SQL** tab shows where each part runs.
+
+{/* TODO: video — where each part of Generated SQL runs (GTM-333) */}
+
+<Frame>
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/generated-sql-where-each-part-runs.png" alt="Generated SQL tab with a default data source part tinted green, a Cube Store part tinted amber, and the legend under the SQL" />
+</Frame>
+
+- A legend under the SQL names each place: a data source by its name, or
+  **Cube Store**. A data source shows its logo only to users with the
+  [**Access SQL Runner**][ref-custom-roles-deployment] permission. In workbooks,
+  chat, and dashboards, the tab itself needs that permission. Playground and
+  embedded apps can show the tab without it, with a generic database icon in place
+  of the logo. Hover over or focus an item to see the pre-aggregations that serve it.
+- When a query runs in more than one place, each part is tinted in the color of
+  its place, and the parts Cube post-processes stay untinted. `default` is always
+  green and Cube Store always amber. Other data sources get one of four more
+  colors, in name order. In one query, each data source gets a different color
+  until there are more than four, and then the colors repeat.
+- A query that runs entirely in one place is not tinted. The legend still names
+  the place.
+- On Cube versions that don't report where a pushed-down SQL query runs, that
+  part is tinted gray and listed as **Unknown data source**. When Cube can't name
+  any place in the query, there is no legend.
+
+**Copy** keeps a comment line around each part that names its place, such as
+`-- <executed in data source: default>` or
+`-- <executed in Cube Store; pre-aggregation: orders.main>`. The comments don't
+change what the SQL does, so you can still run it.
 
 ## Result freshness and provenance
 
@@ -678,4 +712,6 @@ behaves as intended.
 [ref-calculated-fields-top-n]: /docs/explore-analyze/workbooks/calculated-fields#top-n-fields
 [ref-auto-run]: /reference/data-modeling/view#auto_run
 [ref-configuration-auto-run]: /docs/data-modeling/configuration#auto-run
+[ref-cube-store]: /docs/pre-aggregations/running-in-production#architecture
+[ref-custom-roles-deployment]: /admin/users-and-permissions/custom-roles#deployment-permissions
 
