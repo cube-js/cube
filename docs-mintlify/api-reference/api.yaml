@@ -12623,8 +12623,22 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        errorClass:
+          description: >-
+            Databricks' error class for that statement, such as `UNRESOLVED_COLUMN.WITH_SUGGESTION`;
+            never its message. Null when Databricks named none.
+          oneOf:
+            - type: string
+            - type: 'null'
         outcome:
           $ref: '#/components/schemas/DatabricksMetricViewSyncViewOutcomeResponseOutcome'
+        statementId:
+          description: >-
+            The Databricks statement a failed publish ended on; find it in Databricks Query History.
+            Null when no statement ran.
+          oneOf:
+            - type: string
+            - type: 'null'
         target:
           description: The destination, as catalog.schema.name; null when conversion blocked the view.
           oneOf:

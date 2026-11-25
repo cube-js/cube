@@ -89,7 +89,9 @@ also needs **Access SQL Runner** (`SqlRunnerRead`); see [Jinja templates](#jinja
     Select **Publish now**. Review the result for **each view** in run history. **Created**,
     **Updated**, and **Unchanged** are successful outcomes; **Blocked**, **Rejected by Databricks**,
     and **Write failed** need investigation. A run can be **Partial** if some views succeeded and
-    others did not.
+    others did not. A view that Databricks rejected or failed to write can also show Databricks' error
+    class, such as `UNRESOLVED_COLUMN.WITH_SUGGESTION`, and a **Statement ID**. Look up that
+    statement in Databricks Query History to see the full error.
   </Step>
 </Steps>
 
@@ -347,7 +349,11 @@ yourself; or switch **When a view leaves the scope** to **Keep its Metric View i
 which reports obsolete targets without a `detail`. Publication-run `views[].outcome` values are
 `unchanged`, `created`, `updated`, `blocked`, `validation_failed`, `publish_failed`,
 `retained_obsolete`, and `deleted_obsolete`; these differ from preview outcomes. The recipe
-accepts only the successful outcomes.
+accepts only the successful outcomes. A `validation_failed` or `publish_failed` view carries
+`errorClass`, Databricks' error class such as `UNRESOLVED_COLUMN.WITH_SUGGESTION`, and
+`statementId`, the Databricks statement the failed publish ended on. Each is `null` when Databricks
+named no error class or no statement ran, and both are `null` in older runs. Cube does not return
+Databricks' error message; look up the statement in Databricks Query History to read it.
 Each `views[]` entry carries its destination as `target` (`catalog.schema.name`, or `null` when
 conversion blocked the view), and a run carries the `takeOverTargets` it was started with. A
 `blocked` view whose `detail` is `unmanaged-target` or `ownership-conflict` collides with an object
@@ -740,8 +746,8 @@ on, wait for that build's run to finish, then check that the card shows no
 if it does. Inspect run history and the Databricks target
 afterward.
 If publication is unavailable, contact [Cube support](/admin/account-billing/support) with
-the deployment, data source, run ID, and per-view issue codes. Do not send credentials or
-sensitive source data.
+the deployment, data source, run ID, and each failed view's issue code, error class, and statement
+ID. Do not send credentials or sensitive source data.
 
 ### Databricks behind the deployed model {#databricks-behind-the-deployed-model}
 
