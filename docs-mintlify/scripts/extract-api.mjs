@@ -233,6 +233,8 @@ const EXCLUDE_OPERATIONS = new Set([
   'POST /api/v1/deployments/{deploymentId}/automations/{automationUuid}/webhook/regenerate-secret',
   'GET /api/v1/deployments/{deploymentId}/automation-runs',
   'GET /api/v1/deployments/{deploymentId}/automation-runs/{runUuid}',
+  'GET /api/v1/deployments/{deploymentId}/automation-runs/{runUuid}/files',
+  'GET /api/v1/deployments/{deploymentId}/automation-runs/{runUuid}/files/{fileUuid}',
   'GET /api/v1/deployments/{deploymentId}/automation-templates',
   'POST /api/v1/deployments/{deploymentId}/automation-templates/{templateId}/instructions',
   'GET /api/v1/deployments/{deploymentId}/automation-triggers',
