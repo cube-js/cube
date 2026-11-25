@@ -607,10 +607,9 @@ export class CompilerApi {
     return result;
   }
 
-  // A row filter constrains one cube instance in every leg of the query, while
-  // the legs of an overriding measure read the overridden dimension elsewhere.
-  // The measure's own rows are the same in every leg, so their filters hold;
-  // masks follow member names, which the override target doesn't carry.
+  // Row filters hold only on the measure's own rows, the same in every leg; an
+  // overridden dimension is read from another instance. Masks follow member
+  // names, which the override target doesn't carry.
   protected async rejectOverriddenDimensionsUnderPolicies(
     queryMemberNames: Set<string>,
     cubeEvaluator: any,

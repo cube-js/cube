@@ -929,10 +929,7 @@ impl PreAggregationOptimizer {
             }
         }
 
-        // The query's join groups answer both the multiplicativity gate
-        // and the join-path comparison below, so build them once.
-        // Measures of no single join, a view's own measure over unrelated
-        // facts, say, are read from their legs, not from one rollup.
+        // No single join (a view measure over unrelated facts): served per leg.
         let Ok(query_groups) = self.query_join_groups(schema, filters, &all_measures)? else {
             return Ok(None);
         };
