@@ -15,6 +15,7 @@ import {
   Required,
 } from '@cubejs-backend/shared';
 
+import querystring from 'querystring';
 import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
 
 import {
@@ -200,22 +201,27 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
   }
 
   protected queryOptions(requestId?: string): string {
-    let options = `useMultistageEngine=true;enableNullHandling=${this.config.nullHandling};timeoutMs=${this.config.queryTimeout * 1000}`;
+    const options: Record<string, string | number | boolean> = {
+      useMultistageEngine: true,
+      enableNullHandling: Boolean(this.config.nullHandling),
+      timeoutMs: this.config.queryTimeout * 1000,
+    };
 
     if (this.config.applicationName) {
-      options += `;applicationName=${this.config.applicationName}`;
+      options.applicationName = this.config.applicationName;
     }
 
     if (this.config.workloadName) {
-      options += `;workloadName=${this.config.workloadName}`;
+      options.workloadName = this.config.workloadName;
     }
 
     const clientQueryId = requestId && extractRequestUUID(requestId);
-    if (!clientQueryId || !isValidRequestId(clientQueryId) || clientQueryId.includes('=')) {
-      return options;
+    if (clientQueryId && isValidRequestId(clientQueryId) && !clientQueryId.includes('=')) {
+      options.clientQueryId = clientQueryId;
     }
 
-    return `${options};clientQueryId=${clientQueryId}`;
+    // Pinot splits the string on ';' and '=' without decoding it, so the values are not escaped.
+    return querystring.stringify(options, ';', '=', { encodeURIComponent: (value) => value });
   }
 
   protected async request(query: string, requestId?: string): Promise<PinotResponse> {
