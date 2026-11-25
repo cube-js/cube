@@ -508,21 +508,6 @@ impl MockViewBuilder {
         self
     }
 
-    pub fn include_cube_with_prefix(
-        mut self,
-        join_path: impl Into<String>,
-        includes: Vec<String>,
-        prefix: bool,
-    ) -> Self {
-        self.view_cubes.push(ViewCube {
-            join_path: join_path.into(),
-            includes,
-            prefix,
-            ..Default::default()
-        });
-        self
-    }
-
     pub fn add_dimension(
         mut self,
         name: impl Into<String>,

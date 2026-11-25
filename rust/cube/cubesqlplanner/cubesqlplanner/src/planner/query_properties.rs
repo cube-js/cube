@@ -164,6 +164,34 @@ impl QueryProperties {
         Ok(Rc::new(result))
     }
 
+    /// This query with its dimensions, time dimensions, their filters and the
+    /// dimensions it orders by replaced by `f`. Measures are left alone.
+    pub(crate) fn map_dimension_symbols<F>(&self, f: &F) -> Result<Rc<QueryProperties>, CubeError>
+    where
+        F: Fn(&Rc<MemberSymbol>) -> Result<Rc<MemberSymbol>, CubeError>,
+    {
+        let mut result = self.clone();
+        result.dimensions = self.dimensions.iter().map(f).collect::<Result<_, _>>()?;
+        result.time_dimensions = self
+            .time_dimensions
+            .iter()
+            .map(f)
+            .collect::<Result<_, _>>()?;
+        result.dimensions_filters = map_filter_items(&self.dimensions_filters, f)?;
+        result.time_dimensions_filters = map_filter_items(&self.time_dimensions_filters, f)?;
+        for order_item in result.order_by.iter_mut() {
+            if order_item
+                .member_evaluator
+                .peel_refs()
+                .as_dimension()
+                .is_ok()
+            {
+                order_item.member_evaluator = f(&order_item.member_evaluator)?;
+            }
+        }
+        Ok(Rc::new(result))
+    }
+
     pub(crate) fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {
         self.order_by
             .iter()

@@ -3,6 +3,7 @@ use super::symbol_classification::{FullKeyAggregateMeasures, SymbolClassificatio
 use super::MemberSymbol;
 use crate::logical_plan::{FilterPlacement, LogicalFilter};
 use crate::planner::collectors::has_multi_stage_members;
+use crate::planner::dimension_overrides::apply_dimension_overrides;
 use crate::planner::filter::{FilterGroupOperator, FilterItem};
 use crate::planner::multi_fact_join_groups::{MeasuresJoinHints, MultiFactJoinGroups};
 use crate::planner::symbols::transforms;
@@ -30,6 +31,7 @@ pub struct QueryAnalysis {
 
 impl QueryAnalysis {
     pub fn try_new(request: Rc<QueryProperties>) -> Result<Rc<Self>, CubeError> {
+        let request = apply_dimension_overrides(&request)?;
         let specializer = transforms::Specializer::for_query(&request, request.allow_multi_stage());
         let query = request.map_symbols(&|symbol| specializer.specialize(symbol))?;
         let join_groups = OnceCell::new();
