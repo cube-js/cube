@@ -89,6 +89,9 @@ a refresh, it reads **Sales refresh failed**.
 Mentions and replies in comments, shared items, access requests, dashboard
 reviews, and dbt syncs ready to review also arrive by email, unless you turn that off under
 [Notifications][ref-preferences-notifications] on the **Preferences** page.
+Cube waits 5 minutes before sending a mention, reply, share or access-request
+email and skips it if you read or delete the notification in the inbox by then.
+To get it at once, turn off [Skip email if already read][ref-preferences-skip-email].
 The inbox does not send other notifications by email or Slack. Alerts and
 budgets send their own email, as set up on the alert or budget, and
 end-of-support notices come with their own email. A scheduled task can also
@@ -149,6 +152,7 @@ Notifications about finished runs, finished syncs, and recovered deliveries
 stay.
 
 [ref-preferences-notifications]: /docs/preferences#notifications
+[ref-preferences-skip-email]: /docs/preferences#skip-email-if-already-read
 [ref-comments]: /docs/explore-analyze/dashboards/comments#mentions
 [ref-comment-replies]: /docs/explore-analyze/dashboards/comments#reply-notifications
 [ref-alerts]: /admin/monitoring/alerts

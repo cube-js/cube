@@ -90,6 +90,8 @@ whatever you choose here. In the **Notifications** section of the **Preferences*
 page, choose which of them also arrive by email. Only admins see the **Model
 syncs** switch, since only admins get these notifications:
 
+{/* TODO: video — Preferences → Notifications, with the Skip email if already read switch and an email skipped after reading it in the Inbox (GTM-321) */}
+
 <Frame>
   <img
     src="https://static.cube.dev/docs/preferences/notifications/notifications-section-v2.png"
@@ -124,6 +126,19 @@ the item.
 Alerts, budgets, end-of-support notices, scheduled tasks and
 [report deliveries][ref-report-deliveries] send their own email, as set up on
 each of them, and have no switch here.
+
+### Skip email if already read
+
+With **Skip email if already read** on, Cube waits 5 minutes before it sends
+a mention, reply, share or access-request email, and sends nothing if you read
+or delete the notification in your inbox by then. Marking the notification read
+in the inbox counts, whether you select it, choose **Mark read** in its **⋮**
+menu or choose **Mark all read**. Opening the comment or the item from
+somewhere else does not. Dashboard review and model sync emails don't wait and go out at once.
+
+The switch is on by default. Turn it off to get each email as soon as the
+notification arrives. Unlike the other switches, it can't be turned off from
+the unsubscribe link in an email.
 
 [ref-inbox]: /docs/inbox
 [ref-mentions]: /docs/explore-analyze/dashboards/comments#mentions
