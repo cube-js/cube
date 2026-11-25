@@ -52,6 +52,13 @@ CUBEJS_DB_PASS=**********
 | [`CUBEJS_CONCURRENCY`](/reference/configuration/environment-variables#cubejs_concurrency) | The number of [concurrent queries][ref-data-source-concurrency] to the data source | A valid number |    ❌    |
 
 [ref-data-source-concurrency]: /admin/connect-to-data/concurrency#data-source-concurrency
+
+## Query tagging
+
+Queries Cube runs on behalf of an API request are sent with that request's ID
+as the [`clientQueryId`][link-pinot-query-options] query option, so they can be
+matched to the request in Pinot.
+
 ## Pre-Aggregation Feature Support
 
 ### count_distinct_approx
@@ -103,4 +110,5 @@ Cube does not require any additional configuration to enable SSL as Pinot connec
 [pinot-docs-approx-agg-fns]:
   https://docs.pinot.apache.org/users/user-guide-query/query-syntax/how-to-handle-unique-counting
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-modeling/measures#type
+[link-pinot-query-options]: https://docs.pinot.apache.org/users/user-guide-query/query-options
 [link-startree]: https://startree.ai
