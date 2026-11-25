@@ -55,6 +55,35 @@ cubes:
           - sql: "{CUBE}.cancel_date IS NOT NULL"
         rolling_window:
           trailing: unbounded
+      - name: cancellations_year_to_date
+        type: count
+        filters:
+          - sql: "{CUBE}.cancel_date IS NOT NULL"
+        rolling_window:
+          type: to_date
+          granularity: year
+      - name: cancellations_prev_year
+        type: number
+        multi_stage: true
+        sql: "{CUBE.cancellations}"
+        time_shift:
+          - interval: 1 year
+            type: prior
+      - name: cancellations_prev_year_by_cancel_date
+        type: number
+        multi_stage: true
+        sql: "{CUBE.cancellations}"
+        time_shift:
+          - interval: 1 year
+            type: prior
+            timeDimension: subscriptions.cancel_cal.dt_ts
+      - name: count_per_year
+        type: sum
+        multi_stage: true
+        sql: "{CUBE.count}"
+        grain:
+          exclude:
+            - subscriptions.purchase_cal.dt_year_month
 
   - name: carts
     sql_table: vdo_carts
@@ -67,9 +96,19 @@ cubes:
         type: number
         sql: id
         primary_key: true
+      - name: created_year
+        type: string
+        sql: "to_char(created_date, 'YYYY')"
     measures:
       - name: count
         type: count
+      - name: count_all_years
+        type: sum
+        multi_stage: true
+        sql: "{CUBE.count}"
+        filter:
+          exclude:
+            - calendar.dt_year
       - name: count_cumulative
         type: count
         rolling_window:
@@ -102,6 +141,7 @@ views:
         prefix: true
         includes:
           - count
+          - count_per_year
         dimension_overrides:
           dt_ts: subscriptions.purchase_cal.dt_ts
           dt_year: subscriptions.purchase_cal.dt_year
@@ -113,6 +153,9 @@ views:
           - count
           - cancellations
           - cancellations_cumulative
+          - cancellations_year_to_date
+          - cancellations_prev_year
+          - cancellations_prev_year_by_cancel_date
         dimension_overrides:
           dt_ts: subscriptions.cancel_cal.dt_ts
           dt_year: subscriptions.cancel_cal.dt_year
@@ -129,3 +172,13 @@ views:
           - id
           - count
           - count_cumulative
+          - count_all_years
+      # The calendar year of a cart, read off its own column.
+      - join_path: carts
+        alias: carts_own
+        prefix: true
+        includes:
+          - count
+          - count_all_years
+        dimension_overrides:
+          dt_year: carts.created_year

@@ -1,7 +1,6 @@
 use super::query_properties::QueryProperties;
 use super::symbols::transforms;
 use super::{MemberId, MemberSymbol};
-use crate::planner::collectors::has_multi_stage_members;
 use cubenativeutils::CubeError;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -120,12 +119,6 @@ pub fn partition_by_dimension_overrides(
             )));
         }
         let overrides = AppliedOverrides::for_measure(&measure, &used);
-        if !overrides.is_empty() && has_multi_stage_members(&measure.peel_refs(), false)? {
-            return Err(CubeError::user(format!(
-                "Dimension overrides of multi-stage measure {} are not supported yet",
-                measure.full_name()
-            )));
-        }
         check_no_dimension_left_behind(&measure, &overrides, &used_symbols)?;
         match partitions.iter_mut().find(|p| p.overrides == overrides) {
             Some(partition) => partition.measures.push(measure),

@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_dimension_overrides.rs
+expression: result
+---
+biz__dt_ts_year     | biz__cancellations_cancellations_prev_year
+--------------------+-------------------------------------------
+2026-01-01 00:00:00 | 1

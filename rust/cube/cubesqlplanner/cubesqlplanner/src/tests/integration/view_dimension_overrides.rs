@@ -187,30 +187,6 @@ async fn test_measure_without_overrides() {
     }
 }
 
-#[test]
-fn test_multi_stage_measure_with_overrides_is_rejected() {
-    let ctx = create_context();
-    let query = indoc! {r#"
-        measures:
-          - biz.cancellations_cancellations_cumulative
-        time_dimensions:
-          - dimension: biz.dt_ts
-            granularity: month
-            dateRange:
-              - "2026-01-01"
-              - "2026-03-31"
-    "#};
-
-    let error = ctx.build_sql(query).unwrap_err();
-    assert!(
-        error
-            .message
-            .contains("Dimension overrides of multi-stage measure biz.cancellations_cancellations_cumulative are not supported yet"),
-        "{}",
-        error.message
-    );
-}
-
 // Each fact on its own date, one filter: 2026-02: 2 cancellations, 2 carts.
 #[tokio::test(flavor = "multi_thread")]
 async fn test_overridden_and_plain_measures_by_one_dimension() {
@@ -616,4 +592,220 @@ fn test_masked_dimension_override_is_rejected() {
         "{}",
         error.message
     );
+}
+
+// A cube's rolling measure under the cancel role: cancelled so far, by cancel
+// date: 2026-01: 1, 2026-02: 3, 2026-03: 3.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_measure_on_its_own_date() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_cancellations_cumulative
+        time_dimensions:
+          - dimension: biz.dt_ts
+            granularity: month
+            dateRange:
+              - "2026-01-01"
+              - "2026-03-31"
+        order:
+          - id: biz.dt_ts
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Cancelled since the start of the year: 2026-01: none, 2026-02: 2, 2026-03: 2.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_to_date_measure_on_its_own_date() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_cancellations_year_to_date
+        time_dimensions:
+          - dimension: biz.dt_ts
+            granularity: month
+            dateRange:
+              - "2026-01-01"
+              - "2026-03-31"
+        order:
+          - id: biz.dt_ts
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Cancelled a year before, by cancel date: 2026: 1 (subscription 2, in 2025).
+#[tokio::test(flavor = "multi_thread")]
+async fn test_time_shift_on_its_own_date() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_cancellations_prev_year
+        time_dimensions:
+          - dimension: biz.dt_ts
+            granularity: year
+            dateRange:
+              - "2026-01-01"
+              - "2026-12-31"
+        order:
+          - id: biz.dt_ts
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// A time shift naming the role's own time dimension lines up with the
+// overridden view dimension: 2026: 1.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_time_shift_by_the_role_time_dimension() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_cancellations_prev_year_by_cancel_date
+        time_dimensions:
+          - dimension: biz.dt_ts
+            granularity: year
+            dateRange:
+              - "2026-01-01"
+              - "2026-12-31"
+        order:
+          - id: biz.dt_ts
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Purchases per purchase year next to each purchase month: 1 a month, 2 a year.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_grain_on_its_own_date() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.purchases_count_per_year
+        dimensions:
+          - biz.dt_year
+          - biz.dt_year_month
+        order:
+          - id: biz.dt_year_month
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Multi-stage measures in both legs. Purchases per purchase year: 2025: 2,
+// 2026: 2. Cancelled a year before, by cancel year: 2025: none, 2026: 1.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_stage_measures_in_two_legs() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count_per_year
+          - biz.cancellations_cancellations_prev_year
+        time_dimensions:
+          - dimension: biz.dt_ts
+            granularity: year
+            dateRange:
+              - "2025-01-01"
+              - "2026-12-31"
+        order:
+          - id: biz.dt_ts
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Purchases per purchase month next to cancellations so far by cancel month:
+// 2026-01: 1 / 1, 2026-02: 1 / 3, 2026-03: - / 3.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rolling_measure_next_to_another_role() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.cancellations_cancellations_cumulative
+        time_dimensions:
+          - dimension: biz.dt_ts
+            granularity: month
+            dateRange:
+              - "2026-01-01"
+              - "2026-03-31"
+        order:
+          - id: biz.dt_ts
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Carts by created year next to cancellations a year before: 2026: 2 / 1.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_time_shift_next_to_another_fact() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.carts_count
+          - biz.cancellations_cancellations_prev_year
+        time_dimensions:
+          - dimension: biz.dt_ts
+            granularity: year
+            dateRange:
+              - "2026-01-01"
+              - "2026-12-31"
+        order:
+          - id: biz.dt_ts
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The view reads the year filter of these carts off their own column, and the
+// cube measure excludes only the calendar's year, which the rewritten query no
+// longer filters by: the filter stays, 2 carts in 2026. Without the override
+// the exclusion drops it: all 3.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_directive_on_a_dimension_the_override_replaced() {
+    let ctx = create_context();
+    for measure in ["biz.carts_count_all_years", "biz.carts_own_count_all_years"] {
+        let query = format!(
+            "measures:\n  - {measure}\nfilters:\n  - member: biz.dt_year\n    operator: equals\n    values: [\"2026\"]\n"
+        );
+        ctx.build_sql(&query).unwrap();
+
+        if let Some(result) = ctx.try_execute_pg(&query, SEED).await {
+            insta::assert_snapshot!(measure.replace('.', "__"), result);
+        }
+    }
 }

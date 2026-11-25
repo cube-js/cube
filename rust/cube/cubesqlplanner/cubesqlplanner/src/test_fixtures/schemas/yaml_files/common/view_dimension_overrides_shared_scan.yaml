@@ -1,0 +1,86 @@
+# One rollup storing both date roles of a fact, so the legs of either role read
+# the same rollup: multi-stage leaves of different roles must not share a scan.
+cubes:
+  - name: calendar
+    sql_table: vdo_calendar
+    dimensions:
+      - name: dt_ts
+        type: time
+        sql: dt_ts
+        primary_key: true
+      - name: dt_year
+        type: string
+        sql: dt_year
+      - name: dt_year_month
+        type: string
+        sql: dt_year_month
+
+  - name: subscriptions
+    sql_table: vdo_subscriptions
+    joins:
+      - name: calendar
+        alias: purchase_cal
+        sql: "{CUBE}.purchase_date = {purchase_cal.dt_ts}"
+        relationship: many_to_one
+      - name: calendar
+        alias: cancel_cal
+        sql: "{CUBE}.cancel_date = {cancel_cal.dt_ts}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+      - name: cancellations
+        type: count
+        filters:
+          - sql: "{CUBE}.cancel_date IS NOT NULL"
+      - name: count_doubled
+        type: number
+        multi_stage: true
+        sql: "{CUBE.count} * 2"
+      - name: cancellations_to_count
+        type: number
+        multi_stage: true
+        sql: "{CUBE.cancellations} * 1.0 / NULLIF({CUBE.count}, 0)"
+    pre_aggregations:
+      - name: by_both_roles
+        type: rollup
+        external: true
+        measures:
+          - count
+          - cancellations
+        dimensions:
+          - purchase_cal.dt_year
+          - purchase_cal.dt_year_month
+          - cancel_cal.dt_year
+          - cancel_cal.dt_year_month
+
+views:
+  - name: biz
+    cubes:
+      - join_path: calendar
+        includes:
+          - dt_year
+          - dt_year_month
+      - join_path: subscriptions
+        alias: purchases
+        prefix: true
+        includes:
+          - count_doubled
+          - cancellations_to_count
+        dimension_overrides:
+          dt_year: subscriptions.purchase_cal.dt_year
+          dt_year_month: subscriptions.purchase_cal.dt_year_month
+      - join_path: subscriptions
+        alias: cancellations
+        prefix: true
+        includes:
+          - count_doubled
+          - cancellations_to_count
+        dimension_overrides:
+          dt_year: subscriptions.cancel_cal.dt_year
+          dt_year_month: subscriptions.cancel_cal.dt_year_month

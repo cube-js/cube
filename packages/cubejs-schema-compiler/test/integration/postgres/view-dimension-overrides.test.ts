@@ -44,6 +44,11 @@ cubes:
         type: count
         filters: [{sql: "{CUBE}.cancel_date IS NOT NULL"}]
         rolling_window: {trailing: unbounded}
+      - name: cancellations_prev_year
+        type: number
+        multi_stage: true
+        sql: "{CUBE.cancellations}"
+        time_shift: [{interval: 1 year, type: prior}]
 ${withRollups ? `    pre_aggregations:
       - name: counts_by_purchase_month
         measures: [count]
@@ -83,7 +88,7 @@ views:
       - join_path: subscriptions
         alias: cancellations
         prefix: true
-        includes: [count, cancellations, cancellations_cumulative]
+        includes: [count, cancellations, cancellations_cumulative, cancellations_prev_year]
         dimension_overrides:
           dt_ts: subscriptions.cancel_cal.dt_ts
           dt_year: subscriptions.cancel_cal.dt_year
@@ -200,16 +205,24 @@ views:
     ]);
   });
 
-  it('rejects overrides of a multi-stage measure', async () => {
-    await compilers.compiler.compile();
-    expect(() => new PostgresQuery(compilers, {
-      measures: ['biz.cancellations_cancellations_cumulative'],
-      timeDimensions: [{ dimension: 'biz.dt_ts', granularity: 'month', dateRange: ['2026-01-01', '2026-03-31'] }],
-      timezone: 'UTC',
-    }).buildSqlAndParams()).toThrow(
-      /Dimension overrides of multi-stage measure biz.cancellations_cancellations_cumulative are not supported yet/
-    );
-  });
+  it('rolls a cube measure up on its own date', async () => dbRunner.runQueryTest({
+    measures: ['biz.purchases_count', 'biz.cancellations_cancellations_cumulative'],
+    timeDimensions: [{ dimension: 'biz.dt_ts', granularity: 'month', dateRange: ['2026-01-01', '2026-03-31'] }],
+    order: [{ id: 'biz.dt_ts' }],
+    timezone: 'UTC',
+  }, [
+    { biz__dt_ts_month: '2026-01-01T00:00:00.000Z', biz__purchases_count: '1', biz__cancellations_cancellations_cumulative: '1' },
+    { biz__dt_ts_month: '2026-02-01T00:00:00.000Z', biz__purchases_count: '1', biz__cancellations_cancellations_cumulative: '3' },
+    { biz__dt_ts_month: '2026-03-01T00:00:00.000Z', biz__purchases_count: null, biz__cancellations_cancellations_cumulative: '3' },
+  ], compilers));
+
+  it('shifts a cube measure on its own date', async () => dbRunner.runQueryTest({
+    measures: ['biz.carts_count', 'biz.cancellations_cancellations_prev_year'],
+    timeDimensions: [{ dimension: 'biz.dt_ts', granularity: 'year', dateRange: ['2026-01-01', '2026-12-31'] }],
+    timezone: 'UTC',
+  }, [
+    { biz__dt_ts_year: '2026-01-01T00:00:00.000Z', biz__carts_count: '2', biz__cancellations_cancellations_prev_year: '1' },
+  ], compilers));
 });
 
 // One fact blended with itself: flights are departures by their origin and

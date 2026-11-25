@@ -438,6 +438,10 @@ impl PreAggregationOptimizer {
                             if let Some(rewritten) = rewritten {
                                 let new_member = member.with_body(SubqueryBody::Query(rewritten));
                                 NodeRewriteResult::rewritten(new_member.as_plan_node())
+                            } else if leaf.from().as_merge().is_some() {
+                                // Not a leaf: it merges subqueries matched on their
+                                // own, like a leg of measures under dimension overrides.
+                                NodeRewriteResult::pass()
                             } else {
                                 has_unrewritten_leaf = true;
                                 NodeRewriteResult::stop()
