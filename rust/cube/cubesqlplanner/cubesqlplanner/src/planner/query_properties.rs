@@ -192,6 +192,18 @@ impl QueryProperties {
         Ok(Rc::new(result))
     }
 
+    /// The part of this query that computes `measures` only, to be merged with
+    /// the others: measure filters, order and limit apply over the merge.
+    pub(crate) fn leg_for_measures(&self, measures: Vec<Rc<MemberSymbol>>) -> Rc<QueryProperties> {
+        let mut result = self.clone();
+        result.measures = measures;
+        result.measures_filters = vec![];
+        result.order_by = vec![];
+        result.row_limit = None;
+        result.offset = None;
+        Rc::new(result)
+    }
+
     pub(crate) fn extract_dimensions_from_order(&self) -> Vec<Rc<MemberSymbol>> {
         self.order_by
             .iter()

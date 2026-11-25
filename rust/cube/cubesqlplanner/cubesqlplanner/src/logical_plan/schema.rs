@@ -104,8 +104,11 @@ impl LogicalSchema {
     }
 
     /// Whether a dimension of the schema is `member`, references followed.
+    /// A view dimension a measure overrides keeps its own id but references
+    /// another member, so the same id is the same dimension too.
     pub fn has_dimension(&self, member: &Rc<MemberSymbol>) -> bool {
-        self.all_dimensions().any(|d| member_chain_eq(d, member))
+        self.all_dimensions()
+            .any(|d| d.id() == member.id() || member_chain_eq(d, member))
     }
 
     pub fn has_dimensions(&self) -> bool {

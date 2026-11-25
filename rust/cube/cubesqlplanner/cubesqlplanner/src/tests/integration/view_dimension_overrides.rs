@@ -210,3 +210,205 @@ fn test_multi_stage_measure_with_overrides_is_rejected() {
         error.message
     );
 }
+
+// Each fact on its own date, one filter: 2026-02: 2 cancellations, 2 carts.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_overridden_and_plain_measures_by_one_dimension() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.cancellations_cancellations
+          - biz.carts_count
+        dimensions:
+          - biz.dt_year_month
+        filters:
+          - member: biz.dt_year
+            operator: equals
+            values: ["2026"]
+        order:
+          - id: biz.dt_year_month
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// 2026-01: 1 purchase. 2026-02: 1 purchase, 2 cancellations, 2 carts.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_two_roles_of_one_fact_and_another_fact() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.cancellations_cancellations
+          - biz.carts_count
+        dimensions:
+          - biz.dt_year_month
+        filters:
+          - member: biz.dt_year
+            operator: equals
+            values: ["2026"]
+        order:
+          - id: biz.dt_year_month
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Purchased in 2026: 2 (3, 4); cancelled in 2026: 2 (1, 3). One filter must
+// not narrow both roles to the subscription that has both dates in 2026.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_two_roles_of_one_fact_by_filter_only() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.cancellations_cancellations
+        filters:
+          - member: biz.dt_year
+            operator: equals
+            values: ["2026"]
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The same cube measure under two roles: 2026-01: 1 / -, 2026-02: 1 / 2.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_one_cube_measure_under_two_roles() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.cancellations_count
+        dimensions:
+          - biz.dt_year_month
+        filters:
+          - member: biz.dt_year
+            operator: equals
+            values: ["2026"]
+        order:
+          - id: biz.dt_year_month
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// 2026-01-01: 1 purchase. 2026-02-01: 1 purchase, 2 cancellations.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_two_roles_by_time_dimension_granularity() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.cancellations_cancellations
+        time_dimensions:
+          - dimension: biz.dt_ts
+            granularity: month
+            dateRange:
+              - "2026-01-01"
+              - "2026-12-31"
+        order:
+          - id: biz.dt_ts
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The measure filter applies over the merged legs: only 2026-02 has more than
+// one cancellation, and it keeps its purchase and carts.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_measure_filter_over_merged_legs() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.cancellations_cancellations
+          - biz.carts_count
+        dimensions:
+          - biz.dt_year_month
+        filters:
+          - member: biz.dt_year
+            operator: equals
+            values: ["2026"]
+          - member: biz.cancellations_cancellations
+            operator: gt
+            values: ["1"]
+        order:
+          - id: biz.dt_year_month
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Order and limit apply over the merged legs: the last month, 2026-02.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_order_and_limit_over_merged_legs() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.cancellations_cancellations
+        dimensions:
+          - biz.dt_year_month
+        filters:
+          - member: biz.dt_year
+            operator: equals
+            values: ["2026"]
+        order:
+          - id: biz.dt_year_month
+            desc: true
+        limit: 1
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[test]
+fn test_ungrouped_query_with_different_overrides_is_rejected() {
+    let ctx = create_context();
+    let query = indoc! {r#"
+        measures:
+          - biz.purchases_count
+          - biz.cancellations_cancellations
+        dimensions:
+          - biz.dt_year_month
+        ungrouped: true
+    "#};
+
+    let error = ctx.build_sql(query).unwrap_err();
+    assert!(
+        error
+            .message
+            .contains("An ungrouped query can't have measures that need different dimensions"),
+        "{}",
+        error.message
+    );
+}

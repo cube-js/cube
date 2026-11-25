@@ -2,7 +2,7 @@ use super::{
     MergeQueryPlanner, MultiStageQueryPlanner, MultipliedMeasuresQueryPlanner, SimpleQueryPlanner,
 };
 use crate::logical_plan::*;
-use crate::planner::planners::multi_stage::PlanningScope;
+use crate::planner::planners::multi_stage::{EvaluationContext, PlanningScope};
 use crate::planner::state::State;
 use crate::planner::{QueryAnalysis, QueryProperties};
 use cubenativeutils::CubeError;
@@ -42,6 +42,13 @@ impl QueryPlanner {
         if analysis.is_simple() {
             let planner = SimpleQueryPlanner::new(self.query_tools.clone(), analysis);
             planner.plan(scope)
+        } else if !analysis.override_legs().is_empty() {
+            let refs = analysis
+                .override_legs()
+                .iter()
+                .map(|leg| self.plan_override_leg(leg, scope))
+                .collect::<Result<Vec<_>, _>>()?;
+            MergeQueryPlanner::new(analysis).plan_logical_plan(refs, scope)
         } else {
             let mut refs = Vec::new();
 
@@ -60,5 +67,27 @@ impl QueryPlanner {
 
             Ok(result)
         }
+    }
+
+    fn plan_override_leg(
+        &self,
+        leg: &Rc<QueryProperties>,
+        scope: &mut PlanningScope,
+    ) -> Result<Rc<SubqueryRef>, CubeError> {
+        let query = QueryPlanner::new(leg.clone(), self.query_tools.clone()).plan(scope)?;
+        let (subquery_id, subquery_name) = scope.next_subquery();
+        let member = Rc::new(Subquery::new(
+            subquery_id,
+            subquery_name.clone(),
+            SubqueryBody::Query(query.with_evaluation_context(Some(EvaluationContext::default()))),
+        ));
+        scope.add_member(member)?;
+        Ok(Rc::new(
+            SubqueryRef::builder()
+                .id(subquery_id)
+                .name(subquery_name)
+                .schema(query.schema().clone())
+                .build(),
+        ))
     }
 }

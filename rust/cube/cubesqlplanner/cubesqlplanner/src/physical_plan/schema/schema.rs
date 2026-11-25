@@ -50,7 +50,25 @@ impl Schema {
         }
     }
 
+    /// The column of the member itself, not of another member referencing the
+    /// same one.
+    pub fn resolve_member_reference_by_id(&self, member: &Rc<MemberSymbol>) -> Option<String> {
+        self.find_column_by_member_id(member)
+            .map(|column| column.name().clone())
+    }
+
+    fn find_column_by_member_id(&self, member: &Rc<MemberSymbol>) -> Option<&SchemaColumn> {
+        self.columns.iter().find(|col| {
+            col.origin_member()
+                .as_ref()
+                .is_some_and(|origin| origin.id() == member.id())
+        })
+    }
+
     pub fn find_column_for_member(&self, member: &Rc<MemberSymbol>) -> Option<&SchemaColumn> {
+        if let Some(own) = self.find_column_by_member_id(member) {
+            return Some(own);
+        }
         self.columns.iter().find(|col| {
             if let Some(origin_member) = &col.origin_member() {
                 origin_member.clone().resolve_reference_chain()

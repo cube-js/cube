@@ -3,7 +3,6 @@ use super::symbols::transforms;
 use super::{MemberId, MemberSymbol};
 use crate::planner::collectors::has_multi_stage_members;
 use cubenativeutils::CubeError;
-use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -63,63 +62,66 @@ impl AppliedOverrides {
         }
         query.map_dimension_symbols(&|symbol| transforms::substitute_by_name(symbol, &replacements))
     }
+}
 
-    fn describe(&self) -> String {
-        self.items
-            .iter()
-            .map(|(dimension, target)| format!("{dimension} -> {target}"))
-            .join(", ")
+/// Measures of a query that agree on the dimension overrides applying to them.
+pub struct OverridePartition {
+    overrides: AppliedOverrides,
+    measures: Vec<Rc<MemberSymbol>>,
+}
+
+impl OverridePartition {
+    pub fn measures(&self) -> &[Rc<MemberSymbol>] {
+        &self.measures
+    }
+
+    pub fn has_overrides(&self) -> bool {
+        !self.overrides.is_empty()
+    }
+
+    /// `query` with this partition's overrides applied.
+    pub fn apply(&self, query: &QueryProperties) -> Result<Rc<QueryProperties>, CubeError> {
+        self.overrides.apply(query)
+    }
+
+    /// The leg of `query` computing this partition's measures.
+    pub fn leg(&self, query: &QueryProperties) -> Result<Rc<QueryProperties>, CubeError> {
+        self.apply(&query.leg_for_measures(self.measures.clone()))
     }
 }
 
-/// Applies the dimension overrides of the query's view measures. All measures
-/// must agree on them; measures that need different dimensions are not
-/// supported yet.
-pub fn apply_dimension_overrides(
-    query: &Rc<QueryProperties>,
-) -> Result<Rc<QueryProperties>, CubeError> {
-    let measures = query.all_used_measures()?;
-    if measures.is_empty() {
-        return Ok(query.clone());
-    }
+/// The query's measures split by the dimension overrides that apply to them,
+/// in the order the measures come. A query without measures has no partitions.
+pub fn partition_by_dimension_overrides(
+    query: &QueryProperties,
+) -> Result<Vec<OverridePartition>, CubeError> {
     let used = used_dimensions(query)
         .into_iter()
         .map(|symbol| symbol.id().clone())
         .collect::<HashSet<_>>();
-    let applied = measures
-        .iter()
-        .map(|measure| (measure, AppliedOverrides::for_measure(measure, &used)))
-        .collect_vec();
-    if applied.iter().all(|(_, overrides)| overrides.is_empty()) {
-        return Ok(query.clone());
-    }
-    for (measure, overrides) in applied.iter() {
+    let mut partitions: Vec<OverridePartition> = Vec::new();
+    for measure in query.all_used_measures()? {
+        let overrides = AppliedOverrides::for_measure(&measure, &used);
         if !overrides.is_empty() && has_multi_stage_members(&measure.peel_refs(), false)? {
             return Err(CubeError::user(format!(
                 "Dimension overrides of multi-stage measure {} are not supported yet",
                 measure.full_name()
             )));
         }
+        match partitions.iter_mut().find(|p| p.overrides == overrides) {
+            Some(partition) => partition.measures.push(measure),
+            None => partitions.push(OverridePartition {
+                overrides,
+                measures: vec![measure],
+            }),
+        }
     }
-    let (first_measure, first) = &applied[0];
-    if let Some((measure, overrides)) = applied.iter().find(|(_, o)| o != first) {
-        return Err(CubeError::user(format!(
-            "Measures {} and {} need different dimensions in one query ({} vs {}), which is not supported yet",
-            first_measure.full_name(),
-            measure.full_name(),
-            describe_or_none(first),
-            describe_or_none(overrides),
-        )));
+    if query.ungrouped() && partitions.len() > 1 {
+        return Err(CubeError::user(
+            "An ungrouped query can't have measures that need different dimensions".to_string(),
+        ));
     }
-    first.apply(query)
-}
-
-fn describe_or_none(overrides: &AppliedOverrides) -> String {
-    if overrides.is_empty() {
-        "no overrides".to_string()
-    } else {
-        overrides.describe()
-    }
+    Ok(partitions)
 }
 
 // The view dimensions a query groups, filters or orders by. A time dimension
