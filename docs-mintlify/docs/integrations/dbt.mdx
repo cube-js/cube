@@ -540,7 +540,7 @@ cubes**:
 
 - **Cube commits them** — a sync creates a fresh review branch in your Cube data model,
   so a person can approve the update before it reaches production. Repository webhooks
-  and Analytics Chat use this mode. Webhook syncs can
+  and Analytics Chat use this mode. Webhook syncs
   [skip the review branch when generated files are unchanged](#skip-unchanged-webhook-syncs).
 - **Your CI commits them** — [`cube dbt generate`](#generate-into-your-own-repository)
   writes the cubes into your own working copy and commits nothing, so they go through
@@ -743,17 +743,31 @@ to the branch you're syncing.
 
 #### Skip unchanged webhook syncs
 
-By default, each webhook sync creates a review branch even when the generated cube
-files are identical to those on your Cube data model's default branch. To avoid empty
-reviews and their notification emails:
+Webhook syncs skip unchanged runs by default. A webhook sync creates a review branch
+and sends the review notification only when the generated cube files differ from those
+on your Cube data model's default branch, so pushes that change no cubes produce no
+empty reviews and no notification emails. A webhook sync that fails before it generates
+any files creates no review branch either.
+
+To create a review branch for every push instead, turn the option off:
 
 1. Go to **Settings → Data Sources**, edit the **default data source**, and expand
    **dbt project**.
-2. Expand [**Review notifications**](#review-notifications) and enable
+2. Expand [**Review notifications**](#review-notifications) and clear
    **Skip unchanged webhook syncs**.
 3. Click **Save dbt settings**.
 
-When enabled, Cube still parses the dbt project and converts the selected models.
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/integrations/dbt/skip-unchanged-webhook-syncs.png"
+    alt="Review notifications section of the dbt settings card with Skip unchanged webhook syncs checked"
+  />
+</Frame>
+
+The option keeps the value saved with your dbt settings. If webhook syncs still create a
+review branch for every push, check that **Skip unchanged webhook syncs** is selected.
+
+When the option is on, Cube still parses the dbt project and converts the selected models.
 It then compares the generated file paths and contents with the **default branch of
 your Cube data model**, using the configured output path.
 An added file, changed file content, or deletion of a file for a removed dbt model
