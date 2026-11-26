@@ -11,7 +11,7 @@ In Cube, you build a bullet chart from a [bar chart](/docs/explore-analyze/chart
 the target is a second measure drawn as points, or a reference line, and the ranges are
 [reference bands](/docs/explore-analyze/charts/configuration/axes#reference-bands).
 
-{/* Screenshot: horizontal bullet chart — revenue by region as bars, the revenue target as points, and three bands named Poor, Satisfactory and Good. Place directly below this paragraph, full width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+{/* TODO screenshot: horizontal bullet chart — revenue by region as bars, the revenue target as points, and three bands named Poor, Satisfactory and Good. Place directly below this paragraph, full width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
 ## Build a bullet chart
 
@@ -26,19 +26,21 @@ the target is a second measure drawn as points, or a reference line, and the ran
    measures on a horizontal chart, and choose **Add reference band**. Repeat once per range.
 5. In each band row, type the **From** and **To** values, for example 0–8,000, 8,000–14,000 and
    14,000–22,000.
-6. Open each band's options to name it, for example *Poor*, *Satisfactory* and *Good*. Click each
-   band's color swatch to give the bands shades from light to dark.
+6. Click **Band options** in each band row and set its **Label**, for example *Poor*,
+   *Satisfactory* and *Good*. Click each band's color swatch to give the bands shades from light
+   to dark.
 
-If every category has the same target, skip step 3 and add a
-[reference line](/docs/explore-analyze/charts/configuration/axes#reference-lines) at the target
-value instead.
+If every category has the same target, leave the target measure out of the query, skip step 3,
+and add a [reference line](/docs/explore-analyze/charts/configuration/axes#reference-lines) at the
+target value instead.
 
 To show one value with its target and ranges, such as a single KPI, leave out the dimension. The
 chart draws one bar.
 
 <Tip>
 Each band draws a line on its edges and prints its range in its label. For a cleaner chart, turn
-off **Show edges** in the band's options, so only the shading marks the ranges.
+off **Show edges** and **Show value** in **Band options**, so only the shading and the band names
+mark the ranges.
 </Tip>
 
 ## Limitations
