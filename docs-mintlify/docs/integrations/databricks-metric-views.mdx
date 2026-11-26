@@ -671,10 +671,9 @@ run a new **Preview** after a Cube upgrade.
 
 - **Supported** — a view with a clear root source and representable dimensions, measures,
   and joins. Review the generated YAML, then test access and sync.
-- **Warning** — behavior-neutral metadata Databricks cannot represent, or a measure withheld as
-  `CUBE_MEMBER_WITHHELD` because it can over-count. Review the exact difference before accepting
-  publication; for a withheld measure, apply the fix for its case under
-  [withheld measures](#withheld-measures).
+- **Warning** — behavior-neutral metadata Databricks cannot represent, or a withheld measure
+  ([`CUBE_MEMBER_WITHHELD`](#cube-member-withheld)). Review the exact difference before accepting
+  publication.
 
 Preview **blocks** a view it can't publish faithfully, and each blocking issue says what to
 change in the model. [Fix a blocked view](#fix-a-blocked-view) has a section for each issue
@@ -1228,9 +1227,10 @@ cubes:
 
 Databricks compares names case-insensitively, and a Metric View dimension reads earlier dimensions
 by name. Two published names in the view differ only in case, two joined cubes or a cube and the
-reserved `source` alias collide, or two dimensions each read the other's name. Rename one of the
-members in the view with `alias` or `prefix`. A joined cube whose name collides with another join,
-or with `source`, must be renamed in the model: a view alias doesn't change the join's name.
+reserved `source` alias collide, or two dimensions read each other's names where one of them is
+published as `source` or with a join's name. Rename one of the members in the view with `alias` or
+`prefix`: the published name is what collides. A joined cube whose name collides with another
+join, or with `source`, must be renamed in the model: a view alias doesn't change the join's name.
 
 <CodeGroup>
 
