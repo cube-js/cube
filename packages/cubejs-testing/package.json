@@ -118,7 +118,7 @@
     "@types/http-proxy": "^1.17.5",
     "@types/jest": "^29",
     "@types/node": "^22",
-    "cypress": "15.21.1",
+    "cypress": "15.21.2",
     "cypress-localstorage-commands": "^1.4.5",
     "cypress-wait-until": "^1.7.2",
     "globby": "^11.0.4",
