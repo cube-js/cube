@@ -762,11 +762,12 @@ converted from a mix of the two. Try again once the rollout finishes.
 
 Each issue in **Preview** names its code, the view, cube or member it applies to, and ends with
 the change that fixes it. An issue whose code starts with `CUBE_` has a **How to fix** link to its
-section below. Other codes come from the converters. `OSSIE_CUBE_FANOUT_UNSAFE_METRIC` and
-`OSSIE_CUBE_MULTI_STAGE_MEASURE_PARKED` block a view only when none of its measures can publish:
-fix a measure as described under [Withheld measures](#withheld-measures), or include a measure
-that publishes. If any other converter code, such as `DBX_*` or `DATABRICKS_CONVERTER_WARNING`,
-blocks a view, contact the [Cube support team](/admin/account-billing/support).
+section below. Other codes come from the converters, and two of them block a view only when none
+of its measures can publish: for `OSSIE_CUBE_FANOUT_UNSAFE_METRIC`, fix a measure as described
+under [Withheld measures](#withheld-measures); for `OSSIE_CUBE_MULTI_STAGE_MEASURE_PARKED`, include
+a measure that publishes, or keep the view in Cube. If any other converter code, such as `DBX_*`
+or `DATABRICKS_CONVERTER_WARNING`, blocks a view, contact the
+[Cube support team](/admin/account-billing/support).
 
 ### `CUBE_VIEW_NOT_FOUND` {#cube-view-not-found}
 
@@ -1296,7 +1297,7 @@ Every member the view includes is a measure with no Metric View form, such as a 
 `rolling_window`, or ranking measure, so a Metric View would have nothing to query. The message
 lists each one. Include a measure that publishes, or keep the view in Cube. A view that also
 includes a dimension is blocked as `OSSIE_CUBE_MULTI_STAGE_MEASURE_PARKED` instead, as described
-at the start of this section.
+under [Fix a blocked view](#fix-a-blocked-view).
 
 ### `CUBE_MEMBER_WITHHELD` {#cube-member-withheld}
 
