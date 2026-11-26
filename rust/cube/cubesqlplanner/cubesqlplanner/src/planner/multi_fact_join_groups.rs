@@ -43,9 +43,10 @@ impl MeasuresJoinHintsBuilder {
         self
     }
 
-    /// Members whose cubes must be in the join but must not pick its root, such
+    /// Members whose cubes must be in the join but should not pick its root, such
     /// as those a SQL-API sub-query join reads in its ON condition. Their hints
-    /// go after every other hint of each join tree.
+    /// go after every other hint of each join tree, so they only decide the root
+    /// where the join graph ties.
     pub fn add_trailing_members(mut self, members: &[Rc<MemberSymbol>]) -> Self {
         self.trailing_members.extend(members.iter().cloned());
         self
