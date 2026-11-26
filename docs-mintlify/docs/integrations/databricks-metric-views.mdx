@@ -676,58 +676,16 @@ run a new **Preview** after a Cube upgrade.
   publication; for a withheld measure, apply the fix for its case under
   [withheld measures](#withheld-measures).
 
-Preview **blocks** a view when it finds any of these conditions:
-
-- JavaScript or TypeScript models: use YAML.
-- A referenced cube that `extends` a cube outside the YAML model, such as a JavaScript cube:
-  extend a YAML cube instead, or flatten the inherited definitions.
-- A view that `extends` another view: define its cubes and members in the view itself.
-- A Cube access policy on the view or a referenced cube, including one a cube inherits through
-  `extends`: keep that governed view in Cube; the policy cannot be transferred to a Databricks
-  Metric View.
-- Mixed data sources or an ambiguous root dataset: use one data source and a clear root.
-- A two-part `schema.table` source without a default catalog: set `CUBEJS_DB_DATABRICKS_CATALOG`
-  for the selected Databricks data source, or the **Default catalog** of a publication target with
-  its own connection, and preview again.
-- Cyclic joins, a one-to-many join on the view's join path, a join condition that reads a measure,
-  or one that reads a cube other than the two it joins outside the nested case under **Joins**
-  above, including a `table.column` whose table is neither of them: simplify the join. For a
-  one-to-many join (`CUBE_VIEW_JOIN_NOT_REPRESENTABLE`), root the view at the many-side cube.
-- A many-to-one or one-to-one join whose condition reads no column of the joined cube, such as
-  `1 = 1` or `{CUBE}.status = 'open'` (Preview names the join): Cube keeps every row such a join
-  matches, and a Metric View keeps one. This includes a cube the view reaches only through member
-  SQL, such as `{layout.label}` in a dimension of the root cube, and a join to a single-row cube.
-  Add a condition on a column of the joined cube, such as `{users}.id`, `users.id`, or
-  `{settings}.id = 1` for a single-row cube, or leave that cube and the members that read it out
-  of the view.
-- A dimension that reads a cube behind a one-to-many join (Preview names that join): a Metric View
-  dimension needs one value per source row, so root the view at the many-side cube.
-- A cube `sql` that reads [context variables](/reference/data-modeling/context-variables), such
-  as `{FILTER_PARAMS…}`, `{SECURITY_CONTEXT…}`, or `{COMPILE_CONTEXT…}` (`CUBE_CONTEXT_IN_SQL`):
-  only Cube can fill them in, so remove them from the cube's `sql` or keep that view in Cube.
-- An aggregate measure, such as `count_distinct` or `max`, that reads a measure which itself
-  aggregates, such as `{users.score_max}`: SQL cannot nest one aggregate in another, so read a
-  dimension instead, through a join path such as `{CUBE.users.score}`.
-- A measure subquery that reads a joined cube or a measure: a Metric View subquery can read only
-  columns of the measure's own source row, so select from the joined cube's table inside the
-  subquery, or keep that view in Cube.
-- Unsupported expressions or types, or multi-stage, window, or ranking calculations: simplify
-  the model or keep that view in Cube.
-- A measure that reads a column outside any aggregate, such as
-  `CASE WHEN {layout.idx} = 1 THEN {count} END` (Preview names the measure and the column): a
-  Metric View measure must aggregate every column it reads. Move the condition inside the
-  aggregate, or keep that view in Cube.
-- Two dimensions that each read the other's name, where one of them is named `source` or has the
-  same name as a join: a Metric View dimension reads the dimensions before it by name, so Preview
-  must place such a dimension after every dimension that reads its name, and no order works for
-  two that read each other. Rename one of them.
+Preview **blocks** a view it can't publish faithfully, and each blocking issue says what to
+change in the model. [Fix a blocked view](#fix-a-blocked-view) has a section for each issue
+code, with a before-and-after example.
 
 ### Withheld measures
 
 A view's joins are the joins on its join path plus any joins that member SQL reaches, such as
 `{CUBE.users.country}`. That includes the SQL of a member the view doesn't list but one of its
-members references. A one-to-many join on the join path blocks the view, as listed above, and so
-does a dimension that reads a cube behind one. Otherwise, a one-to-many join that member SQL
+members references. A one-to-many join on the join path blocks the view, and so does a
+dimension that reads a cube behind one ([`CUBE_VIEW_JOIN_NOT_REPRESENTABLE`](#cube-view-join-not-representable)). Otherwise, a one-to-many join that member SQL
 reaches doesn't block the view, but it can withhold some of the view's measures.
 
 A measure of the view's root cube that reads a joined cube, such as
@@ -789,7 +747,7 @@ says what rendering needs.
 
 Templates render with the deployment's default context, so Jinja that branches on the security
 context or `COMPILE_CONTEXT` publishes only one variant. A braced `{COMPILE_CONTEXT…}` or other
-[context variable](#what-can-be-published) left in a cube's `sql` blocks the view.
+[context variable](#cube-context-in-sql) left in a cube's `sql` blocks the view.
 
 If a file fails to render, the preview or sync fails with `400` and names the file. A rendered file
 can be up to 2 MiB, the rendered data model up to 20 MiB, and rendering can take up to 2 minutes.
@@ -798,6 +756,568 @@ For a few minutes after a build succeeds, the deployment's Cube runtime can stil
 previous build while it rolls out the new one. Until the rollout finishes, starting a preview or
 sync that renders templates fails with `409` and names both builds, so that a view is never
 converted from a mix of the two. Try again once the rollout finishes.
+
+## Fix a blocked view
+
+Each issue in **Preview** names its code, the view, cube or member it applies to, and ends with
+the change that fixes it. An issue whose code starts with `CUBE_` has a **How to fix** link to its
+section below. Other codes come from the converters. `OSSIE_CUBE_FANOUT_UNSAFE_METRIC` and
+`OSSIE_CUBE_MULTI_STAGE_MEASURE_PARKED` block a view only when none of its measures can publish:
+fix a measure as described under [Withheld measures](#withheld-measures), or include a measure
+that publishes. If any other converter code, such as `DBX_*` or `DATABRICKS_CONVERTER_WARNING`,
+blocks a view, contact the [Cube support team](/admin/account-billing/support).
+
+### `CUBE_VIEW_NOT_FOUND` {#cube-view-not-found}
+
+The selected view isn't in the deployed YAML model. Preview reads YAML only, so a view defined in
+JavaScript or TypeScript is not found. Define the view in YAML, or select a view the model defines.
+
+<CodeGroup>
+
+```javascript title="Before (model/views/sales.js)"
+view(`sales`, {
+  cubes: [{ join_path: orders, includes: [`status`, `count`] }]
+});
+```
+
+```yaml title="After (model/views/sales.yml)"
+views:
+  - name: sales
+    cubes:
+      - join_path: orders
+        includes: [status, count]
+```
+
+</CodeGroup>
+
+### `CUBE_VIEW_INVALID` {#cube-view-invalid}
+
+The view's definition is malformed: a `cubes` entry without `join_path`, a `join_path` step whose
+cube declares no join to the next one, `includes` or `excludes` that aren't lists, an empty
+`alias`, a member that doesn't exist, or a dotted path in `includes`.
+Correct the entry the issue names. A member of a joined cube is included from its own `cubes` entry.
+
+<CodeGroup>
+
+```yaml title="Before"
+views:
+  - name: sales
+    cubes:
+      - join_path: orders
+        includes: [status, users.city]
+```
+
+```yaml title="After"
+views:
+  - name: sales
+    cubes:
+      - join_path: orders
+        includes: [status]
+      - join_path: orders.users
+        includes: [city]
+```
+
+</CodeGroup>
+
+### `CUBE_MODEL_INVALID` {#cube-model-invalid}
+
+A cube definition can't be read: a reference to a member that doesn't exist, a reference cycle,
+two joins to the same cube, a malformed `case`, or a malformed multi-stage property. A context
+variable in a member's SQL, such as `{SECURITY_CONTEXT.region}`, reads as an unknown cube here.
+Correct the cube or member the issue names, and remove any context variable from member SQL.
+
+<CodeGroup>
+
+```yaml title="Before"
+measures:
+  - name: avg_order
+    sql: "{revenu} / {count}"
+    type: number
+```
+
+```yaml title="After"
+measures:
+  - name: avg_order
+    sql: "{revenue} / {count}"
+    type: number
+```
+
+</CodeGroup>
+
+### `CUBE_DUPLICATE_CUBE` {#cube-duplicate-cube}
+
+Two files define a cube with the same name, so Preview can't tell which one a view reads. Keep one
+definition, or rename one of them.
+
+<CodeGroup>
+
+```yaml title="Before (model/cubes/orders_v2.yml)"
+cubes:
+  - name: orders
+    sql_table: main.sales.orders_v2
+```
+
+```yaml title="After (model/cubes/orders_v2.yml)"
+cubes:
+  - name: orders_v2
+    sql_table: main.sales.orders_v2
+```
+
+</CodeGroup>
+
+### `CUBE_DUPLICATE_VIEW` {#cube-duplicate-view}
+
+Two files define a view with the same name. Keep one definition, or rename one of them, as for
+[`CUBE_DUPLICATE_CUBE`](#cube-duplicate-cube).
+
+### `CUBE_REFERENCED_CUBE_NOT_FOUND` {#cube-referenced-cube-not-found}
+
+The view's `join_path` names a cube the model doesn't define. Define that cube, or remove it from
+the view.
+
+<CodeGroup>
+
+```yaml title="Before"
+cubes:
+  - join_path: orders.customer
+    includes: [city]
+```
+
+```yaml title="After"
+cubes:
+  - join_path: orders.customers
+    includes: [city]
+```
+
+</CodeGroup>
+
+### `CUBE_EXTENDS_UNSUPPORTED` {#cube-extends-unsupported}
+
+The view `extends` another view, or a cube the view reaches extends a cube outside the YAML model,
+such as a JavaScript cube. A Metric View would miss the members and access policy the view or cube
+inherits. Define the view's cubes in the view itself, and extend only YAML cubes.
+
+<CodeGroup>
+
+```yaml title="Before"
+views:
+  - name: sales_eu
+    extends: sales
+    cubes:
+      - join_path: orders.regions
+        includes: [name]
+```
+
+```yaml title="After"
+views:
+  - name: sales_eu
+    cubes:
+      - join_path: orders
+        includes: [status, count]
+      - join_path: orders.regions
+        includes: [name]
+```
+
+</CodeGroup>
+
+### `CUBE_ACCESS_POLICY_UNSUPPORTED` {#cube-access-policy-unsupported}
+
+The view, or a cube it reaches, has an `access_policy`, including one a cube inherits through
+`extends`. A Metric View can't reproduce Cube's row and member policies, so publishing it would
+bypass them. Keep that governed view in Cube. To publish the same data, add a view without
+`access_policy`, over cubes without one, and control who can query its Metric View with Unity
+Catalog grants.
+
+<CodeGroup>
+
+```yaml title="Before"
+views:
+  - name: sales
+    access_policy:
+      - group: analysts
+        row_level:
+          filters:
+            - member: region
+              operator: equals
+              values: ["{ userAttributes.region }"]
+    cubes:
+      - join_path: orders
+        includes: [region, count]
+```
+
+```yaml title="After"
+views:
+  # `sales` keeps its access_policy and stays in Cube.
+  # This view is published; Unity Catalog grants control access to it.
+  - name: sales_all_regions
+    cubes:
+      - join_path: orders
+        includes: [region, count]
+```
+
+</CodeGroup>
+
+### `CUBE_CONTEXT_IN_SQL` {#cube-context-in-sql}
+
+A cube's `sql` reads a [context variable](/reference/data-modeling/context-variables), such as
+`{FILTER_PARAMS…}`, `{SECURITY_CONTEXT…}`, or `{COMPILE_CONTEXT…}`. Only Cube can fill these in, so
+Databricks can't run that SQL. Remove the variable from the cube's `sql`, or keep the view in Cube.
+A context variable in a member's SQL is reported as
+[`CUBE_MODEL_INVALID`](#cube-model-invalid), and in a join condition as
+[`CUBE_VIEW_JOIN_NOT_REPRESENTABLE`](#cube-view-join-not-representable); remove it there too.
+
+<CodeGroup>
+
+```yaml title="Before"
+cubes:
+  - name: events
+    sql: >
+      SELECT * FROM main.app.events
+      WHERE {FILTER_PARAMS.events.created_at.filter('created_at')}
+```
+
+```yaml title="After"
+cubes:
+  - name: events
+    sql_table: main.app.events
+```
+
+</CodeGroup>
+
+### `CUBE_MULTIPLE_DATA_SOURCES` {#cube-multiple-data-sources}
+
+The cubes the view reads, including a cube that only a member's SQL references, use more than one
+data source, and a Metric View reads one Databricks data source. Publish views whose cubes, and the
+cubes their members read, all use the target's data source.
+
+### `CUBE_DATA_SOURCE_MISMATCH` {#cube-data-source-mismatch}
+
+A cube in the view uses a data source other than the publication target's. Leave that cube out of
+the view, publish the view from a target on the cube's data source, or set the cube's
+`data_source` to the target's.
+
+<CodeGroup>
+
+```yaml title="Before"
+views:
+  - name: sales
+    cubes:
+      - join_path: orders         # data_source: default
+        includes: [count]
+      - join_path: orders.leads   # data_source: crm
+        includes: [source]
+```
+
+```yaml title="After"
+views:
+  - name: sales
+    cubes:
+      - join_path: orders
+        includes: [count]
+```
+
+</CodeGroup>
+
+### `CUBE_SOURCE_UNSUPPORTED` {#cube-source-unsupported}
+
+A cube's `sql_table` or `sql` isn't a static Databricks table name or a plain `SELECT`: it has an
+empty or extra name part, a two-part `schema.table` name with no default catalog, or a
+`{other_cube.sql()}` reference through a join path. Write `sql_table` as `catalog.schema.table`.
+For a two-part name, you can instead set `CUBEJS_DB_DATABRICKS_CATALOG` for the Databricks data
+source, or the **Default catalog** of a publication target with its own connection.
+
+<CodeGroup>
+
+```yaml title="Before"
+cubes:
+  - name: orders
+    sql_table: sales.orders
+```
+
+```yaml title="After"
+cubes:
+  - name: orders
+    sql_table: main.sales.orders
+```
+
+</CodeGroup>
+
+### `CUBE_VIEW_JOIN_PATH_UNSUPPORTED` {#cube-view-join-path-unsupported}
+
+A Metric View has one source and joins each cube once, along one path. The view starts its
+`join_path` entries at more than one cube, reaches a cube along two paths, has a cyclic path, or
+its members read a cube along a path its joins don't follow. Start every `join_path` at the same
+cube. When two of the view's own entries reach one cube, keep one of the paths. When members reach
+a cube that several declared joins lead to, add an explicit `join_path` entry for it
+(`includes: []` is enough).
+
+<CodeGroup>
+
+```yaml title="Before"
+views:
+  - name: deals_by_owner
+    cubes:
+      - join_path: deals
+        includes: [amount]
+      - join_path: employees
+        includes: [name]
+```
+
+```yaml title="After"
+views:
+  - name: deals_by_owner
+    cubes:
+      - join_path: deals
+        includes: [amount]
+      - join_path: deals.employees
+        includes: [name]
+```
+
+</CodeGroup>
+
+### `CUBE_VIEW_JOIN_NOT_REPRESENTABLE` {#cube-view-join-not-representable}
+
+A Metric View join keeps at most one row of the joined cube for each source row. These joins have
+no such form, and the issue names the join:
+
+- A `one_to_many` join on the view's join path, or a dimension that reads a cube behind one: root
+  the view at the many-side cube.
+- A join whose condition reads no column of the joined cube, such as `1 = 1` or
+  `{CUBE}.status = 'open'`, including a cube the view reaches only through member SQL: Cube keeps
+  every row it matches. Add a condition on a column of the joined cube, such as `{settings}.id = 1`
+  for a single-row cube, or leave that cube and the members that read it out of the view.
+- A join condition that reads a measure, or a cube other than the two it joins, including a
+  `table.column` whose table is neither (except a join nested as described under
+  [What can be published](#what-can-be-published)), or a context variable such as
+  `{SECURITY_CONTEXT…}`, which reads as another cube: rewrite the condition on columns of the two
+  cubes.
+
+<CodeGroup>
+
+```yaml title="Before"
+joins:
+  - name: layout
+    sql: "1 = 1"
+    relationship: many_to_one
+```
+
+```yaml title="After"
+joins:
+  - name: layout
+    sql: "{CUBE}.layout_id = {layout}.id"
+    relationship: many_to_one
+```
+
+</CodeGroup>
+
+### `CUBE_MEMBER_UNSUPPORTED` {#cube-member-unsupported}
+
+The view includes a member with no Metric View form: a segment, a hierarchy, a `geo` or `switch`
+dimension, a `sub_query` dimension, a dimension that references a measure, a time dimension with
+custom `granularities`. Leave it out of the view with
+`excludes`, or drop it from `includes`. For a time dimension with custom granularities, include a
+dimension with the same `sql` and no `granularities` instead.
+
+<CodeGroup>
+
+```yaml title="Before"
+cubes:
+  - name: usage
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+        granularities:
+          - name: fiscal_year
+            interval: 1 year
+            offset: 3 months
+    segments:
+      - name: paid_only
+        sql: "{CUBE}.plan = 'paid'"
+
+views:
+  - name: usage_view
+    cubes:
+      - join_path: usage
+        includes: "*"
+```
+
+```yaml title="After"
+cubes:
+  - name: usage
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+        granularities:
+          - name: fiscal_year
+            interval: 1 year
+            offset: 3 months
+      - name: created_at_time
+        sql: created_at
+        type: time
+    segments:
+      - name: paid_only
+        sql: "{CUBE}.plan = 'paid'"
+
+views:
+  - name: usage_view
+    cubes:
+      - join_path: usage
+        includes: "*"
+        excludes: [created_at, paid_only]
+```
+
+</CodeGroup>
+
+### `CUBE_MEMBER_SQL_UNSUPPORTED` {#cube-member-sql-unsupported}
+
+A member's SQL has no Metric View form. The issue names the member and the case:
+
+- A dimension with a subquery or a lambda: compute it in the cube's `sql` and read the result as a
+  column.
+- An aggregate of a measure that itself aggregates, such as a `count_distinct` of
+  `{users.score_max}`: aggregate a dimension instead, such as `{CUBE.users.score}`.
+- A measure that reads a column outside any aggregate, such as
+  `CASE WHEN {layout.idx} = 1 THEN {count} END`: move the condition inside the aggregate.
+- A measure subquery that reads a joined cube, a measure, or a dimension with a column not written
+  as `{CUBE}.column`: select from the joined cube's table inside the subquery, and write such
+  columns as `{CUBE}.column`.
+- A dimension that reads a joined cube's columns or dimensions in a way the Metric View can't
+  qualify: define it in the cube whose columns it reads.
+- SQL that doesn't parse as Databricks SQL: rewrite it in Databricks SQL.
+
+<CodeGroup>
+
+```yaml title="Before"
+cubes:
+  - name: accounts
+    sql_table: main.crm.accounts
+    dimensions:
+      - name: product_count
+        sql: >
+          (SELECT count(*) FROM main.crm.entitlements e
+           WHERE e.account_id = {CUBE}.id)
+        type: number
+```
+
+```yaml title="After"
+cubes:
+  - name: accounts
+    sql: >
+      SELECT a.*, e.product_count
+      FROM main.crm.accounts a
+      LEFT JOIN (
+        SELECT account_id, count(*) AS product_count
+        FROM main.crm.entitlements
+        GROUP BY account_id
+      ) e ON e.account_id = a.id
+    dimensions:
+      - name: product_count
+        sql: product_count
+        type: number
+```
+
+</CodeGroup>
+
+### `CUBE_MEMBER_NAME_CONFLICT` {#cube-member-name-conflict}
+
+Databricks compares names case-insensitively, and a Metric View dimension reads earlier dimensions
+by name. Two published names in the view differ only in case, two joined cubes or a cube and the
+reserved `source` alias collide, or two dimensions each read the other's name. Rename one of the
+members in the view with `alias` or `prefix`. A joined cube whose name collides with another join,
+or with `source`, must be renamed in the model: a view alias doesn't change the join's name.
+
+<CodeGroup>
+
+```yaml title="Before"
+cubes:
+  - join_path: orders
+    includes: [Status, count]
+  - join_path: orders.users
+    includes: [status]
+```
+
+```yaml title="After"
+cubes:
+  - join_path: orders
+    includes: [Status, count]
+  - join_path: orders.users
+    includes:
+      - name: status
+        alias: user_status
+```
+
+</CodeGroup>
+
+### `CUBE_PRIMARY_KEY_REQUIRED` {#cube-primary-key-required}
+
+A bare `type: count` measure counts rows of its cube, and the conversion needs the cube's primary
+key to count them correctly through joins. Mark the key dimension with `primary_key: true`.
+
+<CodeGroup>
+
+```yaml title="Before"
+dimensions:
+  - name: id
+    sql: id
+    type: number
+measures:
+  - name: count
+    type: count
+```
+
+```yaml title="After"
+dimensions:
+  - name: id
+    sql: id
+    type: number
+    primary_key: true
+measures:
+  - name: count
+    type: count
+```
+
+</CodeGroup>
+
+### `CUBE_VIEW_FULLY_WITHHELD` {#cube-view-fully-withheld}
+
+Every member the view includes is a measure with no Metric View form, such as a multi-stage,
+`rolling_window`, or ranking measure, so a Metric View would have nothing to query. The message
+lists each one. Include a measure that publishes, or keep the view in Cube.
+
+### `CUBE_MEMBER_WITHHELD` {#cube-member-withheld}
+
+A warning: the view publishes without a measure that would over-count, or that has no Metric View
+form, such as a multi-stage, window, or ranking measure. The measure stays queryable in Cube. For
+an over-counting measure, apply the fix for its case under [Withheld measures](#withheld-measures);
+otherwise, keep that measure in Cube.
+
+### `CUBE_PRESENTATION_METADATA_IGNORED` {#cube-presentation-metadata-ignored}
+
+A warning: Databricks has no place for presentation settings, such as `format`, `currency`,
+`drill_members`, `meta`, `folders`, or `view_groups`, so they aren't published. Query results don't
+change, and nothing in the model needs to change.
+
+### `CUBE_EXECUTION_METADATA_IGNORED` {#cube-execution-metadata-ignored}
+
+A warning: `pre_aggregations` and `refresh_key` control how Cube runs queries, and a Metric View
+queries the source tables directly, so they aren't published. Query results don't change, and
+nothing in the model needs to change.
+
+### `CUBE_PROJECTED_DATASET_UNKNOWN` {#cube-projected-dataset-unknown}
+
+The conversion produced a dataset that matches no cube in the model. This is a converter
+limitation, not a model error: contact the [Cube support team](/admin/account-billing/support)
+and name the view.
+
+### `CUBE_VIEW_PROJECTION_FAILED` {#cube-view-projection-failed}
+
+The conversion refused the view for a reason without a specific code yet. Read the message: when it
+names a model change, make it. For example, a `count` measure on a cube with no primary key is
+reported here; fix it as described under
+[`CUBE_PRIMARY_KEY_REQUIRED`](#cube-primary-key-required). Otherwise, contact the
+[Cube support team](/admin/account-billing/support) and name the view.
 
 ## Ownership, failures, and rollback
 
