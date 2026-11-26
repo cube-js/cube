@@ -325,9 +325,10 @@ impl TypedFilterBuilder {
     // some coerce text that is no number at all to zero and filter by it.
     fn validate_number_values(
         member_evaluator: &Rc<MemberSymbol>,
+        member_type: Option<&str>,
         values: &[FilterValue],
     ) -> Result<(), CubeError> {
-        if !Self::compares_as_number(member_evaluator) {
+        if member_type != Some("number") || Self::is_min_max_measure(member_evaluator) {
             return Ok(());
         }
         for value in values {
@@ -349,18 +350,13 @@ impl TypedFilterBuilder {
         Ok(())
     }
 
-    fn compares_as_number(member_evaluator: &Rc<MemberSymbol>) -> bool {
-        let symbol = resolve_base_symbol(member_evaluator);
-        match symbol.as_ref() {
-            MemberSymbol::Dimension(d) => d.dimension_type() == "number",
-            // min/max return whatever their operand is, a string or a time
-            // included, so their values can't be held to a number.
-            MemberSymbol::Measure(m) => !matches!(
-                m.measure_type(),
-                "boolean" | "string" | "time" | "min" | "max"
-            ),
-            MemberSymbol::Ref(r) => r.target_member().is_some_and(Self::compares_as_number),
-            MemberSymbol::TimeDimension(_) | MemberSymbol::MemberExpression(_) => false,
+    // min/max return whatever their operand is, a string or a time included,
+    // so their values can't be held to a number.
+    fn is_min_max_measure(member_evaluator: &Rc<MemberSymbol>) -> bool {
+        match member_evaluator.as_ref() {
+            MemberSymbol::Measure(m) => matches!(m.measure_type(), "min" | "max"),
+            MemberSymbol::Ref(r) => r.target_member().is_some_and(Self::is_min_max_measure),
+            _ => false,
         }
     }
 
@@ -431,7 +427,7 @@ impl TypedFilterBuilder {
                         | FilterOperator::Lte
                 )
             {
-                Self::validate_number_values(&member_evaluator, &values)?;
+                Self::validate_number_values(&member_evaluator, member_type.as_deref(), &values)?;
             }
             match operator {
                 FilterOperator::Equal | FilterOperator::NotEqual => {
