@@ -23,6 +23,7 @@ echo "::endgroup::"
 
 echo "::group::Postgres"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:postgres
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:hll-rolling
 echo "::endgroup::"
 
 echo "::group::QuestDB"

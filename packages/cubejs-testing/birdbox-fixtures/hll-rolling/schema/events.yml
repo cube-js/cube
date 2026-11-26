@@ -1,0 +1,55 @@
+cubes:
+  - name: events
+    sql: >
+      SELECT 'a' || (g % 7) AS id_a,
+             g % 5 AS entity_id,
+             g % 3 AS group_id,
+             timestamp '2026-01-01 00:00:00' + g * interval '37 seconds' AS event_time,
+             (g % 11)::numeric AS value
+      FROM generate_series(1, 500) g
+
+    dimensions:
+      - name: group_id
+        sql: group_id
+        type: number
+
+      - name: entity_id
+        sql: entity_id
+        type: number
+
+      - name: event_time
+        sql: event_time
+        type: time
+
+    measures:
+      - name: count_trailing_1_hr
+        type: count_distinct_approx
+        sql: "id_a || '-' || entity_id::text"
+        rolling_window:
+          trailing: 1 hour
+
+      - name: sum_trailing_1_hr
+        type: sum
+        sql: value
+        rolling_window:
+          trailing: 1 hour
+
+      - name: avg_trailing_1_hr
+        type: number
+        sql: "{CUBE.sum_trailing_1_hr} / {CUBE.count_trailing_1_hr}"
+
+    pre_aggregations:
+      - name: avg_by_minute
+        measures:
+          - CUBE.sum_trailing_1_hr
+          - CUBE.count_trailing_1_hr
+        dimensions:
+          - CUBE.group_id
+          - CUBE.entity_id
+        time_dimension: CUBE.event_time
+        granularity: minute
+        partition_granularity: hour
+        build_range_start:
+          sql: SELECT '2026-01-01 00:00:00'::timestamp
+        build_range_end:
+          sql: SELECT '2026-01-01 05:59:59'::timestamp
