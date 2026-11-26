@@ -1,5 +1,7 @@
 use super::{assert_filter, build_filter};
 use crate::cube_bridge::base_query_options::FilterValue;
+use crate::test_fixtures::cube_bridge::MockSchema;
+use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
 
 fn build(filter_yaml: &str) -> (String, Vec<FilterValue>) {
@@ -919,4 +921,172 @@ fn test_time_dimension_date_range() {
         r#"("visitors".created_at >= $_0_$::timestamptz AND "visitors".created_at <= $_1_$::timestamptz)"#,
         &["2024-01-01T00:00:00.000", "2024-12-31T23:59:59.999"],
     );
+}
+
+// ── number values ───────────────────────────────────────────────────────────
+
+fn build_number_filter(member: &str, operator: &str, value: &str) -> Result<String, String> {
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+    let query = format!(
+        "measures:\n  - visitors.count\nfilters:\n  - member: {}\n    operator: {}\n    values:\n      - \"{}\"\n",
+        member, operator, value
+    );
+    ctx.build_filter_sql(&query)
+        .map(|(sql, _)| sql)
+        .map_err(|e| e.message)
+}
+
+#[test]
+fn test_number_filter_accepts_decimal_literals() {
+    for value in [
+        "0",
+        "-0",
+        "42",
+        "-42",
+        "1.5",
+        "-0.5",
+        "0.0",
+        "1e3",
+        "1E3",
+        "1e+3",
+        "1.5e-10",
+        "9007199254740993",
+    ] {
+        for operator in [
+            "equals",
+            "notEquals",
+            "in",
+            "notIn",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+        ] {
+            let result = build_number_filter("visitors.id", operator, value);
+            assert!(result.is_ok(), "{} {}: {:?}", operator, value, result);
+        }
+    }
+}
+
+#[test]
+fn test_number_filter_rejects_non_decimal_literals() {
+    for value in [
+        "0x1F",
+        "0o17",
+        "0b101",
+        "+1",
+        "01",
+        "-01",
+        ".5",
+        "5.",
+        "1_000",
+        "1e",
+        "1e+",
+        "1.e3",
+        "",
+        " 1",
+        "1 ",
+        "-",
+        "NaN",
+        "Infinity",
+        "-Infinity",
+        "abc",
+        "1,5",
+        "١",
+    ] {
+        for operator in [
+            "equals",
+            "notEquals",
+            "in",
+            "notIn",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+        ] {
+            let error = build_number_filter("visitors.id", operator, value).unwrap_err();
+            assert_eq!(
+                error,
+                format!(
+                    "Invalid value '{}' in a filter on the number member 'visitors.id': expected a decimal number such as 42, -1.5 or 1e3",
+                    value
+                ),
+                "{} {}",
+                operator,
+                value
+            );
+        }
+    }
+}
+
+#[test]
+fn test_number_filter_rejects_any_invalid_value_of_a_list() {
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+    let error = ctx
+        .build_filter_sql(indoc! {"
+            measures:
+              - visitors.count
+            filters:
+              - dimension: visitors.id
+                operator: equals
+                values:
+                  - \"1\"
+                  - null
+                  - \"0x2\"
+        "})
+        .unwrap_err();
+    assert!(error.message.contains("'0x2'"), "{}", error.message);
+}
+
+#[test]
+fn test_number_measure_filter_rejects_non_decimal_literals() {
+    for member in [
+        "visitors.count",
+        "visitors.total_revenue",
+        "visitors.total_revenue_proxy",
+    ] {
+        let result = build_number_filter(member, "gt", "0x1F");
+        assert!(result.is_err(), "{}: {:?}", member, result);
+    }
+}
+
+#[test]
+fn test_like_filter_on_number_keeps_any_value() {
+    for operator in ["contains", "notContains", "startsWith", "endsWith"] {
+        let result = build_number_filter("visitors.id", operator, "0x1F");
+        assert!(result.is_ok(), "{}: {:?}", operator, result);
+    }
+}
+
+#[test]
+fn test_non_number_members_keep_any_value() {
+    for member in [
+        "visitors.source",
+        "visitors.source_label",
+        "visitors.is_active",
+    ] {
+        let result = build_number_filter(member, "equals", "01");
+        assert!(result.is_ok(), "{}: {:?}", member, result);
+    }
+}
+
+#[test]
+fn test_min_max_measure_filters_keep_any_value() {
+    let schema = MockSchema::from_yaml_file("common/simple.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+    for member in ["customers.max_age", "customers.min_age"] {
+        let query = format!(
+            "measures:\n  - customers.count\nfilters:\n  - member: {}\n    operator: gt\n    values:\n      - \"2024-01-01\"\n",
+            member
+        );
+        let result = ctx.build_filter_sql(&query);
+        assert!(
+            result.is_ok(),
+            "{}: {:?}",
+            member,
+            result.err().map(|e| e.message)
+        );
+    }
 }

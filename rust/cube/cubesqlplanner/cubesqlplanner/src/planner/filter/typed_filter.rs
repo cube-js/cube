@@ -194,6 +194,45 @@ impl TypedFilter {
     }
 }
 
+/// Whether `value` is a number as JSON spells one: an optional minus, an
+/// integer part without a leading zero, an optional fraction and exponent.
+fn is_number_literal(value: &str) -> bool {
+    fn digits(bytes: &[u8]) -> usize {
+        bytes.iter().take_while(|b| b.is_ascii_digit()).count()
+    }
+
+    let mut rest = value.as_bytes();
+    rest = rest.strip_prefix(b"-").unwrap_or(rest);
+
+    let integer = digits(rest);
+    if integer == 0 || (integer > 1 && rest[0] == b'0') {
+        return false;
+    }
+    rest = &rest[integer..];
+
+    if let Some(fraction) = rest.strip_prefix(b".") {
+        let len = digits(fraction);
+        if len == 0 {
+            return false;
+        }
+        rest = &fraction[len..];
+    }
+
+    if let Some(exponent) = rest.strip_prefix(b"e").or(rest.strip_prefix(b"E")) {
+        let exponent = exponent
+            .strip_prefix(b"+")
+            .or(exponent.strip_prefix(b"-"))
+            .unwrap_or(exponent);
+        let len = digits(exponent);
+        if len == 0 {
+            return false;
+        }
+        rest = &exponent[len..];
+    }
+
+    rest.is_empty()
+}
+
 fn boundary_at(at: &str, shift_ms: i64) -> Option<(String, String)> {
     let start =
         QueryDateTimeHelper::parse_native_date_time(at).ok()? + Duration::milliseconds(shift_ms);
@@ -281,6 +320,45 @@ impl TypedFilterBuilder {
         }
     }
 
+    // What a database accepts as a number in a string differs by engine and
+    // version: hex or digit separators parse on some and fail on others, and
+    // some coerce text that is no number at all to zero and filter by it.
+    fn validate_number_values(
+        member_evaluator: &Rc<MemberSymbol>,
+        values: &[FilterValue],
+    ) -> Result<(), CubeError> {
+        if !Self::compares_as_number(member_evaluator) {
+            return Ok(());
+        }
+        for value in values {
+            if let FilterValue::Str(value) = value {
+                if !is_number_literal(value) {
+                    return Err(CubeError::user(format!(
+                        "Invalid value '{}' in a filter on the number member '{}': expected a decimal number such as 42, -1.5 or 1e3",
+                        value,
+                        member_evaluator.full_name()
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn compares_as_number(member_evaluator: &Rc<MemberSymbol>) -> bool {
+        let symbol = resolve_base_symbol(member_evaluator);
+        match symbol.as_ref() {
+            MemberSymbol::Dimension(d) => d.dimension_type() == "number",
+            // min/max return whatever their operand is, a string or a time
+            // included, so their values can't be held to a number.
+            MemberSymbol::Measure(m) => !matches!(
+                m.measure_type(),
+                "boolean" | "string" | "time" | "min" | "max"
+            ),
+            MemberSymbol::Ref(r) => r.target_member().is_some_and(Self::compares_as_number),
+            MemberSymbol::TimeDimension(_) | MemberSymbol::MemberExpression(_) => false,
+        }
+    }
+
     fn first_non_null_value(values: &[FilterValue]) -> Result<FilterValue, CubeError> {
         values
             .iter()
@@ -335,6 +413,21 @@ impl TypedFilterBuilder {
             op
         } else {
             let member_type = Self::resolve_member_type(&member_evaluator);
+            if !self.use_raw_values
+                && matches!(
+                    operator,
+                    FilterOperator::Equal
+                        | FilterOperator::NotEqual
+                        | FilterOperator::In
+                        | FilterOperator::NotIn
+                        | FilterOperator::Gt
+                        | FilterOperator::Gte
+                        | FilterOperator::Lt
+                        | FilterOperator::Lte
+                )
+            {
+                Self::validate_number_values(&member_evaluator, &values)?;
+            }
             match operator {
                 FilterOperator::Equal | FilterOperator::NotEqual => {
                     let negated = matches!(operator, FilterOperator::NotEqual);
