@@ -45,6 +45,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use futures::Stream;
+use itertools::Itertools;
 use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -289,6 +290,31 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                 None
             },
         )
+    }
+}
+
+/// Where a pushed-down query runs, printed by `EXPLAIN` after the `SQL:` prefix
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WrappedSqlPlace<'a> {
+    /// `None` in Cube Store, which `external` names
+    data_source: Option<&'a str>,
+    external: bool,
+    pre_aggregations: Vec<&'a str>,
+}
+
+impl<'a> WrappedSqlPlace<'a> {
+    fn new(sql: &'a SqlQuery) -> Self {
+        Self {
+            data_source: sql.data_source.as_deref().filter(|_| !sql.external),
+            external: sql.external,
+            pre_aggregations: sql
+                .pre_aggregations
+                .iter()
+                .filter_map(|desc| desc.get("preAggregationId")?.as_str())
+                .unique()
+                .collect(),
+        }
     }
 }
 
@@ -1098,7 +1124,13 @@ impl ExecutionPlan for CubeScanExecutionPlan {
             DisplayFormatType::Default => {
                 // TODO padding
                 if let Some(sql) = self.wrapped_sql.as_ref() {
-                    write!(f, "CubeScanExecutionPlan, SQL:\n{}", sql.sql)
+                    write!(
+                        f,
+                        "CubeScanExecutionPlan, SQL: {}\n{}",
+                        serde_json::to_string(&WrappedSqlPlace::new(sql))
+                            .map_err(|_| fmt::Error)?,
+                        sql.sql
+                    )
                 } else {
                     write!(
                         f,

@@ -657,8 +657,18 @@ Union
 }
 ```
 
-The plan names each cube, not its data source. Read it together with the
-`data_source` of each cube.
+A `CubeScan` with a request names each cube, not its data source. Read it together
+with the `data_source` of each cube. A pushed-down query names where it runs: in the
+physical plan, its `CubeScanExecutionPlan, SQL:` line ends with JSON, and the SQL
+follows on the next lines:
+
+```
+CubeScanExecutionPlan, SQL: {"dataSource":"default","external":false,"preAggregations":[]}
+```
+
+`dataSource` is the data source that runs the SQL, and `preAggregations` lists the
+IDs of the pre-aggregations it reads, such as `orders.main`. When Cube Store runs it,
+`external` is `true` and `dataSource` is `null`.
 
 ## Limitations
 
