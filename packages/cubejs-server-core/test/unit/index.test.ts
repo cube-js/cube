@@ -146,6 +146,17 @@ describe('index.test', () => {
       .toThrowError(/"compilerCacheSize" must be greater than or equal to 1/);
   });
 
+  test('Should throw error, orchestratorCacheSize of 0', () => {
+    const options = {
+      externalDbType: <DatabaseType>'mysql',
+      devServer: true,
+      orchestratorCacheSize: 0,
+    };
+
+    expect(() => new CubejsServerCore(options))
+      .toThrowError(/"orchestratorCacheSize" must be greater than or equal to 1/);
+  });
+
   test('Should create instance of CubejsServerCore, orchestratorOptions as func', async () => {
     const options = {
       driverFactory: () => <any>({ type: 'mysql' }),
