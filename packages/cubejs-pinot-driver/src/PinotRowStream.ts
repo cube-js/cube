@@ -2,15 +2,8 @@ import { Readable } from 'stream';
 
 export type PinotRow = Record<string, unknown>;
 
-/**
- * Resolves with the next page of rows, or `null` once the result is exhausted.
- */
 export type PinotPageReader = () => Promise<PinotRow[] | null>;
 
-/**
- * Called when the stream is closed, whether it ended, failed or was destroyed.
- * The stream does not wait for it to finish.
- */
 export type PinotStreamCloser = () => Promise<void>;
 
 export class PinotRowStream extends Readable {

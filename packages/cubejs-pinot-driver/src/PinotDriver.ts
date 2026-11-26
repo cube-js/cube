@@ -86,10 +86,8 @@ type PinotResponse = {
   traceInfo: any,
   requestId?: string,
   numRowsResultSet?: number,
-  // The broker that ran the query. A cursor lives in the response store of that broker only.
   brokerHost?: string,
   brokerPort?: number,
-  // Set only on responses served from a cursor.
   offset?: number,
   numRows?: number,
 };
@@ -110,8 +108,6 @@ const isCursorResponse = (response: PinotResponse): response is PinotCursorRespo
 
 type PinotCursor = {
   id: string,
-  // Starts as the configured address and moves to the owning broker once that address
-  // turns out to route to a broker without the cursor.
   storeUrl: string,
   brokerStoreUrl: string | null,
 };
@@ -362,8 +358,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
 
   /**
    * The configured address may balance over several brokers, while a cursor is known only
-   * to the broker that ran the query. When the address answers that it has no such cursor,
-   * the request is repeated against the owning broker, and the cursor stays there.
+   * to the broker that ran the query.
    */
   protected async sendToResponseStore(
     cursor: PinotCursor,
@@ -395,9 +390,8 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
   }
 
   /**
-   * Answers a query that is known to return no rows. Pinot plans `LIMIT 0` without
-   * scanning anything, so the schema comes at the price of planning instead of a
-   * second execution. A query that cannot be wrapped is executed as is.
+   * Pinot plans `LIMIT 0` without scanning anything, so the schema of an empty result
+   * costs planning instead of a second execution.
    */
   protected async requestEmptyResult(query: string, requestId?: string): Promise<PinotResponse> {
     try {
@@ -554,14 +548,13 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
     };
 
     if (cursor !== null && nextOffset >= totalRows) {
-      // The first page holds the whole result, so the cursor is dropped right away,
-      // in the background, instead of costing the consumer a round trip at the end.
+      // Saves the consumer a round trip at the end.
       release();
     }
 
     return {
-      // The stream releases the cursor itself when it closes, so a consumer that never
-      // calls `release` does not leave the result in the broker's response store.
+      // A consumer that never calls `release` must not leave the result in the broker's
+      // response store.
       rowStream: new PinotRowStream(nextPage, pageSize, release),
       types: this.resultTableTypes(first.resultTable),
       release,

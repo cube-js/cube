@@ -105,7 +105,6 @@ describe('Pinot', () => {
 
   const AUTHORIZATION = `Basic ${Buffer.from('admin:mysecret').toString('base64')}`;
 
-  // The ids of the cursors the broker keeps in its response store.
   const storedCursors = async (): Promise<string[]> => {
     let failure = '';
 

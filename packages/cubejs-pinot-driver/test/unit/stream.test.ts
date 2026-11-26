@@ -13,13 +13,9 @@ type BrokerOptions = {
   exception?: { message: string, errorCode: number },
   failResultsWith?: { status: number, body: string },
   failDeleteWith?: { status: number, body: string },
-  // Accepts the page request and never answers it.
   hangResults?: boolean,
-  // Accepts the delete request and never answers it.
   hangDelete?: boolean,
-  // Rejects the `LIMIT 0` query that reads the schema of an empty result.
   failSchemaQuery?: boolean,
-  // Reported as the broker that ran the query.
   owner?: { host: string, port: number },
 };
 
@@ -412,7 +408,6 @@ describe('PinotDriver stream', () => {
     expect(await streamToArray(<any> source.rowStream)).toEqual(EXPECTED);
     await source.release?.();
 
-    // The configured address is asked once, every later request goes to the owner.
     expect(calls(requests)).toEqual([
       'POST /query/sql?getCursor=true&numRows=2',
       `GET /responseStore/${CURSOR_ID}/results?offset=2&numRows=2`,
