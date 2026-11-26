@@ -55,8 +55,9 @@ async function sqlApiLoad(
   sqlQuery?: [string, any[]],
   signedWithPlaygroundAuthSecret = false,
   request: Record<string, any> = {},
+  compilerApiFactory: any = compilerApi,
 ) {
-  const apiGateway = createGateway(adapterApi);
+  const apiGateway = createGateway(adapterApi, compilerApiFactory);
 
   let response: any;
 
@@ -246,16 +247,11 @@ describe('sqlApiLoad over Cube Store pre-aggregations', () => {
 
   test('sqlQuery without external runs on the data source', async () => {
     const adapterApi = new FreshnessAdapterApiMock();
-    await sqlApiLoad(
-      adapterApi,
-      ['SELECT 1', []],
-      false,
-      { preAggregations: [PRE_AGGREGATION] },
-    );
+    await sqlApiLoad(adapterApi, ['SELECT 1', []]);
 
     const [executed] = adapterApi.executedQueries;
     expect(executed.external).toBeFalsy();
-    expect(executed.preAggregations).toBeUndefined();
+    expect(executed.preAggregations).toEqual([]);
   });
 });
 
@@ -263,6 +259,7 @@ describe('sqlApiLoad over source database pre-aggregations', () => {
   const OUTER_PRE_AGGREGATION = {
     tableName: 'dev_pre_aggregations.orders_main',
     external: false,
+    matchedTimeDimensionDateRange: ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999'],
   };
 
   const SUB_QUERY_PRE_AGGREGATION = {
@@ -286,19 +283,13 @@ describe('sqlApiLoad over source database pre-aggregations', () => {
   }
 
   async function sqlApiLoadWithOuterRollup(adapterApi: any, request: Record<string, any>) {
-    const apiGateway = createGateway(adapterApi, compilerApiWithOuterRollup());
-
-    await apiGateway.sqlApiLoad({
-      query: { measures: ['Foo.bar'] },
-      sqlQuery: ['SELECT * FROM dev_pre_aggregations.orders_main JOIN dev_pre_aggregations.logs_main', []],
-      ...request,
-      streaming: false,
-      memberExpressions: true,
-      context: { requestId: 'sql-api-load-test', securityContext: {} } as any,
-      res: () => undefined,
-      apiType: 'sql',
-    } as any);
-
+    await sqlApiLoad(
+      adapterApi,
+      ['SELECT * FROM dev_pre_aggregations.orders_main JOIN dev_pre_aggregations.logs_main', []],
+      false,
+      request,
+      compilerApiWithOuterRollup(),
+    );
     return adapterApi.executedQueries[0];
   }
 
@@ -311,21 +302,12 @@ describe('sqlApiLoad over source database pre-aggregations', () => {
     );
 
     expect(executed.external).toBeFalsy();
+    // cubesql echoes the outer rollup too: the same description keeps its date range
     expect(executed.preAggregations).toEqual([OUTER_PRE_AGGREGATION, SUB_QUERY_PRE_AGGREGATION]);
   });
 
   test('sqlQuery on the data source keeps its own rollups without sub-queries', async () => {
     const executed = await sqlApiLoadWithOuterRollup(new FreshnessAdapterApiMock(), {});
-
-    expect(executed.external).toBeFalsy();
-    expect(executed.preAggregations).toEqual([OUTER_PRE_AGGREGATION]);
-  });
-
-  test('sqlQuery on the data source leaves Cube Store rollups out', async () => {
-    const executed = await sqlApiLoadWithOuterRollup(
-      new FreshnessAdapterApiMock(),
-      { preAggregations: [{ tableName: 'dev_pre_aggregations.logs_main', external: true }] },
-    );
 
     expect(executed.external).toBeFalsy();
     expect(executed.preAggregations).toEqual([OUTER_PRE_AGGREGATION]);

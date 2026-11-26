@@ -853,9 +853,9 @@ filter_subq AS (
       expect(res.rows).toMatchSnapshot('join grouped empty members');
     });
 
-    // Each side is served from its own rollup in the source database: the one the
-    // sub-query reads has to be built and swapped in too
-    test('join with grouped query over source database rollups', async () => {
+    // The sub-query is served from a rollup in the source database, which has to be
+    // built and swapped in although the outer query doesn't read it
+    test('join with grouped query over a source database rollup', async () => {
       const query = `
         SELECT
           o.status AS order_status,
@@ -879,6 +879,23 @@ filter_subq AS (
         { order_status: 'new', known_status: 'new' },
         { order_status: 'shipped', known_status: 'shipped' },
       ]);
+
+      const dbConnection = new PgClient({
+        host: db.getHost(),
+        port: db.getMappedPort(5432),
+        database: 'test',
+        user: 'test',
+        password: 'test',
+      });
+      await dbConnection.connect();
+      try {
+        const tables = await dbConnection.query(
+          "SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'sub_query_rollup_statuses_by_status%'"
+        );
+        expect(tables.rows.length).toBeGreaterThan(0);
+      } finally {
+        await dbConnection.end();
+      }
     });
 
     test('where segment is false', async () => {
