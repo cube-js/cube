@@ -683,9 +683,11 @@ code, with a before-and-after example.
 
 A view's joins are the joins on its join path plus any joins that member SQL reaches, such as
 `{CUBE.users.country}`. That includes the SQL of a member the view doesn't list but one of its
-members references. A one-to-many join on the join path blocks the view, and so does a
-dimension that reads a cube behind one ([`CUBE_VIEW_JOIN_NOT_REPRESENTABLE`](#cube-view-join-not-representable)). Otherwise, a one-to-many join that member SQL
-reaches doesn't block the view, but it can withhold some of the view's measures.
+members references. A one-to-many join on the join path blocks the view, and so does a dimension
+that reads a cube behind one
+([`CUBE_VIEW_JOIN_NOT_REPRESENTABLE`](#cube-view-join-not-representable)). Otherwise, a
+one-to-many join that member SQL reaches doesn't block the view, but it can withhold some of the
+view's measures.
 
 A measure of the view's root cube that reads a joined cube, such as
 `SUM(CASE WHEN {products.family} = 'CX' THEN {CUBE}.events END)`, publishes when all of the
@@ -1292,7 +1294,9 @@ measures:
 
 Every member the view includes is a measure with no Metric View form, such as a multi-stage,
 `rolling_window`, or ranking measure, so a Metric View would have nothing to query. The message
-lists each one. Include a measure that publishes, or keep the view in Cube.
+lists each one. Include a measure that publishes, or keep the view in Cube. A view that also
+includes a dimension is blocked as `OSSIE_CUBE_MULTI_STAGE_MEASURE_PARKED` instead, as described
+at the start of this section.
 
 ### `CUBE_MEMBER_WITHHELD` {#cube-member-withheld}
 
