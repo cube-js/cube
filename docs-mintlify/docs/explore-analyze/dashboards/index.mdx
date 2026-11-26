@@ -101,54 +101,141 @@ saved yet, no dialog asks which one to keep:
 - On a chart, the change that arrived replaces your edit to that chart.
 </Warning>
 
-## Full screen
+## Presentation mode {#presentation}
 
-To show a published dashboard in a meeting or on a wall display, open the
-**More actions** menu (`⋮`) at the right end of the dashboard header and choose
-**Full screen**, the first item. The browser goes full screen and the dashboard
+To show a published dashboard in a meeting or on a TV, open the **More
+actions** menu (`⋮`) at the right end of the dashboard header and choose
+**Present**, the first item. The browser goes full screen and the dashboard
 fills it: the sidebar, the dashboard header, an open comments, scheduled
-refreshes or agent panel, and the floating chat button are hidden. Controls,
-tabs and a chart's **Explore** keep working.
+refreshes or agent panel, and the floating chat button are hidden. A panel
+floats at the bottom of the screen to run the presentation. Controls, tabs and
+a chart's **Explore** keep working.
 
-Press **Esc** to leave full screen. After you entered from the menu, the
-browser's **Back** button leaves too, which is the way out on a device with no
-Esc key. The dashboard comes back as you left it: your control selections and
-tabs are kept, and a panel that was open is open again.
+The panel holds, from left to right:
+
+- **Pause** and **Play**, a switch with a pause icon and a play icon.
+  Presentation mode opens on **Pause**, which shows the whole dashboard.
+  **Play** shows the dashboard's charts one at a time, each filling the
+  screen, starting at the first.
+- **Previous chart** and **Next chart**, which step through the charts in
+  **Play**. On **Pause** they are disabled, with the hint "Press Play to step
+  through the charts".
+- **Autoplay**, off at first. While it is on, **Play** moves to the next chart
+  by itself.
+- The interval of **Autoplay**, a whole number of seconds from 5 to 3600. It
+  starts at 10.
+- **Loop**, on at first: after the last chart, **Autoplay** starts again at
+  the first. With **Loop** off, it stops on the last chart.
+- **Copy TV link**, which copies a [link](#presentation-link) that opens this
+  presentation.
+- **Exit presentation** (`✕`).
+
+**Play** steps through every chart on the dashboard, KPIs included, in the
+order you read it: top to bottom, then left to right. When it reaches a
+[container][ref-layout], it shows every chart inside it before going on, and
+the same in a container nested in another:
+
+- A grid's charts go top to bottom, then left to right, and a stack's in its
+  order.
+- A tabs container's charts go tab by tab from the left: every chart of the
+  first tab, then every chart of the next one, whichever tab the dashboard
+  shows.
+
+A container is never shown on its own, and a chart from a tab fills the screen
+without the tab strip. Text, controls, Analysis widgets, spacers and dividers
+show only on **Pause**, with the whole dashboard. Each chart uses the
+dashboard's control selections, and a chart in a tab also uses the defaults of
+the controls in that tab. A [cross-filter][ref-cross-filtering] you set on one
+chart stays on for the next ones and for the whole dashboard.
+
+- **Pause** shows the whole dashboard again, on the tabs it showed before, and
+  **Play** after it starts at the first chart once more.
+- Stepping by hand never wraps: **Previous chart** is disabled on the first
+  chart and **Next chart** on the last.
+- **Autoplay** moves only in **Play**. Turned on while on **Pause**, it waits
+  for **Play**; **Pause** stops it and leaves it on.
+
+A dashboard with no chart anywhere on it, in a container or not, has nothing
+to play, and neither has an [app](/docs/explore-analyze/apps). An app's own
+[slide deck](/docs/explore-analyze/apps#present-a-slide-deck) keeps its own
+buttons and keys.
+
+In **Play**, the keys of an app's slide deck step through the charts:
+
+- **→**, **Page Down**, or **Space** for the next chart.
+- **←**, **Page Up**, or **Shift+Space** for the previous chart.
+- **Home** or **End** for the first or last chart.
+
+On **Pause** these keys do nothing.
+
+The panel hides after 3 seconds without a mouse move. Moving the mouse,
+clicking or scrolling shows it again, and so does **Tab**, which puts the focus
+on the **Pause** and **Play** switch. It stays while the pointer is over it or
+you use it from the keyboard.
+
+Click **Exit presentation** or press **Esc** to leave. After you entered from
+the menu, the browser's **Back** button leaves too, which is the way out on a
+device with no Esc key. The dashboard comes back as you left it: your control
+selections and tabs are kept, and a panel that was open is open again.
+**Present** opens on **Pause** again, with the **Autoplay**, interval and
+**Loop** you last set; reloading the page sets them back.
 
 If the browser doesn't allow full screen, the dashboard still fills the browser
 window, without the sidebar, header and panels. Whenever it fills only the
-window, that way or [from a link](#full-screen-link), an **Esc** that closes an
-open list or dialog closes only that; press **Esc** again to leave.
+window, that way or [from a link](#presentation-link), an **Esc** that closes
+an open list or dialog closes only that; press **Esc** again to leave.
 
-Full screen needs a window at least 920 pixels wide. In a narrower window, such
-as on a phone, the header offers no **Full screen** item and a [full-screen
-link](#full-screen-link) opens the dashboard as usual, with its sidebar and
-header. Narrowing the window below 920 pixels while in full screen brings the
-sidebar and header back and takes the browser out of full screen.
+Presentation mode needs a window at least 920 pixels wide. In a narrower
+window, such as on a phone, the header offers no **Present** item and a
+[presentation link](#presentation-link) opens the dashboard as usual, with its
+sidebar and header. Narrowing the window below 920 pixels while presenting
+brings the sidebar and header back and takes the browser out of full screen.
 
-### Open a dashboard in full screen from a link {#full-screen-link}
+### Open a dashboard in presentation mode from a link {#presentation-link}
 
-Add `fullscreen=true` to a published dashboard's address to open it without the
-sidebar, header and panels, for example on a TV:
+Add `fullscreen=true` to a published dashboard's address to open it in
+presentation mode, on **Pause**, for example on a TV:
 
 ```text
 /d/<deployment_id>/dashboard/<dashboard_id>?fullscreen=true
 ```
 
+Add `autoplay=<seconds>` as well to open it playing: it shows the first chart,
+moves to the next one every that many seconds, and starts again at the first
+after the last:
+
+```text
+/d/<deployment_id>/dashboard/<dashboard_id>?fullscreen=true&autoplay=30
+```
+
+`autoplay` takes a whole number of seconds from 5 to 3600; any other value
+plays every 10 seconds. Without `fullscreen=true` it does nothing.
+
+**Copy TV link** in the panel copies such a link: the dashboard's address with
+your control selections, cross-filters and tabs, as the header's **Copy link**
+has them, plus `fullscreen=true`, and `autoplay` with the interval while
+**Autoplay** is on. **Pause** or **Play** and **Loop** don't change it, so a
+link with `autoplay` always plays and loops. The notice after copying says how
+the link opens. While you present, the page's own address carries the same
+`autoplay`, so a reload opens the way the copied link does.
+
 The link doesn't switch the browser itself to full screen: on a desktop, use
-the browser's own full-screen mode to hide its toolbar too. A reload keeps the
-view, and **Esc** leaves it. In a window narrower than 920 pixels the link opens
-the normal page, and widening the window to 920 pixels or more hides the
-sidebar and header. Only the value `true` turns it on, and it combines
-with the [control][ref-sharing-selection] and [tab][ref-tabs-url] parameters,
-so a link such as `?fullscreen=true&tg_orders.created_at=week` opens with that
-granularity picked. The link opens the dashboard in Cube, so the browser showing
-it needs to be signed in with access to the dashboard; an [embedded
+the browser's own full-screen mode to hide its toolbar too. The panel stays
+hidden until the mouse moves or you press **Tab**, and **Esc** leaves
+presentation mode. In a window narrower than 920 pixels the link opens the
+normal page, and widening the window to 920 pixels or more opens presentation
+mode. Only the value `true` turns it on, and it combines with the
+[control][ref-sharing-selection] and [tab][ref-tabs-url] parameters, so a link
+such as `?fullscreen=true&tg_orders.created_at=week` opens with that
+granularity picked. The link opens the dashboard in Cube, so the browser
+showing it needs to be signed in with access to the dashboard; an [embedded
 dashboard](/embedding/iframe/dashboards#show-or-hide-header-controls) hides its
 header with `showDashboardHeader=false` instead. Ask the [Dashboard
 Agent][ref-dashboard-agent] for a link to show the dashboard on a TV, and it
-answers with this link; ask it to keep the dashboard refreshing too, and the
-link also carries [`autoRefresh`](#auto-refresh-link).
+answers with this link; ask it to cycle through the charts, and the link
+carries `autoplay`; ask it to keep the dashboard refreshing too, and the link
+also carries [`autoRefresh`](#auto-refresh-link), which **Copy TV link** leaves
+out.
 
 ## Auto-refresh
 
@@ -178,8 +265,8 @@ dashboard with auto-refresh off and turns it on from the **More actions** menu
 </Info>
 
 On a dashboard published with auto-refresh on, the **More actions** menu (`⋮`)
-lists **Auto-refresh** right below **Full screen**. In a window narrower
-than 920 pixels, which has no **Full screen** item, it sits right above
+lists **Auto-refresh** right below **Present**. In a window narrower
+than 920 pixels, which has no **Present** item, it sits right above
 **Duplicate** instead. While auto-refresh runs, the item reads **Stop auto-refresh**,
 and choosing it stops the refreshes. A dashboard published with auto-refresh off
 has the item only while an `autoRefresh=<minutes>` [link](#auto-refresh-link) runs
@@ -212,8 +299,9 @@ While auto-refresh runs:
   dashboard** when a chart's query failed, or **Couldn't load filter values**
   when only a [filter's value list][ref-filter-values-failed] failed. The
   chart or filter that failed shows its error.
-- It keeps running in [full screen](#full-screen) and after a reload, since it
-  is kept in the page's address as an [`autoRefresh`](#auto-refresh-link)
+- It keeps running in [presentation mode](#presentation), where it refreshes
+  the chart on screen while **Play** steps, and after a reload, since it is
+  kept in the page's address as an [`autoRefresh`](#auto-refresh-link)
   parameter: **Auto-refresh** adds `autoRefresh=true`, and a link's own
   value stays as it was. A link copied with **Copy link** leaves it out.
 

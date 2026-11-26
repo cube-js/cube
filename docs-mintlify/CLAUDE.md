@@ -135,7 +135,7 @@ Make sure to use correct terms. On billing, pricing, and support pages, use **on
     - **Dashboard**
       - Cross-filtering
       - Drill-through
-      - Full screen
+      - Presentation mode (the `⋮` menu's **Present**; formerly Full screen)
       - Schedules ("Refreshes, deliveries and alerts"; "schedule" where the kind is unknown)
         - Refresh (notifies nobody; not the dashboard's auto-refresh)
         - Dashboard delivery (sends by Email and/or Slack; How: "Every time")
