@@ -9,7 +9,7 @@ Unlike [source SQL in Explore](/docs/explore-analyze/explore#querying-source-dat
 Source SQL tabs are saved with the workbook and can feed charts on dashboards.
 
 <Frame>
-  <img src="https://lgo0ecceic.ucarecd.net/103fafdb-783c-46d0-9d5d-a4879bc11a9d/" />
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/source-sql-tabs/source-sql-tab.png" alt="Source SQL tab with the data source pane, the SQL editor, the Row limit and Run buttons in the toolbar, and the results table" />
 </Frame>
 
 ## Adding a Source SQL tab
@@ -44,7 +44,7 @@ bare name. Names are copied as is, without quotes.
 
 <Frame>
   <img
-    src="https://static.cube.dev/docs/explore-analyze/workbooks/source-schemas-copy-name.png"
+    src="https://static.cube.dev/docs/explore-analyze/workbooks/source-sql-tabs/source-schemas-copy-name.png"
     alt="Source schemas pane with the Copy name and Query table actions on a table row"
   />
 </Frame>
@@ -57,8 +57,8 @@ You can query source SQL in two ways:
 - **Ask AI** – Use the AI agent to help you research your data source, build SQL queries, and refine results in real-time
 
 Click **Run** or press **Cmd+Enter** (macOS) or **Ctrl+Enter** (Windows/Linux)
-to run the query. Results show up to 5,000 rows. When a query fails, click
-**Fix in chat** to have the agent fix it.
+to run the query. The [row limit](#row-limit) caps how many rows it returns.
+When a query fails, click **Fix in chat** to have the agent fix it.
 
 Queries run with the [security context](/docs/explore-analyze/workbooks/querying-data#applying-a-security-context)
 selected in the header, if any.
@@ -66,3 +66,32 @@ selected in the header, if any.
 DDL statements, such as `CREATE` or `DROP`, run only when **Enable DDL
 operations in SQL** is turned on in the deployment's **Settings →
 Configuration**.
+
+## Row limit
+
+To set how many rows a Source SQL tab returns, click **Row limit** in the
+toolbar and enter a number.
+
+{/* TODO: video — setting a row limit on a Source SQL tab (GTM-332) */}
+
+<Frame>
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/source-sql-tabs/row-limit-popover.png" alt="Row limit popover with the info icon, the Reset button, and a row limit of 2,500" />
+</Frame>
+
+- **Empty** — The query runs with the deployment's
+  [default row limit](/docs/data-modeling/configuration#default-row-limit),
+  10,000 rows unless it's changed. The field shows the default as its
+  placeholder. Click **Reset** to clear a number. A tab saved without a row
+  limit runs with the default, too.
+- **A number** — The query returns up to that many rows. A number above the
+  deployment's [maximum row limit](/docs/data-modeling/configuration#maximum-row-limit)
+  is reduced to the maximum. Hover over the info icon next to **Row limit** to
+  see the maximum. If you can edit the deployment's environment variables,
+  click the icon to open **Environment variables** in a new tab, where the
+  default and the maximum are set.
+
+A new limit re-runs the query on screen. If you haven't run the query yet,
+the limit is saved and applies when you run it.
+
+The limit is saved with the tab, so it stays after a reload and when the
+workbook is promoted. A CSV export includes the rows that the limit returns.
