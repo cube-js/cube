@@ -31,7 +31,26 @@ const calcMessageLength = (message: unknown) => Buffer.byteLength(
 
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => Promise<void>;
 
+/**
+ * A subscribe load in flight. `isUnsubscribed` tells whether the subscription was unsubscribed
+ * after the load started, in which case the load must not register it again.
+ */
+type SubscribeLoad = {
+  isUnsubscribed: () => boolean,
+  release: () => void,
+};
+
+type SubscribeLoadsEntry = {
+  // Loads in flight for this subscription id: a client re-send can overlap a tick re-run
+  running: number,
+  // Bumped on every unsubscribe, so each load can tell whether one happened since it started
+  unsubscribes: number,
+};
+
 export class SubscriptionServer {
+  // connectionId -> subscriptionId -> loads in flight. Entries are removed once their last load ends.
+  protected readonly subscribeLoads: Map<string, Map<string, SubscribeLoadsEntry>> = new Map();
+
   public constructor(
     protected readonly apiGateway: ApiGateway,
     protected readonly sendMessage: WebSocketSendMessageFn,
@@ -130,6 +149,7 @@ export class SubscriptionServer {
   protected async handleMessage(connectionId: string, message: WsMessage, isSubscription: boolean) {
     let authContext: any = {};
     let context: Partial<ExtendedRequestContext> = {};
+    let subscribeLoad: SubscribeLoad | undefined;
 
     try {
       const connection = this.subscriptionStore.connect(connectionId);
@@ -161,12 +181,18 @@ export class SubscriptionServer {
       }
 
       if ('unsubscribe' in message) {
-        await this.subscriptionStore.unsubscribe(connectionId, message.unsubscribe);
+        await this.unsubscribe(connectionId, message.unsubscribe);
         return;
       }
 
       if (!message.messageId) {
         throw new UserError('messageId is required');
+      }
+
+      // Tracked before the first await, so an unsubscribe that arrives after this message
+      // is always seen by its load, however long the steps before the load take
+      if (message.method === 'subscribe') {
+        subscribeLoad = this.trackSubscribeLoad(connectionId, message.messageId);
       }
 
       authContext = await this.subscriptionStore.getAuthContext(connectionId);
@@ -210,6 +236,20 @@ export class SubscriptionServer {
         return;
       }
 
+      if (subscribeLoad && !isSubscription) {
+        // Register before the load, so an unsubscribe that arrives during it has something to remove.
+        // The state of an existing subscription is kept: a heartbeat re-send must not re-send an unchanged result.
+        const existing = await this.subscriptionStore.getSubscription(connectionId, subscriptionId);
+        if (subscribeLoad.isUnsubscribed()) {
+          return;
+        }
+
+        await this.subscriptionStore.subscribe(connectionId, subscriptionId, {
+          message,
+          state: existing?.state,
+        });
+      }
+
       this.apiGateway.log({
         type: 'Incoming network usage',
         service: 'api-ws',
@@ -242,11 +282,18 @@ export class SubscriptionServer {
           const subscription = await this.subscriptionStore.getSubscription(connectionId, subscriptionId);
           return subscription && subscription.state;
         },
-        subscribe: async (state) => this.subscriptionStore.subscribe(connectionId, subscriptionId, {
-          message,
-          state
-        }),
-        unsubscribe: async () => this.subscriptionStore.unsubscribe(connectionId, subscriptionId)
+        subscribe: async (state) => {
+          // An unsubscribe that arrived during the load wins over the load's result
+          if (subscribeLoad?.isUnsubscribed()) {
+            return;
+          }
+
+          await this.subscriptionStore.subscribe(connectionId, subscriptionId, {
+            message,
+            state
+          });
+        },
+        unsubscribe: async () => this.unsubscribe(connectionId, subscriptionId)
       });
 
       await this.sendMessage(connectionId, { messageProcessedId: message.messageId });
@@ -262,11 +309,70 @@ export class SubscriptionServer {
         res: this.resultFn(connectionId, messageId, context.requestId),
         context
       });
+    } finally {
+      subscribeLoad?.release();
     }
   }
 
+  protected async unsubscribe(connectionId: string, subscriptionId: string) {
+    const entry = this.subscribeLoads.get(connectionId)?.get(subscriptionId);
+    if (entry) {
+      entry.unsubscribes++;
+    }
+
+    await this.subscriptionStore.unsubscribe(connectionId, subscriptionId);
+  }
+
+  protected trackSubscribeLoad(connectionId: string, subscriptionId: string): SubscribeLoad {
+    let loads = this.subscribeLoads.get(connectionId);
+    if (!loads) {
+      loads = new Map();
+      this.subscribeLoads.set(connectionId, loads);
+    }
+
+    let entry = loads.get(subscriptionId);
+    if (!entry) {
+      entry = { running: 0, unsubscribes: 0 };
+      loads.set(subscriptionId, entry);
+    }
+
+    entry.running++;
+
+    const connectionLoads = loads;
+    const trackedEntry = entry;
+    const unsubscribesAtStart = entry.unsubscribes;
+    let released = false;
+
+    return {
+      isUnsubscribed: () => trackedEntry.unsubscribes !== unsubscribesAtStart,
+      release: () => {
+        if (released) {
+          return;
+        }
+
+        released = true;
+        trackedEntry.running--;
+
+        if (trackedEntry.running === 0) {
+          connectionLoads.delete(subscriptionId);
+
+          if (connectionLoads.size === 0 && this.subscribeLoads.get(connectionId) === connectionLoads) {
+            this.subscribeLoads.delete(connectionId);
+          }
+        }
+      },
+    };
+  }
+
+  protected isSubscribeLoadInFlight(connectionId: string, subscriptionId: string | undefined): boolean {
+    return subscriptionId !== undefined && !!this.subscribeLoads.get(connectionId)?.has(subscriptionId);
+  }
+
   public async processSubscriptions() {
-    const allSubscriptions = this.subscriptionStore.getAllSubscriptions();
+    const allSubscriptions = this.subscriptionStore.getAllSubscriptions()
+      // A subscription is registered before its first load ends. Until a load ends, that load
+      // delivers the result: re-running it here would load it twice and send the result twice.
+      .filter(subscription => !this.isSubscribeLoadInFlight(subscription.connectionId, subscription.message?.messageId));
     await Promise.all(allSubscriptions.map(async subscription => {
       // One failing subscription must not abort the tick for the others
       try {

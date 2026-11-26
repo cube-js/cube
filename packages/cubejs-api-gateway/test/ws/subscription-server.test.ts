@@ -797,4 +797,194 @@ describe('SubscriptionServer', () => {
       );
     });
   });
+  describe('Unsubscribe while a subscribe load is in flight', () => {
+    const subscribeMessage = (messageId: string) => JSON.stringify({
+      method: 'subscribe',
+      messageId,
+      params: { query: { measures: ['Orders.count'] } },
+    });
+
+    const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+    const createServer = () => {
+      const { mockApiGateway, mockSendMessage, mockContextAcceptor, sentMessages } = createMocks();
+      const store = new TestSubscriptionStore();
+      mockApiGateway.unsubscribe = ApiGateway.prototype.unsubscribe;
+
+      // Each load waits for the next call to `finishLoad`
+      const pendingLoads: Array<() => void> = [];
+      const finishLoad = () => pendingLoads.shift()!();
+
+      // Mirrors the gateway: load, reply when the result changed, then record the subscription
+      mockApiGateway.subscribe = jest.fn(async ({ res, subscribe, subscriptionState }) => {
+        await new Promise<void>((resolve) => pendingLoads.push(resolve));
+        const state = await subscriptionState();
+        if (!state || state.resultHash !== 'hash') {
+          await res({ data: [] });
+        }
+        await subscribe({ resultHash: 'hash' });
+      });
+
+      const server = new SubscriptionServer(mockApiGateway, mockSendMessage, store, mockContextAcceptor);
+
+      return { server, store, mockApiGateway, sentMessages, pendingLoads, finishLoad };
+    };
+
+    // Sends a message and waits until its load has started. The message's promise is wrapped,
+    // since an async function returning it directly would wait for the whole message.
+    const startLoad = async (server: SubscriptionServer, pendingLoads: unknown[], body: string) => {
+      const loadsBefore = pendingLoads.length;
+      const done = server.processMessage('conn-1', body);
+      while (pendingLoads.length === loadsBefore) {
+        await flush();
+      }
+
+      return { done };
+    };
+
+    it('should register the subscription before its first load ends', async () => {
+      const { server, store, pendingLoads, finishLoad } = createServer();
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      const { done: inFlight } = await startLoad(server, pendingLoads, subscribeMessage('1'));
+      expect(await store.getSubscription('conn-1', '1')).toBeDefined();
+
+      finishLoad();
+      await inFlight;
+
+      expect((await store.getSubscription('conn-1', '1'))?.state).toEqual({ resultHash: 'hash' });
+    });
+
+    it('should drop a subscription unsubscribed during its first load', async () => {
+      const { server, store, mockApiGateway, pendingLoads, finishLoad } = createServer();
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      const { done: inFlight } = await startLoad(server, pendingLoads, subscribeMessage('1'));
+      await server.processMessage('conn-1', JSON.stringify({ unsubscribe: '1' }));
+
+      finishLoad();
+      await inFlight;
+
+      expect(store.getAllSubscriptions()).toEqual([]);
+
+      await server.processSubscriptions();
+      expect(mockApiGateway.subscribe).toHaveBeenCalledTimes(1);
+    });
+
+    it('should drop a subscription unsubscribed with the unsubscribe method during its first load', async () => {
+      const { server, store, pendingLoads, finishLoad } = createServer();
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      const { done: inFlight } = await startLoad(server, pendingLoads, subscribeMessage('1'));
+      await server.processMessage('conn-1', JSON.stringify({ method: 'unsubscribe', messageId: '1' }));
+
+      finishLoad();
+      await inFlight;
+
+      expect(store.getAllSubscriptions()).toEqual([]);
+    });
+
+    it('should drop a subscription unsubscribed during a heartbeat re-send', async () => {
+      const { server, store, pendingLoads, finishLoad } = createServer();
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      const { done: first } = await startLoad(server, pendingLoads, subscribeMessage('1'));
+      finishLoad();
+      await first;
+
+      const { done: resend } = await startLoad(server, pendingLoads, subscribeMessage('1'));
+      await server.processMessage('conn-1', JSON.stringify({ unsubscribe: '1' }));
+
+      finishLoad();
+      await resend;
+
+      expect(store.getAllSubscriptions()).toEqual([]);
+    });
+
+    it('should drop a subscription unsubscribed during a tick re-run', async () => {
+      const { server, store, pendingLoads, finishLoad } = createServer();
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      const { done: first } = await startLoad(server, pendingLoads, subscribeMessage('1'));
+      finishLoad();
+      await first;
+
+      const tick = server.processSubscriptions();
+      while (pendingLoads.length === 0) {
+        await flush();
+      }
+      await server.processMessage('conn-1', JSON.stringify({ unsubscribe: '1' }));
+
+      finishLoad();
+      await tick;
+
+      expect(store.getAllSubscriptions()).toEqual([]);
+    });
+
+    it('should not load a subscription unsubscribed before its load starts', async () => {
+      const { server, store, mockApiGateway } = createServer();
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      let resolveContext!: () => void;
+      mockApiGateway.contextByReq = jest.fn(() => new Promise((resolve) => {
+        resolveContext = () => resolve({ requestId: 'test-req' });
+      }));
+
+      const inFlight = server.processMessage('conn-1', subscribeMessage('1'));
+      while (!resolveContext) {
+        await flush();
+      }
+      await server.processMessage('conn-1', JSON.stringify({ unsubscribe: '1' }));
+
+      resolveContext();
+      await inFlight;
+
+      expect(mockApiGateway.subscribe).not.toHaveBeenCalled();
+      expect(store.getAllSubscriptions()).toEqual([]);
+    });
+
+    it('should keep a re-subscribe that reuses the id of an unsubscribed load', async () => {
+      const { server, store, pendingLoads, finishLoad } = createServer();
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      const { done: first } = await startLoad(server, pendingLoads, subscribeMessage('1'));
+      await server.processMessage('conn-1', JSON.stringify({ unsubscribe: '1' }));
+      const { done: second } = await startLoad(server, pendingLoads, subscribeMessage('1'));
+
+      finishLoad();
+      finishLoad();
+      await Promise.all([first, second]);
+
+      expect(await store.getSubscription('conn-1', '1')).toBeDefined();
+    });
+
+    it('should not re-run a subscription in the tick while its load is in flight', async () => {
+      const { server, mockApiGateway, sentMessages, pendingLoads, finishLoad } = createServer();
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      const { done: inFlight } = await startLoad(server, pendingLoads, subscribeMessage('1'));
+      await server.processSubscriptions();
+      expect(mockApiGateway.subscribe).toHaveBeenCalledTimes(1);
+
+      finishLoad();
+      await inFlight;
+
+      expect(sentMessages.filter((m) => m.messageId === '1' && m.message?.data)).toHaveLength(1);
+    });
+
+    it('should not re-send an unchanged result on a heartbeat re-send', async () => {
+      const { server, sentMessages, pendingLoads, finishLoad } = createServer();
+      await server.processMessage('conn-1', JSON.stringify({ authorization: 'token' }));
+
+      const { done: first } = await startLoad(server, pendingLoads, subscribeMessage('1'));
+      finishLoad();
+      await first;
+
+      const { done: resend } = await startLoad(server, pendingLoads, subscribeMessage('1'));
+      finishLoad();
+      await resend;
+
+      expect(sentMessages.filter((m) => m.messageId === '1' && m.message?.data)).toHaveLength(1);
+    });
+  });
 });
