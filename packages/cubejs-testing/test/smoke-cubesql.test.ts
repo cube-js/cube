@@ -888,6 +888,7 @@ filter_subq AS (
         password: 'test',
       });
       await dbConnection.connect();
+
       try {
         const tables = await dbConnection.query(
           "SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'sub_query_rollup_statuses_by_status%'"
