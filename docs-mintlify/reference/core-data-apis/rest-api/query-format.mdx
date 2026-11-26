@@ -135,7 +135,8 @@ with no leading zeros, an optional fraction, and an optional exponent.
 
 A query with a rejected value fails with an error instead of being sent to the
 data source, where each database would interpret such a string in its own way.
-`NaN` and infinite values can't be matched with these operators.
+`NaN` and infinite values can't be matched with these operators. A boolean
+(`true` or `false`) is rejected the same way as the string `"true"`.
 
 Values for `min` and `max` measures aren't checked, because they return the type
 of the column they aggregate.

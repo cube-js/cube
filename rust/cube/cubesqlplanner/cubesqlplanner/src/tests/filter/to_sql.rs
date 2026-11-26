@@ -1021,6 +1021,60 @@ fn test_number_filter_rejects_non_decimal_literals() {
 }
 
 #[test]
+fn test_number_filter_rejects_boolean_values() {
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+    for (member, value) in [
+        ("visitors.id", "true"),
+        ("visitors.id", "false"),
+        ("visitors.count", "true"),
+    ] {
+        for operator in [
+            "equals",
+            "notEquals",
+            "in",
+            "notIn",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+        ] {
+            let query = format!(
+                "measures:\n  - visitors.count\nfilters:\n  - member: {}\n    operator: {}\n    values:\n      - {}\n",
+                member, operator, value
+            );
+            let error = ctx.build_filter_sql(&query).unwrap_err();
+            assert_eq!(
+                error.message,
+                format!(
+                    "Invalid value '{}' in a filter on the number member '{}': expected a decimal number such as 42, -1.5 or 1e3",
+                    value, member
+                ),
+                "{} {}",
+                member,
+                operator
+            );
+        }
+    }
+}
+
+#[test]
+fn test_boolean_member_filter_keeps_boolean_values() {
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+    let result = ctx.build_filter_sql(indoc! {"
+        measures:
+          - visitors.count
+        filters:
+          - member: visitors.is_active
+            operator: equals
+            values:
+              - true
+    "});
+    assert!(result.is_ok(), "{:?}", result.err().map(|e| e.message));
+}
+
+#[test]
 fn test_number_filter_rejects_any_invalid_value_of_a_list() {
     let schema = MockSchema::from_yaml_file("common/visitors.yaml");
     let ctx = TestContext::new(schema).unwrap();

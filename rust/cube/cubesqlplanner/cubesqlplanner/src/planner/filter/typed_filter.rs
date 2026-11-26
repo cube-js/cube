@@ -331,14 +331,19 @@ impl TypedFilterBuilder {
             return Ok(());
         }
         for value in values {
-            if let FilterValue::Str(value) = value {
-                if !is_number_literal(value) {
-                    return Err(CubeError::user(format!(
-                        "Invalid value '{}' in a filter on the number member '{}': expected a decimal number such as 42, -1.5 or 1e3",
-                        value,
-                        member_evaluator.full_name()
-                    )));
-                }
+            let invalid = match value {
+                FilterValue::Str(value) if !is_number_literal(value) => Some(value.clone()),
+                // Bound as the text `true`/`false`, a boolean is cast by the
+                // database like any other non-number string.
+                FilterValue::Bool(value) => Some(value.to_string()),
+                _ => None,
+            };
+            if let Some(invalid) = invalid {
+                return Err(CubeError::user(format!(
+                    "Invalid value '{}' in a filter on the number member '{}': expected a decimal number such as 42, -1.5 or 1e3",
+                    invalid,
+                    member_evaluator.full_name()
+                )));
             }
         }
         Ok(())
