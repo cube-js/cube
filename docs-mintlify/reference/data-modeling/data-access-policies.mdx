@@ -530,6 +530,11 @@ REST (JSON) API][ref-rest-query-filters] queries, allowing to use the same set o
 You can also use `and` and `or` parameters to combine multiple filters into
 [boolean logical operators][ref-rest-boolean-ops].
 
+Values are checked the same way as in queries: a value compared with a `number`
+member, including one that comes from `userAttributes` or `securityContext`,
+must be a [decimal number][ref-rest-number-values]. For example, `"007"` is
+rejected.
+
 Note that access policies also respect [row-level security][ref-rls] restrictions
 configured via the `query_rewrite` configuration option. See [row-level access][ref-dap-rls] to
 learn more about policy evaluation.
@@ -591,4 +596,5 @@ cube(`orders`, {
 [ref-mask-dim]: /reference/data-modeling/dimensions#mask
 [ref-rest-query-filters]: /reference/core-data-apis/rest-api/query-format#filters-format
 [ref-rest-query-ops]: /reference/core-data-apis/rest-api/query-format#filters-operators
+[ref-rest-number-values]: /reference/core-data-apis/rest-api/query-format#number-values
 [ref-rest-boolean-ops]: /reference/core-data-apis/rest-api/query-format#boolean-logical-operators
