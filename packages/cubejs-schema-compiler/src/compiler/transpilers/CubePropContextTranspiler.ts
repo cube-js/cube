@@ -224,7 +224,11 @@ export class CubePropContextTranspiler implements TranspilerInterface {
         if (key === 'members' || key === 'order' || key === 'member') {
           const fullPath = CubePropContextTranspiler.fullPath(path);
           if (drillReferenceFieldsPatterns.some(p => p.test(fullPath))) {
-            this.transformObjectProperty(path, (n: string) => !NON_REFERENCE_IDENTIFIERS.has(n));
+            // A name the file declares (a shared member list, say) stays as written
+            this.transformObjectProperty(
+              path,
+              (n: string) => !NON_REFERENCE_IDENTIFIERS.has(n) && !path.scope.hasBinding(n)
+            );
             return;
           }
         }

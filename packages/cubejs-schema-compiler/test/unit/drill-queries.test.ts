@@ -233,6 +233,39 @@ cubes:
     }]);
   });
 
+  it('keeps module constants in JS drill query members as written', async () => {
+    const compilers = prepareJsCompiler(`
+      const DETAIL = ['id', 'status'];
+
+      cube('orders', {
+        sql_table: 'orders',
+        memberSets: [{ name: 'details', members: DETAIL }],
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          status: { sql: 'status', type: 'string' },
+        },
+        measures: {
+          total: {
+            sql: 'amount',
+            type: 'sum',
+            drillQueries: [
+              { name: 'shared', members: DETAIL },
+              { name: 'spread', members: [...DETAIL, total] },
+              { name: 'from_set', members: [details] },
+            ],
+          },
+        },
+      });
+    `);
+    await compilers.compile();
+
+    expect(measureMeta(compilers, 'orders', 'total').drillQueries.map((q: any) => [q.name, q.members])).toEqual([
+      ['shared', ['orders.id', 'orders.status']],
+      ['spread', ['orders.id', 'orders.status', 'orders.total']],
+      ['from_set', ['orders.id', 'orders.status']],
+    ]);
+  });
+
   it('keeps JS values in filters as written, references only in filter members', async () => {
     const compilers = prepareJsCompiler(`
       const COMPLETED = 'completed';
