@@ -140,7 +140,11 @@ impl TopLevelPlanner {
         plan: Rc<RootQuery>,
     ) -> Result<(Rc<RootQuery>, Vec<PreAggregationUsage>), CubeError> {
         let options = self.query_tools.request_options();
-        let result = if !self.request.is_pre_aggregation_query() {
+        // A rollup can't apply a sub-query join, so serving such a query from
+        // one would silently drop the join and whatever filtering it does.
+        let result = if !self.request.is_pre_aggregation_query()
+            && self.request.subquery_joins().is_empty()
+        {
             let mut pre_aggregation_optimizer = PreAggregationOptimizer::new(
                 self.query_tools.clone(),
                 self.request.query_join_hints().clone(),

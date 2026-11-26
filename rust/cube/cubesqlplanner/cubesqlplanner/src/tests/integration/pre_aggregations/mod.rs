@@ -14,5 +14,6 @@ mod rolling_non_additive;
 mod rollup_join_keys;
 mod rollup_join_usages;
 mod sql_generation;
+mod subquery_joins;
 mod ungrouped_gate;
 mod views;
