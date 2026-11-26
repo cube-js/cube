@@ -878,15 +878,19 @@ the view.
 <CodeGroup>
 
 ```yaml title="Before"
-cubes:
-  - join_path: orders.customer
-    includes: [city]
+views:
+  - name: sales
+    cubes:
+      - join_path: orders.customer
+        includes: [city]
 ```
 
 ```yaml title="After"
-cubes:
-  - join_path: orders.customers
-    includes: [city]
+views:
+  - name: sales
+    cubes:
+      - join_path: orders.customers
+        includes: [city]
 ```
 
 </CodeGroup>
@@ -1113,10 +1117,10 @@ joins:
 ### `CUBE_MEMBER_UNSUPPORTED` {#cube-member-unsupported}
 
 The view includes a member with no Metric View form: a segment, a hierarchy, a `geo` or `switch`
-dimension, a `sub_query` dimension, a dimension that references a measure, a time dimension with
-custom `granularities`. Leave it out of the view with
-`excludes`, or drop it from `includes`. For a time dimension with custom granularities, include a
-dimension with the same `sql` and no `granularities` instead.
+dimension, a `sub_query` dimension, a dimension that references a measure, or a time dimension
+with custom `granularities`. Leave it out of the view with `excludes`, or drop it from `includes`.
+For a time dimension with custom granularities, include a dimension with the same `sql` and no
+`granularities` instead.
 
 <CodeGroup>
 
@@ -1231,21 +1235,25 @@ or with `source`, must be renamed in the model: a view alias doesn't change the 
 <CodeGroup>
 
 ```yaml title="Before"
-cubes:
-  - join_path: orders
-    includes: [Status, count]
-  - join_path: orders.users
-    includes: [status]
+views:
+  - name: sales
+    cubes:
+      - join_path: orders
+        includes: [Status, count]
+      - join_path: orders.users
+        includes: [status]
 ```
 
 ```yaml title="After"
-cubes:
-  - join_path: orders
-    includes: [Status, count]
-  - join_path: orders.users
-    includes:
-      - name: status
-        alias: user_status
+views:
+  - name: sales
+    cubes:
+      - join_path: orders
+        includes: [Status, count]
+      - join_path: orders.users
+        includes:
+          - name: status
+            alias: user_status
 ```
 
 </CodeGroup>
