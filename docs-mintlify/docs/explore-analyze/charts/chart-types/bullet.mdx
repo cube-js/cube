@@ -1,0 +1,51 @@
+---
+title: Bullet
+description: Compare a measure to its target against qualitative ranges, such as revenue against quota by region.
+---
+
+A bullet chart draws one bar per category, a marker for the target, and shaded ranges behind them,
+such as *Poor*, *Satisfactory* and *Good*. It shows in a compact space whether each value meets its
+target and how far it is from the next range.
+
+In Cube, you build a bullet chart from a [bar chart](/docs/explore-analyze/charts/chart-types/bar):
+the target is a second measure drawn as points, or a reference line, and the ranges are
+[reference bands](/docs/explore-analyze/charts/configuration/axes#reference-bands).
+
+{/* Screenshot: horizontal bullet chart — revenue by region as bars, the revenue target as points, and three bands named Poor, Satisfactory and Good. Place directly below this paragraph, full width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
+## Build a bullet chart
+
+1. Build a query with a dimension, such as a region, the measure to compare, such as revenue, and
+   the target measure, such as the revenue quota.
+2. Pick the **Bar** chart type. On the Fields tab, set **Orientation** to **Horizontal**.
+3. On the Fields tab, open the mark type menu next to the target measure and choose **Point**. Each
+   category gets a marker at its own target. The chart type now reads **Composite**, since the
+   chart mixes bars and points. See
+   [Series configuration](/docs/explore-analyze/charts/configuration/series-configuration#mark-type-override).
+4. Add the ranges. In the Style tab, open the **⋮** menu of the **X-axis** section, which holds the
+   measures on a horizontal chart, and choose **Add reference band**. Repeat once per range.
+5. In each band row, type the **From** and **To** values, for example 0–8,000, 8,000–14,000 and
+   14,000–22,000.
+6. Open each band's options to name it, for example *Poor*, *Satisfactory* and *Good*. Click each
+   band's color swatch to give the bands shades from light to dark.
+
+If every category has the same target, skip step 3 and add a
+[reference line](/docs/explore-analyze/charts/configuration/axes#reference-lines) at the target
+value instead.
+
+To show one value with its target and ranges, such as a single KPI, leave out the dimension. The
+chart draws one bar.
+
+<Tip>
+Each band draws a line on its edges and prints its range in its label. For a cleaner chart, turn
+off **Show edges** in the band's options, so only the shading marks the ranges.
+</Tip>
+
+## Limitations
+
+- A band covers the whole chart, so every category shares the same ranges. Ranges set as a
+  percentage of each category's own target, for example 60% and 80% of each region's quota, are not
+  supported.
+- The target marker is a point: a circle, a square, or a triangle. There is no thin tick mark.
+- The bars keep their usual width, so the bands show around the bars rather than as a wider strip
+  behind a narrow bar.
