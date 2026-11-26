@@ -154,6 +154,8 @@ export class CubejsServerCore {
 
   protected compilerCache: LRUCache<string, CompilerApi>;
 
+  protected readonly compileLimiter?: pLimit.Limit;
+
   protected readonly contextToOrchestratorId: ContextToOrchestratorIdFn;
 
   protected readonly contextToCubeStoreRouterId: ContextToCubeStoreRouterIdFn | null;
@@ -222,6 +224,10 @@ export class CubejsServerCore {
 
     this.optsHandler = new OptsHandler(this, opts, systemOptions);
     this.options = this.optsHandler.getCoreInitializedOptions();
+
+    this.compileLimiter = this.options.compilerConcurrency === undefined
+      ? undefined
+      : pLimit(this.options.compilerConcurrency);
 
     this.repository = new FileRepository(this.options.schemaPath);
     this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
@@ -919,6 +925,7 @@ export class CubejsServerCore {
       maxCompilerCacheKeepAlive: this.options.maxCompilerCacheKeepAlive,
       updateCompilerCacheKeepAlive: this.options.updateCompilerCacheKeepAlive,
       onCompiled: options.onCompiled,
+      compileLimiter: this.compileLimiter,
     };
   }
 
