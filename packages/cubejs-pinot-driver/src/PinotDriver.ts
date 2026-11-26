@@ -123,6 +123,10 @@ type SendOptions = {
   signal?: AbortSignal,
 };
 
+// Deleting a cursor is a courtesy to the broker, which expires it anyway, so it must not
+// hold a caller for as long as a query may run.
+const CURSOR_DELETE_TIMEOUT_MS = 10 * 1000;
+
 const PinotTypeToGenericType: Record<string, string> = {
   string: 'text',
   int: 'int',
@@ -454,7 +458,7 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
       const response = await this.sendToResponseStore(
         cursor,
         '',
-        { method: 'DELETE', timeout: this.responseStoreTimeout() }
+        { method: 'DELETE', timeout: Math.min(this.responseStoreTimeout(), CURSOR_DELETE_TIMEOUT_MS) }
       );
 
       if (response.ok) {

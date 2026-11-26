@@ -8,7 +8,8 @@ export type PinotRow = Record<string, unknown>;
 export type PinotPageReader = () => Promise<PinotRow[] | null>;
 
 /**
- * Called once when the stream is closed, whether it ended, failed or was destroyed.
+ * Called when the stream is closed, whether it ended, failed or was destroyed.
+ * The stream does not wait for it to finish.
  */
 export type PinotStreamCloser = () => Promise<void>;
 
@@ -42,15 +43,13 @@ export class PinotRowStream extends Readable {
   }
 
   public override _destroy(error: Error | null, callback: (error?: Error | null) => void): void {
-    if (!this.close) {
-      callback(error);
-      return;
+    // Not awaited: Node reports 'error' and 'close' from the callback, and a consumer
+    // must not wait for the clean-up, which talks to the broker, to learn of a failure.
+    if (this.close) {
+      this.close().catch(() => undefined);
     }
 
-    this.close().then(
-      () => callback(error),
-      (closeError) => callback(error || closeError)
-    );
+    callback(error);
   }
 
   protected async readPages(): Promise<void> {

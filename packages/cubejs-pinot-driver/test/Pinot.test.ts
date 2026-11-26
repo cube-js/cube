@@ -231,7 +231,7 @@ describe('Pinot', () => {
           rowStream.destroy();
         });
 
-        expect(await storedCursors()).toEqual([]);
+        await waitForNoStoredCursors();
       });
     });
 

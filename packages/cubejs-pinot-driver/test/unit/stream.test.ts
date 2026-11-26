@@ -15,6 +15,8 @@ type BrokerOptions = {
   failDeleteWith?: { status: number, body: string },
   // Accepts the page request and never answers it.
   hangResults?: boolean,
+  // Accepts the delete request and never answers it.
+  hangDelete?: boolean,
   // Rejects the `LIMIT 0` query that reads the schema of an empty result.
   failSchemaQuery?: boolean,
   // Reported as the broker that ran the query.
@@ -128,6 +130,10 @@ class FakeBroker {
     }
 
     if (req.method === 'DELETE' && url.pathname === `/responseStore/${CURSOR_ID}`) {
+      if (this.options.hangDelete) {
+        return undefined;
+      }
+
       if (this.options.failDeleteWith) {
         return res.writeHead(this.options.failDeleteWith.status).end(this.options.failDeleteWith.body);
       }
@@ -166,6 +172,12 @@ describe('PinotDriver stream', () => {
     });
 
     return { driver, requests };
+  };
+
+  const waitForRequests = async (requests: RecordedRequest[], count: number) => {
+    while (requests.length < count) {
+      await new Promise((resolve) => { setTimeout(resolve, 5); });
+    }
   };
 
   const calls = (requests: RecordedRequest[]) => requests.map(({ method, url }) => `${method} ${url}`);
@@ -283,9 +295,7 @@ describe('PinotDriver stream', () => {
 
     const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 5 });
 
-    while (requests.length < 2) {
-      await new Promise((resolve) => { setTimeout(resolve, 5); });
-    }
+    await waitForRequests(requests, 2);
 
     expect(calls(requests)).toEqual([
       'POST /query/sql?getCursor=true&numRows=5',
@@ -345,11 +355,32 @@ describe('PinotDriver stream', () => {
       rowStream.once('close', resolve);
       rowStream.destroy();
     });
+    await waitForRequests(requests, 2);
 
     expect(calls(requests)).toEqual([
       'POST /query/sql?getCursor=true&numRows=2',
       `DELETE /responseStore/${CURSOR_ID}`,
     ]);
+  });
+
+  it('reports a failure without waiting for the cursor to be deleted', async () => {
+    const { driver, requests } = await start({
+      rows: ROWS,
+      hangDelete: true,
+      failResultsWith: { status: 500, body: 'Response store is down' },
+    });
+
+    const source = await driver.stream('SELECT id, name FROM t', [], { highWaterMark: 2 });
+    const rowStream = <Readable> source.rowStream;
+    const closed = new Promise((resolve) => {
+      rowStream.once('close', resolve);
+    });
+
+    await expect(streamToArray(<any> rowStream)).rejects.toThrow('Response store is down');
+    await closed;
+    await waitForRequests(requests, 3);
+
+    expect(calls(requests).at(-1)).toBe(`DELETE /responseStore/${CURSOR_ID}`);
   });
 
   it('deletes the cursor once the stream has been read to the end', async () => {
@@ -363,6 +394,7 @@ describe('PinotDriver stream', () => {
 
     expect(await streamToArray(<any> rowStream)).toEqual(EXPECTED);
     await closed;
+    await waitForRequests(requests, 4);
 
     expect(calls(requests).at(-1)).toBe(`DELETE /responseStore/${CURSOR_ID}`);
   });
@@ -424,14 +456,13 @@ describe('PinotDriver stream', () => {
     const rowStream = <Readable> source.rowStream;
     rowStream.resume();
 
-    while (requests.length < 2) {
-      await new Promise((resolve) => { setTimeout(resolve, 5); });
-    }
+    await waitForRequests(requests, 2);
 
     await new Promise((resolve) => {
       rowStream.once('close', resolve);
       rowStream.destroy();
     });
+    await waitForRequests(requests, 3);
 
     expect(calls(requests).at(-1)).toBe(`DELETE /responseStore/${CURSOR_ID}`);
   });
