@@ -6,10 +6,12 @@ use datafusion::arrow::{
         Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
         IntervalDayTimeArray, IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeStringArray,
         ListArray, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-        TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+        TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array,
+        UInt8Array,
     },
     datatypes::{DataType, IntervalDayTime, IntervalMonthDayNano, IntervalUnit, Schema, TimeUnit},
     record_batch::RecordBatch,
+    util::display::array_value_to_string,
 };
 use rust_decimal::prelude::*;
 use serde::{Serialize, Serializer};
@@ -287,6 +289,22 @@ impl ToString for ListValue {
             }};
         }
 
+        // Elements are converted the same way as top-level cells in `batches_to_dataframe`,
+        // so a list element renders exactly like the scalar value of the same type
+        macro_rules! write_array_as_text {
+            ($ARRAY:expr, $ARRAY_TYPE: ident, |$ARR: ident, $I: ident| $VALUE: expr) => {{
+                let $ARR = $ARRAY.as_any().downcast_ref::<$ARRAY_TYPE>().unwrap();
+
+                for $I in 0..$ARR.len() {
+                    if $ARR.is_null($I) {
+                        values.push("NULL".to_string());
+                    } else {
+                        values.push($VALUE.to_string());
+                    }
+                }
+            }};
+        }
+
         match self.v.data_type() {
             DataType::Float16 => write_native_array_as_text!(self.v, Float16Array),
             DataType::Float32 => write_native_array_as_text!(self.v, Float32Array),
@@ -302,10 +320,81 @@ impl ToString for ListValue {
             DataType::Boolean => write_native_array_as_text!(self.v, BooleanArray),
             DataType::Utf8 => write_native_array_as_text!(self.v, StringArray),
             DataType::LargeUtf8 => write_native_array_as_text!(self.v, LargeStringArray),
-            dt => unimplemented!("Unable to convert List of {} to string", dt),
+            DataType::Date32 => write_array_as_text!(self.v, Date32Array, |a, i| a
+                .value_as_date(i)
+                .expect("value_as_date must return Option with NaiveDate for Date32Array")),
+            DataType::Date64 => write_array_as_text!(self.v, Date64Array, |a, i| a
+                .value_as_date(i)
+                .expect("value_as_date must return Option with NaiveDate for Date64Array")),
+            DataType::Timestamp(TimeUnit::Second, tz) => {
+                write_array_as_text!(self.v, TimestampSecondArray, |a, i| TimestampValue::new(
+                    a.value(i) * 1_000_000_000_i64,
+                    tz.as_deref().map(str::to_string),
+                ))
+            }
+            DataType::Timestamp(TimeUnit::Millisecond, tz) => {
+                write_array_as_text!(self.v, TimestampMillisecondArray, |a, i| {
+                    TimestampValue::new(
+                        a.value(i) * 1_000_000_i64,
+                        tz.as_deref().map(str::to_string),
+                    )
+                })
+            }
+            DataType::Timestamp(TimeUnit::Microsecond, tz) => {
+                write_array_as_text!(self.v, TimestampMicrosecondArray, |a, i| {
+                    TimestampValue::new(a.value(i) * 1000_i64, tz.as_deref().map(str::to_string))
+                })
+            }
+            DataType::Timestamp(TimeUnit::Nanosecond, tz) => {
+                write_array_as_text!(self.v, TimestampNanosecondArray, |a, i| {
+                    TimestampValue::new(a.value(i), tz.as_deref().map(str::to_string))
+                })
+            }
+            DataType::Interval(IntervalUnit::DayTime) => {
+                write_array_as_text!(self.v, IntervalDayTimeArray, |a, i| {
+                    interval_day_time_value(a.value(i))
+                })
+            }
+            DataType::Interval(IntervalUnit::YearMonth) => {
+                write_array_as_text!(self.v, IntervalYearMonthArray, |a, i| {
+                    interval_year_month_value(a.value(i))
+                })
+            }
+            DataType::Interval(IntervalUnit::MonthDayNano) => {
+                write_array_as_text!(self.v, IntervalMonthDayNanoArray, |a, i| {
+                    interval_month_day_nano_value(a.value(i))
+                })
+            }
+            DataType::Decimal128(_, s) => match Decimal128Value::scale_from_arrow(*s) {
+                Ok(scale) => write_array_as_text!(self.v, Decimal128Array, |a, i| {
+                    Decimal128Value::new(a.value(i), scale)
+                }),
+                Err(_) => self.write_with_arrow_display(&mut values),
+            },
+            DataType::List(_) => write_array_as_text!(self.v, ListArray, |a, i| {
+                ListValue::new(a.value(i)).to_string()
+            }),
+            DataType::Null => values.extend((0..self.v.len()).map(|_| "NULL".to_string())),
+            // Never panic while serializing a result: fall back to Arrow's own formatting
+            _ => self.write_with_arrow_display(&mut values),
         }
 
         "{".to_string() + &values.join(",") + "}"
+    }
+}
+
+impl ListValue {
+    fn write_with_arrow_display(&self, values: &mut Vec<String>) {
+        for i in 0..self.v.len() {
+            if self.v.is_null(i) {
+                values.push("NULL".to_string());
+            } else {
+                values.push(
+                    array_value_to_string(self.v.as_ref(), i)
+                        .unwrap_or_else(|_| format!("<unsupported {}>", self.v.data_type())),
+                );
+            }
+        }
     }
 }
 
@@ -608,6 +697,11 @@ pub fn batches_to_dataframe(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use datafusion::arrow::{
+        array::{ListBuilder, NullArray, Time64NanosecondArray, TimestampNanosecondBuilder},
+        datatypes::{Field, Int64Type},
+    };
+    use std::sync::Arc;
 
     #[test]
     fn test_dataframe_print() {
@@ -816,5 +910,155 @@ mod tests {
             let result = arrow_to_column_type(arrow_type.clone()).unwrap();
             assert_eq!(result, expected_column_type, "Failed for {:?}", arrow_type);
         }
+    }
+    fn list_to_string(array: ArrayRef) -> String {
+        ListValue::new(array).to_string()
+    }
+
+    #[test]
+    fn test_list_value_to_string_native() {
+        assert_eq!(
+            list_to_string(Arc::new(Int64Array::from(vec![Some(1), None, Some(3)]))),
+            "{1,NULL,3}"
+        );
+        assert_eq!(
+            list_to_string(Arc::new(StringArray::from(vec![Some("a"), Some("b")]))),
+            "{a,b}"
+        );
+    }
+
+    #[test]
+    fn test_list_value_to_string_date() {
+        let date = NaiveDate::from_ymd_opt(1993, 5, 21).unwrap();
+        let days = (date - NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()).num_days() as i32;
+
+        assert_eq!(
+            list_to_string(Arc::new(Date32Array::from(vec![Some(days), None]))),
+            "{1993-05-21,NULL}"
+        );
+        assert_eq!(
+            list_to_string(Arc::new(Date64Array::from(vec![Some(
+                days as i64 * 86_400_000
+            )]))),
+            "{1993-05-21}"
+        );
+    }
+
+    #[test]
+    fn test_list_value_to_string_timestamp() {
+        let nanos = 737942400 * 1_000_000_000_i64;
+        // A list element renders exactly like a top-level timestamp cell
+        let scalar = TableValue::Timestamp(TimestampValue::new(nanos, None)).to_string();
+
+        assert_eq!(
+            list_to_string(Arc::new(TimestampNanosecondArray::from(vec![
+                Some(nanos),
+                None
+            ]))),
+            format!("{{{},NULL}}", scalar)
+        );
+        assert_eq!(
+            list_to_string(Arc::new(TimestampMicrosecondArray::from(vec![Some(
+                nanos / 1_000
+            )]))),
+            format!("{{{}}}", scalar)
+        );
+        assert_eq!(
+            list_to_string(Arc::new(TimestampMillisecondArray::from(vec![Some(
+                nanos / 1_000_000
+            )]))),
+            format!("{{{}}}", scalar)
+        );
+        assert_eq!(
+            list_to_string(Arc::new(TimestampSecondArray::from(vec![Some(
+                nanos / 1_000_000_000
+            )]))),
+            format!("{{{}}}", scalar)
+        );
+
+        let with_tz = TimestampMillisecondArray::from(vec![Some(nanos / 1_000_000)])
+            .with_timezone("UTC".to_string());
+        let scalar_tz =
+            TableValue::Timestamp(TimestampValue::new(nanos, Some("UTC".to_string()))).to_string();
+        assert_eq!(
+            list_to_string(Arc::new(with_tz)),
+            format!("{{{}}}", scalar_tz)
+        );
+    }
+
+    #[test]
+    fn test_list_value_to_string_decimal() {
+        let array = Decimal128Array::from(vec![Some(123456789), None, Some(-5)])
+            .with_precision_and_scale(10, 2)
+            .unwrap();
+
+        assert_eq!(list_to_string(Arc::new(array)), "{1234567.89,NULL,-0.05}");
+    }
+
+    #[test]
+    fn test_list_value_to_string_interval() {
+        let value = IntervalMonthDayNano::new(1, 2, 3_000_000_000);
+        let scalar = TableValue::Interval(interval_month_day_nano_value(value)).to_string();
+
+        assert_eq!(
+            list_to_string(Arc::new(IntervalMonthDayNanoArray::from(vec![
+                Some(value),
+                None
+            ]))),
+            format!("{{{},NULL}}", scalar)
+        );
+        assert_eq!(
+            list_to_string(Arc::new(IntervalYearMonthArray::from(vec![Some(14)]))),
+            format!(
+                "{{{}}}",
+                TableValue::Interval(interval_year_month_value(14)).to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn test_list_value_to_string_null_and_nested() {
+        assert_eq!(list_to_string(Arc::new(NullArray::new(2))), "{NULL,NULL}");
+
+        let nested = ListArray::from_iter_primitive::<Int64Type, _, _>(vec![
+            Some(vec![Some(1), Some(2)]),
+            None,
+            Some(vec![]),
+        ]);
+        assert_eq!(list_to_string(Arc::new(nested)), "{{1,2},NULL,{}}");
+    }
+
+    #[test]
+    fn test_list_value_to_string_unknown_type_does_not_panic() {
+        let array = Time64NanosecondArray::from(vec![Some(3_600_000_000_000), None]);
+
+        assert_eq!(list_to_string(Arc::new(array)), "{01:00:00,NULL}");
+    }
+
+    #[test]
+    fn test_batches_to_dataframe_list_of_timestamps() {
+        // ARRAY_AGG over a time dimension used to panic in ListValue::to_string
+        // while serializing the /v1/cubesql response
+        let nanos = 737942400 * 1_000_000_000_i64;
+        let mut builder = ListBuilder::new(TimestampNanosecondBuilder::new());
+        builder.values().append_value(nanos);
+        builder.values().append_null();
+        builder.append(true);
+        let list = builder.finish();
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "dates",
+            list.data_type().clone(),
+            true,
+        )]));
+        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(list)]).unwrap();
+        let frame = batches_to_dataframe(&schema, vec![batch]).unwrap();
+
+        let scalar = TableValue::Timestamp(TimestampValue::new(nanos, None)).to_string();
+        let cell = &frame.data[0].values()[0];
+        assert_eq!(
+            serde_json::to_string(cell).unwrap(),
+            serde_json::to_string(&format!("{{{},NULL}}", scalar)).unwrap()
+        );
     }
 }
