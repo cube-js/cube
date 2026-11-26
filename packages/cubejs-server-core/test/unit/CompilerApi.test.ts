@@ -1135,6 +1135,45 @@ describe('CompilerApi leafFilterImplies', () => {
     expect(compilerApi.leafFilterImplies(leaf('gt', ['50']), leaf('gt', ['100']))).toBe(false);
   });
 
+  test.each<[string, string, boolean[]]>([
+    ['gt', 'gt', [false, true, true]],
+    ['gt', 'gte', [false, true, true]],
+    ['gte', 'gt', [false, false, false]],
+    ['gte', 'gte', [false, true, true]],
+    ['lt', 'lt', [true, true, false]],
+    ['lt', 'lte', [true, true, false]],
+    ['lte', 'lt', [false, false, false]],
+    ['lte', 'lte', [true, true, false]],
+    ['gt', 'lt', [false, false, false]],
+    ['gt', 'lte', [false, false, false]],
+    ['gte', 'lt', [false, false, false]],
+    ['gte', 'lte', [false, false, false]],
+    ['lt', 'gt', [false, false, false]],
+    ['lt', 'gte', [false, false, false]],
+    ['lte', 'gt', [false, false, false]],
+    ['lte', 'gte', [false, false, false]],
+  ])('query %s versus policy %s at lower, equal and higher bounds', (queryOperator, policyOperator, expected) => {
+    const actual = ['10', '20', '30'].map(value => compilerApi.leafFilterImplies(
+      leaf(queryOperator, [value]), leaf(policyOperator, ['20']),
+    ));
+    expect(actual).toEqual(expected);
+  });
+
+  test.each<[string, string, boolean, boolean]>([
+    ['1', '-1', true, false],
+    ['-1', '1', false, true],
+    ['0', '-0.1', true, false],
+    ['0', '0.1', false, true],
+    ['-0.1', '0', false, true],
+    ['0.1', '-0', true, false],
+  ])('compares query bound %s with policy bound %s across zero', (queryBound, policyBound, lower, upper) => {
+    for (const [operator, expected] of [['gt', lower], ['gte', lower], ['lt', upper], ['lte', upper]] as const) {
+      expect(compilerApi.leafFilterImplies(
+        leaf(operator, [queryBound]), leaf(operator, [policyBound]),
+      )).toBe(expected);
+    }
+  });
+
   test('numeric bounds compare as numbers of any length', () => {
     const implies = (qOp: string, q: string, tOp: string, t: string) => compilerApi.leafFilterImplies(leaf(qOp, [q]), leaf(tOp, [t]));
 
@@ -1160,10 +1199,9 @@ describe('CompilerApi leafFilterImplies', () => {
     const implies = (qOp: string, q: string, tOp: string, t: string) => compilerApi.leafFilterImplies(leaf(qOp, [q]), leaf(tOp, [t]));
 
     // The bound is sent untyped and takes the column type: a `real` column runs
-    // `amount >= 1.0000001` as `amount >= 1`, which returns the `amount = 1` row.
-    expect(implies('gte', '1.0000001', 'gt', '1')).toBe(false);
-    expect(implies('lte', '0.9999999', 'lt', '1')).toBe(false);
-    // A fixed-scale decimal column rounds 100.004 to 100.00.
+    // `amount >= 1.00000001` as `amount >= 1`, which returns the `amount = 1` row.
+    expect(implies('gte', '1.00000001', 'gt', '1')).toBe(false);
+    expect(implies('lte', '0.99999999', 'lt', '1')).toBe(false);
     expect(implies('gte', '100.004', 'gt', '100')).toBe(false);
     expect(implies('gte', '9007199254740993', 'gt', '9007199254740992')).toBe(false);
     expect(implies('lte', '9007199254740992', 'lt', '9007199254740993')).toBe(false);
@@ -1174,8 +1212,8 @@ describe('CompilerApi leafFilterImplies', () => {
     expect(implies('lte', '100', 'lt', '100')).toBe(false);
 
     // Rounding keeps the order of the bounds, so the other pairs still hold.
-    expect(implies('gt', '1.0000001', 'gt', '1')).toBe(true);
-    expect(implies('gte', '1.0000001', 'gte', '1')).toBe(true);
+    expect(implies('gt', '1.00000001', 'gt', '1')).toBe(true);
+    expect(implies('gte', '1.00000001', 'gte', '1')).toBe(true);
     expect(implies('gt', '1', 'gte', '1')).toBe(true);
     expect(implies('lt', '1', 'lte', '1')).toBe(true);
   });
@@ -1194,6 +1232,59 @@ describe('CompilerApi leafFilterImplies', () => {
     expect(compilerApi.queryFiltersImplyFilter(queryFilters, {})).toBe(false);
     expect(compilerApi.queryFiltersImplyFilter([{ or: queryFilters }], leaf('equals', ['a']))).toBe(false);
     expect(compilerApi.queryFiltersImplyFilter([{ and: queryFilters }], leaf('equals', ['a']))).toBe(true);
+  });
+
+  test('an AND policy requires every condition, including nested conditions on other members', () => {
+    const amount = leaf('gt', ['20']);
+    const status = { member: 'statements.status', operator: 'equals', values: ['paid'] };
+    const country = { member: 'statements.country', operator: 'equals', values: ['NL'] };
+    const policy = { and: [amount, { and: [status, country] }] };
+    const narrower = leaf('gt', ['100']);
+
+    expect(compilerApi.queryFiltersImplyFilter([narrower], policy)).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter([narrower, status], policy)).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter([{ and: [narrower, { and: [status, country] }] }], policy)).toBe(true);
+  });
+
+  test('an OR policy requires one complete branch', () => {
+    const status = { member: 'statements.status', operator: 'equals', values: ['paid'] };
+    const policy = { or: [{ and: [leaf('gt', ['20']), status] }, leaf('lt', ['-20'])] };
+
+    expect(compilerApi.queryFiltersImplyFilter([leaf('gt', ['100'])], policy)).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter([leaf('gt', ['100']), status], policy)).toBe(true);
+    expect(compilerApi.queryFiltersImplyFilter([leaf('lt', ['-100'])], policy)).toBe(true);
+    expect(compilerApi.queryFiltersImplyFilter([leaf('equals', ['0'])], policy)).toBe(false);
+  });
+
+  test.each(['and', 'or'])('a nested %s policy preserves each member type', (operator) => {
+    const numericPolicy = leaf('gt', ['20']);
+    const numericQuery = leaf('gt', ['100']);
+    const stringPolicy = { ...numericPolicy, member: 'statements.code' };
+    const stringQuery = { ...numericQuery, member: 'statements.code' };
+    const isNumberDimension = (member: string) => member === 'statements.booked';
+
+    expect(compilerApi.queryFiltersImplyFilter(
+      [numericQuery, stringQuery],
+      { [operator]: [{ and: [numericPolicy, stringPolicy] }] },
+      isNumberDimension,
+    )).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter(
+      [numericQuery, stringPolicy],
+      { [operator]: [{ and: [numericPolicy, stringPolicy] }] },
+      isNumberDimension,
+    )).toBe(true);
+    expect(compilerApi.queryFiltersImplyFilter(
+      [stringQuery], { [operator]: [stringPolicy] }, isNumberDimension,
+    )).toBe(false);
+  });
+
+  test('conditions inside query OR groups cannot prove a policy, even inside AND groups', () => {
+    const policy = leaf('gt', ['20']);
+    const alternatives = { or: [leaf('gt', ['100']), leaf('lt', ['0'])] };
+    const status = { member: 'statements.status', operator: 'equals', values: ['paid'] };
+
+    expect(compilerApi.queryFiltersImplyFilter([{ and: [status, alternatives] }], policy)).toBe(false);
+    expect(compilerApi.queryFiltersImplyFilter([{ and: [policy, alternatives] }], policy)).toBe(true);
   });
 
   test('set operators still match regardless of value order', () => {
