@@ -1036,3 +1036,47 @@ fn test_subquery_join_rejected_when_query_is_not_simple() -> Result<(), CubeErro
 
     Ok(())
 }
+
+// Ungrouped queries build their join groups separately, so check the ON's cube
+// is joined there too.
+#[test]
+fn test_subquery_join_on_member_of_otherwise_unused_cube_ungrouped() -> Result<(), CubeError> {
+    let ctx = create_context();
+    let subquery_join = make_subquery_join(
+        TOP_CITIES_SUBQUERY,
+        "\"top_cities\"",
+        "INNER",
+        "orders",
+        "{customers.city} = \"top_cities\".city",
+    )?;
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .dimensions(Some(members_from_strings(vec![
+                "orders.id",
+                "orders.status",
+            ])))
+            .ungrouped(Some(true))
+            .subquery_joins(Some(vec![subquery_join]))
+            .build(),
+    );
+
+    let sql = normalize_sql(&ctx.build_sql_from_options(options)?);
+
+    assert!(
+        sql.contains("FROM orders AS \"orders\" LEFT JOIN customers AS \"customers\""),
+        "expected orders as the root with customers joined to it, got: {sql}"
+    );
+    assert!(
+        sql.contains(&format!(
+            "INNER JOIN ({TOP_CITIES_SUBQUERY}) AS \"top_cities\""
+        )),
+        "expected the sub-query join, got: {sql}"
+    );
+
+    Ok(())
+}

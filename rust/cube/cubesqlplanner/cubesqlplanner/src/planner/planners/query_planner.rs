@@ -67,7 +67,8 @@ impl QueryPlanner {
             if !self.request.subquery_joins().is_empty() {
                 return Err(CubeError::user(
                     "Sub-query joins are not supported in queries with multiplied measures, \
-                     multi-stage members or measures from several cubes"
+                     multi-stage members or measures from several cubes. The cubes a \
+                     sub-query join's ON condition reads count towards multiplied measures"
                         .to_string(),
                 ));
             }

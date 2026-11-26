@@ -100,8 +100,9 @@ impl MeasuresJoinHintsBuilder {
 ///   reaches the fallback in the first place. That also means the view grouping
 ///   only guards the case where `base_hints` is empty - a dimension of an
 ///   unrelated view still pulls a hint-less member expression into its join.
-/// - `query_hints` — `base_hints` plus every measure's hints, then `trailing_hints`: the single tree over all
-///   members, for a measure whose own hints have no root. Inherited like `hints_by_cube`.
+/// - `query_hints` — `base_hints`, every measure's hints, then `trailing_hints`:
+///   the single tree over all members, for a measure whose own hints have no
+///   root. Inherited like `hints_by_cube`.
 /// - `member_paths` — the join paths dimensions and filters bring in (a view's
 ///   `fact.dim`), by member, to name in a no-join-path error.
 #[derive(Clone, Debug)]
