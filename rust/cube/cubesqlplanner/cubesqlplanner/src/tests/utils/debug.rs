@@ -175,7 +175,7 @@ fn test_filter_simple_expanded() {
 fn test_filter_bool_and_num_values_unquoted() -> Result<(), CubeError> {
     let schema = MockSchema::from_yaml_file("common/visitors.yaml");
     let ctx = TestContext::new(schema)?;
-    let symbol = ctx.create_symbol("visitors.id")?;
+    let symbol = ctx.create_symbol("visitors.source")?;
 
     // Booleans and numbers render bare; only strings are quoted.
     let filter = BaseFilter::try_new(
@@ -192,7 +192,7 @@ fn test_filter_bool_and_num_values_unquoted() -> Result<(), CubeError> {
     )?;
 
     let sql = filter.debug_sql(false);
-    assert_eq!(sql, "{visitors.id} in: [42, true, 'google']");
+    assert_eq!(sql, "{visitors.source} in: [42, true, 'google']");
 
     Ok(())
 }

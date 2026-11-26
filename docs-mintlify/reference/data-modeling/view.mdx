@@ -1094,7 +1094,8 @@ The filter operator. Supported operators match the ones available in the
 #### `values`
 
 A list of values for the filter operator. Required for all operators except
-`set` and `notSet`.
+`set` and `notSet`. Values for `number` members must be
+[decimal numbers][ref-rest-number-values].
 
 #### `unless`
 
@@ -1165,6 +1166,7 @@ The `access_policy` parameter is used to configure [access policies][ref-ref-dap
 [ref-ref-hierarchies]: /reference/data-modeling/hierarchies
 [ref-ref-dap]: /reference/data-modeling/data-access-policies
 [ref-rest-query-ops]: /reference/core-data-apis/rest-api/query-format#filters-operators
+[ref-rest-number-values]: /reference/core-data-apis/rest-api/query-format#number-values
 [ref-apis-support]: /reference#data-modeling
 [ref-playground]: /docs/explore-analyze/playground#viewing-the-data-model
 [ref-viz-tools]: /admin/connect-to-data/visualization-tools

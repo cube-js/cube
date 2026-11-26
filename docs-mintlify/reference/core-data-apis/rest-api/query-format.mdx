@@ -114,8 +114,39 @@ A filter is a JavaScript object with the following properties:
   available for measures. For dimensions the available operators depend on the
   type of the dimension. Please see the reference below for the full list of
   available operators.
-- `values`: An array of values for the filter. Values must be of type String. If
-  you need to pass a date, pass it as a string in `YYYY-MM-DD` format.
+- `values`: An array of values for the filter. Pass values as strings; numbers
+  and booleans are accepted and converted to strings. If you need to pass a
+  date, pass it as a string in `YYYY-MM-DD` format. Values for `number` members
+  must be [decimal numbers](#number-values).
+
+### Number values
+
+With the `equals`, `notEquals`, `gt`, `gte`, `lt`, and `lte` operators, a value
+for a dimension of type `number` or for a numeric measure must be a decimal
+number written the way JSON writes one: an optional minus sign, an integer part
+with no leading zeros, an optional fraction, and an optional exponent.
+
+| Accepted | Rejected |
+| --- | --- |
+| `"42"`, `"-42"`, `"0"` | `"+42"`, `"042"`, `" 42"`, `""` |
+| `"1.5"`, `"-0.5"` | `".5"`, `"5."`, `"1,5"` |
+| `"1e3"`, `"1.5E-10"` | `"0x1F"`, `"0o17"`, `"0b101"`, `"1_000"` |
+| | `"NaN"`, `"Infinity"`, `"-Infinity"`, `"true"` |
+
+A query with a rejected value fails with an error instead of being sent to the
+data source, where each database would interpret such a string in its own way.
+`NaN` and infinite values can't be matched with these operators. A boolean
+(`true` or `false`) is rejected the same way as the string `"true"`.
+
+Values for `min` and `max` measures aren't checked, because they return the type
+of the column they aggregate.
+
+<Info>
+
+This check is done by Tesseract, the default SQL planner. The deprecated legacy
+planner passes these values to the data source as is.
+
+</Info>
 
 ### Filtering Dimensions vs Filtering Measures
 
@@ -137,6 +168,7 @@ Use it when you need an exact match. It supports multiple values.
 
 - Applied to measures.
 - Dimension types: `string`, `number`, `time`.
+- Values for `number` members must be [decimal numbers](#number-values).
 
 ```json
 {
@@ -159,6 +191,7 @@ The opposite operator of `equals`. It supports multiple values.
 
 - Applied to measures.
 - Dimension types: `string`, `number`, `time`.
+- Values for `number` members must be [decimal numbers](#number-values).
 
 ```json
 {
@@ -263,6 +296,7 @@ of type `number`.
 
 - Applied to measures.
 - Dimension types: `number`.
+- Values for `number` members must be [decimal numbers](#number-values).
 
 ```json
 {
@@ -279,6 +313,7 @@ or dimensions of type `number`.
 
 - Applied to measures.
 - Dimension types: `number`.
+- Values for `number` members must be [decimal numbers](#number-values).
 
 ```json
 {
@@ -295,6 +330,7 @@ type `number`.
 
 - Applied to measures.
 - Dimension types: `number`.
+- Values for `number` members must be [decimal numbers](#number-values).
 
 ```json
 {
@@ -311,6 +347,7 @@ dimensions of type `number`.
 
 - Applied to measures.
 - Dimension types: `number`.
+- Values for `number` members must be [decimal numbers](#number-values).
 
 ```json
 {
