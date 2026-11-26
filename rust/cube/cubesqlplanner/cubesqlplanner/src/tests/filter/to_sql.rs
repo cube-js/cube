@@ -923,8 +923,6 @@ fn test_time_dimension_date_range() {
     );
 }
 
-// ── number values ───────────────────────────────────────────────────────────
-
 fn build_number_filter(member: &str, operator: &str, value: &str) -> Result<String, String> {
     let schema = MockSchema::from_yaml_file("common/visitors.yaml");
     let ctx = TestContext::new(schema).unwrap();
