@@ -240,6 +240,11 @@ const EXCLUDE_OPERATIONS = new Set([
   'POST /api/v1/deployments/{deploymentId}/automation-templates/{templateId}/instructions',
   'GET /api/v1/deployments/{deploymentId}/automation-triggers',
   'POST /api/v1/deployments/{deploymentId}/automations/{automationUuid}/runs',
+  // Change requests are what automation runs propose: preview with the rest of automations.
+  'GET /api/v1/deployments/{deploymentId}/change-requests',
+  'GET /api/v1/deployments/{deploymentId}/change-requests/{changeRequestUuid}',
+  'POST /api/v1/deployments/{deploymentId}/change-requests/{changeRequestUuid}/close',
+  'POST /build/api/v1/deployments/{deploymentId}/change-requests/{changeRequestUuid}/approve-and-merge',
   // Automation settings: flag-gated with the rest of automations (assertAutomationsEnabled).
   'GET /api/v1/automation-settings',
   'PUT /api/v1/automation-settings',
