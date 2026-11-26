@@ -337,6 +337,7 @@ impl TypedFilterBuilder {
                 // Bound as the text `true`/`false`, a boolean is cast by the
                 // database like any other non-number string.
                 FilterValue::Bool(value) => Some(value.to_string()),
+                FilterValue::Num(value) if !value.is_finite() => Some(value.to_string()),
                 _ => None,
             };
             if let Some(invalid) = invalid {

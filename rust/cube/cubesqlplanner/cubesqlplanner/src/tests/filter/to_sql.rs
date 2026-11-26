@@ -1057,6 +1057,42 @@ fn test_number_filter_rejects_boolean_values() {
 }
 
 #[test]
+fn test_number_filter_rejects_non_finite_numbers() {
+    use crate::planner::filter::base_filter::{BaseFilter, FilterType};
+    use crate::planner::filter::filter_operator::FilterOperator;
+
+    let schema = MockSchema::from_yaml_file("common/visitors.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+    let build = |value: f64| {
+        BaseFilter::try_new(
+            ctx.query_tools().query_tools().clone(),
+            ctx.create_symbol("visitors.id").unwrap(),
+            FilterType::Dimension,
+            FilterOperator::Gt,
+            Some(vec![FilterValue::Num(value)]),
+            None,
+        )
+    };
+
+    for (value, rendered) in [
+        (f64::NAN, "NaN"),
+        (f64::INFINITY, "inf"),
+        (f64::NEG_INFINITY, "-inf"),
+    ] {
+        let error = build(value).err().expect("non-finite number is rejected");
+        assert_eq!(
+            error.message,
+            format!(
+                "Invalid value '{}' in a filter on the number member 'visitors.id': expected a decimal number such as 42, -1.5 or 1e3",
+                rendered
+            )
+        );
+    }
+
+    assert!(build(1.5).is_ok());
+}
+
+#[test]
 fn test_boolean_member_filter_keeps_boolean_values() {
     let schema = MockSchema::from_yaml_file("common/visitors.yaml");
     let ctx = TestContext::new(schema).unwrap();
