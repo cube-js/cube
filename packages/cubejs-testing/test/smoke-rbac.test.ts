@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { afterAll, beforeAll, jest, expect } from '@jest/globals';
+import { afterAll, beforeAll, jest, expect, test } from '@jest/globals';
 import { sign } from 'jsonwebtoken';
 import { Client as PgClient } from 'pg';
 import cubejs, { CubeApi, Query } from '@cubejs-client/core';
