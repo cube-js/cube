@@ -12,6 +12,9 @@ workloads. [StarTree][link-startree] is a fully-managed platform for Pinot.
 - The hostname for the [Pinot][pinot] broker
 - The port for the [Pinot][pinot] broker
 
+Apache Pinot 1.4.0 is the minimum supported version. Cube is tested against it;
+compatibility with older versions is not guaranteed.
+
 Note that the following features should be enabled in your Pinot cluster:
 - [Multi-stage query engine][link-pinot-msqe].
 - [Advanced null value support][link-pinot-nvs].
@@ -105,6 +108,12 @@ the queries that exceed it.
 
 </Warning>
 
+## Streaming
+
+Queries in the [streaming mode][ref-sql-api-streaming] of the SQL API are
+supported. Their results are read the same way as with
+[batching][self-preaggs-batching].
+
 ## Pre-Aggregation Feature Support
 
 ### count_distinct_approx
@@ -126,20 +135,28 @@ here][ref-caching-using-preaggs-build-strats].
 
 | Feature       | Works with read-only mode? | Is default? |
 |---------------|:--------------------------:|:-----------:|
-| Simple        |             ✅             |      ✅     |
-| Batching      |             -              |      -      |
+| Batching      |             ✅             |      ✅     |
 | Export bucket |             -              |      -      |
 
-By default, Pinot uses a simple strategy to build pre-aggregations.
-
-### Simple
-
-No extra configuration is required to configure simple pre-aggregation builds
-for Pinot.
+By default, Pinot uses [batching][self-preaggs-batching] to build
+pre-aggregations.
 
 ### Batching
 
-Pinot does not support batching.
+No extra configuration is required to configure batching for Pinot.
+
+Cube reads the results page by page through [Pinot cursors][link-pinot-cursors].
+A Pinot version without cursors returns the whole result in a single response.
+
+<Note>
+
+A cursor is stored on the broker that ran the query. If several brokers share
+one address and a follow-up request lands on another broker, Cube repeats it
+against the host and port that the owning broker reports. When the brokers are
+not reachable from Cube directly, the load balancer in front of them has to
+route follow-up requests to the same broker.
+
+</Note>
 
 ### Export bucket
 
@@ -150,6 +167,10 @@ Pinot does not support export buckets.
 Cube does not require any additional configuration to enable SSL as Pinot connections are made over HTTPS.
 
 [link-pinot]: https://pinot.apache.org/
+[link-pinot-cursors]: https://docs.pinot.apache.org/build-with-pinot/querying-and-sql/query-execution-controls/query-using-cursors
+[ref-caching-using-preaggs-build-strats]: /docs/pre-aggregations/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-sql-api-streaming]: /reference/core-data-apis/sql-api#streaming
+[self-preaggs-batching]: #batching
 [pinot]: https://docs.pinot.apache.org/
 [link-pinot-msqe]: https://docs.pinot.apache.org/reference/multi-stage-engine
 [link-pinot-nvs]: https://docs.pinot.apache.org/developers/advanced/null-value-support#advanced-null-handling-support

@@ -1,6 +1,9 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { DockerComposeEnvironment, Wait, StartedDockerComposeEnvironment } from 'testcontainers';
 import { prepareCompiler as originalPrepareCompiler } from '@cubejs-backend/schema-compiler';
+import { getEnv, streamToArray } from '@cubejs-backend/shared';
+import fetch from 'node-fetch';
+import type { Readable } from 'stream';
 import { PinotQuery } from '../src/PinotQuery';
 import { PinotDriver } from '../src/PinotDriver';
 
@@ -23,6 +26,29 @@ describe('Pinot', () => {
     const driver = new PinotDriver(config);
     const result = await callback(driver);
     return result;
+  };
+
+  // The ingestion job returns before the servers have loaded the segment, and a query
+  // issued in between answers with no rows instead of failing.
+  const waitForRows = async (table: string, expected: number) => {
+    const deadline = Date.now() + 60 * 1000;
+    let count: unknown;
+
+    while (Date.now() < deadline) {
+      try {
+        [{ count }] = await doWithDriver((driver: PinotDriver) => driver.query(`SELECT COUNT(*) AS "count" FROM ${table}`, []));
+      } catch {
+        count = undefined;
+      }
+
+      if (Number(count) === expected) {
+        return;
+      }
+
+      await new Promise((resolve) => { setTimeout(resolve, 500); });
+    }
+
+    throw new Error(`Pinot table ${table} has ${count} rows, expected ${expected}`);
   };
 
   // eslint-disable-next-line consistent-return,func-names
@@ -65,6 +91,9 @@ describe('Pinot', () => {
     await controller.exec(['/opt/pinot/bin/pinot-admin.sh', 'AddTable', '-controllerPort', '9000', '-schemaFile', '/tmp/data/test-resources/scores.schema.json', '-tableConfigFile', '/tmp/data/test-resources/scores.table.json', '-exec']);
     await controller.exec(['/opt/pinot/bin/pinot-admin.sh', 'LaunchDataIngestionJob', '-jobSpecFile', '/tmp/data/test-resources/students.jobspec.yml']);
     await controller.exec(['/opt/pinot/bin/pinot-admin.sh', 'LaunchDataIngestionJob', '-jobSpecFile', '/tmp/data/test-resources/scores.jobspec.yml']);
+
+    await waitForRows('students', 3);
+    await waitForRows('scores', 6);
   });
 
   // eslint-disable-next-line consistent-return,func-names
@@ -73,6 +102,40 @@ describe('Pinot', () => {
       await env.down();
     }
   });
+
+  const AUTHORIZATION = `Basic ${Buffer.from('admin:mysecret').toString('base64')}`;
+
+  const storedCursors = async (): Promise<string[]> => {
+    let failure = '';
+
+    // The broker fails the listing with a 500 when a cursor is deleted while it reads the store.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const response = await fetch(`${config.host}:${config.port}/responseStore`, {
+        headers: { Authorization: AUTHORIZATION },
+      });
+
+      if (response.ok) {
+        return (<{ requestId: string }[]> await response.json()).map((cursor) => cursor.requestId);
+      }
+
+      failure = `${response.status} ${await response.text()}`;
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+    }
+
+    throw new Error(`Unable to list Pinot cursors: ${failure}`);
+  };
+
+  const waitForNoStoredCursors = async () => {
+    const deadline = Date.now() + 10 * 1000;
+
+    while ((await storedCursors()).length > 0) {
+      if (Date.now() > deadline) {
+        throw new Error(`Pinot cursors were not deleted: ${await storedCursors()}`);
+      }
+
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+    }
+  };
 
   describe('PinotDriver', () => {
     it('constructs', async () => {
@@ -85,6 +148,98 @@ describe('Pinot', () => {
     it('tests the connection', async () => {
       await doWithDriver(async (driver: any) => {
         await driver.testConnection();
+      });
+    });
+
+    const STUDENT_TYPES = [
+      { name: 'studentID', type: 'int' },
+      { name: 'firstName', type: 'text' },
+    ];
+
+    it('streams query results page by page through a cursor', async () => {
+      await doWithDriver(async (driver: PinotDriver) => {
+        const source = await driver.stream(
+          'SELECT studentID, firstName FROM students WHERE studentID >= ? ORDER BY studentID',
+          [200],
+          { highWaterMark: 2 }
+        );
+
+        try {
+          // The result does not fit in the first page, so its cursor has to be alive.
+          expect(await storedCursors()).toHaveLength(1);
+          expect(source.types).toEqual(STUDENT_TYPES);
+          expect(await streamToArray(<any> source.rowStream)).toEqual([
+            { studentID: 200, firstName: 'Lucy' },
+            { studentID: 201, firstName: 'Bob' },
+            { studentID: 202, firstName: 'Nick' },
+          ]);
+        } finally {
+          await source.release?.();
+        }
+
+        await waitForNoStoredCursors();
+      });
+    });
+
+    it('reads the column types of an empty result', async () => {
+      await doWithDriver(async (driver: PinotDriver) => {
+        const source = await driver.stream(
+          'SELECT studentID, firstName FROM students WHERE studentID < ? ORDER BY studentID',
+          [0],
+          { highWaterMark: 2 }
+        );
+
+        try {
+          expect(source.types).toEqual(STUDENT_TYPES);
+          expect(await streamToArray(<any> source.rowStream)).toEqual([]);
+        } finally {
+          await source.release?.();
+        }
+
+        await waitForNoStoredCursors();
+      });
+    });
+
+    it('deletes the cursor of a single-page result without a release', async () => {
+      await doWithDriver(async (driver: PinotDriver) => {
+        const source = await driver.stream(
+          'SELECT studentID, firstName FROM students WHERE studentID >= ? ORDER BY studentID',
+          [200],
+          { highWaterMark: 100 }
+        );
+
+        await waitForNoStoredCursors();
+
+        expect(await streamToArray(<any> source.rowStream)).toHaveLength(3);
+      });
+    });
+
+    it('deletes the cursor when the stream is destroyed', async () => {
+      await doWithDriver(async (driver: PinotDriver) => {
+        const source = await driver.stream(
+          'SELECT studentID, firstName FROM students ORDER BY studentID',
+          [],
+          { highWaterMark: 1 }
+        );
+        const rowStream = <Readable> source.rowStream;
+
+        expect(await storedCursors()).toHaveLength(1);
+
+        await new Promise((resolve) => {
+          rowStream.once('close', resolve);
+          rowStream.destroy();
+        });
+
+        await waitForNoStoredCursors();
+      });
+    });
+
+    it('rejects a stream for a query that fails', async () => {
+      await doWithDriver(async (driver: PinotDriver) => {
+        await expect(driver.stream('SELECT missingColumn FROM students', [], { highWaterMark: 2 }))
+          .rejects.toThrow(/missingColumn/);
+
+        expect(await storedCursors()).toEqual([]);
       });
     });
   });
@@ -293,22 +448,20 @@ describe('Pinot', () => {
         { id: 'scores.scoreDate' }
       ]
     },
-    [
-      {
-        scores__score_date_day: '2024-09-02 00:00:00.0',
-        scores__count: 1,
-        scores__unbounded_count: 2
-      },
-      {
-        scores__score_date_day: '2024-09-03 00:00:00.0',
-        scores__count: 3,
-        scores__unbounded_count: 5
-      },
-      {
-        scores__score_date_day: '2024-09-04 00:00:00.0',
-        scores__count: 1,
-        scores__unbounded_count: 6
-      },
+    // Tesseract returns a row for every day of the date range, the legacy planner
+    // only for the days that have scores.
+    getEnv('nativeSqlPlanner') ? [
+      { scores__score_date_day: '2024-09-01 00:00:00.0', scores__count: null, scores__unbounded_count: 1 },
+      { scores__score_date_day: '2024-09-02 00:00:00.0', scores__count: 1, scores__unbounded_count: 2 },
+      { scores__score_date_day: '2024-09-03 00:00:00.0', scores__count: 3, scores__unbounded_count: 5 },
+      { scores__score_date_day: '2024-09-04 00:00:00.0', scores__count: 1, scores__unbounded_count: 6 },
+      { scores__score_date_day: '2024-09-05 00:00:00.0', scores__count: null, scores__unbounded_count: 6 },
+      { scores__score_date_day: '2024-09-06 00:00:00.0', scores__count: null, scores__unbounded_count: 6 },
+      { scores__score_date_day: '2024-09-07 00:00:00.0', scores__count: null, scores__unbounded_count: 6 },
+    ] : [
+      { scores__score_date_day: '2024-09-02 00:00:00.0', scores__count: 1, scores__unbounded_count: 2 },
+      { scores__score_date_day: '2024-09-03 00:00:00.0', scores__count: 3, scores__unbounded_count: 5 },
+      { scores__score_date_day: '2024-09-04 00:00:00.0', scores__count: 1, scores__unbounded_count: 6 },
     ]));
   });
 });

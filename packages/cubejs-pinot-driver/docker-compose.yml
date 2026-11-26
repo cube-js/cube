@@ -1,6 +1,6 @@
 services:
   pinot-controller:
-    image: apachepinot/pinot:1.1.0
+    image: apachepinot/pinot:1.4.0
     hostname: pinot-controller
     restart: unless-stopped
     command: StartController -configFileName /tmp/data/test-resources/controller.conf
@@ -20,7 +20,7 @@ services:
       - ./pinot-resources:/tmp/data/test-resources:ro
 
   pinot-broker:
-    image: apachepinot/pinot:1.1.0
+    image: apachepinot/pinot:1.4.0
     hostname: pinot-broker
     restart: unless-stopped
     command: StartBroker -zkAddress zookeeper:2181 -configFileName /tmp/data/test-resources/broker.conf
@@ -40,7 +40,7 @@ services:
       start_period: 10s
 
   pinot-server:
-    image: apachepinot/pinot:1.1.0
+    image: apachepinot/pinot:1.4.0
     hostname: pinot-server
     restart: unless-stopped
     container_name: pinot-server-cube-tests
