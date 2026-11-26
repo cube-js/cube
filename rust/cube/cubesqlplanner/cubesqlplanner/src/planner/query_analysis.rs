@@ -250,6 +250,12 @@ impl QueryAnalysis {
     }
 
     fn compute_join_groups(query: &QueryProperties) -> Result<MultiFactJoinGroups, CubeError> {
+        // A sub-query join's ON may read a cube nothing else in the query reads.
+        let subquery_join_members = query
+            .subquery_joins()
+            .iter()
+            .flat_map(|join| join.on_sql.get_dependencies())
+            .collect_vec();
         let measures_join_hints = MeasuresJoinHints::builder(query.query_join_hints())
             .add_dimensions(query.dimensions())
             .add_dimensions(&query.extract_dimensions_from_order())
@@ -257,6 +263,7 @@ impl QueryAnalysis {
             .add_filters(query.time_dimensions_filters())
             .add_filters(query.dimensions_filters())
             .add_filters(query.segments())
+            .add_trailing_members(&subquery_join_members)
             .build(&query.all_used_measures()?)?;
         let query_tools = query.query_tools().clone();
         // A pre-aggregation query describes the rollup to build, and matching
