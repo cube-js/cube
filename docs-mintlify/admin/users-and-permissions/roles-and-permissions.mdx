@@ -21,6 +21,8 @@ The Enterprise tier allows creation of custom roles with a customized set of per
 | Export data from dashboards (CSV, PDF, PNG) |   ✅   |     ✅     |    ✅     |   ✅    |
 | Access Analytics Chat               |   ✅   |     ✅     |    ✅     |   ✅    |
 | Query from external tools (Tableau, Power BI) |   ✅   |     ✅     |    ✅     |   ✅    |
+| Have the agent email you            |   ✅   |     ✅     |    ✅     |   ✅    |
+| Have the agent email other workspace members |   ✅   |     ❌     |    ❌     |   ❌    |
 
 What a user can do with dashboard comments depends on their
 [access level][ref-sharing-comments] to the dashboard's workbook.
@@ -48,6 +50,10 @@ Agents are connected to Semantic Model Deployments and inherit the permission le
 
 Each agent can be configured to use the _Restrict views_ feature which allows to select the views that are visible to the agent.
 This feature should not be used as a security measure. Configure [access policies][ref-data-access-policies] instead.
+
+Who the agent can email depends on the user's role: Admins can email any workspace member, and the other built-in roles can email only the user themselves. Custom roles grant this with the [email permissions][ref-custom-roles-global]. The agent's email tool must also be enabled for the workspace.
+
+[ref-custom-roles-global]: /admin/users-and-permissions/custom-roles#global-permissions
 
 ## Typical Usage Scenarios
 

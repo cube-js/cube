@@ -85,7 +85,11 @@ Removing the elevated action re-enables the lower tiers. This is a rule of the b
 
 ### Global permissions
 
-Global permissions are org-wide. Check any number of them on the **Global permissions** card:
+Global permissions are org-wide. Check any number of them on the **Global permissions** card.
+
+<Frame>
+  <img src="https://static.cube.dev/docs/admin/custom-roles/global-permissions-email.png" alt="Global permissions card of the role editor with Send email to yourself checked in the AI group" />
+</Frame>
 
 | Group                                | Permission                          | What it grants                                            |
 | ------------------------------------ | ----------------------------------- | --------------------------------------------------------- |
@@ -98,6 +102,16 @@ Global permissions are org-wide. Check any number of them on the **Global permis
 | Integrations and network             | Issue OAuth tokens                  | Mint OAuth tokens for integrations.                       |
 | Integrations and network             | Manage MCP server and connectors    | Set up the [MCP server][ref-mcp-server] and [MCP Connectors][ref-mcp-connectors]. Choosing which deployments MCP clients can reach stays with admins. |
 | Deployment management (account-wide) | Manage deployments (account-wide)   | Create and list deployments across the account.           |
+| AI                                   | Send email to yourself              | Have the agent send email to the address on your Cube account only. |
+| AI                                   | Send email to workspace members     | Have the agent send email to yourself and to other active members of the workspace. |
+
+The email permissions decide who the agent can email, in chats and in [scheduled runs][ref-scheduled-tasks-agent], and who you can email with `POST /api/v1/email` in the [Platform API][ref-platform-api]. The email tool must also be enabled for the workspace: while it is off, nobody can send email, admins included. Admins can email any workspace member. A new custom role sends no email until you check one of the permissions.
+
+<Note>
+
+A custom role saved before the email permissions existed holds **Send email to yourself**. The role editor shows it checked, and saving stores what the editor shows. To withhold it, uncheck it and save the role. Roles stack, so a user keeps it while any of their roles grants it.
+
+</Note>
 
 #### Console access
 
@@ -173,6 +187,8 @@ A custom role saved before **Create scheduled tasks** existed holds it on every 
 [ref-mcp-connectors]: /admin/ai/mcp-connectors
 [ref-signed-embedding]: /embedding/iframe/auth/signed
 [ref-private-embedding]: /embedding/iframe/auth/private
+[ref-scheduled-tasks-agent]: /docs/explore-analyze/scheduled-tasks#what-the-agent-can-do-in-a-scheduled-run
+[ref-platform-api]: /api-reference/introduction#platform-api
 
 ## Walkthroughs
 
@@ -346,6 +362,8 @@ As a custom role's Base Role, the action sets the license tier — see [Base Rol
 | `OAuthIntegrationsIssueTokens` | Issue OAuth tokens                |
 | `McpToolsManage`               | Manage MCP server and connectors  |
 | `DeploymentsManage`            | Manage deployments (account-wide) |
+| `SendEmailToSelf`              | Send email to yourself            |
+| `SendEmailToWorkspaceMembers`  | Send email to workspace members   |
 
 ### Deployment-scoped actions
 
