@@ -252,6 +252,12 @@ To hide the rest instead of grouping it, switch **Group remaining values as**
 off. The panel then adds a [Top N filter][ref-top-n-filter] to the report
 instead of a field.
 
+A report has at most one Top N field. Next to it, Top N filters can rank only
+the field's dimension, within the same **Ranked within** dimensions as the
+field, such as a **top** 3 filter on *Status* beside *Status, top 10*. The
+panel and the filter's popover refuse any other ranking, and say which one
+is in the way.
+
 ### Durations between dates
 
 You can count the time between two time dimensions of a semantic view without

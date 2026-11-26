@@ -90,6 +90,8 @@ No tab offers a list of values: each field takes one, and a `between` filter's t
 
 In the filter's edit sidebar, **Viewers can rank by** lists the measures of the view the filter may rank by. At least one must stay checked. The filter itself has two settings: **Number of values** and, when more than one measure is allowed, **Ranked by**. It reads like "10 by Count". With a single allowed measure, viewers set only the number.
 
+On a chart with a [Top N field][ref-top-n-field], a `top` or `bottom` filter applies only when it ranks the field's dimension and the field ranks across the whole report. Otherwise, the chart leaves that filter out and keeps every other filter. In the dashboard builder, the chart's [filter icon](#incompatible-controls) says why; on a published dashboard, the chart shows a notice that its Top N filter couldn't be applied.
+
 A [parent control](#parent)'s **Set to** can set a filter to `top` or `bottom`, with a number and a measure. When a filter ranks by a measure that is no longer in the semantic view, it says so; pick another measure in the filter.
 
 ### Single vs. multiple selection
@@ -775,16 +777,16 @@ Adding a chart built on a different semantic view is the case where this needs a
 
 ### Incompatible controls
 
-If controls of a certain type are incompatible with a particular chart's query, the chart skips all controls of that type and renders the data without them. Each type is skipped independently — if filters fail but a time granularity switcher works, the chart shows the granularity-adjusted data without filtering, and vice versa. A [field switcher](#field-switcher) that can't be applied says so [on the chart itself](#when-a-chart-cant-take-the-switch) rather than through the icons below.
+If controls of a certain type are incompatible with a particular chart's query, the chart skips all controls of that type and renders the data without them. A [`top` or `bottom` filter](#top-n-and-bottom-n) that can't run beside a chart's Top N field is the exception: only that filter is skipped. Each type is skipped independently — if filters fail but a time granularity switcher works, the chart shows the granularity-adjusted data without filtering, and vice versa. A [field switcher](#field-switcher) that can't be applied says so [on the chart itself](#when-a-chart-cant-take-the-switch) rather than through the icons below.
 
 The chart displays a warning icon to indicate the problem:
 
 | Icon | Meaning |
 |---|---|
-| Crossed-out filter | Filters were skipped for this chart |
+| Crossed-out filter | Filters, or a `top` or `bottom` filter, were skipped for this chart |
 | Crossed-out clock | Time granularity override was skipped for this chart |
 
-Hover over the icon for details. Click it to open the chart's [Controls mapping](#controls-mapping) and fix the issue — remap the control to a compatible dimension or disable it for this chart.
+Hover over the icon for details. Click it to open the chart's [Controls mapping](#controls-mapping) and fix the issue — remap the control to a compatible dimension or disable it for this chart. For a skipped `top` or `bottom` filter, remap it to the dimension of the chart's Top N field if that field ranks across the whole report. Otherwise, disable the filter for this chart, or change the Top N field so it [can run beside the filter](#top-n-and-bottom-n).
 
 ### Controls mapping
 
@@ -858,6 +860,7 @@ Filtering an advanced query by members requires Cube Core 1.8.9 or newer on the 
 [ref-calculated-fields-editing]: /docs/explore-analyze/workbooks/calculated-fields#editing-a-calculated-field
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-top-n-filter]: /docs/explore-analyze/workbooks/querying-data#top-n-and-bottom-n
+[ref-top-n-field]: /docs/explore-analyze/workbooks/calculated-fields#top-n-fields
 [ref-pre-aggregations]: /docs/pre-aggregations
 [ref-switch-dimensions]: /reference/data-modeling/dimensions#type
 [ref-granularities]: /docs/data-modeling/dimensions
