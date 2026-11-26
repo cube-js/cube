@@ -78,6 +78,7 @@
                       "docs/explore-analyze/charts/chart-types/boxplot",
                       "docs/explore-analyze/charts/chart-types/table",
                       "docs/explore-analyze/charts/chart-types/kpi",
+                      "docs/explore-analyze/charts/chart-types/bullet",
                       "docs/explore-analyze/charts/chart-types/map",
                       "docs/explore-analyze/charts/chart-types/html"
                     ]
