@@ -46,6 +46,14 @@ fn plan(
     external: bool,
     subquery_joins: Option<Vec<Rc<dyn SubqueryJoin>>>,
 ) -> Result<(String, Vec<PreAggregationUsage>), CubeError> {
+    plan_with(external, false, subquery_joins)
+}
+
+fn plan_with(
+    external: bool,
+    match_only: bool,
+    subquery_joins: Option<Vec<Rc<dyn SubqueryJoin>>>,
+) -> Result<(String, Vec<PreAggregationUsage>), CubeError> {
     let ctx = if external {
         TestContext::new_with_external_cubestore(MockSchema::from_yaml(SCHEMA)?)?
     } else {
@@ -62,6 +70,7 @@ fn plan(
             .measures(Some(members_from_strings(vec!["visitors.count"])))
             .dimensions(Some(members_from_strings(vec!["visitors.source"])))
             .subquery_joins(subquery_joins)
+            .pre_aggregations_match_only(Some(match_only))
             .build(),
     );
     ctx.build_sql_with_used_pre_aggregations_from_options(options)
@@ -111,9 +120,35 @@ async fn test_left_subquery_join_skips_rollup() -> Result<(), CubeError> {
 
         assert!(usages.is_empty(), "expected no rollup, got: {sql}");
         assert!(
+            !sql.contains("daily_rollup"),
+            "expected no rollup table, got: {sql}"
+        );
+        assert!(
             sql.contains("LEFT JOIN") && sql.contains(TOP_SOURCES_SUBQUERY),
             "expected the sub-query join, got: {sql}"
         );
+        assert!(
+            sql.contains("\"top_sources\".source"),
+            "expected the join condition, got: {sql}"
+        );
+    }
+    Ok(())
+}
+
+// The refresh and metadata path only asks which rollup a query reads, and must
+// get the same answer as the SQL build.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_match_only_skips_rollup_for_subquery_join() -> Result<(), CubeError> {
+    for external in [true, false] {
+        let (_, usages) = plan_with(external, true, None)?;
+        assert_eq!(
+            usages.len(),
+            1,
+            "expected the rollup to match without the join"
+        );
+
+        let (_, usages) = plan_with(external, true, Some(vec![top_sources_join("INNER")?]))?;
+        assert!(usages.is_empty(), "expected no rollup with the join");
     }
     Ok(())
 }
