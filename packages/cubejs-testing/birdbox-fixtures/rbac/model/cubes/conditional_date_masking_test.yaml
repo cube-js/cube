@@ -17,6 +17,13 @@ cubes:
         type: number
         mask: -1
 
+      # A number dimension over a text column: the database orders its bounds as text, so a
+      # narrower numeric bound lifts the mask on rows the policy hides. This is a data model
+      # error, not a masking bug: Cube trusts `type: number` and can't see the column type.
+      - name: price_text
+        sql: "CAST(price AS TEXT)"
+        type: number
+
     measures:
       - name: count
         type: count
@@ -78,3 +85,13 @@ cubes:
               values:
                 - "2018-02-01"
                 - "2018-03-31"
+
+      - group: "conditional_text_number_mask_group"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: price_text
+              operator: gt
+              values:
+                - "20"

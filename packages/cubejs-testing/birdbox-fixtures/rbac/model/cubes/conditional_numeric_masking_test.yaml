@@ -1,0 +1,72 @@
+cubes:
+  - name: conditional_numeric_masking_test
+    sql: |
+      SELECT * FROM (VALUES
+        (1, 0::real, '1000', 10),
+        (2, 1::real, '102', 20),
+        (3, 2::real, '30', 30)
+      ) AS source(id, amount, code, secret)
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+        public: true
+
+      - name: amount
+        sql: amount
+        type: number
+
+      - name: code
+        sql: code
+        type: string
+
+      - name: secret
+        sql: secret
+        type: number
+        mask: -1
+
+    measures:
+      - name: total
+        sql: secret
+        type: sum
+
+    access_policy:
+      - group: "*"
+        member_level:
+          includes:
+            - id
+            - amount
+            - code
+        member_masking:
+          includes:
+            - secret
+            - total
+
+      - group: conditional_numeric_lower
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: amount
+              operator: gt
+              values: ["1"]
+
+      - group: conditional_numeric_upper
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: amount
+              operator: lt
+              values: ["1"]
+
+      - group: conditional_numeric_string
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: code
+              operator: gt
+              values: ["20"]

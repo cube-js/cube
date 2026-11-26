@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { afterAll, beforeAll, jest, expect } from '@jest/globals';
+import { afterAll, beforeAll, jest, expect, test } from '@jest/globals';
 import { sign } from 'jsonwebtoken';
 import { Client as PgClient } from 'pg';
 import cubejs, { CubeApi, Query } from '@cubejs-client/core';
@@ -786,6 +786,27 @@ describe('Cube RBAC Engine', () => {
       }
     });
 
+    // Pins a data model error, not a mask Cube should keep: as text, '102' sorts below
+    // the policy bound '20' and above the query bound '1000', so the row comes back unmasked.
+    test('a narrower bound on a number dimension over a text column unmasks rows in text order', async () => {
+      const client = cubejs(async () => tokenFor('conditional_text_number_mask_group'), {
+        apiUrl: birdbox.configuration.apiUrl,
+      });
+      const prices = async (filters: Query['filters']) => {
+        const result = await client.load({ dimensions: [`${CUBE}.price_text`], filters, limit: 5000 });
+
+        return result.rawData().map((row) => row[`${CUBE}.price_text`]);
+      };
+
+      const unfiltered = await prices([]);
+      expect(unfiltered).toContain(null);
+      expect(unfiltered).not.toContain('102');
+
+      const narrower = await prices([{ member: `${CUBE}.price_text`, operator: 'gt', values: ['1000'] }]);
+      expect(narrower).toContain('102');
+      expect(narrower).not.toContain(null);
+    });
+
     // The shift moves the date filter with it, so the measure sums January and
     // February rows: the query filter doesn't keep it inside the policy.
     test('a time-shifted measure stays masked under the policy date range', async () => {
@@ -802,6 +823,64 @@ describe('Cube RBAC Engine', () => {
         expect(values.length).toBeGreaterThan(0);
         expectMasked(values);
       });
+    });
+  });
+
+  describe('RBAC conditional masking with numeric row filters via REST API', () => {
+    const CUBE = 'conditional_numeric_masking_test';
+    const clientFor = (group: string) => cubejs(async () => sign({
+      auth: { username: group, userAttributes: {}, groups: [`conditional_numeric_${group}`] },
+    }, DEFAULT_CONFIG.CUBEJS_API_SECRET, { expiresIn: '2 days' }), {
+      apiUrl: birdbox.configuration.apiUrl,
+    });
+
+    test.each<[
+      string, 'gt' | 'gte' | 'lt' | 'lte', string, string[][], (string | null)[],
+    ]>([
+      ['lower', 'gte', '1.00000001', [['2', '-1'], ['3', '30']], [null, null]],
+      ['upper', 'lte', '0.99999999', [['1', '10'], ['2', '-1']], [null, null]],
+      ['lower', 'gt', '1.00000001', [['3', '30']], ['30']],
+      ['upper', 'lt', '0.99999999', [['1', '10']], ['10']],
+    ])('%s policy with %s %s respects the rounded real bound', async (group, operator, bound, expectedRows, expectedTotal) => {
+      const client = clientFor(group);
+      const filters = [{ member: `${CUBE}.amount`, operator, values: [bound] }];
+      const result = await client.load({
+        dimensions: [`${CUBE}.id`, `${CUBE}.secret`],
+        filters,
+        order: { [`${CUBE}.id`]: 'asc' },
+      });
+
+      expect(result.rawData().map(row => [row[`${CUBE}.id`], row[`${CUBE}.secret`]])).toEqual(expectedRows);
+
+      const aggregate = await client.load({ measures: [`${CUBE}.total`], filters });
+      expect(aggregate.rawData().map(row => row[`${CUBE}.total`])).toEqual(expectedTotal);
+    });
+
+    test('a numerically tighter bound on a string dimension keeps the mask', async () => {
+      const client = clientFor('string');
+      const result = await client.load({
+        dimensions: [`${CUBE}.id`, `${CUBE}.secret`],
+        filters: [{ member: `${CUBE}.code`, operator: 'gt', values: ['1000'] }],
+        order: { [`${CUBE}.id`]: 'asc' },
+      });
+
+      expect(result.rawData().map(row => [row[`${CUBE}.id`], row[`${CUBE}.secret`]]))
+        .toEqual([['2', '-1'], ['3', '30']]);
+
+      const aggregate = await client.load({
+        measures: [`${CUBE}.total`],
+        filters: [{ member: `${CUBE}.code`, operator: 'gt', values: ['1000'] }],
+      });
+      expect(aggregate.rawData().map(row => row[`${CUBE}.total`])).toEqual([null, null]);
+    });
+
+    test('an identical bound on a string dimension unmasks the aggregate', async () => {
+      const result = await clientFor('string').load({
+        measures: [`${CUBE}.total`],
+        filters: [{ member: `${CUBE}.code`, operator: 'gt', values: ['20'] }],
+      });
+
+      expect(result.rawData().map(row => row[`${CUBE}.total`])).toEqual(['30']);
     });
   });
 
