@@ -853,6 +853,34 @@ filter_subq AS (
       expect(res.rows).toMatchSnapshot('join grouped empty members');
     });
 
+    // Each side is served from its own rollup in the source database: the one the
+    // sub-query reads has to be built and swapped in too
+    test('join with grouped query over source database rollups', async () => {
+      const query = `
+        SELECT
+          o.status AS order_status,
+          s.status AS known_status
+        FROM
+          "SubQueryRollupOrders" o
+          INNER JOIN
+          (
+            SELECT status
+            FROM "SubQueryRollupStatuses"
+            GROUP BY 1
+          ) s
+        ON
+          o.status = s.status
+        GROUP BY 1, 2
+        ORDER BY 1
+        `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toEqual([
+        { order_status: 'new', known_status: 'new' },
+        { order_status: 'shipped', known_status: 'shipped' },
+      ]);
+    });
+
     test('where segment is false', async () => {
       const query =
         'SELECT value AS val, * FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';

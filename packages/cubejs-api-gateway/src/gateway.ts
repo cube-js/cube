@@ -2784,6 +2784,13 @@ class ApiGateway {
       };
 
       if (request.sqlQuery) {
+        // The SQL can be built over several cube queries, and `sqlQueries[0]` describes
+        // one of them: the rollups the others read come along with the request. On the
+        // data source, only its own rollups can be read
+        const otherPreAggregations = external
+          ? request.preAggregations
+          : request.preAggregations?.filter((p) => !p?.external);
+
         const finalQuery: QueryBody = {
           query: request.sqlQuery[0],
           values: request.sqlQuery[1],
@@ -2793,13 +2800,11 @@ class ApiGateway {
           ...sqlQueries[0],
           // TODO Can we just pass through data? Ensure hidden members can't be queried
           aliasNameToMember: null,
-          // The SQL can be built over several cube queries, and `sqlQueries[0]` describes
-          // one of them: the rollups the others read come along with the request
-          ...(external ? {
-            external: true,
+          ...(external ? { external: true } : {}),
+          ...(external || otherPreAggregations?.length ? {
             preAggregations: mergePreAggregationDescriptions(
               sqlQueries[0].preAggregations,
-              request.preAggregations,
+              otherPreAggregations,
             ),
           } : {}),
         };
