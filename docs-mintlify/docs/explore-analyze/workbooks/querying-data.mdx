@@ -193,6 +193,12 @@ To show the top N members and group the rest under one label, use a
 [Top N field][ref-calculated-fields-top-n] instead. A data model author can
 also seed a ranking with [`default_ui_filters`][ref-default-ui-filters].
 
+A report can rank several dimensions with several filters. Next to a
+[Top N field][ref-calculated-fields-top-n], though, a filter can rank only the
+field's dimension, within the same **Ranked within** dimensions as the field.
+For any other ranking, **Apply** is disabled and the popover says which
+ranking is in the way.
+
 ### Combining filters
 
 Filters in the bar are combined with AND: every one of them must hold. For OR,
