@@ -167,12 +167,29 @@ To add a reference band:
 
 | Setting | Description |
 |---|---|
-| **From** / **To** | On a measure axis, a number or a computed value: **Average**, **Median**, **Minimum**, **Maximum**, or **Percentile**. For example, shade the range from the 25th to the 75th percentile. |
+| **From** / **To** | On a measure axis, a number or a computed value: **Average**, **Median**, **Minimum**, **Maximum**, **Percentile**, or **Percent**. For example, shade the range from the 25th to the 75th percentile. |
 | **Computed from** | The measure that computed values use, when the axis has more than one |
 | **Label** | The band's name. A new band is named *Band*, then *Band 2*, and so on. |
 | **Show value** | Print the band's range in the label. On by default. |
 | **Show edges** | Draw a line on each edge of the band. On by default. |
 | Line style, width, and label position | The same settings as for a [reference line](#reference-lines). The line style and width apply to the edges. |
+
+#### Bands for each bar
+
+On a bar chart, set **From** or **To** to **Percent** to draw the band behind each bar, from that
+bar's own value of the **Computed from** measure. For example, a band from 0 to 60% of a revenue
+target shades 0 to 60% of each region's own target. The other edge can be a number, usually 0, or
+a computed value other than **Percentile**. An empty **From** starts at 0.
+
+While a band is drawn behind each bar, the bars on that axis get narrower, so the band shows
+around them. When an edge first turns to **Percent**, **Computed from** switches to the measure
+drawn as points, such as the target in a [bullet chart](/docs/explore-analyze/charts/chart-types/bullet).
+The band has one label, on the bar with the largest value. With **Show value** on, it prints
+**Percent** edges as percentages, for example *Good · 80–100%*.
+
+**Percent** is available on bar charts without a breakdown. On a line, area or scatter chart, or
+with a breakdown, a band with a **Percent** edge stays in the Style tab but does not show on the
+chart, and its row shows a warning. Such a band cannot be split into lines.
 
 To change a line into a band, open the line row's **⋮** menu and choose **Convert to band**. The
 line's value becomes the **From** edge. On a measure axis, the **To** edge is the **Average**, or

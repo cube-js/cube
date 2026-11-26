@@ -24,11 +24,16 @@ the target is a second measure drawn as points, or a reference line, and the ran
    [Series configuration](/docs/explore-analyze/charts/configuration/series-configuration#mark-type-override).
 4. Add the ranges. In the Style tab, open the **⋮** menu of the **X-axis** section, which holds the
    measures on a horizontal chart, and choose **Add reference band**. Repeat once per range.
-5. In each band row, type the **From** and **To** values, for example 0–8,000, 8,000–14,000 and
-   14,000–22,000.
-6. Click **Band options** in each band row and set its **Label**, for example *Poor*,
-   *Satisfactory* and *Good*. Click each band's color swatch to give the bands shades from light
-   to dark.
+5. Click **Band options** in each band row and set **To** to **Percent**, so each category gets
+   its own ranges from its own target. **Computed from** switches to the target measure. Set the
+   percentages, for example 60% for *Poor*, 80% for *Satisfactory* and 100% for *Good*, each with
+   an empty **From**, which starts at 0. The bands overlap and shade darker toward 0, and the bars
+   get narrower, so the ranges show around them.
+6. In **Band options**, set each band's **Label**, for example *Poor*, *Satisfactory* and *Good*.
+
+To use the same ranges for every category, type the **From** and **To** values in each band row
+instead, for example 0–8,000, 8,000–14,000 and 14,000–22,000, and click each band's color swatch
+to give the bands shades from light to dark.
 
 If every category has the same target, leave the target measure out of the query, skip step 3,
 and add a [reference line](/docs/explore-analyze/charts/configuration/axes#reference-lines) at the
@@ -45,9 +50,8 @@ mark the ranges.
 
 ## Limitations
 
-- A band covers the whole chart, so every category shares the same ranges. Ranges set as a
-  percentage of each category's own target, for example 60% and 80% of each region's quota, are not
-  supported.
+- Each range is a band of its own.
+- Ranges set as a percentage of each category's target need a chart without a breakdown.
 - The target marker is a point: a circle, a square, or a triangle. There is no thin tick mark.
-- The bars keep their usual width, so the bands show around the bars rather than as a wider strip
-  behind a narrow bar.
+- With ranges set as numbers, the bars keep their usual width, so the bands show around the bars
+  rather than as a wider strip behind a narrow bar.
