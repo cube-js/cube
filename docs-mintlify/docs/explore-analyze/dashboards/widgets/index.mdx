@@ -36,6 +36,16 @@ Each item — a toolbar button, or an option inside the **Controls**, **Containe
 
 Starting a drag from a menu option closes the menu, so it doesn't cover the canvas while you place the widget.
 
+When the window is narrower than 920 pixels, for example on a phone, the toolbar takes two rows. The first row holds **Charts** and **Controls**, then **Design**, the freshness indicator, **Refreshes, deliveries and alerts**, **Dashboard options** and the chat; **Containers** and **Other** wrap to the second. **Controls**, **Containers** and **Other** collapse to an icon and a chevron, **Charts** shows its icon and count, and the **Add:** label is hidden. Hover a button to see its name in a tooltip.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/builder-on-a-phone.png"
+    alt="Dashboard builder on a phone with the toolbar collapsed to icons"
+    width="390"
+  />
+</Frame>
+
 ### Adding a widget at a spot on the canvas
 
 You can also start from the canvas itself. Hover an empty part of the board — a gap between widgets, the space below the last one, or the canvas of an empty dashboard — and the cell under the pointer is highlighted with a plus:
@@ -75,6 +85,8 @@ A minimum only constrains a resize you make in the builder. A dashboard that alr
 ## Arranging widgets
 
 Drag any widget to move it, and use the handle in its bottom-right corner to resize it — the surrounding widgets shift to make room.
+
+On a phone, the builder shows the board's Mobile layout, the one the **Mobile (414px)** device preview shows, fitted to the screen. Dragging a widget there changes only the Mobile layout; the Desktop positions stay as they are. In a window 920 pixels or wider where the board itself is narrower than 800 pixels, for example with the side chat open, the builder shows the Tablet layout, the one the **Tablet (768px)** device preview shows, fitted the same way.
 
 To work with several widgets at once, select them first:
 
