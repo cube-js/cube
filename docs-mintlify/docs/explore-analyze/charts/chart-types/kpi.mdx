@@ -108,9 +108,9 @@ KPI tiles have a layout panel that controls how blocks are arranged:
 
 ## Drill down
 
-Clicking a **Number** block opens the rows behind its value, as clicking a measure cell does in a [table](/docs/explore-analyze/charts/chart-types/table#cell-menu). The block must show a measure with [`drill_members`](/reference/data-modeling/measures#drill_members) defined in the data model. Other block types are not clickable.
+Clicking a **Number** block that shows a measure opens the [value menu](/docs/explore-analyze/charts#clicking-a-value), as clicking a measure cell does in a [table](/docs/explore-analyze/charts/chart-types/table#cell-menu). Choose **Drill down** there to open the rows behind the value. **Drill down** is offered when the measure has [`drill_members`](/reference/data-modeling/measures#drill_members) defined in the data model. Other block types are not clickable.
 
-Drill down works on dashboards, including published and embedded ones, but not in a workbook or while you edit a dashboard.
+The menu opens in workbooks and on dashboards, including published and embedded ones. While you edit a dashboard, a click on the **Number** block doesn't open the menu, because the tile can be dragged.
 
 ## Converting to raw Markdown
 

@@ -46,6 +46,35 @@ Adjust the appearance of any chart through the configuration panel:
 - **[Tooltips](/docs/explore-analyze/charts/configuration/tooltips)** — Fields shown on hover
 - **[Data labels](/docs/explore-analyze/charts/configuration/data-labels)** — Values displayed directly on chart marks
 
+## Clicking a value
+
+A click on a value in a chart opens the same menu as a measure cell in a [table](/docs/explore-analyze/charts/chart-types/table#cell-menu). You can click a bar, a line or area point, a pie slice, a scatter point, a heatmap cell, a funnel stage, a box, a Sankey ribbon, a map marker, or the **Number** block of a KPI chart. The menu opens in workbooks and on dashboards: in the dashboard builder, on published dashboards and on embedded ones. While you edit a dashboard, a click on a KPI's **Number** block doesn't open the menu. A click alone doesn't drill down. Choose **Drill down** in the menu instead.
+
+{/* TODO: video — clicking a chart value opens the value menu, then Drill down (GTM-334) */}
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/value-menu-v2.png"
+    alt="Value menu on a bar chart with a title, Drill down and Copy value"
+  />
+</Frame>
+
+The menu lists, from top to bottom:
+
+- A title that names the clicked value: each dimension's title and value, then the measure's title and formatted value.
+- **Open in** and the target dashboard's title, on a chart with a [drill-through](/docs/explore-analyze/dashboards/drill-through).
+- **Drill down**, when the measure has [`drill_members`](/reference/data-modeling/measures#drill_members) defined, and **Copy value**, which copies the raw (unformatted) value.
+- The [cross-filter](/docs/explore-analyze/dashboards/cross-filtering) items: **Filter dashboard by this point**, **Narrow filter to this point** and **Reset this filter**.
+- **Comment on this point** and **Comment on whole chart**, on a published dashboard with [comments](/docs/explore-analyze/dashboards/comments#comments-on-a-data-point) on.
+
+Each item appears only where it applies. Some values get a shorter menu:
+
+- The **Other** slice of a pie chart, and a Sankey ribbon that touches a grouped **Other** node, offer only **Copy value**. They cover several members, so they have no title and no **Drill down**.
+- A KPI total with no dimension has no title.
+- A region of a region map offers the drill-through, comment and cross-filter items only, with no title and no **Copy value**.
+
+Dragging across a chart's axis [selects a range](/docs/explore-analyze/dashboards/cross-filtering#selecting-a-range), and the menu then has one item, **Filter dashboard by these points**. Cmd/Ctrl+click [adds a value](/docs/explore-analyze/dashboards/cross-filtering#adding-and-removing-values) to the chart's cross-filter without opening the menu.
+
 ## Custom visualizations
 
 When the built-in chart types don't cover your use case, write a raw [Vega-Lite spec](/docs/explore-analyze/charts/custom) or use an HTML template with Handlebars. Both options give you complete control over the rendered output.
