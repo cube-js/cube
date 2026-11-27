@@ -231,9 +231,46 @@ right end when the chart has the measure on the X axis and the boxes are
 horizontal. In the popover, the measure is followed by **(median)**. Each
 outlier is a data point of its own, with its own value.
 
-Comments on a data point are not available on **Table**, **KPI**, **HTML**,
-**Map**, and **Sankey** charts. On these charts, comment on the whole chart
-instead.
+On a **Map** chart, each marker of a point map and each region of a region map
+is a data point. Click the marker or the region and choose **Comment on this
+point**. The pin is on the marker, or inside the region, and stays there when you
+pan and zoom the map. Some things work differently on a map:
+
+- Comments on a data point are available only when the map shows a measure:
+  as the size or color of the markers, or as the color of the regions.
+- The menu of a region has no title and no **Copy value**. It has only the
+  comment, cross-filter and drill-through items.
+- When markers are grouped in a cluster, the cluster shows one pin with the
+  total number of open threads. Click it to zoom in.
+- When the map shows [density](/docs/explore-analyze/charts/chart-types/map#density),
+  pins stay visible at every zoom level. To start a thread, zoom in until the
+  map shows the points instead of the surface.
+- If a data point is out of view, click it in the panel. The map moves to show
+  it.
+- On a point map, the data point leaves out the latitude and longitude when it
+  has another dimension, for example a store name.
+
+On a **Sankey** chart, each ribbon between two nodes is a data point. Click the
+ribbon and choose **Comment on this point**. The pin is at the middle of the ribbon,
+and while its popover is open, the other ribbons are dimmed. A ribbon that combines
+several rows, for example a ribbon to or from an **Other** node, does not take
+comments.
+
+On a **Table** chart, each cell with a measure value is a data point. Click the
+cell and choose **Comment on this point**. Some things work differently on a
+table:
+
+- The pin is in the cell, next to the value. It moves with its row when you sort
+  the table, scroll it, or go to another page.
+- If the row is out of view, click the data point in the panel. The table goes to
+  the row's page and scrolls to it.
+- In a pivot table, the data point also has the values of the column's
+  dimensions.
+- Totals, subtotals, group rows, empty cells, sparklines, and period comparison
+  columns do not take comments.
+
+Comments on a data point are not available on **KPI** and **HTML** charts. On
+these charts, comment on the whole chart instead.
 
 ## Editing and deleting
 
