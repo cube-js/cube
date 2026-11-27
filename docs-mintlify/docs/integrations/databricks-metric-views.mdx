@@ -673,7 +673,8 @@ run a new **Preview** after a Cube upgrade.
   and joins. Review the generated YAML, then test access and sync.
 - **Warning** — behavior-neutral metadata Databricks cannot represent, or a measure
   [withheld](#withheld-measures) as [`CUBE_MEMBER_WITHHELD`](#cube-member-withheld): a
-  fan-out-unsafe joined measure or a multi-stage measure a Metric View cannot represent. Review
+  fan-out-unsafe joined measure, or a multi-stage or `rolling_window` measure a Metric View cannot
+  represent. Review
   the exact difference before accepting publication.
 
 Preview **blocks** a view it can't publish faithfully, and each blocking issue says what to
@@ -709,15 +710,18 @@ represent is withheld too: one with [`time_shift`](/reference/data-modeling/meas
 [`grain`](/reference/data-modeling/measures#grain), `group_by`, `reduce_by`, or `add_group_by`, or
 one of a type other than `number`, such as `rank`. So is a
 [`rolling_window`](/reference/data-modeling/measures#rolling_window) measure, and any measure that
-references one of these. These measures stay queryable in Cube. In Databricks, you can compute a
-prior period with a window function, such as `LAG`, over `MEASURE()` results. A view left with no
-measure to publish is blocked instead, as described under
-[Fix a blocked view](#fix-a-blocked-view).
+references one of these. These measures stay queryable in Cube. For a `time_shift` measure, you
+can compute the prior period in Databricks with a window function, such as `LAG`, over `MEASURE()`
+results. A view left with no measure to publish is blocked instead, as
+[`CUBE_VIEW_FULLY_WITHHELD`](#cube-view-fully-withheld) or, when it also includes a dimension, as
+`OSSIE_CUBE_MULTI_STAGE_MEASURE_PARKED` under [Fix a blocked view](#fix-a-blocked-view).
 
 Preview lists each withheld measure, with its reason, under **Measures not published** and as a
-`CUBE_MEMBER_WITHHELD` warning. Each entry in `withheldMembers` names the member and its code:
+`CUBE_MEMBER_WITHHELD` warning. In the Preview result, each entry in `withheldMembers` names the
+member and its code:
 `FANOUT_UNSAFE_METRIC` for a measure that would over-count, `MULTI_STAGE_UNSUPPORTED` for a
-multi-stage or `rolling_window` measure.
+multi-stage or `rolling_window` measure. In a sync run, `withheldMembers` lists only the members,
+as `cube.member`.
 
 A view with a withheld measure is **still published without it**. That view may show
 **Created**, **Updated**, or **Unchanged**, and the run may show **Completed**, even though some
@@ -1318,7 +1322,7 @@ under [Fix a blocked view](#fix-a-blocked-view).
 ### `CUBE_MEMBER_WITHHELD` {#cube-member-withheld}
 
 A warning: the view publishes without a measure that would over-count, or that has no Metric View
-form, such as a multi-stage, window, or ranking measure. The measure stays queryable in Cube. For
+form, such as a multi-stage, `rolling_window`, or ranking measure. The measure stays queryable in Cube. For
 an over-counting measure, apply the fix for its case under [Withheld measures](#withheld-measures);
 otherwise, keep that measure in Cube.
 
