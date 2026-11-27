@@ -39,6 +39,11 @@ const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 
 const QUERY_TAG_MAX_LENGTH = 2000;
 export const CANCEL_ACK_TIMEOUT = 30 * 1000;
+export const CANCEL_RETRY_INTERVAL = 100;
+
+// Snowflake answers an abort that outruns its own statement (sent but not registered yet)
+// with this code and drops it, so the statement would run to completion.
+const STATEMENT_NOT_EXECUTING = '000605';
 
 const FETCH_AS_STRING: DataType[] = [
   // It's not possible to store big numbers in Number, It's a common way how to handle it in Cube
@@ -1019,9 +1024,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return hydrationMap;
   }
 
-  protected cancelStatement(stmt: RowStatement): Promise<void> {
+  protected cancelStatement(stmt: RowStatement, isStatementSettled: () => boolean): Promise<void> {
     return new Promise<void>((resolve) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
+      let retryTimer: ReturnType<typeof setTimeout> | undefined;
       let settled = false;
 
       const finish = (warning?: string, error?: any) => {
@@ -1037,6 +1043,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
           clearTimeout(timer);
         }
 
+        if (retryTimer) {
+          clearTimeout(retryTimer);
+        }
+
         if (warning && this.logger) {
           this.logger(warning, {
             queryId: stmt.getQueryId(),
@@ -1049,16 +1059,35 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         resolve();
       };
 
+      const attempt = () => {
+        try {
+          stmt.cancel((err) => {
+            // Typed as the SDK's own codes, but server-side failures carry Snowflake's code string.
+            const code: unknown = err?.code;
+            if (code === STATEMENT_NOT_EXECUTING) {
+              if (isStatementSettled()) {
+                // Nothing left to abort: the statement finished on its own.
+                finish();
+              } else if (!settled) {
+                retryTimer = setTimeout(attempt, CANCEL_RETRY_INTERVAL);
+              }
+
+              return;
+            }
+
+            finish(err ? 'Snowflake statement cancel error' : undefined, err);
+          });
+        } catch (e) {
+          finish('Snowflake statement cancel error', e);
+        }
+      };
+
       timer = setTimeout(
         () => finish('Snowflake statement cancel timeout'),
         CANCEL_ACK_TIMEOUT,
       );
 
-      try {
-        stmt.cancel((err) => finish(err ? 'Snowflake statement cancel error' : undefined, err));
-      } catch (e) {
-        finish('Snowflake statement cancel error', e);
-      }
+      attempt();
     });
   }
 
@@ -1135,7 +1164,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       cancelled = true;
 
       if (stmt) {
-        await this.cancelStatement(stmt);
+        await this.cancelStatement(stmt, () => settled);
       }
     };
 
