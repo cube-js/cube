@@ -37,7 +37,6 @@ import { ConnectionError } from './errors';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 
-// Snowflake rejects a longer QUERY_TAG.
 const QUERY_TAG_MAX_LENGTH = 2000;
 export const CANCEL_ACK_TIMEOUT = 30 * 1000;
 
@@ -129,10 +128,6 @@ export interface SnowflakeDriverOptions {
   identIgnoreCase?: boolean,
   application: string,
   readOnly?: boolean,
-  /**
-   * A string is a static tag for the whole connection. An object is sent as JSON
-   * with the Cube request id merged in under `requestId`.
-   */
   queryTag?: string | Record<string, unknown>,
 
   /**
@@ -1070,7 +1065,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * Tags the statement with the Cube request id, so it can be traced in Snowflake `QUERY_HISTORY`.
    * A string `queryTag` wins: the SDK overwrites the statement `QUERY_TAG` with it anyway.
-   * An object `queryTag` is merged with the request id, its own `requestId` key taking priority.
    */
   protected statementParameters(requestId?: string): StatementOption['parameters'] {
     if (this.config.queryTag && typeof this.config.queryTag !== 'string') {
