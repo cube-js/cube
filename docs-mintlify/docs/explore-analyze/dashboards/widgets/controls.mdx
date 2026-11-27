@@ -332,7 +332,7 @@ On those charts, the filter's value wins over the report's own value. Until a
 viewer picks a value, the filter fills the value you picked in the builder, or
 the parameter's default. On a published dashboard, a viewer's pick lasts for the
 session, and the URL carries it as `?p_<name>=<value>`, so a link opens the
-dashboard with the same values. A `p_` value applies only to a parameter that a
+dashboard with the same values (see [Sharing the current selection](#sharing-the-current-selection) for the format). A `p_` value applies only to a parameter that a
 filter fills. Publishing saves the parameters' defaults with the dashboard, so
 republish it after you change a default.
 
@@ -720,11 +720,14 @@ Each control type has its own parameter:
 | Control | Parameter | Example |
 |---|---|---|
 | [Filter](#filter) | `f_<semantic_view>.<dimension>=<JSON>` | `f_orders.status={"value":"shipped"}` |
+| [Filter](#filling-a-sql-parameter) that fills a SQL parameter | `p_<parameter>=<value>` | `p_min_orders=100` |
 | [Time granularity switcher](#time-granularity-switcher) | `tg_<semantic_view>.<dimension>=<granularity>` | `tg_orders.created_at=week` |
 | [Field switcher](#field-switcher) | `ms_<semantic_view>.<replaced_member>=<selected_member>` | `ms_orders.status=users_city` |
 | A control added to the [Dynamic controls](#dynamic-controls) widget | `dc_<key>=<JSON>`, beside the parameter of its type | `dc_h87irx={"type":"FILTER","config":{"dimension":"orders.status"}}` |
 
 The semantic view and member are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. The same goes for the member on the right-hand side of `ms_`: it is the internal name of the member to switch to, and it is a measure rather than a dimension when the switcher's **Field type** is **Measure**. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
+
+A `p_` parameter is named after the SQL parameter's identifier, not a member, and its value is plain text rather than JSON, written the way the parameter's [type][ref-sql-parameter-types] takes it: any text for a **String**, a number such as `100`, `true` or `false`, a date such as `2026-01-31` for a **Date**, or a date and time such as `2026-01-31 08:30` for a **Date and time**. A date also takes a [relative date value][ref-relative-date-values] such as `7 days ago`, resolved each time the charts run. A filter that fills a range writes one `p_` parameter for each end, such as `p_start_date=2026-01-01&p_end_date=2026-01-31`.
 
 You can also write these parameters by hand to open a dashboard in a particular state — see [Pre-set dashboard filters, granularities, and tabs via URL][ref-embed-url-filters] for the embedded case, which uses the same format.
 
@@ -848,6 +851,7 @@ The controls icon on a chart counts these filters along with the other controls,
 [ref-workbook-agent]: /docs/explore-analyze/workbooks/workbook-agent
 [ref-advanced-queries]: /docs/explore-analyze/workbooks/querying-data#advanced-semantic-queries
 [ref-sql-parameters]: /docs/explore-analyze/workbooks/sql-parameters
+[ref-sql-parameter-types]: /docs/explore-analyze/workbooks/sql-parameters#types
 [ref-print-version]: /docs/explore-analyze/dashboards#print-version
 
 [ref-workbooks]: /docs/explore-analyze/workbooks

@@ -72,13 +72,15 @@ the value into the SQL:
 | **String** | Any text | A quoted string, such as `'completed'`. Single quotes in the value are escaped. |
 | **Number** | A finite number | The number, such as `100`. A negative number is wrapped in parentheses, such as `(-1)`. |
 | **Date** | A fixed date, or a relative one such as `7 days ago` | A date, such as `CAST('2026-01-31' AS DATE)` |
+| **Date and time** | A fixed date and time, such as `2026-01-31 08:30`, or a relative one | A timestamp, such as `CAST('2026-01-31 08:30' AS TIMESTAMP)` |
 | **Boolean** | `true` or `false` | `TRUE` or `FALSE` |
 
 A parameter holds a single value. There is no list type, so a parameter can't
 stand for the values of an `IN (…)` list.
 
 **Type** lists **Date and time** only when you edit a parameter that already
-has that type. A new parameter can't take it.
+has that type. A new parameter can't take it. A bare date, such as
+`2026-01-31`, is that day's midnight.
 
 Changing the type resets the default.
 
