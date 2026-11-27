@@ -3,7 +3,9 @@ use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use cubeorchestrator::query_message_parser::QueryResult;
-use cubeorchestrator::query_result_transform::TransformedData;
+use cubeorchestrator::query_result_transform::{
+    columnar_plan, transform_value, ColumnarColumnSource, DBResponsePrimitive, TransformedData,
+};
 use cubeorchestrator::transport::{
     ConfigItem, MemberOrMemberExpression, NormalizedQuery, QueryType, ResultType,
     TransformDataRequest,
@@ -241,5 +243,93 @@ fn bench_transform_time_scenarios(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_transform, bench_transform_time_scenarios);
+/// The SQL API reads a columnar result column by column (`ResultWrapper` in
+/// `cubejs-backend-native`). `materialize` is the old path — transform into a
+/// full copy, then read it; `lazy` resolves the plan and reads the source
+/// cells in place, formatting only time strings.
+fn bench_sql_api_columns(c: &mut Criterion) {
+    let mut group = c.benchmark_group("sql_api_columns");
+
+    let scenarios = [
+        TimeScenario::NoTimeDim,
+        TimeScenario::OneTimeDim,
+        TimeScenario::TwoTimeDims,
+    ];
+
+    for scenario in scenarios {
+        let time_dims = scenario.time_columns();
+        let regular_count = SCENARIO_COL_COUNT - time_dims.len();
+        let (dim_count, measure_count) = split_dim_measure(regular_count);
+        let dimensions = make_member_aliases("dim", dim_count);
+        let measures = make_member_aliases("measure", measure_count);
+
+        let raw = QueryResult::from_js_raw_data(build_dataset(
+            SCENARIO_ROW_COUNT,
+            &dimensions,
+            &measures,
+            &time_dims,
+        ))
+        .expect("from_js_raw_data");
+        let request = build_request(
+            Some(ResultType::Columnar),
+            &dimensions,
+            &measures,
+            &time_dims,
+        );
+
+        group.throughput(Throughput::Elements(
+            (SCENARIO_ROW_COUNT * SCENARIO_COL_COUNT) as u64,
+        ));
+        let id_param = format!(
+            "{}/c{:02}_r{}",
+            scenario.label(),
+            SCENARIO_COL_COUNT,
+            SCENARIO_ROW_COUNT
+        );
+
+        group.bench_with_input(BenchmarkId::new("materialize", &id_param), &(), |b, _| {
+            b.iter(|| {
+                let transformed = TransformedData::transform(black_box(&request), black_box(&raw))
+                    .expect("transform");
+                let TransformedData::Columnar { columns, .. } = &transformed else {
+                    unreachable!()
+                };
+                for column in columns {
+                    for cell in column.iter() {
+                        black_box(cell);
+                    }
+                }
+            });
+        });
+
+        group.bench_with_input(BenchmarkId::new("lazy", &id_param), &(), |b, _| {
+            b.iter(|| {
+                let (_, plan) =
+                    columnar_plan(black_box(&request), black_box(&raw)).expect("columnar_plan");
+                for entry in &plan {
+                    let ColumnarColumnSource::DbColumn { index } = entry.source else {
+                        continue;
+                    };
+                    let is_time = entry.member_type == "time";
+                    for cell in raw.column(index).expect("column").iter() {
+                        if is_time && matches!(cell, DBResponsePrimitive::String(_)) {
+                            black_box(transform_value(cell.clone(), "time"));
+                        } else {
+                            black_box(cell);
+                        }
+                    }
+                }
+            });
+        });
+    }
+
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_transform,
+    bench_transform_time_scenarios,
+    bench_sql_api_columns
+);
 criterion_main!(benches);
