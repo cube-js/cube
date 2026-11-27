@@ -108,11 +108,11 @@ value yet, so it appears greyed until you set one in the **Filters** pane.
 Click on **×** to remove members from a query.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/integrations/google-sheets/acc8e133.png" />
+  <img src="https://static.cube.dev/docs/integrations/google-sheets/create-exploration.png" alt="Cube for Google Sheets pane with the Orders view in the member list and Status, Users City and Count in the Columns, Rows and Measures zones, next to the pivoted result on the sheet" />
 </Frame>
 
-Use **Order** and **Filters** panes below to sort and filter the
-data in the exploration.
+Use the **Filters** and **Limit & Order** tabs below the member list to
+filter and sort the data in the exploration.
 
 Above the query editor, a **cursor row** (`● Sheet1 · A1` next to **+ New**)
 shows the cell you last selected in the sheet. It can briefly lag your click;
@@ -120,12 +120,11 @@ press the target button in that row to re-read your selection. It only
 refreshes the readout — it doesn't move or write anything.
 
 If you'd like to move the exploration to a new location, click on the desired
-top-left cell and then confirm with the target button under
-**Result location**. Unlike the cursor row's button, this one moves the
-exploration.
+top-left cell, open the **⋮** menu, and click **Move to selection**. Unlike
+the cursor row's button, this moves the exploration.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/integrations/google-sheets/5a8d2b6a.png" />
+  <img src="https://static.cube.dev/docs/integrations/google-sheets/limit-and-order.png" alt="Limit & Order tab of the Cube for Google Sheets pane with the row limit and Count sorted from 9 to 0, next to the re-sorted result on the sheet" />
 </Frame>
 
 With every change to your query, Cube for Sheets will update the exploration on
@@ -273,7 +272,7 @@ the insert, but the stored anchor doesn't move with it, so the next refresh
 targets the wrong cell.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/integrations/google-sheets/c8d490c6.png" />
+  <img src="https://static.cube.dev/docs/integrations/google-sheets/workbook-home.png" alt="Workbook home of the Cube for Google Sheets pane listing a saved exploration placed on Sheet1 with its range and last refresh time" />
 </Frame>
 
 If an exploration has filters applied, an admin can turn on **Show applied filters
