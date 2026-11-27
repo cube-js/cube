@@ -4622,14 +4622,20 @@ LIMIT 10000"#,
                 .await?;
         }
 
-        // Wait until repartition jobs have drained every inactive parent partition.
+        // Wait until the partition has split and repartition jobs have drained
+        // every inactive parent partition. Before the split there is nothing
+        // to drain yet, so an empty list alone does not mean done.
         let mut drained = false;
-        for _ in 0..300 {
+        for _ in 0..1200 {
             let pending = services
                 .meta_store
                 .all_inactive_partitions_to_repartition()
                 .await?;
-            if pending.is_empty() {
+            let active = services
+                .meta_store
+                .get_active_partitions_by_index_id(1)
+                .await?;
+            if pending.is_empty() && active.len() > 1 {
                 drained = true;
                 break;
             }
@@ -4637,7 +4643,7 @@ LIMIT 10000"#,
         }
         assert!(
             drained,
-            "inactive partitions were not fully repartitioned in time"
+            "partition did not split, or inactive partitions were not fully repartitioned, in time"
         );
 
         // The partition must have actually split.
@@ -4714,24 +4720,6 @@ LIMIT 10000"#,
                 .await?;
         }
 
-        let mut drained = false;
-        for _ in 0..300 {
-            let pending = services
-                .meta_store
-                .all_inactive_partitions_to_repartition()
-                .await?;
-            if pending.is_empty() {
-                drained = true;
-                break;
-            }
-            Delay::new(Duration::from_millis(50)).await;
-        }
-        assert!(
-            drained,
-            "inactive partitions were not fully repartitioned in time"
-        );
-
-        // The aggregate index must have actually split into more than one partition.
         let aggr_index = services
             .meta_store
             .get_table_indexes(1)
@@ -4739,6 +4727,31 @@ LIMIT 10000"#,
             .into_iter()
             .find(|i| i.get_row().get_name() == "byg")
             .expect("aggregate index byg must exist");
+
+        // Wait until the aggregate index has split and repartition jobs have
+        // drained every inactive parent partition.
+        let mut drained = false;
+        for _ in 0..1200 {
+            let pending = services
+                .meta_store
+                .all_inactive_partitions_to_repartition()
+                .await?;
+            let active = services
+                .meta_store
+                .get_active_partitions_by_index_id(aggr_index.get_id())
+                .await?;
+            if pending.is_empty() && active.len() > 1 {
+                drained = true;
+                break;
+            }
+            Delay::new(Duration::from_millis(50)).await;
+        }
+        assert!(
+            drained,
+            "partition did not split, or inactive partitions were not fully repartitioned, in time"
+        );
+
+        // The aggregate index must have actually split into more than one partition.
         let active = services
             .meta_store
             .get_active_partitions_by_index_id(aggr_index.get_id())
