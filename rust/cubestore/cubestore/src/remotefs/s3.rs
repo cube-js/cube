@@ -981,4 +981,23 @@ mod tests {
             .get("x-amz-server-side-encryption")
             .is_none());
     }
+
+    // https://github.com/cube-js/cube/issues/7574: AWS GovCloud regions are
+    // unknown to rust-s3's `Region`, so `CUBESTORE_S3_REGION=us-gov-west-1`
+    // parses into a custom region whose endpoint is the bare region name.
+    // Cube Store then sends requests to `https://<bucket>.us-gov-west-1/...`,
+    // which fails with a DNS error instead of reaching the GovCloud S3 endpoint.
+    #[test]
+    fn govcloud_region_resolves_to_govcloud_s3_endpoint() {
+        let region = "us-gov-west-1".parse::<Region>().unwrap();
+        let credentials =
+            Credentials::new(Some("access"), Some("secret"), None, None, None).unwrap();
+        let bucket = new_bucket("cube-bucket", region, credentials, &None).unwrap();
+
+        assert_eq!(bucket.region.to_string(), "us-gov-west-1");
+        assert_eq!(
+            bucket.url(),
+            "https://cube-bucket.s3.us-gov-west-1.amazonaws.com"
+        );
+    }
 }
