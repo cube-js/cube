@@ -52,6 +52,8 @@ A `between` filter picks a range. **Presets** lists **Today**, **Yesterday**, **
 
 The filter shows the range's name, such as "Last month, up to now", with its dates in a tooltip.
 
+In the dashboard filter widget, the popover ends with one bar on every tab: the now boxes on the left, each explaining itself in a tooltip, and **Reset**, **Clear** and **Apply** on the right. **Clear** keeps the popover open on the same tab; on **Fixed** it also empties the dates. The filter's [published default](#clearing-and-resetting) is always on **Presets**, marked *default*: on its preset, or listed above the presets when it isn't one. Clicking it does what **Reset** does. On **Relative**, the option that matches it carries the same mark.
+
 A `between` filter also reads a range typed in the search field. Each reading is a row with its dates, listed above the presets that match the text. Enter applies the highlighted row, and a click applies any row. Nothing applies on its own. The search field reads English:
 
 - The ranges that **Presets** and **Relative** offer, such as "past 5 years", "last 3 full quarters", "ytd", "next 2 weeks", "next month from now" or "past 90 days until now". A phrase that names now keeps it; otherwise the **Up to now** box decides.
@@ -691,7 +693,7 @@ Every control offers at most one of two actions in the control itself, beside it
 This is the control's *own* published value, which is not always what a [parent control](#parent) means by its **Reset to default** [child mapping](#children): despite the shared label, that one returns the child to the value it opens on *for that viewer*.
 </Note>
 
-**Reset to default** takes the one action slot in the control whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown header is not limited that way — whichever of the two apply are there as text links, **Reset** to the left of **Clear** — and neither closes the dropdown.
+**Reset to default** takes the one action slot in the control whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown is not limited that way — whichever of the two apply are there, **Reset** to the left of **Clear** — and neither closes the dropdown. Most controls show them as text links in the dropdown header; a time filter shows them as buttons in the popover's last bar, to the left of **Apply**. A filter that [fills a parameter](#parameter-filters) always holds a value, so it offers **Reset** and never **Clear**.
 
 On a published dashboard, clearing or resetting changes only what that viewer sees, and writes nothing back to the dashboard. [Neither action is recorded in the URL](#sharing-the-current-selection), so a reload reopens the control on whatever it opens on for that viewer. A control whose [visibility](#visibility) is **Disabled** greys out whichever action it shows, so a viewer can see the state without changing it.
 
