@@ -67,11 +67,17 @@ To compare against a static number like a quarterly goal, add a calculated field
 
 ### Sparkline
 
-Renders a compact trend chart — either a bar or line — within the KPI tile. Use this to show the trend behind the headline number.
+Renders a compact trend chart — either a bar or line — within the KPI tile. Use this to show the trend behind a value.
+
+Above the chart, the block shows a headline value. By default, it's the series measure from the first row of the query result. Turn off **Headline uses sparkline measure** and pick a **Headline column** to show a different measure. If you turn it off and leave **Headline column** empty, the headline shows the last point of the trend.
 
 | Setting | Description |
 |---|---|
 | **Series measure** | The measure to plot |
+| **Headline uses sparkline measure** | Shows the series measure in the headline. Turn it off to pick a different measure |
+| **Headline column** | The measure the headline shows when **Headline uses sparkline measure** is off |
+| **Headline row** | Which row of the query result the headline reads: 1st or 2nd, in the order the query returns rows |
+| **Show value** | Shows or hides the headline value |
 | **Series dimension** | The dimension to use as the X axis (typically a time dimension) |
 | **Chart type** | Bar or line |
 | **Height / Width** | Dimensions of the sparkline in the tile |
@@ -108,9 +114,9 @@ KPI tiles have a layout panel that controls how blocks are arranged:
 
 ## Drill down
 
-Clicking a **Number** block that shows a measure opens the [value menu](/docs/explore-analyze/charts#clicking-a-value), as clicking a measure cell does in a [table](/docs/explore-analyze/charts/chart-types/table#cell-menu). Choose **Drill down** there to open the rows behind the value. **Drill down** is offered when the measure has [`drill_members`](/reference/data-modeling/measures#drill_members) defined in the data model. Other block types are not clickable.
+Clicking the value of a **Number** block that shows a measure, or the headline value of a **Sparkline** block, opens the [value menu](/docs/explore-analyze/charts#clicking-a-value), as clicking a measure cell does in a [table](/docs/explore-analyze/charts/chart-types/table#cell-menu). Choose **Drill down** there to open the rows behind the value. **Drill down** is offered when the measure has [`drill_members`](/reference/data-modeling/measures#drill_members) defined in the data model. Other blocks don't open the value menu. On a published dashboard with [comments](/docs/explore-analyze/dashboards/comments#comments-on-a-data-point), a click elsewhere on the KPI opens a menu with only **Comment on whole chart**.
 
-The menu opens in workbooks and on dashboards, including published and embedded ones. While you edit a dashboard, a click on the **Number** block doesn't open the menu, because the tile can be dragged.
+The menu opens in workbooks and on dashboards, including published and embedded ones. While you edit a dashboard, a click on a KPI value doesn't open the menu, because the tile can be dragged.
 
 ## Converting to raw Markdown
 
