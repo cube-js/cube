@@ -3,7 +3,7 @@ import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 
 // Labels the statements in Snowflake QUERY_HISTORY, so test load can be told apart in usage stats.
 const DRIVER_OPTIONS: Record<string, Record<string, unknown>> = {
-  snowflake: { queryTag: { app: 'cube-ci', suite: 'testing-drivers' } },
+  snowflake: { queryTag: { tenant: 'cube-ci', deployment: 'testing-drivers' } },
 };
 
 export async function getDriver(type: string): Promise<{

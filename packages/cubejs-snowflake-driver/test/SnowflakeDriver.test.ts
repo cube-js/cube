@@ -7,7 +7,7 @@ const LONG_RUNNING_QUERY = 'SELECT SYSTEM$WAIT(120)';
 
 // Labels the statements in Snowflake QUERY_HISTORY, so test load can be told apart in usage stats.
 const createDriver = () => new SnowflakeDriver({
-  queryTag: { app: 'cube-ci', suite: 'snowflake-driver' },
+  queryTag: { tenant: 'cube-ci', deployment: 'snowflake-driver' },
 });
 
 const pause = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
