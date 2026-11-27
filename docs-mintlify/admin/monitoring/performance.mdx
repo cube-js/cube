@@ -34,7 +34,7 @@ sustain just a few infrequent load bursts per day and auto-scaling to 3 API
 instances does the job just fine:
 
 <Frame>
-  <img src="https://ucarecdn.com/71de8978-8d3f-42cd-a32f-03daa73ad561/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/performance/71de8978.png" />
 </Frame>
 
 The next chart shows a deployment with auto-scaling limits that definitely
@@ -43,7 +43,7 @@ this deployment has to use at least 4-6 API instances. So, it would be wise
 to increase the minimum auto-scaling limit to 6 API instances:
 
 <Frame>
-  <img src="https://ucarecdn.com/e5c074b0-e4d4-442e-af48-e50ec0f61963/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/performance/e5c074b0.png" />
 </Frame>
 
 When in doubt, consider using a higher minimum auto-scaling limit: when an
@@ -61,7 +61,7 @@ deployment][ref-dev-instance] that is only accessed a few times
 a day and automatically suspends after a short period of inactivity:
 
 <Frame>
-  <img src="https://ucarecdn.com/9bf6760b-805c-413c-85fb-9402b48718cb/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/performance/9bf6760b.png" />
 </Frame>
 
 The next chart shows a misconfigured [Dedicated
@@ -69,7 +69,7 @@ deployment][ref-prod-cluster] that serves the requests throughout the whole
 day but was configured to auto-suspend with a tiny threshold:
 
 <Frame>
-  <img src="https://ucarecdn.com/2938ff51-0699-4f60-bba6-03a0132774f0/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/performance/2938ff51.png" />
 </Frame>
 
 ### Cache type
@@ -81,7 +81,7 @@ following chart shows a deployment that fulfills about 50% of requests by
 using pre-aggregations:
 
 <Frame>
-  <img src="https://ucarecdn.com/fe784a74-edd5-44c0-803f-267237219b1d/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/performance/fe784a74.png" />
 </Frame>
 
 The&nbsp;**Avg. response time by cache type** shows the difference
@@ -91,7 +91,7 @@ pre-aggregations usually provide sub-second response times while queries to
 the data source take much longer:
 
 <Frame>
-  <img src="https://ucarecdn.com/94ac15b6-a59c-4474-ba68-e07657d55d78/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/performance/94ac15b6.png" />
 </Frame>
 
 You can use these charts to see if you'd like to have more queries that hit
@@ -109,7 +109,7 @@ only has a tiny fraction of requests that require the data model to be
 compiled:
 
 <Frame>
-  <img src="https://ucarecdn.com/022a6a71-121a-4b45-ba97-1b0fd2571556/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/performance/022a6a71.png" />
 </Frame>
 
 The&nbsp;**Wait time for data model compilation** chart
@@ -118,7 +118,7 @@ The next chart shows that at certain points of time requests had to wait
 dozens of seconds while the data model was being compiled:
 
 <Frame>
-  <img src="https://ucarecdn.com/520d7e4b-3838-48ae-b0aa-c988f588c3d7/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/performance/520d7e4b.png" />
 </Frame>
 
 You can use these charts to **fine-tune the [auto-suspension][ref-auto-sus]
@@ -143,7 +143,7 @@ workers and almost never lets them come to saturation, resulting in no wait
 time for queries: 
 
 <Frame>
-  <img src="https://ucarecdn.com/9f33377e-ebf4-4227-9f49-a30b7f5bc04b/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/performance/9f33377e.png" />
 </Frame>
 
 Similarly, the&nbsp;**Saturation for jobs by Cube Store workers**
@@ -157,14 +157,14 @@ intervals, resulting in huge wait time and, in case of jobs, delayed refresh
 of pre-aggregations:
 
 <Frame>
-  <img src="https://ucarecdn.com/eb3f8897-5358-4e5b-8507-b10c122d6206/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/performance/eb3f8897.png" />
 </Frame>
 
 The next chart shows that oversaturated Cube Store workers might yield
 hours of wait time for queries and jobs:
 
 <Frame>
-  <img src="https://ucarecdn.com/14edcb1d-a22c-47f8-aef4-636c0d726fb2/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/performance/14edcb1d.png" />
 </Frame>
 
 You can use these charts to **fine-tune the [number of Cube Store
