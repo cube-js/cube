@@ -180,7 +180,8 @@ On a bar chart, set **From** or **To** to **Percent** to draw the band behind ea
 bar's own value of the **Computed from** measure. For example, a band from 0 to 60% of a revenue
 target shades 0 to 60% of each region's own target. The other edge can be a number, usually 0,
 another **Percent**, as in a band from 80% to 100% of the target, or a computed value other than
-**Percentile**. An empty **From** starts at 0.
+**Percentile**. An empty **From** starts at 0. An empty **To** ends at the largest value of
+the **Computed from** measure across the bars, the same for every bar.
 
 While a band is drawn behind each bar, the bars on that axis get narrower, so the band shows
 around them. When an edge first turns to **Percent**, **Computed from** switches to the measure
