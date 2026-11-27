@@ -685,17 +685,17 @@ Every control offers at most one of two actions in the control itself, beside it
 | Action | When it shows | What it does |
 |---|---|---|
 | **Clear** (✕) | The control has a value, and is neither a [field switcher](#field-switcher), which carries no ✕, nor a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), which cannot be changed by hand. | Stops applying the control: a cleared filter leaves its charts unfiltered, and a cleared switcher hands each chart back to the granularity or member it was built with. Clearing a [parent control](#parent) mid-session only deselects it: the parent stops driving, and each child keeps the value it is showing rather than reverting. |
-| **Reset to default** (↩) | The control has been changed, it has a value published in the last dashboard version, and the two differ — except on a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), which cannot be changed by hand. | Puts the control back on that published value. |
+| **Reset** (⟳) | The control has been changed, it has a value published in the last dashboard version, and the two differ — except on a filter whose default is [resolved from the data](#defaults-resolved-from-the-data), which cannot be changed by hand. | Puts the control back on that published value, which its tooltip names, such as **Reset to Last 7 days**. |
 
 <Note>
-This is the control's *own* published value, which is not always what a [parent control](#parent) means by its **Reset to default** [child mapping](#children): despite the shared label, that one returns the child to the value it opens on *for that viewer*.
+This is the control's *own* published value, which is not always what a [parent control](#parent) means by its **Reset to default** [child mapping](#children): despite the similar label, that one returns the child to the value it opens on *for that viewer*.
 </Note>
 
-**Reset to default** takes the one action slot in the control whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown header is not limited that way — whichever of the two apply are there as text links, **Reset** to the left of **Clear** — and neither closes the dropdown.
+**Reset** takes the one action slot in the control whenever it applies, so a control that has drifted from its published value offers the way back rather than the way to empty. The dropdown header is not limited that way — whichever of the two apply are there as text links, **Reset** to the left of **Clear** — and neither closes the dropdown.
 
 On a published dashboard, clearing or resetting changes only what that viewer sees, and writes nothing back to the dashboard. [Neither action is recorded in the URL](#sharing-the-current-selection), so a reload reopens the control on whatever it opens on for that viewer. A control whose [visibility](#visibility) is **Disabled** greys out whichever action it shows, so a viewer can see the state without changing it.
 
-In the [dashboard builder][ref-workbooks] both write the draft. **Reset to default** returns the control to the published value, so that control has no unsaved change left on it. **Clear** removes the control's saved default, which viewers see once you publish; clearing a [parent control](#parent) removes the preset saved as its default and leaves the children's saved defaults alone.
+In the [dashboard builder][ref-workbooks] both write the draft. **Reset** returns the control to the published value, so that control has no unsaved change left on it. **Clear** removes the control's saved default, which viewers see once you publish; clearing a [parent control](#parent) removes the preset saved as its default and leaves the children's saved defaults alone.
 
 ## Sharing the current selection
 
