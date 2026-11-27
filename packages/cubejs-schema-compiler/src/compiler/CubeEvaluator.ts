@@ -1205,7 +1205,7 @@ export class CubeEvaluator extends CubeSymbols {
         // Note: Segments do not have type set
         // A reference through a join alias names a member of a cube instance,
         // not the member of the cube it instantiates
-        if (!ownedByCube && !joinAliasUsed && !member.filters && (!member.type || CubeSymbols.isCalculatedMeasureType(member.type)) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
+        if (!ownedByCube && !joinAliasUsed && !member.filters && (!member.type || CubeSymbols.isCalculatedMeasureType(CubeSymbols.measureAggregationType(member))) && pathReferencesUsed.length === 1 && this.pathFromArray(pathReferencesUsed[0]) === evaluatedSql) {
           aliasMember = this.pathFromArray(pathReferencesUsed[0]);
         }
         const foreignCubes = cubeReferencesUsed.filter(usedCube => usedCube !== cube.name);

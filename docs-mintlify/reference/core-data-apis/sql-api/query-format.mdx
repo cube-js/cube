@@ -65,6 +65,10 @@ correspond to [measure types][ref-measure-types]:
 | [`sum`](/reference/data-modeling/measures#type) | `MEASURE` or `SUM` |
 | [`time`](/reference/data-modeling/measures#type) | `MEASURE` or `MAX` or `MIN` |
 
+For a measure with [`agg_type`](/reference/data-modeling/measures#agg_type), the allowed
+function is the one that matches `agg_type`. Measures of the `time` type are exposed as
+timestamp columns.
+
 <Warning>
 
 If an aggregate function doesn't match the measure type, the following error

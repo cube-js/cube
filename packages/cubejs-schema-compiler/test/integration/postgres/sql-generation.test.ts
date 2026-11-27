@@ -340,6 +340,11 @@ describe('SQL Generation', () => {
         min_created_at: {
           type: 'time',
           sql: 'MIN(created_at)'
+        },
+        first_created_at: {
+          type: 'time',
+          agg_type: 'min',
+          sql: 'created_at'
         }
       },
 
@@ -2502,6 +2507,42 @@ SELECT 1 AS revenue,  cast('2024-01-01' AS timestamp) as time UNION ALL
         },
         {
           visitors__min_created_at: '2017-01-03T00:00:00.000Z',
+          visitors__source: 'some',
+        },
+      ]);
+    });
+  });
+
+  it('having filter (time measure with agg_type)', async () => {
+    await compilers.compile();
+
+    const query = compilers.createQuery(PostgresQuery, {
+      measures: [
+        'visitors.first_created_at'
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        dimension: 'visitors.first_created_at',
+        operator: 'inDateRange',
+        values: ['2017-01-01', '2018-01-01']
+      }],
+      order: [{
+        id: 'visitors.source'
+      }]
+    });
+
+    return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
+      expect(res).toEqual([
+        {
+          visitors__first_created_at: '2017-01-06T00:00:00.000Z',
+          visitors__source: 'google',
+        },
+        {
+          visitors__first_created_at: '2017-01-03T00:00:00.000Z',
           visitors__source: 'some',
         },
       ]);

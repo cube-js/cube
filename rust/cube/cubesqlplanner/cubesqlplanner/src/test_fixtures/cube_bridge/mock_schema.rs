@@ -651,6 +651,11 @@ impl MockViewBuilder {
                             );
                         }
 
+                        let source_agg_type = measure
+                            .static_data()
+                            .agg_type
+                            .clone()
+                            .unwrap_or_else(|| measure.static_data().measure_type.clone());
                         let original_type = &measure.static_data().measure_type;
                         let view_type = match original_type.as_str() {
                             "number" | "string" | "time" | "boolean" => original_type.clone(),
@@ -666,6 +671,7 @@ impl MockViewBuilder {
                             Rc::new(
                                 MockMeasureDefinition::builder()
                                     .measure_type(view_type)
+                                    .agg_type(Some(source_agg_type))
                                     .sql(view_member_sql)
                                     .multi_stage(measure.static_data().multi_stage)
                                     .order_by(measure.raw_order_by())

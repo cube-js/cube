@@ -113,7 +113,7 @@ const CONVERTED_STRINGS: Record<string, string> = {
 const anyCase = (value: unknown) => [...String(value)].map((c) => `[${c.toUpperCase()}${c.toLowerCase()}]`).join('');
 
 // `CubeSymbols.camelCaseTypes` camelizes these values, so `count_distinct` is `countDistinct`.
-const CAMELIZED_VALUES = ['type', 'relationship'];
+const CAMELIZED_VALUES = ['type', 'aggType', 'relationship'];
 
 // The Joi forms the converter handles. An unknown one, such as `.unknown()` or `.single()`, may make
 // Core accept more than the schema, so it fails the build until the converter handles it.
@@ -706,7 +706,7 @@ class ModelSchemaConverter {
   // `convert` leaves a key's `.required()` to its object, so a branch demands the key itself; not with
   // a second `when`, whose match Joi merges in and may make the key optional again.
   protected whenBranch(key: string, d: JoiDescription | undefined, demandsKey: boolean): JsonSchemaObject {
-    const branch = inEitherSpelling(key, this.convert(d));
+    const branch = inEitherSpelling(key, valuesFor(key, this.convert(d)));
     return demandsKey && d?.flags?.presence === 'required' ? { ...branch, ...present(key) } : branch;
   }
 }

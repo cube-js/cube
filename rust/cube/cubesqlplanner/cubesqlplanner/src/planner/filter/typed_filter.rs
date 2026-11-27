@@ -309,8 +309,9 @@ impl TypedFilterBuilder {
             // numbers. String/time measures are non-numeric scalars and must
             // not be coerced to a number; date comparisons take the dedicated
             // date operators instead. min/max carry their operand type, which
-            // isn't known here, so they fall through to the numeric default.
-            MemberSymbol::Measure(m) => match m.measure_type() {
+            // is known only when the measure declares it next to `agg_type`;
+            // otherwise they fall through to the numeric default.
+            MemberSymbol::Measure(m) => match m.value_type().unwrap_or(m.measure_type()) {
                 "boolean" => Some("boolean".to_string()),
                 "string" | "time" => None,
                 _ => Some("number".to_string()),
@@ -355,7 +356,9 @@ impl TypedFilterBuilder {
     // so their values can't be held to a number.
     fn is_min_max_measure(member_evaluator: &Rc<MemberSymbol>) -> bool {
         match member_evaluator.as_ref() {
-            MemberSymbol::Measure(m) => matches!(m.measure_type(), "min" | "max"),
+            MemberSymbol::Measure(m) => {
+                m.value_type().is_none() && matches!(m.measure_type(), "min" | "max")
+            }
             MemberSymbol::Ref(r) => r.target_member().is_some_and(Self::is_min_max_measure),
             _ => false,
         }

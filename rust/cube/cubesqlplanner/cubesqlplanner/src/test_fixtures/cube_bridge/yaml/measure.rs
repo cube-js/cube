@@ -15,6 +15,8 @@ pub struct YamlMeasureDefinition {
     #[serde(rename = "type")]
     measure_type: String,
     #[serde(default)]
+    agg_type: Option<String>,
+    #[serde(default)]
     multi_stage: Option<bool>,
     #[serde(default, alias = "reduce_by")]
     reduce_by_references: Option<Vec<String>>,
@@ -229,6 +231,7 @@ impl YamlMeasureDefinition {
         Rc::new(
             MockMeasureDefinition::builder()
                 .measure_type(self.measure_type)
+                .agg_type(self.agg_type)
                 .multi_stage(self.multi_stage)
                 .reduce_by_references(qualify_references(self.reduce_by_references, cube_name))
                 .add_group_by_references(qualify_references(

@@ -24,5 +24,6 @@ pub fn measure_over_reference(
         measure_order_by: measure.measure_order_by.clone(),
         mask_sql: measure.mask_sql.clone(),
         render_modifier: measure.render_modifier.clone(),
+        value_type: measure.value_type.clone(),
     })
 }

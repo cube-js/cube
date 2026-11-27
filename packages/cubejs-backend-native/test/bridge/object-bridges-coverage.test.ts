@@ -195,6 +195,7 @@ const BRIDGES: BridgeSpec[] = [
     name: 'measureDefinition',
     expected: [
       'add_group_by_references',
+      'agg_type',
       'case',
       'drill_filters',
       'filter',

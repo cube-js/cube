@@ -168,6 +168,9 @@ pub struct MeasureSymbol {
     pub(super) measure_order_by: Vec<MeasureOrderBy>,
     pub(super) mask_sql: Option<Rc<SqlCall>>,
     pub(super) render_modifier: Option<MeasureRenderModifier>,
+    /// Data type declared next to `agg_type`. `None` for a measure whose
+    /// `type` names the aggregate: its operand type isn't known.
+    pub(super) value_type: Option<String>,
 }
 
 symbol_deps! {
@@ -184,6 +187,7 @@ symbol_deps! {
         is_reference: skip,
         is_view: skip,
         render_modifier: skip,
+        value_type: skip,
     }
 }
 
@@ -200,6 +204,7 @@ impl MeasureSymbol {
         measure_drill_filters: Vec<Rc<SqlCall>>,
         measure_order_by: Vec<MeasureOrderBy>,
         mask_sql: Option<Rc<SqlCall>>,
+        value_type: Option<String>,
     ) -> Rc<Self> {
         Rc::new(Self {
             compiled_path,
@@ -214,6 +219,7 @@ impl MeasureSymbol {
             multi_stage,
             mask_sql,
             render_modifier: None,
+            value_type,
         })
     }
 
@@ -380,6 +386,10 @@ impl MeasureSymbol {
 
     pub fn measure_type(&self) -> &str {
         self.kind.measure_type_str()
+    }
+
+    pub fn value_type(&self) -> Option<&str> {
+        self.value_type.as_deref()
     }
 
     pub fn kind(&self) -> &MeasureKind {
@@ -688,7 +698,10 @@ impl SymbolFactory for MeasureSymbolFactory {
             compiler,
         )?;
 
-        let measure_type_str = &definition.static_data().measure_type;
+        let static_data = definition.static_data();
+        let agg_type = static_data.agg_type.as_ref().filter(|_| !included);
+        let value_type = agg_type.map(|_| static_data.measure_type.clone());
+        let measure_type_str = agg_type.unwrap_or(&static_data.measure_type);
         let rolling_window = definition.static_data().rolling_window.clone();
         let is_multi_stage = multi_stage.is_some();
 
@@ -743,6 +756,7 @@ impl SymbolFactory for MeasureSymbolFactory {
             measure_drill_filters,
             measure_order_by,
             mask_sql,
+            value_type,
         )))
     }
 }

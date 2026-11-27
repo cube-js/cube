@@ -4,6 +4,7 @@ import { JoinPathNotFoundError } from './UserError';
 
 import type { CubeValidator } from './CubeValidator';
 import type { CubeEvaluator, MeasureDefinition } from './CubeEvaluator';
+import { CubeSymbols } from './CubeSymbols';
 import type { CubeDefinition, JoinDefinition } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
 import inflection from 'inflection';
@@ -104,7 +105,7 @@ export class JoinGraph implements CompilerInterface {
       return Object.values(measures).filter((m: MeasureDefinition) => (m.sql &&
           this.cubeEvaluator.funcArguments(m.sql).length === 0 &&
           m.sql() === 'count(*)') ||
-        ['sum', 'avg', 'count', 'number'].includes(m.type));
+        ['sum', 'avg', 'count', 'number'].includes(CubeSymbols.measureAggregationType(m)));
     };
 
     const joinRequired =

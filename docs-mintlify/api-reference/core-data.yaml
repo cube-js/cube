@@ -535,6 +535,9 @@ components:
           type: string
         aggType:
           type: string
+          description: >-
+            Aggregate of the measure: its `agg_type`, or its `type` when
+            `agg_type` isn't set.
         meta:
           type: object
         format:

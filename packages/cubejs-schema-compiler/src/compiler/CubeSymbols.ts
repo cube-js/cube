@@ -664,6 +664,9 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       if (member.type && member.type.indexOf('_') !== -1) {
         member.type = camelize(member.type, true);
       }
+      if (typeof member.aggType === 'string' && member.aggType.indexOf('_') !== -1) {
+        member.aggType = camelize(member.aggType, true);
+      }
       if (member.relationship && member.relationship.indexOf('_') !== -1) {
         member.relationship = camelize(member.relationship, true);
       }
@@ -1271,7 +1274,7 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           sql,
           included: true,
           type: CubeSymbols.toMemberDataType(resolvedMember.type),
-          aggType: resolvedMember.type,
+          aggType: resolvedMember.aggType || resolvedMember.type,
           meta: memberRef.override?.meta || resolvedMember.meta,
           title: memberRef.override?.title || resolvedMember.title,
           description: memberRef.override?.description || resolvedMember.description,
@@ -1946,8 +1949,14 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
   }
 
   /**
-   TODO: support type qualifiers on min and max
+   * A measure declared with `aggType` keeps its data type in `type`. On a
+   * measure a view includes, `aggType` only describes the source measure:
+   * the aggregate is already part of the SQL the view references.
    */
+  public static measureAggregationType(definition: { type: string, aggType?: string, included?: boolean }): string {
+    return !definition.included && definition.aggType ? definition.aggType : definition.type;
+  }
+
   public static toMemberDataType(type: string): string {
     return this.isCalculatedMeasureType(type) ? type : 'number';
   }

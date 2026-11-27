@@ -494,7 +494,20 @@ const forbiddenCurrencyNonNumericMeasure = (value: string) => Joi.forbidden().me
   'any.unknown': `"currency" property can only be used with numeric measures, actual type: ${value}`,
 });
 
+const numericMeasureAggType = Joi.string().valid('sum', 'avg', 'min', 'max', 'count', 'countDistinct', 'countDistinctApprox');
+const orderedMeasureAggType = Joi.string().valid('min', 'max');
+const forbiddenAggTypeForAggregateType = Joi.forbidden().messages({
+  'any.unknown': '"aggType" property can only be used with type: number, string, time or boolean',
+});
+
 const BaseMeasure = {
+  aggType: Joi.when('type', {
+    switch: [
+      { is: 'number', then: numericMeasureAggType },
+      { is: Joi.valid('string', 'time', 'boolean'), then: orderedMeasureAggType },
+    ],
+    otherwise: forbiddenAggTypeForAggregateType,
+  }).description('Aggregate function applied to sql, while type declares the data type of the result: sum, avg, min, max, count, count_distinct and count_distinct_approx with type: number; min and max with type: string, time or boolean. See https://docs.cube.dev/reference/data-modeling/measures#agg_type'),
   aliases: Joi.array().items(Joi.string()).description('Other names for this measure'),
   format: measureFormatSchema.description('How the measure is displayed. Use a named format (number, id, percent, currency, abbr, accounting) with optional _N suffix (N=0–6) for decimal precision on supported formats, or any valid d3-format specifier (e.g. $,.2f, .0%), or { sql } returning one of these per row. See https://docs.cube.dev/reference/data-modeling/measures#format'),
   currency: Joi.when('type', {
@@ -1021,7 +1034,11 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
     {
       is: measureType,
       then: inherit(BaseMeasure, {
-        sql: Joi.func().required().description('SQL expression for the measure'),
+        sql: Joi.when('aggType', {
+          is: 'count',
+          then: Joi.func(),
+          otherwise: Joi.func().required(),
+        }).description('SQL expression for the measure'),
         type: measureType.required().description('Type of the measure')
       }),
       otherwise: Joi.object().keys({
