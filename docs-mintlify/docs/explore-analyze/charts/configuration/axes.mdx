@@ -167,7 +167,7 @@ To add a reference band:
 
 | Setting | Description |
 |---|---|
-| **From** / **To** | On a measure axis, a number or a computed value: **Average**, **Median**, **Minimum**, **Maximum**, **Percentile**, or **Percent**. For example, shade the range from the 25th to the 75th percentile. |
+| **From** / **To** | On a measure axis, a number or a computed value: **Average**, **Median**, **Minimum**, **Maximum**, **Percentile**, or **Percent** (bar charts only, see [Bands for each bar](#bands-for-each-bar)). For example, shade the range from the 25th to the 75th percentile. |
 | **Computed from** | The measure that computed values use, when the axis has more than one |
 | **Label** | The band's name. A new band is named *Band*, then *Band 2*, and so on. |
 | **Show value** | Print the band's range in the label. On by default. |
@@ -192,7 +192,7 @@ that bar's band is the widest. With **Show value** on, it prints
 **Percent** is available when the measures on the band's axis include bars and have no breakdown,
 including a Composite chart of bars and points. On a line, area or scatter chart, or
 with a breakdown, a band with a **Percent** edge stays in the Style tab but does not show on the
-chart, and its row shows a warning. Such a band cannot be split into lines.
+chart, and its row shows a warning. A band with a **Percent** edge cannot be split into lines.
 
 To change a line into a band, open the line row's **⋮** menu and choose **Convert to band**. The
 line's value becomes the **From** edge. On a measure axis, the **To** edge is the **Average**, or
