@@ -93,9 +93,9 @@ Global permissions are org-wide. Check any number of them on the **Global permis
 
 #### Console access
 
-**Sign in to the console** is checked on a new role. Uncheck it for users who should reach Cube only programmatically, such as service accounts. It gates signing in to Cube in a browser: with a password, through SSO or a social login, and when approving an OAuth client. API keys, the SQL API, OAuth tokens already issued and [embedded analytics][ref-embedding] don't check it.
+**Sign in to the console** is checked on a new role. Uncheck it for users who should reach Cube only programmatically, such as service accounts. It gates signing in to Cube in a browser: with a password, through SSO or a social login, and when approving an OAuth client. API keys, the SQL API, OAuth tokens already issued and [Signed embedding][ref-signed-embedding] don't check it. [Private embedding][ref-private-embedding] signs users in to Cube, so it does.
 
-Roles stack, so a user can sign in while any of their roles grants it. The built-in Developer, Explorer and Viewer roles grant it, and admins can always sign in. A user none of whose roles grants it is refused at sign-in.
+Roles stack, so a user can sign in while any of their roles grants it. The built-in Developer, Explorer and Viewer roles grant it, and admins can always sign in. A user with no role that grants it is refused at sign-in.
 
 <Note>
 
@@ -159,7 +159,8 @@ A custom role saved before **Create scheduled tasks** existed holds it on every 
 [ref-mcp-server-pre-aggregations]: /docs/integrations/mcp-server#pre-aggregations
 [ref-mcp-server]: /docs/integrations/mcp-server
 [ref-mcp-connectors]: /admin/ai/mcp-connectors
-[ref-embedding]: /embedding
+[ref-signed-embedding]: /embedding/iframe/auth/signed
+[ref-private-embedding]: /embedding/iframe/auth/private
 
 ## Walkthroughs
 
