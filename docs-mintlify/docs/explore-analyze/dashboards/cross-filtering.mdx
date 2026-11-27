@@ -3,7 +3,7 @@ title: Cross-filtering
 description: Let viewers click a chart's data to filter the other charts on a published dashboard.
 ---
 
-With cross-filtering on, a viewer of a published dashboard can click a bar, a slice, a point, a map region or a table cell and filter every other chart on the dashboard by it, or [highlight](#highlighting) the selection on bar, funnel, pie and donut charts. The chart they clicked isn't filtered: it dims the data outside the selection instead.
+With cross-filtering on, a viewer of a published dashboard can click a bar, a slice, a point, a map region or a table cell and filter every other chart on the dashboard by it; bar, funnel, pie and donut charts [highlight](#highlighting) the selection instead. The chart they clicked isn't filtered: it dims the data outside the selection instead.
 
 <iframe
   width="100%"
@@ -40,7 +40,7 @@ Bar, line, area, scatter, pie and composite charts, maps and tables can start a 
 
 A bar, funnel, pie or donut chart that another chart's cross-filter reaches keeps all of its data, dimmed, and draws the filtered part over it at full strength, so you can see each category's share of the selection. Stacked, grouped and small-multiples bars highlight each segment. The tooltip of a bar or slice gives the filtered value next to the full one. A bar chart's axes stay put when you set, change or reset the cross-filter.
 
-Some of these charts filter instead, like a line chart: a chart with a period comparison, and a chart with a row limit, a Top N field or filter, or a filter on a measure, since the cross-filter can change which rows it shows. A [download][ref-downloads] as CSV holds the filtered rows, as do a schedule's AI summary and an alert's check.
+Some charts filter instead, like a line chart: a composite chart that draws a line, a chart with a period comparison, and a chart with a row limit, a Top N field or filter, or a filter on a measure, since the cross-filter can change which rows it shows. A [download][ref-downloads] as CSV holds the filtered rows, as do a schedule's AI summary and an alert's check.
 
 ### Adding and removing values
 
