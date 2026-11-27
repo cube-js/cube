@@ -158,8 +158,9 @@ How it works and what to expect:
   members.** The agent picks from the same
   [**Alternatives**][ref-field-switcher] a viewer could pick from by hand.
 - **A parent control can only be set to one of its defined presets** — the
-  agent can't invent a new preset, only choose among the ones the dashboard's
-  author configured.
+  agent can't invent a preset for a parent control the dashboard's author
+  placed, only choose among its presets. On a published dashboard it can also
+  save presets of [your own](#your-own-presets).
 - **Cross-filters need cross-filtering on.** The agent can set or remove a
   chart's [cross-filter][ref-cross-filtering], or remove every cross-filter,
   only on a dashboard with cross-filtering on; otherwise it tells you it's off.
@@ -169,10 +170,33 @@ How it works and what to expect:
   changing a control by hand: reflected in the dashboard's URL — so you can
   share or bookmark the filtered view — but **not** saved to the dashboard. They
   don't affect what other viewers see, and the author's saved defaults are left
-  untouched.
+  untouched. A preset you ask it to save is kept, for you alone; see [Your own
+  presets](#your-own-presets).
 
 This works the same way on both published dashboards and
-[embedded][ref-embedding] dashboards.
+[embedded][ref-embedding] dashboards, except your own presets, which only
+published dashboards have.
+
+### Your own presets {#your-own-presets}
+
+On a published dashboard, the agent sees your own [parent
+controls][ref-viewer-parent-controls] beside the dashboard's, and picks their
+presets the same way. It can also save and rename them:
+
+- _"Save these filters as a preset."_ The agent adds the values on screen as a
+  preset, to the parent control of yours you name, or else to a new one, with
+  the name you ask for, numbered when that name is taken. The parent control
+  shows the new preset as picked, and its settings don't open. When there is nothing to save, a toast says why:
+  _These values are already the defaults. Nothing to save._, or _These values
+  are already saved in_ and the name of your parent control that holds them.
+- _"Rename my Presets to EMEA views."_ or _"Rename Preset 2 to Q3."_ The agent
+  renames your parent control or one of its presets, as **Save** in its
+  settings would, and a reload shows the new name.
+
+It can't delete a preset or a parent control, since that can't be undone: use
+the parent control's ⚙ menu. Asked to save to or rename a parent control the
+dashboard's author placed, it changes nothing and tells you only your own
+presets can be changed.
 
 ## Changing the dashboard
 
@@ -233,6 +257,9 @@ contents — text, PDF, ZIP, and image files are supported.
   controls][ref-dynamic-controls] widget lets you add, and set or remove
   [cross-filters][ref-cross-filtering] (your session only — see [Changing
   filters and controls](#changing-filters-and-time-granularity))
+- Save the values on screen as a preset of your own parent control, and rename
+  your own parent controls and presets (see [Your own
+  presets](#your-own-presets))
 - Explain how a metric or dimension is defined
 - Look up the values available for a dimension
 - Read the contents of [attachments](#attachments) you add to the chat
@@ -241,6 +268,7 @@ contents — text, PDF, ZIP, and image files are supported.
 
 - Save its control changes to the dashboard — they apply to your session only
   and never change what other viewers see
+- Delete your own presets or parent controls
 - Send email, set up scheduled tasks, search the web, or run Python analysis
 
 **If the agent is read-only, it also can't:**
@@ -279,6 +307,7 @@ read-only.
 [ref-controls]: /docs/explore-analyze/dashboards/widgets/controls
 [ref-field-switcher]: /docs/explore-analyze/dashboards/widgets/controls#field-switcher
 [ref-parent-control]: /docs/explore-analyze/dashboards/widgets/controls#parent
+[ref-viewer-parent-controls]: /docs/explore-analyze/dashboards/widgets/controls#viewer-parent-controls
 [ref-control-visibility]: /docs/explore-analyze/dashboards/widgets/controls#visibility
 [ref-dynamic-controls]: /docs/explore-analyze/dashboards/widgets/controls#dynamic-controls
 [ref-embedding]: /embedding/iframe/dashboards
