@@ -18,7 +18,7 @@ account, apply across all devices, and don't affect other users in the account.
 | New message scrolling | Automatically scroll to new messages in chat | On |
 | Alternating row colors | Highlight alternating rows in data tables | Off |
 | Default deployment | Open this deployment when you go to Cube without one in the URL | Account default |
-| Notifications | Choose whether comment, sharing, access-request, dashboard review and dbt sync review notifications also arrive by email | On |
+| Notifications | Choose whether comment, sharing, access-request, dashboard review and dbt sync notifications also arrive by email | On |
 
 ## Language
 
@@ -85,7 +85,7 @@ deployment. The control is hidden on accounts with only one reachable deployment
 ## Notifications
 
 These switches control email only. Mentions, replies, shares, access requests,
-dashboard reviews and dbt syncs ready to review arrive in your [inbox][ref-inbox]
+dashboard reviews and dbt syncs arrive in your [inbox][ref-inbox]
 whatever you choose here. In the **Notifications** section of the **Preferences**
 page, choose which of them also arrive by email. Only admins see the **Model
 syncs** switch, since only admins get these notifications:
@@ -94,8 +94,8 @@ syncs** switch, since only admins get these notifications:
 
 <Frame>
   <img
-    src="https://static.cube.dev/docs/preferences/notifications/notifications-section-v2.png"
-    alt="Notifications section of the Preferences page with email switches for mentions, replies, model syncs, shares, access requests and dashboard reviews, and the Skip email if already read switch"
+    src="https://static.cube.dev/docs/preferences/notifications/notifications-section-v5.png"
+    alt="Notifications section of the Preferences page with email switches for alerts, mentions, replies, end of support, report deliveries, model syncs, shares, access requests, AI tokens and dashboard reviews, and the Skip email if already read switch"
   />
 </Frame>
 
@@ -103,7 +103,7 @@ syncs** switch, since only admins get these notifications:
 | --- | --- | --- |
 | Mentions in comments | Someone [mentions you][ref-mentions] in a dashboard comment | On |
 | Replies to comments | Someone replies [in a comment thread][ref-replies] you wrote in | On |
-| Model syncs | A [dbt sync][ref-dbt-review] that a webhook started has changes ready to review, and the dbt project has no notification list. Admins only | On |
+| Model syncs | A [dbt sync][ref-dbt-review] that a webhook started has changes ready to review and the dbt project has no notification list, or starts failing. Admins only | On |
 | Shared with you | Someone [shares][ref-sharing] a workbook, a folder, or a chat with you, or approves your access request | On |
 | Access requests | Someone [requests access][ref-request-access] to an item you can share, or declines your request | On |
 | Dashboard reviews | Someone [requests your review][ref-reviews] of a dashboard, or comments on, approves, requests changes to, or publishes a review you take part in | On |
