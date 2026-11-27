@@ -452,4 +452,51 @@ describe('resolveDateRange', () => {
     // Why: a timeDimension may have only `granularity` and no `dateRange`.
     expect(resolveDateRange(undefined, 'UTC')).toBeUndefined();
   });
+
+  test('timestamps without a zone are local to the query timezone and pass through', () => {
+    expect(
+      resolveDateRange(['2026-09-16T05:00:00.000', '2026-09-16 08:59:59.999'], 'America/Vancouver')
+    ).toEqual(['2026-09-16T05:00:00.000', '2026-09-16T08:59:59.999']);
+  });
+
+  test('UTC-suffixed timestamps are converted to the query timezone', () => {
+    // Why: the SQL API writes its bounds with a `Z` designator, and a filter
+    // reads the same value as an instant. Dropping the designator would shift
+    // the range by the timezone offset.
+    expect(
+      resolveDateRange(['2026-09-16T05:00:00.000Z', '2026-09-16T08:59:59.999Z'], 'America/Vancouver')
+    ).toEqual(['2026-09-15T22:00:00.000', '2026-09-16T01:59:59.999']);
+  });
+
+  test('offset timestamps are converted to the query timezone', () => {
+    expect(
+      resolveDateRange(['2026-09-16T07:00:00+02:00', '2026-09-16T10:59:59.999+02:00'], 'America/Vancouver')
+    ).toEqual(['2026-09-15T22:00:00.000', '2026-09-16T01:59:59.999']);
+  });
+
+  test('zoned timestamps keep their wall time in UTC', () => {
+    expect(
+      resolveDateRange(['2026-09-16T05:00:00.000Z', '2026-09-16T08:59:59.999Z'], 'UTC')
+    ).toEqual(['2026-09-16T05:00:00.000', '2026-09-16T08:59:59.999']);
+  });
+});
+
+describe('normalizeQuery timeDimensions.dateRange', () => {
+  test('a zoned range names the same instants as the same values in a filter', () => {
+    // Why: BaseFilter reads a zoned filter value as an instant; the range of a
+    // time dimension must not read it as a local time.
+    const result = normalizeQuery({
+      measures: ['Orders.count'],
+      timezone: 'America/Vancouver',
+      timeDimensions: [{
+        dimension: 'Orders.createdAt',
+        dateRange: ['2026-09-16T05:00:00.000Z', '2026-09-16T08:59:59.999Z'],
+      }],
+    }, false);
+
+    expect(result.timeDimensions[0].dateRange).toEqual([
+      '2026-09-15T22:00:00.000',
+      '2026-09-16T01:59:59.999',
+    ]);
+  });
 });

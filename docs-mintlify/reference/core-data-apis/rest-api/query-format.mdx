@@ -678,6 +678,8 @@ provides a convenient shortcut to pass a dimension and a filter as a
 - `dimension`: Time dimension name.
 - `dateRange`: An array of dates with the following format `YYYY-MM-DD` or in
   `YYYY-MM-DDTHH:mm:ss.SSS` format. Values should always be local and in query
+  `timezone`. A timestamp with a UTC designator or an offset, such as
+  `2020-01-01T08:00:00.000Z`, is an instant and is converted to the query
   `timezone`. Dates in `YYYY-MM-DD` format are also accepted. Such dates are
   padded to the start and end of the day if used in start and end of date range
   interval accordingly. Please note that for timestamp comparison, `>=` and `<=`
