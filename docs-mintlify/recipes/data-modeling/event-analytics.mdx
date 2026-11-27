@@ -422,7 +422,8 @@ cubes:
     measures:
       - name: last_event_timestamp
         sql: timestamp
-        type: max
+        type: time
+        agg_type: max
         public: false
 
   - name: sessions
@@ -459,7 +460,8 @@ cube("events", {
   measures: {
     last_event_timestamp: {
       sql: `timestamp`,
-      type: `max`,
+      type: `time`,
+      agg_type: `max`,
       public: false
     }
   }

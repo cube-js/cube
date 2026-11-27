@@ -39,6 +39,10 @@ pub struct RollingWindow {
 pub struct MeasureDefinitionStatic {
     #[serde(rename = "type")]
     pub measure_type: String,
+    /// Aggregate applied to `sql` when `type` declares only the data type.
+    /// On an `included` view measure it describes the source measure instead.
+    #[serde(rename = "aggType")]
+    pub agg_type: Option<String>,
     #[serde(rename = "ownedByCube")]
     pub owned_by_cube: Option<bool>,
     #[serde(rename = "multiStage")]

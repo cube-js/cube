@@ -416,7 +416,7 @@ export class PreAggregations {
             countDistinctApprox: 'merge',
             min: 'min',
             max: 'max'
-          }[m.measureDefinition().type];
+          }[CubeSymbols.measureAggregationType(m.measureDefinition())];
           return `${fname}(${m.preAggregationColumnName()})`;
         });
     }
@@ -677,7 +677,7 @@ export class PreAggregations {
             return {
               measure,
               additive: baseMeasure.isAdditive(),
-              type: baseMeasure.definition().type
+              type: CubeSymbols.measureAggregationType(baseMeasure.definition())
             };
           });
 

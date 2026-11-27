@@ -1,0 +1,55 @@
+cubes:
+  - name: events
+    sql: "SELECT * FROM events"
+
+    dimensions:
+      - name: id
+        type: number
+        sql: id
+        primary_key: true
+      - name: status
+        type: number
+        sql: status
+      - name: created_at
+        type: time
+        sql: created_at
+    measures:
+      - name: last_event_at
+        type: time
+        agg_type: max
+        sql: created_at
+      - name: first_source
+        type: string
+        agg_type: min
+        sql: source
+      - name: total_amount
+        type: number
+        agg_type: sum
+        sql: amount
+      - name: unique_users
+        type: number
+        agg_type: count_distinct
+        sql: user_id
+      - name: rows_count
+        type: number
+        agg_type: count
+      - name: legacy_max
+        type: max
+        sql: amount
+    pre_aggregations:
+      - name: by_status
+        type: rollup
+        measures:
+          - last_event_at
+          - total_amount
+        dimensions:
+          - status
+
+views:
+  - name: events_view
+    cubes:
+      - join_path: events
+        includes:
+          - status
+          - created_at
+          - last_event_at

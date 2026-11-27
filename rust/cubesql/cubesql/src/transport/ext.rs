@@ -101,23 +101,21 @@ impl V1CubeMetaMeasureExt for CubeMetaMeasure {
     }
 
     fn get_sql_type(&self) -> ColumnType {
-        let from_type = match &self.r#type.to_lowercase().as_str() {
-            &"number" => ColumnType::Double,
-            &"boolean" => ColumnType::Boolean,
-            _ => ColumnType::String,
+        let from_type = match self.r#type.to_lowercase().as_str() {
+            "number" => ColumnType::Double,
+            "boolean" => ColumnType::Boolean,
+            "time" => ColumnType::Timestamp,
+            _ => return ColumnType::String,
         };
 
-        match &self.agg_type {
-            Some(agg_type) => match agg_type.as_str() {
-                "count" => ColumnType::Int64,
-                "countDistinct" => ColumnType::Int64,
-                "countDistinctApprox" => ColumnType::Int64,
-                "sum" => ColumnType::Double,
-                "avg" => ColumnType::Double,
-                "min" => ColumnType::Double,
-                "max" => ColumnType::Double,
-                _ => from_type,
-            },
+        // An aggregate narrows only a number measure: min and max over a time,
+        // a string or a boolean keep the type of their operand.
+        if from_type != ColumnType::Double {
+            return from_type;
+        }
+
+        match self.agg_type.as_deref() {
+            Some("count" | "countDistinct" | "countDistinctApprox") => ColumnType::Int64,
             _ => from_type,
         }
     }
@@ -424,5 +422,42 @@ pub fn df_data_type_by_column_type(column_type: ColumnType) -> DataType {
         ColumnType::Boolean => DataType::Boolean,
         ColumnType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
         _ => panic!("Unimplemented support for {:?}", column_type),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn measure(r#type: &str, agg_type: &str) -> CubeMetaMeasure {
+        CubeMetaMeasure {
+            agg_type: Some(agg_type.to_string()),
+            ..CubeMetaMeasure::new("cube.measure".to_string(), r#type.to_string())
+        }
+    }
+
+    #[test]
+    fn measure_sql_type_follows_the_data_type() {
+        let cases = [
+            ("number", "max", ColumnType::Double),
+            ("number", "sum", ColumnType::Double),
+            ("number", "number", ColumnType::Double),
+            ("number", "count", ColumnType::Int64),
+            ("number", "countDistinct", ColumnType::Int64),
+            ("number", "countDistinctApprox", ColumnType::Int64),
+            ("time", "max", ColumnType::Timestamp),
+            ("time", "time", ColumnType::Timestamp),
+            ("string", "min", ColumnType::String),
+            ("string", "string", ColumnType::String),
+            ("boolean", "max", ColumnType::Boolean),
+            ("boolean", "boolean", ColumnType::Boolean),
+        ];
+        for (r#type, agg_type, expected) in cases {
+            assert_eq!(
+                measure(r#type, agg_type).get_sql_type(),
+                expected,
+                "type: {type}, aggType: {agg_type}"
+            );
+        }
     }
 }

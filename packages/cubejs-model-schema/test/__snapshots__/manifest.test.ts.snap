@@ -4,7 +4,7 @@ exports[`the generated manifest marks the same places where it differs from Core
 Object {
   "converts-string": 44,
   "custom": 268,
-  "function": 513,
+  "function": 515,
   "function-condition": 78,
   "list-of-either": 2,
 }
@@ -4063,6 +4063,36 @@ Object {
             "additionalProperties": false,
             "allOf": Array [
               Object {
+                "$ref": "#/definitions/measure_agg_type_type_number",
+              },
+              Object {
+                "$ref": "#/definitions/measure_agg_type_type_string",
+              },
+              Object {
+                "if": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "type": Object {
+                        "enum": Array [
+                          "number",
+                          "string",
+                          "time",
+                          "boolean",
+                        ],
+                      },
+                    },
+                  },
+                },
+                "then": Object {
+                  "patternProperties": Object {
+                    "^aggType$": false,
+                  },
+                  "properties": Object {
+                    "agg_type": false,
+                  },
+                },
+              },
+              Object {
                 "if": Object {
                   "not": Object {
                     "properties": Object {
@@ -4152,8 +4182,73 @@ Object {
                   },
                 },
               },
+              Object {
+                "if": Object {
+                  "$ref": "#/definitions/measure_variant",
+                },
+                "then": Object {
+                  "properties": Object {
+                    "sql": Object {
+                      "items": Object {
+                        "type": Array [
+                          "string",
+                          "number",
+                          "boolean",
+                        ],
+                      },
+                      "type": Array [
+                        "string",
+                        "number",
+                        "boolean",
+                        "array",
+                        "object",
+                      ],
+                    },
+                  },
+                },
+              },
+              Object {
+                "if": Object {
+                  "not": Object {
+                    "$ref": "#/definitions/measure_variant",
+                  },
+                },
+                "then": Object {
+                  "not": Object {
+                    "properties": Object {
+                      "sql": false,
+                    },
+                  },
+                  "properties": Object {
+                    "sql": Object {
+                      "items": Object {
+                        "type": Array [
+                          "string",
+                          "number",
+                          "boolean",
+                        ],
+                      },
+                      "type": Array [
+                        "string",
+                        "number",
+                        "boolean",
+                        "array",
+                        "object",
+                      ],
+                    },
+                  },
+                },
+              },
             ],
             "patternProperties": Object {
+              "^aggType$": Object {
+                "allOf": Array [
+                  Object {
+                    "$ref": "#/definitions/measure_agg_type",
+                  },
+                ],
+                "deprecated": true,
+              },
               "^drillFilters$": Object {
                 "allOf": Array [
                   Object {
@@ -4211,6 +4306,9 @@ Object {
               },
             },
             "properties": Object {
+              "agg_type": Object {
+                "$ref": "#/definitions/measure_agg_type",
+              },
               "aliases": Object {
                 "description": "Other names for this measure",
                 "items": Object {
@@ -4278,20 +4376,6 @@ Object {
               },
               "sql": Object {
                 "description": "SQL expression for the measure",
-                "items": Object {
-                  "type": Array [
-                    "string",
-                    "number",
-                    "boolean",
-                  ],
-                },
-                "type": Array [
-                  "string",
-                  "number",
-                  "boolean",
-                  "array",
-                  "object",
-                ],
               },
               "title": Object {
                 "description": "Display title for the measure",
@@ -4328,7 +4412,6 @@ Object {
             },
             "required": Array [
               "name",
-              "sql",
               "type",
             ],
             "type": "object",
@@ -4351,6 +4434,36 @@ Object {
         "then": Object {
           "additionalProperties": false,
           "allOf": Array [
+            Object {
+              "$ref": "#/definitions/measure_agg_type_type_number",
+            },
+            Object {
+              "$ref": "#/definitions/measure_agg_type_type_string",
+            },
+            Object {
+              "if": Object {
+                "not": Object {
+                  "properties": Object {
+                    "type": Object {
+                      "enum": Array [
+                        "number",
+                        "string",
+                        "time",
+                        "boolean",
+                      ],
+                    },
+                  },
+                },
+              },
+              "then": Object {
+                "patternProperties": Object {
+                  "^aggType$": false,
+                },
+                "properties": Object {
+                  "agg_type": false,
+                },
+              },
+            },
             Object {
               "if": Object {
                 "not": Object {
@@ -4443,6 +4556,14 @@ Object {
             },
           ],
           "patternProperties": Object {
+            "^aggType$": Object {
+              "allOf": Array [
+                Object {
+                  "$ref": "#/definitions/measure_agg_type",
+                },
+              ],
+              "deprecated": true,
+            },
             "^drillFilters$": Object {
               "allOf": Array [
                 Object {
@@ -4500,6 +4621,9 @@ Object {
             },
           },
           "properties": Object {
+            "agg_type": Object {
+              "$ref": "#/definitions/measure_agg_type",
+            },
             "aliases": Object {
               "description": "Other names for this measure",
               "items": Object {
@@ -4640,6 +4764,36 @@ Object {
         "additionalProperties": false,
         "allOf": Array [
           Object {
+            "$ref": "#/definitions/measure_agg_type_type_number",
+          },
+          Object {
+            "$ref": "#/definitions/measure_agg_type_type_string",
+          },
+          Object {
+            "if": Object {
+              "not": Object {
+                "properties": Object {
+                  "type": Object {
+                    "enum": Array [
+                      "number",
+                      "string",
+                      "time",
+                      "boolean",
+                    ],
+                  },
+                },
+              },
+            },
+            "then": Object {
+              "patternProperties": Object {
+                "^aggType$": false,
+              },
+              "properties": Object {
+                "agg_type": false,
+              },
+            },
+          },
+          Object {
             "if": Object {
               "not": Object {
                 "properties": Object {
@@ -4735,6 +4889,14 @@ Object {
             "allOf": Array [
               Object {
                 "$ref": "#/definitions/measure_add_group_by",
+              },
+            ],
+            "deprecated": true,
+          },
+          "^aggType$": Object {
+            "allOf": Array [
+              Object {
+                "$ref": "#/definitions/measure_agg_type",
               },
             ],
             "deprecated": true,
@@ -4839,6 +5001,9 @@ Object {
         "properties": Object {
           "add_group_by": Object {
             "$ref": "#/definitions/measure_add_group_by",
+          },
+          "agg_type": Object {
+            "$ref": "#/definitions/measure_agg_type",
           },
           "aliases": Object {
             "description": "Other names for this measure",
@@ -5286,6 +5451,114 @@ Object {
         "array",
         "object",
       ],
+    },
+    "measure_agg_type": Object {
+      "description": "Aggregate function applied to sql, while type declares the data type of the result: sum, avg, min, max, count, count_distinct and count_distinct_approx with type: number; min and max with type: string, time or boolean. See https://docs.cube.dev/reference/data-modeling/measures#agg_type",
+    },
+    "measure_agg_type_type_number": Object {
+      "if": Object {
+        "not": Object {
+          "properties": Object {
+            "type": false,
+          },
+        },
+        "properties": Object {
+          "type": Object {
+            "enum": Array [
+              "number",
+            ],
+          },
+        },
+      },
+      "then": Object {
+        "patternProperties": Object {
+          "^aggType$": Object {
+            "allOf": Array [
+              Object {
+                "anyOf": Array [
+                  Object {
+                    "enum": Array [
+                      "sum",
+                      "avg",
+                      "min",
+                      "max",
+                      "count",
+                      "count_distinct",
+                      "count_distinct_approx",
+                    ],
+                    "type": "string",
+                  },
+                  Object {
+                    "pattern": "^(countDistinct|countDistinctApprox)$",
+                    "type": "string",
+                  },
+                ],
+              },
+            ],
+            "deprecated": true,
+          },
+        },
+        "properties": Object {
+          "agg_type": Object {
+            "anyOf": Array [
+              Object {
+                "enum": Array [
+                  "sum",
+                  "avg",
+                  "min",
+                  "max",
+                  "count",
+                  "count_distinct",
+                  "count_distinct_approx",
+                ],
+                "type": "string",
+              },
+              Object {
+                "pattern": "^(countDistinct|countDistinctApprox)$",
+                "type": "string",
+              },
+            ],
+          },
+        },
+      },
+    },
+    "measure_agg_type_type_string": Object {
+      "if": Object {
+        "properties": Object {
+          "type": Object {
+            "enum": Array [
+              "string",
+              "time",
+              "boolean",
+            ],
+          },
+        },
+      },
+      "then": Object {
+        "patternProperties": Object {
+          "^aggType$": Object {
+            "allOf": Array [
+              Object {
+                "enum": Array [
+                  "min",
+                  "max",
+                ],
+                "type": "string",
+              },
+            ],
+            "deprecated": true,
+          },
+        },
+        "properties": Object {
+          "agg_type": Object {
+            "enum": Array [
+              "min",
+              "max",
+            ],
+            "type": "string",
+          },
+        },
+      },
     },
     "measure_currency": Object {
       "description": "ISO 4217 currency code (e.g. USD, EUR, GBP) for this measure. Use with format: currency or currency_N. Case-insensitive. See https://docs.cube.dev/reference/data-modeling/measures#currency",
@@ -5895,6 +6168,38 @@ Object {
         },
         "type": "array",
       },
+    },
+    "measure_variant": Object {
+      "anyOf": Array [
+        Object {
+          "not": Object {
+            "properties": Object {
+              "agg_type": false,
+            },
+          },
+          "properties": Object {
+            "agg_type": Object {
+              "enum": Array [
+                "count",
+              ],
+            },
+          },
+        },
+        Object {
+          "not": Object {
+            "patternProperties": Object {
+              "^aggType$": false,
+            },
+          },
+          "patternProperties": Object {
+            "^aggType$": Object {
+              "enum": Array [
+                "count",
+              ],
+            },
+          },
+        },
+      ],
     },
     "nested_view_group": Object {
       "additionalProperties": false,

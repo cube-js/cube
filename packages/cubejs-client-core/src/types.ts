@@ -436,8 +436,23 @@ export type BaseCubeMember = {
   aliasMember?: string;
 };
 
+export type TCubeMeasureAggType =
+  | 'count'
+  | 'countDistinct'
+  | 'countDistinctApprox'
+  | 'sum'
+  | 'avg'
+  | 'min'
+  | 'max'
+  | 'number'
+  | 'string'
+  | 'time'
+  | 'boolean'
+  | 'numberAgg'
+  | 'rank';
+
 export type TCubeMeasure = BaseCubeMember & {
-  aggType: 'count' | 'number';
+  aggType: TCubeMeasureAggType;
   cumulative: boolean;
   cumulativeTotal: boolean;
   drillMembers: string[];

@@ -20,6 +20,8 @@ use typed_builder::TypedBuilder;
 #[derive(TypedBuilder)]
 pub struct MockMeasureDefinition {
     measure_type: String,
+    #[builder(default)]
+    agg_type: Option<String>,
     #[builder(default = Some(false))]
     owned_by_cube: Option<bool>,
     #[builder(default)]
@@ -59,6 +61,7 @@ impl_static_data!(
     MockMeasureDefinition,
     MeasureDefinitionStatic,
     measure_type,
+    agg_type,
     owned_by_cube,
     multi_stage,
     reduce_by_references,

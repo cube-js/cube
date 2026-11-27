@@ -42,6 +42,7 @@ pub fn unroll_rolling(measure: &MeasureSymbol) -> Rc<MeasureSymbol> {
         // a render modifier is stamped against, so a carried-over
         // modifier would contradict the resulting symbol.
         render_modifier: None,
+        value_type: None,
     })
 }
 

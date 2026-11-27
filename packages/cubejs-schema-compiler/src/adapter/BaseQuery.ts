@@ -2113,7 +2113,7 @@ export class BaseQuery {
       },
       // TODO condition should something else instead of rank
       multiStageQuery: !!withQuery.measures.find((d: string) => {
-        const { type } = this.newMeasure(d).definition();
+        const type = CubeSymbols.measureAggregationType(this.newMeasure(d).definition());
         return type === 'rank' || CubeSymbols.isCalculatedMeasureType(type);
       }),
       disableExternalPreAggregations: true,
@@ -3678,7 +3678,7 @@ export class BaseQuery {
           // already-aggregated SQL (e.g. SUM(col)). Filters must be applied inside
           // that aggregation, not outside. We pre-evaluate the filter SQL at the
           // view level, push it down via context, and skip filters at this level.
-          const isPatchedViewMeasure = symbol.aggType && symbol.patchedFrom && symbol.filters?.length;
+          const isPatchedViewMeasure = symbol.included && symbol.aggType && symbol.patchedFrom && symbol.filters?.length;
           if (isPatchedViewMeasure) {
             const pushDownFilterSql = this.evaluateFiltersArray(symbol.filters, cubeName);
             sql = this.evaluateSymbolSqlWithContext(evaluateSql, {
@@ -4174,14 +4174,15 @@ export class BaseQuery {
     parentMeasure: string | undefined,
     orderBySql: RenderedOrderBy[]
   ) {
+    const aggType = CubeSymbols.measureAggregationType(symbol);
     const multiplied = this.multipliedJoinRowResult(cubeName) || false;
     const measurePath = `${cubeName}.${name}`;
     let resultMultiplied = multiplied;
     if (multiplied && (
-      symbol.type === 'countDistinct' ||
+      aggType === 'countDistinct' ||
       !this.safeEvaluateSymbolContext().hasMultipliedForPreAggregation && (
-        symbol.type === 'number' && evaluateSql === 'count(*)' ||
-        symbol.type === 'count' && !symbol.sql
+        aggType === 'number' && evaluateSql === 'count(*)' ||
+        aggType === 'count' && !symbol.sql
       )
     )) {
       resultMultiplied = false;
@@ -4212,7 +4213,7 @@ export class BaseQuery {
         evaluateSql = this.safeEvaluateSymbolContext().ungroupedAliasesForCumulative[measurePath];
       }
 
-      if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
+      if (aggType === 'count' || aggType === 'countDistinct' || aggType === 'countDistinctApprox') {
         const sql = this.caseWhenStatement([{ sql: `(${evaluateSql}) IS NOT NULL`, label: '1' }]);
         return evaluateSql === '*' ? '1' : sql;
       } else {
@@ -4235,49 +4236,50 @@ export class BaseQuery {
     if (symbol.multiStage) {
       const partitionBy = (this.multiStageDimensions.length || this.multiStageTimeDimensions.length) ?
         `PARTITION BY ${this.multiStageDimensions.concat(this.multiStageTimeDimensions).map(d => d.dimensionSql()).join(', ')} ` : '';
-      if (symbol.type === 'rank') {
-        return `${symbol.type}() OVER (${partitionBy}ORDER BY ${orderBySql.map(o => `${o.sql} ${o.dir}`).join(', ')})`;
+      if (aggType === 'rank') {
+        return `${aggType}() OVER (${partitionBy}ORDER BY ${orderBySql.map(o => `${o.sql} ${o.dir}`).join(', ')})`;
       }
       if (!(
         R.equals(this.multiStageDimensions.map(d => d.expressionPath()), this.dimensions.map(d => d.expressionPath())) &&
         R.equals(this.multiStageTimeDimensions.map(d => d.expressionPath()), this.timeDimensions.map(d => d.expressionPath()))
       )) {
         let funDef;
-        if (symbol.type === 'countDistinctApprox') {
+        if (aggType === 'countDistinctApprox') {
           funDef = this.countDistinctApprox(evaluateSql);
-        } else if (symbol.type === 'countDistinct' || symbol.type === 'count' && !symbol.sql && multiplied) {
+        } else if (aggType === 'countDistinct' || aggType === 'count' && !symbol.sql && multiplied) {
           funDef = `count(distinct ${evaluateSql})`;
-        } else if (CubeSymbols.isCalculatedMeasureType(symbol.type)) {
+        } else if (CubeSymbols.isCalculatedMeasureType(aggType)) {
           // TODO calculated measure type will be ungrouped
           // if (this.multiStageDimensions.length !== this.dimensions.length) {
           //   throw new UserError(`Calculated measure '${measurePath}' uses group_by or reduce_by context modifiers while it isn't allowed`);
           // }
           return evaluateSql;
         } else {
-          funDef = `${symbol.type}(${symbol.type}(${evaluateSql}))`;
+          funDef = `${aggType}(${aggType}(${evaluateSql}))`;
         }
         return `${funDef} OVER(${partitionBy})`;
       }
     }
-    if (symbol.type === 'countDistinctApprox') {
+    if (aggType === 'countDistinctApprox') {
       return this.safeEvaluateSymbolContext().overTimeSeriesAggregate || this.options.preAggregationQuery ?
         this.hllInit(evaluateSql) :
         this.countDistinctApprox(evaluateSql);
-    } else if (symbol.type === 'countDistinct' || symbol.type === 'count' && !symbol.sql && multiplied) {
+    } else if (aggType === 'countDistinct' || aggType === 'count' && !symbol.sql && multiplied) {
       return `count(distinct ${evaluateSql})`;
     }
     if (multiplied) {
-      if (symbol.type === 'number' && evaluateSql === 'count(*)') {
+      if (aggType === 'number' && evaluateSql === 'count(*)') {
         return this.primaryKeyCount(cubeName, true);
       }
     }
-    if (CubeSymbols.isCalculatedMeasureType(symbol.type)) {
+    if (CubeSymbols.isCalculatedMeasureType(aggType)) {
       return evaluateSql;
     }
-    return `${symbol.type}(${evaluateSql})`;
+    return `${aggType}(${evaluateSql})`;
   }
 
   public aggregateOnGroupedColumn(symbol: MemberSymbolDefinition, evaluateSql: string, topLevelMerge: boolean, measurePath: string) {
+    const aggType = CubeSymbols.measureAggregationType(symbol);
     const cumulativeMeasureFilters = (this.safeEvaluateSymbolContext().cumulativeMeasureFilters || {})[measurePath];
     if (cumulativeMeasureFilters) {
       const sql = cumulativeMeasureFilters.filterToWhere();
@@ -4285,18 +4287,18 @@ export class BaseQuery {
         evaluateSql = this.caseWhenStatement([{ sql, label: evaluateSql }]);
       }
     }
-    if (symbol.type === 'count' || symbol.type === 'sum') {
+    if (aggType === 'count' || aggType === 'sum') {
       return `sum(${evaluateSql})`;
-    } else if (symbol.type === 'countDistinctApprox') {
+    } else if (aggType === 'countDistinctApprox') {
       return topLevelMerge ? this.hllCardinalityMerge(evaluateSql) : this.hllMergeOnly(evaluateSql);
-    } else if (symbol.type === 'min' || symbol.type === 'max') {
-      return `${symbol.type}(${evaluateSql})`;
+    } else if (aggType === 'min' || aggType === 'max') {
+      return `${aggType}(${evaluateSql})`;
     }
     return undefined;
   }
 
   public topAggregateWrap(symbol: MemberSymbolDefinition, evaluateSql: string): string {
-    if (symbol.type === 'countDistinctApprox') {
+    if (CubeSymbols.measureAggregationType(symbol) === 'countDistinctApprox') {
       return this.hllCardinality(evaluateSql);
     }
     return evaluateSql;

@@ -1,4 +1,5 @@
 import { UserError } from '../compiler/UserError';
+import { CubeSymbols } from '../compiler/CubeSymbols';
 import type { BaseQuery } from './BaseQuery';
 import type { FixedRollingWindow, MeasureDefinition } from '../compiler/CubeEvaluator';
 
@@ -275,8 +276,9 @@ export class BaseMeasure {
     if (definition.multiStage) {
       return false;
     }
-    return definition.type === 'sum' || definition.type === 'count' || definition.type === 'countDistinctApprox' ||
-      definition.type === 'min' || definition.type === 'max';
+    const aggType = CubeSymbols.measureAggregationType(definition);
+    return aggType === 'sum' || aggType === 'count' || aggType === 'countDistinctApprox' ||
+      aggType === 'min' || aggType === 'max';
   }
 
   public static isCumulative(definition: Pick<MeasureDefinition, 'rollingWindow'>): boolean {

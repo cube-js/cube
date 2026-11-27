@@ -49,5 +49,6 @@ pub fn patch_measure(
         measure_order_by: measure.measure_order_by.clone(),
         mask_sql: measure.mask_sql.clone(),
         render_modifier: measure.render_modifier.clone(),
+        value_type: measure.value_type.clone(),
     }))
 }

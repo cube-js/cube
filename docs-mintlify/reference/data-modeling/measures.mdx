@@ -384,6 +384,16 @@ engine][link-tesseract]. In versions before v1.7.0, it was not enabled by defaul
 
 </Warning>
 
+<Warning>
+
+Starting from v1.8.35, setting an aggregate as the `type` (`count`, `count_distinct`,
+`count_distinct_approx`, `sum`, `avg`, `min`, or `max`) is the legacy way to define
+a measure. It keeps working, but such a measure is always treated as a number, even
+if `min` or `max` runs over a timestamp or a string. Set the data type in `type` and
+the aggregate in [`agg_type`](#agg_type) instead.
+
+</Warning>
+
 <CodeGroup>
 
 ```yaml title="YAML"
@@ -441,6 +451,63 @@ cube(`orders`, {
       sql: `1.0 * ${purchases} / ${orders_count}`,
       type: `number`,
       format: `percent`
+    }
+  }
+})
+```
+
+</CodeGroup>
+
+### `agg_type`
+
+The `agg_type` parameter sets the aggregate function applied to `sql`, while
+[`type`](#type) sets the data type of the result. Use it to aggregate values
+that aren't numbers, e.g., to get the latest timestamp.
+
+| `type` | Supported `agg_type` values |
+|--------|-----------------------------|
+| `number` | `count`, `count_distinct`, `count_distinct_approx`, `sum`, `avg`, `min`, `max` |
+| `string` | `min`, `max` |
+| `time` | `min`, `max` |
+| `boolean` | `min`, `max` |
+
+With `agg_type`, the `sql` parameter should be a non-aggregated expression. It is
+optional for `count`.
+
+<CodeGroup>
+
+```yaml title="YAML"
+cubes:
+  - name: orders
+    # ...
+
+    measures:
+      - name: last_order_at
+        sql: created_at
+        type: time
+        agg_type: max
+
+      - name: total_amount
+        sql: amount
+        type: number
+        agg_type: sum
+```
+
+```javascript title="JavaScript"
+cube(`orders`, {
+  // ...
+
+  measures: {
+    last_order_at: {
+      sql: `created_at`,
+      type: `time`,
+      agg_type: `max`
+    },
+
+    total_amount: {
+      sql: `amount`,
+      type: `number`,
+      agg_type: `sum`
     }
   }
 })
