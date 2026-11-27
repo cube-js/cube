@@ -104,6 +104,7 @@ impl V1CubeMetaMeasureExt for CubeMetaMeasure {
         let from_type = match &self.r#type.to_lowercase().as_str() {
             &"number" => ColumnType::Double,
             &"boolean" => ColumnType::Boolean,
+            &"time" => ColumnType::Timestamp,
             _ => ColumnType::String,
         };
 
@@ -424,5 +425,40 @@ pub fn df_data_type_by_column_type(column_type: ColumnType) -> DataType {
         ColumnType::Boolean => DataType::Boolean,
         ColumnType::Timestamp => DataType::Timestamp(TimeUnit::Nanosecond, None),
         _ => panic!("Unimplemented support for {:?}", column_type),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn measure(r#type: &str, agg_type: Option<&str>) -> CubeMetaMeasure {
+        CubeMetaMeasure {
+            name: "Orders.m".to_string(),
+            r#type: r#type.to_string(),
+            agg_type: agg_type.map(|t| t.to_string()),
+            ..CubeMetaMeasure::default()
+        }
+    }
+
+    #[test]
+    fn measure_sql_type() {
+        // The schema compiler sends `aggType` = `type` for measures without an aggregation
+        for (r#type, agg_type, expected) in [
+            ("time", Some("time"), ColumnType::Timestamp),
+            ("time", None, ColumnType::Timestamp),
+            ("TIME", Some("time"), ColumnType::Timestamp),
+            ("number", Some("number"), ColumnType::Double),
+            ("number", Some("count"), ColumnType::Int64),
+            ("number", Some("sum"), ColumnType::Double),
+            ("string", Some("string"), ColumnType::String),
+            ("boolean", Some("boolean"), ColumnType::Boolean),
+        ] {
+            assert_eq!(
+                measure(r#type, agg_type).get_sql_type(),
+                expected,
+                "type: {type}, aggType: {agg_type:?}",
+            );
+        }
     }
 }
