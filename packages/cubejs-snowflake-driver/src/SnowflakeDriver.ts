@@ -1027,7 +1027,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   protected cancelStatement(stmt: RowStatement, isStatementSettled: () => boolean): Promise<void> {
     return new Promise<void>((resolve) => {
       let timer: ReturnType<typeof setTimeout> | undefined;
-      let retryTimer: ReturnType<typeof setTimeout> | undefined;
       let settled = false;
 
       const finish = (warning?: string, error?: any) => {
@@ -1043,10 +1042,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
           clearTimeout(timer);
         }
 
-        if (retryTimer) {
-          clearTimeout(retryTimer);
-        }
-
         if (warning && this.logger) {
           this.logger(warning, {
             queryId: stmt.getQueryId(),
@@ -1060,6 +1055,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       };
 
       const attempt = () => {
+        if (settled) {
+          return;
+        }
+
         try {
           stmt.cancel((err) => {
             // Typed as the SDK's own codes, but server-side failures carry Snowflake's code string.
@@ -1068,8 +1067,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
               if (isStatementSettled()) {
                 // Nothing left to abort: the statement finished on its own.
                 finish();
-              } else if (!settled) {
-                retryTimer = setTimeout(attempt, CANCEL_RETRY_INTERVAL);
+              } else {
+                setTimeout(attempt, CANCEL_RETRY_INTERVAL);
               }
 
               return;
