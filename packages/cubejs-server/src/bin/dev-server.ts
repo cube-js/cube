@@ -6,7 +6,7 @@ import { CubejsServer } from '../server';
 
 // Dev mode is requested through CreateOptions rather than by writing CUBEJS_DEV_MODE,
 // because that variable also gates the SQL API's port and password check. An explicit
-// CUBEJS_DEV_MODE wins, matching `cubejs dev-server`
+// CUBEJS_DEV_MODE wins, matching `cubejs-server dev-server`
 const devServer = process.env.CUBEJS_DEV_MODE === undefined || getEnv('devMode');
 
 if (devServer) {

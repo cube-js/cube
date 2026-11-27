@@ -51,7 +51,7 @@ which is enabled by `CUBEJS_DEV_MODE=true` — or, when you embed
 effect on it. A custom [`check_auth`](/reference/configuration/config#check_auth) that
 rejects unauthenticated requests enforces verification either way.
 
-Verification is therefore on by default everywhere, including under `cubejs server`,
+Verification is therefore on by default everywhere, including under `cubejs-server`,
 the official Docker images and a bare embedded server. Development mode also
 exposes Playground's unauthenticated endpoints, which hand out and mint valid tokens
 carrying any security context, signed with your API secret. This is

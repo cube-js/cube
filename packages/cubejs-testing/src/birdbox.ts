@@ -35,7 +35,6 @@ enum Log {
  * Birdbox modes defined in CLI.
  */
 enum Mode {
-  CLI = 'cli',
   LOCAL = 'local',
   DOCKER = 'docker',
 }
@@ -64,12 +63,11 @@ export interface ContainerOptions {
 }
 
 /**
- * Birdbox options for local/cli mode.
+ * Birdbox options for local mode.
  */
 export interface LocalOptions extends ContainerOptions {
   schemaDir?: string
   cubejsConfig?: string
-  useCubejsServerBinary?: boolean
 }
 
 type RequiredEnv = {
@@ -443,7 +441,7 @@ export async function startBirdBoxFromContainer(
 }
 
 /**
- * Returns Birdbox in cli/local mode.
+ * Returns Birdbox in local mode.
  */
 export async function startBirdBoxFromCli(
   options: LocalOptions
@@ -507,13 +505,6 @@ export async function startBirdBoxFromCli(
   }
 
   const testDir = path.join(process.cwd(), 'birdbox-test-project');
-
-  if (!options.useCubejsServerBinary) {
-    // cli mode, using a project created via cli
-    if (!fs.existsSync(testDir)) {
-      execInDir('.', 'npx cubejs-cli create birdbox-test-project -d postgres');
-    }
-  }
 
   // Do not remove whole dir as it contains node_modules
   if (fs.existsSync(path.join(testDir, '.env'))) {
@@ -590,12 +581,8 @@ export async function startBirdBoxFromCli(
 
   try {
     cli = spawn(
-      options.useCubejsServerBinary
-        ? path.resolve(process.cwd(), '../cubejs-server/bin/server')
-        : 'npm',
-      options.useCubejsServerBinary
-        ? []
-        : ['run', 'dev'],
+      path.resolve(process.cwd(), '../cubejs-server/bin/server'),
+      [],
       {
         cwd: testDir,
         shell: true,
@@ -707,7 +694,6 @@ export async function getBirdbox(
       mode: {
         describe: 'Determines Birdbox mode.',
         choices: [
-          Mode.CLI,
           Mode.LOCAL,
           Mode.DOCKER,
         ],
@@ -755,7 +741,6 @@ export async function getBirdbox(
 
   try {
     switch (mode) {
-      case Mode.CLI:
       case Mode.LOCAL: {
         birdbox = await startBirdBoxFromCli({
           type: type === 'postgres' ? 'postgresql' : type,
@@ -763,7 +748,6 @@ export async function getBirdbox(
           log,
           cubejsConfig: options.cubejsConfig,
           schemaDir: options.schemaDir,
-          useCubejsServerBinary: mode === Mode.LOCAL,
           schemas: options?.schemas,
         });
         break;

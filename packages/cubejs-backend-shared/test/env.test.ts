@@ -738,7 +738,7 @@ describe('the NODE_ENV deprecation warning', () => {
 
   // Both dev server paths leave CUBEJS_DEV_MODE unset, and the warning fires on any
   // non-production NODE_ENV including none at all — so without this it would greet
-  // every `cubejs dev-server` run telling a dev server to enable development mode
+  // every `cubejs-server dev-server` run telling a dev server to enable development mode
   test('is silenced by markDevModeResolvedByCaller', () => {
     process.env.NODE_ENV = 'development';
 

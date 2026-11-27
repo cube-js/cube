@@ -37,8 +37,7 @@
     "@cubejs-backend/snowflake-driver": "file:/cube-build/packages/cubejs-snowflake-driver",
     "@cubejs-backend/sqlite-driver": "file:/cube-build/packages/cubejs-sqlite-driver",
     "@cubejs-backend/trino-driver": "file:/cube-build/packages/cubejs-trino-driver",
-    "@cubejs-backend/pinot-driver": "file:/cube-build/packages/cubejs-pinot-driver",
-    "cubejs-cli": "file:/cube-build/packages/cubejs-cli"
+    "@cubejs-backend/pinot-driver": "file:/cube-build/packages/cubejs-pinot-driver"
   },
   "resolutions": {
     "colors": "1.4.0"

@@ -72,7 +72,7 @@ features:
 | Deprecated | [Node.js 22](#nodejs-22)                                                                                                          | v1.7.0     |           |
 | Deprecated | [Hive driver](#hive-driver)                                                                                                       | v1.7.25    |           |
 | Removed    | [`cube.ts` configuration file](#cubets-configuration-file)                                                                        | v1.7.34    | v1.7.34   |
-| Deprecated | [Legacy `cubejs` CLI](#legacy-cubejs-cli)                                                                                         | v1.7.45    |           |
+| Removed    | [Legacy `cubejs` CLI](#legacy-cubejs-cli)                                                                                         | v1.7.45    | v1.8.36   |
 | Removed    | [`NODE_ENV` as a development mode switch](#node_env-as-a-development-mode-switch)                                                  | v1.7.47    | v1.7.47   |
 
 ### Node.js 8
@@ -483,13 +483,18 @@ A `cube.ts` configuration file is no longer supported. Please use `cube.js` or
 
 **Deprecated in Release: v1.7.45**
 
-The legacy `cubejs` CLI (the `cubejs-cli` npm package) is deprecated and will stop
-receiving updates. Please use the native
-[Cube CLI](https://docs.cube.dev/reference/cli) (`cube`) instead: use `cube login`
-instead of `cubejs auth` and `cube deploy <deployment-id>` instead of `cubejs deploy`.
-The `cubejs` CLI prints a deprecation warning to stderr for these commands and when it
-runs with no command or with `--help` or `-h`. Set `CUBEJS_CLI_NO_DEPRECATION_WARNING=true` to
-hide the warning. Other commands, such as `cubejs server`, print no warning.
+**Removed in Release: v1.8.36**
+
+The legacy `cubejs` CLI (the `cubejs-cli` npm package) is removed and no longer
+published. Please use the native [Cube CLI](https://docs.cube.dev/reference/cli)
+(`cube`) instead: use `cube login` instead of `cubejs auth` and
+`cube deploy <deployment-id>` instead of `cubejs deploy`. The `create`, `generate`,
+`token`, `typegen` and `validate` commands are removed with it.
+
+The official Docker images no longer ship the `cubejs` binary. They now start with
+`cubejs-server` instead of `cubejs server`. If you override the container command,
+replace `cubejs server` with `cubejs-server` and `cubejs dev-server` with
+`cubejs-server dev-server`.
 
 ### `NODE_ENV` as a development mode switch
 
@@ -506,12 +511,12 @@ or by the `devServer` option when embedding `@cubejs-backend/server-core` direct
 
 Cube prints a warning when it sees a non-production `NODE_ENV` with `CUBEJS_DEV_MODE`
 unset. If you relied on `NODE_ENV` to get development mode, set `CUBEJS_DEV_MODE=true`
-instead. The dev server commands — `cubejs dev-server` and the `cubejs-dev-server` bin —
+instead. The dev server commands — `cubejs-server dev-server` and the `cubejs-dev-server` bin —
 keep the behaviour they had: they ask for development mode directly, without
 `CUBEJS_DEV_MODE`, so the SQL API keeps the generated password it has always had there.
 An explicit `CUBEJS_DEV_MODE=false` now wins over them, so either command starts a
 non-development server and requires `CUBEJS_DB_TYPE` or a `driverFactory` like
-`cubejs server` does.
+`cubejs-server` does.
 
 An instance that was implicitly in development mode also changes the pre-aggregation
 schema it writes to, from `dev_pre_aggregations` to `prod_pre_aggregations`, unless
@@ -571,7 +576,7 @@ Authentication can also flip without the `devServer` option. An embedder that se
 still enforced on the REST (JSON) and GraphQL APIs, because enforcement keyed on
 `NODE_ENV` rather than on development mode. It now follows development mode, so those
 APIs accept requests with no token. Drop `CUBEJS_DEV_MODE=true` if the instance was not
-meant to be a dev server. `cubejs server`, `cubejs dev-server` and the official Docker
+meant to be a dev server. `cubejs-server`, `cubejs-server dev-server` and the official Docker
 images are unaffected: they sync `NODE_ENV` to `development` whenever development mode
 resolves true, so that contradictory pair never reached them. The `cubejs-dev-server`
 bin does not sync it, so that pair does reach an instance started that way.

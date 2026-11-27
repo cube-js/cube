@@ -25,7 +25,6 @@
     "cubejs-dev-server": "./bin/dev-server",
     "cubejs-server": "./bin/server"
   },
-  "cubejsCliVersion": ">=0.22",
   "scripts": {
     "postpack": "rm -f oclif.manifest.json",
     "prepack": "OCLIF_TS_NODE=0 oclif-dev manifest",

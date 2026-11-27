@@ -128,9 +128,6 @@
       "path": "packages/cubejs-testing-drivers"
     },
     {
-      "path": "packages/cubejs-cli"
-    },
-    {
       "path": "packages/cubejs-dbt-schema-extension"
     },
     {
