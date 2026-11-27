@@ -2,6 +2,7 @@ import { Alert, Block } from '@cube-dev/ui-kit';
 import { useMemo } from 'react';
 
 import { useQueryBuilderContext } from './context';
+import { normalizeQueryOrder } from './utils/normalize-order';
 import { CopyButton } from './components/CopyButton';
 import { TabPaneWithToolbar } from './components/TabPaneWithToolbar';
 import { ScrollableCodeContainer } from './components/ScrollableCodeContainer';
@@ -10,7 +11,7 @@ export function QueryBuilderRest() {
   const { query, isQueryEmpty, queryHash } = useQueryBuilderContext();
 
   return useMemo(() => {
-    const stringifiedQuery = JSON.stringify(query, null, 2);
+    const stringifiedQuery = JSON.stringify(query ? normalizeQueryOrder(query) : query, null, 2);
 
     return !query || isQueryEmpty ? (
       <Block padding="1x">

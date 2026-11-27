@@ -14,3 +14,4 @@ export * from './graphql-converters';
 export * from './titleize';
 export * from './validate-query';
 export * from './get-member-search-name';
+export * from './normalize-order';
