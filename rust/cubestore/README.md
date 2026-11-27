@@ -170,3 +170,36 @@ you are making changes in arrow-rs.
 ## License
 
 Cube Store is [Apache 2.0 licensed](./cubestore/LICENSE).
+
+## GCS authentication
+
+CubeStore supports keyless GCS access on GKE through the metadata server's
+Application Default Credentials (ADC). Grant the router and workers' runtime
+identity the bucket permissions needed to list, read, create, and delete objects.
+Do not set key-file variables for this mode.
+
+Credential selection uses the first non-empty setting in this order. It is the
+order earlier versions resolved, so a deployment that sets more than one of
+these keeps the identity it had: a credential file always wins over inline JSON.
+
+1. `CUBESTORE_GCP_KEY_FILE` (service-account JSON file).
+2. Legacy `CUBESTORE_GCP_SERVICE_ACCOUNT` / `SERVICE_ACCOUNT` file aliases.
+3. `CUBESTORE_GCP_GOOGLE_APPLICATION_CREDENTIALS` / `GOOGLE_APPLICATION_CREDENTIALS`
+   (service-account or authorized-user ADC file).
+4. `CUBESTORE_GCP_CREDENTIALS` (base64-encoded service-account JSON).
+5. Legacy inline service-account JSON aliases `SERVICE_ACCOUNT_JSON` and
+   `GOOGLE_APPLICATION_CREDENTIALS_JSON`, including their `CUBESTORE_GCP_` forms.
+6. The local gcloud ADC file, then the metadata server.
+
+A `CUBESTORE_GCP_CREDENTIALS` value that cannot be decoded is an error unless a
+legacy inline alias is also set; it never falls through to ADC.
+
+The supported credential formats follow `object_store` 0.11.1; arbitrary
+`external_account` federation files are not supported by that version. GKE's
+metadata-server credentials do not require an external-account file.
+
+Existing object names, including their leading slash when `CUBESTORE_GCS_SUB_PATH`
+is unset, are preserved. Keep the same bucket and subpath when changing credentials.
+Uploads and downloads stream between files and GCS. Listing uses the GCS API's raw
+prefix semantics for snapshot discovery and log replay, and propagates errors
+instead of treating a failed listing as an empty bucket.

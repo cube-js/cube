@@ -2343,8 +2343,10 @@ unique on each node and different from `CUBESTORE_REMOTE_DIR`.
 
 ## `CUBESTORE_GCP_CREDENTIALS`
 
-A Base64-encoded JSON key for connecting to Google Cloud. Required when
-using Google Cloud Storage
+A Base64-encoded JSON key for connecting to Google Cloud. Optional when using
+Google Cloud Storage: if neither this variable nor `CUBESTORE_GCP_KEY_FILE` is
+set, Cube Store uses [Application Default Credentials][gcp-docs-adc], such as
+Workload Identity Federation for GKE.
 
 | Possible Values                                                                 | Default in Development | Default in Production |
 | ------------------------------------------------------------------------------- | ---------------------- | --------------------- |
@@ -2352,8 +2354,10 @@ using Google Cloud Storage
 
 ## `CUBESTORE_GCP_KEY_FILE`
 
-The path to a JSON key file for connecting to Google Cloud. Required when using
-Google Cloud Storage.
+The path to a JSON key file for connecting to Google Cloud. Optional when using
+Google Cloud Storage: if neither this variable nor `CUBESTORE_GCP_CREDENTIALS`
+is set, Cube Store uses [Application Default Credentials][gcp-docs-adc], such as
+Workload Identity Federation for GKE.
 
 | Possible Values                                           | Default in Development | Default in Production |
 | --------------------------------------------------------- | ---------------------- | --------------------- |
@@ -3004,6 +3008,8 @@ The port for a Cube deployment to listen to API connections on.
   https://docs.firebolt.io/managing-your-account/concepts-and-terminology.html#firebolt-account
 [firebolt-docs-engine-name]:
   https://docs.firebolt.io/working-with-engines/understanding-engine-fundamentals.html#engine-name
+[gcp-docs-adc]:
+  https://cloud.google.com/docs/authentication/application-default-credentials
 [gcp-docs-creds-json]:
   https://cloud.google.com/iam/docs/creating-managing-service-account-keys
 [gh-docs-pat]:
