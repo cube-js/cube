@@ -41,8 +41,8 @@ class FreshnessAdapterApiMock extends AdapterApiMock {
   }
 }
 
-function createGateway(adapterApi: any) {
-  return new ApiGateway('secret', compilerApi, async () => adapterApi, testLogger, {
+function createGateway(adapterApi: any, compilerApiFactory: any = compilerApi) {
+  return new ApiGateway('secret', compilerApiFactory, async () => adapterApi, testLogger, {
     standalone: true,
     dataSourceStorage: new DataSourceStorageMock(),
     basePath: '/cubejs-api',
@@ -55,8 +55,9 @@ async function sqlApiLoad(
   sqlQuery?: [string, any[]],
   signedWithPlaygroundAuthSecret = false,
   request: Record<string, any> = {},
+  compilerApiFactory: any = compilerApi,
 ) {
-  const apiGateway = createGateway(adapterApi);
+  const apiGateway = createGateway(adapterApi, compilerApiFactory);
 
   let response: any;
 
@@ -246,16 +247,70 @@ describe('sqlApiLoad over Cube Store pre-aggregations', () => {
 
   test('sqlQuery without external runs on the data source', async () => {
     const adapterApi = new FreshnessAdapterApiMock();
-    await sqlApiLoad(
-      adapterApi,
-      ['SELECT 1', []],
-      false,
-      { preAggregations: [PRE_AGGREGATION] },
-    );
+    await sqlApiLoad(adapterApi, ['SELECT 1', []]);
 
     const [executed] = adapterApi.executedQueries;
     expect(executed.external).toBeFalsy();
-    expect(executed.preAggregations).toBeUndefined();
+    expect(executed.preAggregations).toEqual([]);
+  });
+});
+
+describe('sqlApiLoad over source database pre-aggregations', () => {
+  const OUTER_PRE_AGGREGATION = {
+    tableName: 'dev_pre_aggregations.orders_main',
+    external: false,
+    matchedTimeDimensionDateRange: ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999'],
+  };
+
+  const SUB_QUERY_PRE_AGGREGATION = {
+    tableName: 'dev_pre_aggregations.logs_main',
+    external: false,
+  };
+
+  function compilerApiWithOuterRollup() {
+    return jest.fn().mockImplementation(async (...args: any[]) => {
+      const api = await (compilerApi as any)(...args);
+      return {
+        ...api,
+        async getSql(...sqlArgs: any[]) {
+          return {
+            ...(await api.getSql(...sqlArgs)),
+            preAggregations: [OUTER_PRE_AGGREGATION],
+          };
+        },
+      };
+    });
+  }
+
+  async function sqlApiLoadWithOuterRollup(adapterApi: any, request: Record<string, any>) {
+    await sqlApiLoad(
+      adapterApi,
+      ['SELECT * FROM dev_pre_aggregations.orders_main JOIN dev_pre_aggregations.logs_main', []],
+      false,
+      request,
+      compilerApiWithOuterRollup(),
+    );
+    return adapterApi.executedQueries[0];
+  }
+
+  // A sub-query join reads a rollup the outer cube query doesn't describe: unless it
+  // comes along, it is neither built nor swapped for its versioned table
+  test('sqlQuery on the data source loads the rollups of its sub-queries', async () => {
+    const executed = await sqlApiLoadWithOuterRollup(
+      new FreshnessAdapterApiMock(),
+      { preAggregations: [SUB_QUERY_PRE_AGGREGATION, OUTER_PRE_AGGREGATION] },
+    );
+
+    expect(executed.external).toBeFalsy();
+    // cubesql echoes the outer rollup too: the same description keeps its date range
+    expect(executed.preAggregations).toEqual([OUTER_PRE_AGGREGATION, SUB_QUERY_PRE_AGGREGATION]);
+  });
+
+  test('sqlQuery on the data source keeps its own rollups without sub-queries', async () => {
+    const executed = await sqlApiLoadWithOuterRollup(new FreshnessAdapterApiMock(), {});
+
+    expect(executed.external).toBeFalsy();
+    expect(executed.preAggregations).toEqual([OUTER_PRE_AGGREGATION]);
   });
 });
 

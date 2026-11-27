@@ -2793,15 +2793,13 @@ class ApiGateway {
           ...sqlQueries[0],
           // TODO Can we just pass through data? Ensure hidden members can't be queried
           aliasNameToMember: null,
+          ...(external ? { external: true } : {}),
           // The SQL can be built over several cube queries, and `sqlQueries[0]` describes
           // one of them: the rollups the others read come along with the request
-          ...(external ? {
-            external: true,
-            preAggregations: mergePreAggregationDescriptions(
-              sqlQueries[0].preAggregations,
-              request.preAggregations,
-            ),
-          } : {}),
+          preAggregations: mergePreAggregationDescriptions(
+            sqlQueries[0].preAggregations,
+            request.preAggregations,
+          ),
         };
 
         if (request.streaming) {

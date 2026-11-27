@@ -853,6 +853,52 @@ filter_subq AS (
       expect(res.rows).toMatchSnapshot('join grouped empty members');
     });
 
+    // The sub-query is served from a rollup in the source database, which has to be
+    // built and swapped in although the outer query doesn't read it
+    test('join with grouped query over a source database rollup', async () => {
+      const query = `
+        SELECT
+          o.status AS order_status,
+          s.status AS known_status
+        FROM
+          "SubQueryRollupOrders" o
+          INNER JOIN
+          (
+            SELECT status
+            FROM "SubQueryRollupStatuses"
+            GROUP BY 1
+          ) s
+        ON
+          o.status = s.status
+        GROUP BY 1, 2
+        ORDER BY 1
+        `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toEqual([
+        { order_status: 'new', known_status: 'new' },
+        { order_status: 'shipped', known_status: 'shipped' },
+      ]);
+
+      const dbConnection = new PgClient({
+        host: db.getHost(),
+        port: db.getMappedPort(5432),
+        database: 'test',
+        user: 'test',
+        password: 'test',
+      });
+      await dbConnection.connect();
+
+      try {
+        const tables = await dbConnection.query(
+          "SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'sub_query_rollup_statuses_by_status%'"
+        );
+        expect(tables.rows.length).toBeGreaterThan(0);
+      } finally {
+        await dbConnection.end();
+      }
+    });
+
     test('where segment is false', async () => {
       const query =
         'SELECT value AS val, * FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';
