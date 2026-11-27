@@ -55,6 +55,22 @@ Assign one series to the right Y axis and set its mark type to **Line** in [seri
 
 {/* Screenshot: composite bar+line chart with dual Y axes — order count (bars, left axis) and average order value (line, right axis). Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
+### Top N with Other
+
+A bar chart can show the biggest categories and group the rest into one bar. Cube builds it from a [Top N field](/docs/explore-analyze/workbooks/calculated-fields#top-n-fields):
+
+1. Add a measure, such as `Count`, and a string dimension with many values to the query.
+2. Open the dimension's menu and choose **Top N…**. Set the number of values to show, for example 5, and choose **Create**.
+3. On the **Chart** tab, choose **Bar**.
+
+The chart has a bar for each of the top members and one `Other` bar for the rest. The bars add up to the same total as the original dimension. Cube computes `Other` in SQL, so its value is correct for measures that can't be summed, such as percentages.
+
+The bars are sorted by label, so `Other` takes its alphabetical place among them. To order the bars by height, set **Sort** under **Dimension** on the **Fields** tab to **Y-axis descending**.
+
+To split the bars of another dimension by the top members, add that dimension to the query, such as `Status`. Then set the Top N field as the measure's **Break down by** field on the **Fields** tab. The legend has one entry for each top member and one for `Other`. To pick the top members separately for each bar, choose **Edit Top N…** in the field's menu and set **Ranked within** to that dimension.
+
+{/* Screenshot: bar chart of Count by Users City, top 5 — five bars and an Other bar. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
 ## Stacking
 
 Stacking behavior is set in the **Color & stacking** section of the Style tab:
