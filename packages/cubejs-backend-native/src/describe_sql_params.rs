@@ -9,6 +9,7 @@ use crate::rest4sql::json_value_to_js;
 use crate::tokio_runtime_node;
 use cubesql::compile::parameters::describe_parameters;
 use cubesql::compile::parser::parse_sql_to_statement;
+use cubesql::config::ConfigObj;
 use cubesql::{CubeError, CubeErrorCauseType};
 
 /// `{ params }`, or `{ error }` for the caller's failures, which the gateway maps to a 400;
@@ -18,7 +19,16 @@ async fn handle_describe_sql_params(
     native_auth_ctx: Arc<NativeSQLAuthContext>,
     sql_query: &str,
 ) -> Result<serde_json::Value, CubeError> {
+    let config = services
+        .injector()
+        .get_service_typed::<dyn ConfigObj>()
+        .await;
+
     let result = with_session(&services, native_auth_ctx.clone(), |session| async move {
+        session
+            .state
+            .set_introspection_disabled(!config.rest_introspection());
+
         let transport = session.server.transport.clone();
         let meta_context = transport.meta(native_auth_ctx).await?;
         let stmt = parse_sql_to_statement(sql_query, session.state.protocol.clone(), &mut None)?;

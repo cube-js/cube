@@ -581,6 +581,15 @@ This endpoint is part of the [SQL API][ref-sql-api].
 
 </Info>
 
+<Note>
+
+Introspection tables (`information_schema.*`, `pg_catalog.*`) can't be queried through
+this endpoint unless
+[`CUBESQL_REST_INTROSPECTION`](/reference/configuration/environment-variables#cubesql_rest_introspection)
+is set. Use [`/v1/meta`](#base_path/v1/meta) to inspect the data model.
+
+</Note>
+
 | Parameter | Description | Required |
 | --- | --- | --- |
 | `query` | The SQL query to run | ✅ Yes |

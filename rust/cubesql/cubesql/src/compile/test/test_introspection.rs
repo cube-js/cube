@@ -1,10 +1,13 @@
 use crate::{
     compile::{
-        test::{execute_query, init_testing_logger},
+        test::{execute_query, init_testing_logger, TestContext},
         DatabaseProtocol,
     },
+    sql::temp_tables::TempTable,
     CubeError,
 };
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use std::sync::Arc;
 
 #[tokio::test]
 async fn test_excel() -> Result<(), CubeError> {
@@ -3768,4 +3771,63 @@ mod pg_stat_activity {
 
         Ok(())
     }
+}
+
+#[tokio::test]
+async fn test_introspection_disabled() -> Result<(), CubeError> {
+    init_testing_logger();
+
+    let introspection_queries = [
+        "SELECT table_name FROM information_schema.tables",
+        "SELECT column_name FROM information_schema.columns",
+        "SELECT relname FROM pg_catalog.pg_class",
+        "SELECT typname FROM pg_type",
+        "SELECT name FROM pg_catalog.pg_settings",
+        "SELECT table_name FROM svv_tables",
+        "SELECT table_name FROM public.svv_tables",
+        "SELECT * FROM information_schema.testing_dataset",
+        "SELECT * FROM (SELECT relname FROM pg_class) t",
+        "SELECT 1 WHERE EXISTS (SELECT 1 FROM pg_namespace)",
+    ];
+
+    let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+    for query in introspection_queries {
+        context.execute_query(query.to_string()).await?;
+    }
+
+    let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+    context.session.state.set_introspection_disabled(true);
+
+    for query in introspection_queries {
+        let Err(err) = context.execute_query(query.to_string()).await else {
+            panic!("{} must not resolve an introspection table", query);
+        };
+        assert!(
+            err.to_string().contains("not found"),
+            "{} failed with an unexpected error: {}",
+            query,
+            err
+        );
+    }
+
+    // Everything that isn't a catalog table stays available
+    context.execute_query("SELECT 1".to_string()).await?;
+    context
+        .execute_query("SELECT current_schema(), version()".to_string())
+        .await?;
+    context.session.state.temp_tables().save(
+        "tmp",
+        TempTable::from_arrow_schema(
+            Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, true)])),
+            vec![],
+        ),
+    )?;
+    context
+        .execute_query("SELECT a FROM tmp".to_string())
+        .await?;
+    context
+        .convert_sql_to_cube_query("SELECT COUNT(*) FROM KibanaSampleDataEcommerce")
+        .await?;
+
+    Ok(())
 }
