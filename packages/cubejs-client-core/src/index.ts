@@ -454,6 +454,8 @@ class CubeApi {
         return continueWait(true);
       }
 
+      const errorOptions = 'error' in response && response.cause !== undefined ? { cause: response.cause } : undefined;
+
       // From here we're sure that response is only fetch Response
       response = (response as Response);
       let body: BodyResponse = {};
@@ -481,7 +483,7 @@ class CubeApi {
       let result;
       let error: RequestError | null = null;
       if (response.status !== 200) {
-        error = new RequestError(body.error || (response as any).error || '', body, response.status);
+        error = new RequestError(body.error || (response as any).error || '', body, response.status, errorOptions);
       } else {
         try {
           result = toResult(body);
