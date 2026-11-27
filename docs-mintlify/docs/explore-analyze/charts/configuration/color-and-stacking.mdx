@@ -15,7 +15,12 @@ The **Color** section in the Style tab controls two related things: how series a
   allowFullScreen
 />
 
-{/* TODO screenshot: color and stacking section of the Style tab (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/configuration/color-and-stacking/palette-menu.png"
+    alt="Palette menu open under a series in the Style tab, listing Default, Cube and other built-in palettes"
+  />
+</Frame>
 
 ## Color faceting
 
@@ -45,17 +50,10 @@ For continuous data, the gradient palette maps to the range of values in your re
 
 ### Custom palettes
 
-If none of the provided palettes fit your needs, you can build a custom palette for an individual chart:
-
-1. Open the **Color** section of the Style tab.
-2. Select the last option in the palette menu: **Custom palette**.
-3. Click **Customize** to open the palette editor.
-4. Add, remove, and edit individual hex colors.
-5. Use **Open hex code editor** to toggle a bulk editor and paste a comma-separated list of hex values.
-
-{/* TODO screenshot: custom palette editor with hex editor open (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
-
-To reuse a custom palette across charts, copy the hex codes and paste them into the custom palette editor of another chart.
+To use colors that no built-in palette offers, such as your brand colors, ask an admin to create a
+custom palette in **Admin → Customization → Chart palettes**. It needs the **Manage chart palettes**
+permission. The palette then appears in the palette menu of every chart in the account. See
+[Chart palettes](/admin/customization/chart-palettes).
 
 ## Series color controls
 
@@ -73,7 +71,12 @@ The stacking behavior controls how multiple series at the same X-axis value are 
 | **Overlay** | Series are drawn on top of each other from the same baseline |
 | **Stack %** | Series are stacked and normalized to 100% — tooltip shows raw value |
 
-{/* TODO screenshot: stacking option dropdown (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/configuration/color-and-stacking/stacking-placement.png"
+    alt="Stacked bar chart with the Stacked button selected next to Break down by in the Fields tab"
+  />
+</Frame>
 
 ### Per-series stacking
 
@@ -119,4 +122,9 @@ To show or hide one series without affecting the others, <kbd>⌘</kbd>-click it
 
 On a chart with several color legends, a click affects only the legend you click. What you show or hide isn't saved: reloading the page or changing the chart's fields or settings shows all series again.
 
-{/* TODO screenshot: legend position options (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/configuration/color-and-stacking/legend-bottom.png"
+    alt="Legend section of the Style tab with the bottom position selected, and the legend below the chart"
+  />
+</Frame>
