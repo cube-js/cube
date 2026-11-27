@@ -30,11 +30,17 @@ Click a data point and choose **Filter dashboard by this point**. The cross-filt
 - a map region filters by the region, and a point on a point map by its dimension values;
 - a table cell of a dimension column filters by that value, and a cell of a measure column by every dimension value in its row. In a pivot table, a value cell filters by its row's and its column's values.
 
-Every other chart that can take the filter re-runs its query with it, and a table or KPI shows the filtered numbers, totals and comparisons included. The chart you clicked shows the selected data at full strength and the rest dimmed.
+Every other chart that can take the filter re-runs its query with it. A bar, column, funnel, pie, donut or sunburst chart [highlights](#highlighting) the filtered part of its data, and every other chart, such as a line, a table or a KPI, shows only the filtered numbers, totals and comparisons included. The chart you clicked shows the selected data at full strength and the rest dimmed.
 
 A plain click on another value of the same chart opens the menu again, and **Filter dashboard by this point** there replaces the chart's selection with that value.
 
 Bar, line, area, scatter, pie and composite charts, maps and tables can start a cross-filter. Heatmaps, box plots, funnels, KPIs, Sankey charts and HTML charts can't, but the other charts' cross-filters filter them like any other chart. Over the bars, lines, areas, points and slices of a chart that can start one, the pointer turns into a hand.
+
+### Highlighting
+
+A bar, column, funnel, pie, donut or sunburst chart that another chart's cross-filter reaches keeps all of its data, dimmed, and draws the filtered part over it at full strength, so you can see each category's share of the selection. Stacked, grouped and small-multiples bars highlight each segment. The tooltip of a bar or slice gives the filtered value next to the full one. The axes stay put when you set, change or reset the cross-filter.
+
+These charts filter instead, like a line chart: a chart with a row limit, a Top N field or filter, or a filter on a measure, since the cross-filter can change which rows it shows; a chart with a period comparison; and a [Python analysis][ref-python] chart. A [download][ref-downloads] as CSV holds the filtered rows, as do a schedule's AI summary and an alert's check.
 
 ### Adding and removing values
 
@@ -62,7 +68,7 @@ A data point whose value is empty (null) can't start a cross-filter: **Filter da
 Hover a chart to see its cross-filter buttons. They sit beside the chart's other buttons, such as **Download** and **⋮**, and look like them:
 
 - A chart with a cross-filter of its own shows a bolt button, *Is filtering other charts. Click to reset*. Click it, or choose **Reset this filter** on one of the chart's selected values, to remove that chart's cross-filter; the other charts go back to what they showed without it.
-- A chart filtered by other charts' cross-filters shows a filter button with a check mark, whose tooltip names the fields filtering it, for example *Filtered by Status, City. Click to reset*. When one chart's cross-filter reaches it, clicking the button removes that cross-filter from the whole dashboard, as the bolt on the chart that set it does. When several reach it, clicking the button opens a **Cross-filter to reset** menu that lists them by their fields, in the order they were set: pick one to remove it and keep the others.
+- A chart filtered by other charts' cross-filters shows a filter button with a check mark, whose tooltip names the fields filtering it, for example *Filtered by Status, City. Click to reset*, or *Highlighting Status, City. Click to reset* on a chart that [highlights](#highlighting). When one chart's cross-filter reaches it, clicking the button removes that cross-filter from the whole dashboard, as the bolt on the chart that set it does. When several reach it, clicking the button opens a **Cross-filter to reset** menu that lists them by their fields, in the order they were set: pick one to remove it and keep the others.
 
 A chart that has a cross-filter of its own and is filtered by other charts shows both buttons. Its filter button only ever removes another chart's cross-filter, never the chart's own: the bolt removes that one.
 
