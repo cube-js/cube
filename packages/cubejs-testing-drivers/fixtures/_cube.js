@@ -1,3 +1,10 @@
+// Labels the statements in Snowflake QUERY_HISTORY, so test load can be told apart in usage stats.
+const driverOptions = {
+  snowflake: { queryTag: { tenant: 'cube-ci-oss', deployment: 'testing-drivers' } },
+};
+
+const dbType = process.env.CUBEJS_DB_TYPE;
+
 module.exports = {
   contextToApiScopes: async (
     securityContext,
@@ -6,4 +13,7 @@ module.exports = {
     defaultPermissions.push('jobs');
     return defaultPermissions;
   },
+  ...(driverOptions[dbType] ? {
+    driverFactory: () => ({ type: dbType, ...driverOptions[dbType] }),
+  } : {}),
 };

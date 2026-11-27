@@ -5,6 +5,11 @@ import { SnowflakeDriver } from '../src';
 
 const LONG_RUNNING_QUERY = 'SELECT SYSTEM$WAIT(120)';
 
+// Labels the statements in Snowflake QUERY_HISTORY, so test load can be told apart in usage stats.
+const createDriver = () => new SnowflakeDriver({
+  queryTag: { tenant: 'cube-ci-oss', deployment: 'snowflake-driver' },
+});
+
 const pause = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
 const QUERY_TO_TEST_HYDRATION = `
@@ -50,7 +55,7 @@ function assertHydrationResults(rows: any[]) {
 
 describe('SnowflakeDriver', () => {
   test('query', async () => {
-    const driver = new SnowflakeDriver({});
+    const driver = createDriver();
 
     try {
       const rows = await driver.query<any[]>(QUERY_TO_TEST_HYDRATION, []);
@@ -61,7 +66,7 @@ describe('SnowflakeDriver', () => {
   }, 2 * 60 * 1000);
 
   test('stream', async () => {
-    const driver = new SnowflakeDriver({});
+    const driver = createDriver();
 
     try {
       const tableData = await driver.stream(QUERY_TO_TEST_HYDRATION, [], { highWaterMark: 100 });
@@ -89,7 +94,7 @@ describe('SnowflakeDriver', () => {
   }, 2 * 60 * 1000);
 
   test('query() exposes cancel synchronously', async () => {
-    const driver = new SnowflakeDriver({});
+    const driver = createDriver();
 
     try {
       // QueryCache reads `resultPromise.cancel` on the very next line after
@@ -106,7 +111,7 @@ describe('SnowflakeDriver', () => {
   }, 2 * 60 * 1000);
 
   test('query() cancel aborts a running statement', async () => {
-    const driver = new SnowflakeDriver({});
+    const driver = createDriver();
 
     try {
       const promise = driver.query(LONG_RUNNING_QUERY, []);
@@ -128,7 +133,7 @@ describe('SnowflakeDriver', () => {
   }, 2 * 60 * 1000);
 
   test('query() cancel before the connection is established', async () => {
-    const driver = new SnowflakeDriver({});
+    const driver = createDriver();
 
     try {
       // No await in between: the driver is still connecting, so no statement
@@ -143,7 +148,7 @@ describe('SnowflakeDriver', () => {
   }, 2 * 60 * 1000);
 
   test('stream() cancel aborts a running statement', async () => {
-    const driver = new SnowflakeDriver({});
+    const driver = createDriver();
 
     try {
       const promise = driver.stream(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
@@ -159,7 +164,7 @@ describe('SnowflakeDriver', () => {
   }, 2 * 60 * 1000);
 
   test('downloadQueryResults() cancel aborts a running statement (memory)', async () => {
-    const driver = new SnowflakeDriver({});
+    const driver = createDriver();
 
     try {
       const promise = driver.downloadQueryResults(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
@@ -175,7 +180,7 @@ describe('SnowflakeDriver', () => {
   }, 2 * 60 * 1000);
 
   test('downloadQueryResults() cancel aborts a running statement (stream)', async () => {
-    const driver = new SnowflakeDriver({});
+    const driver = createDriver();
 
     try {
       const promise = driver.downloadQueryResults(
@@ -195,7 +200,7 @@ describe('SnowflakeDriver', () => {
   }, 2 * 60 * 1000);
 
   test('downloadQueryResults() returns memory data when not streaming', async () => {
-    const driver = new SnowflakeDriver({});
+    const driver = createDriver();
 
     try {
       const tableData = <any> await driver.downloadQueryResults(
@@ -210,7 +215,7 @@ describe('SnowflakeDriver', () => {
   }, 2 * 60 * 1000);
 
   test('stream() release() after normal completion does not abort', async () => {
-    const driver = new SnowflakeDriver({});
+    const driver = createDriver();
 
     try {
       const tableData = await driver.stream(QUERY_TO_TEST_HYDRATION, [], { highWaterMark: 100 });
