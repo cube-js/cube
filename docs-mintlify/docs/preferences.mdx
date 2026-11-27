@@ -18,7 +18,7 @@ account, apply across all devices, and don't affect other users in the account.
 | New message scrolling | Automatically scroll to new messages in chat | On |
 | Alternating row colors | Highlight alternating rows in data tables | Off |
 | Default deployment | Open this deployment when you go to Cube without one in the URL | Account default |
-| Notifications | Choose whether comment, sharing, access-request, dashboard review and dbt sync notifications also arrive by email | On |
+| Notifications | Choose whether alert, budget, comment, sharing, access-request, dashboard review and dbt sync notifications also arrive by email | On |
 
 ## Language
 
@@ -84,23 +84,24 @@ deployment. The control is hidden on accounts with only one reachable deployment
 
 ## Notifications
 
-These switches control email only. Mentions, replies, shares, access requests,
-dashboard reviews and dbt syncs arrive in your [inbox][ref-inbox]
-whatever you choose here. In the **Notifications** section of the **Preferences**
-page, choose which of them also arrive by email. Only admins see the **Model
-syncs** switch, since only admins get these emails:
+These switches control email only. Alerts, budgets, mentions, replies, shares,
+access requests, dashboard reviews and dbt syncs arrive in your
+[inbox][ref-inbox] whatever you choose here. In the **Notifications** section of
+the **Preferences** page, choose which of them also arrive by email. Only admins
+see the **Model syncs** switch, since only admins get these emails:
 
 {/* TODO: video — Preferences → Notifications, with the Skip email if already read switch and an email skipped after reading it in the Inbox (GTM-321) */}
 
 <Frame>
   <img
     src="https://static.cube.dev/docs/preferences/notifications/notifications-section-v5.png"
-    alt="Notifications section of the Preferences page with the email switches, including Model syncs with its ready-to-review or starts-failing description, and the Skip email if already read switch"
+    alt="Notifications section of the Preferences page with the email switches, including Alerts and Model syncs with its ready-to-review or starts-failing description, and the Skip email if already read switch"
   />
 </Frame>
 
 | Switch | You get an email when | Default |
 | --- | --- | --- |
+| Alerts | An [alert][ref-alerts] that lists you as a recipient fires or resolves, or usage crosses a [budget][ref-budgets] threshold you get notifications for | On |
 | Mentions in comments | Someone [mentions you][ref-mentions] in a dashboard comment | On |
 | Replies to comments | Someone replies [in a comment thread][ref-replies] you wrote in | On |
 | Model syncs | A [dbt sync][ref-dbt-review] that a webhook started has changes ready to review and the dbt project has no notification list, or a webhook dbt sync starts failing, with or without a list. Admins only | On |
@@ -123,7 +124,10 @@ comment, a shared item or a dashboard you can no longer open, or about a dbt syn
 once you're no longer an admin. An email about a declined request doesn't name
 the item.
 
-Alerts, budgets, end-of-support notices, scheduled tasks and
+An email address on an alert or a budget that doesn't belong to a Cube user
+always gets its email, whatever the Alerts switch says.
+
+End-of-support notices, scheduled tasks and
 [report deliveries][ref-report-deliveries] send their own email, as set up on
 each of them, and have no switch here.
 
@@ -134,8 +138,8 @@ a mention, reply, share or access-request email, and sends nothing if you read
 or delete the notification in your inbox by then. Marking the notification read
 in the inbox counts, whether you select it, choose **Mark read** in its **⋮**
 menu or choose **Mark all read**. Opening the comment or the item from
-somewhere else does not. Dashboard review and model sync emails don't wait and
-go out at once.
+somewhere else does not. Alert, budget, dashboard review and model sync emails
+don't wait and go out at once.
 
 The switch is on by default. Turn it off to get each email as soon as the
 notification arrives. Unlike the other switches, it can't be turned off from
@@ -149,3 +153,5 @@ the unsubscribe link in an email.
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews#notifications
 [ref-dbt-review]: /docs/integrations/dbt#review-notifications
 [ref-report-deliveries]: /docs/explore-analyze/report-deliveries#notifications
+[ref-alerts]: /admin/monitoring/alerts
+[ref-budgets]: /admin/account-billing/budgets
