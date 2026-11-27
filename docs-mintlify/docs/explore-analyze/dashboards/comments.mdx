@@ -183,7 +183,7 @@ On a published dashboard, a chart with a
   />
 </Frame>
 
-{/* TODO: video — point comments on maps, funnels, Sankey charts, tables and box plots (GTM-270) */}
+{/* TODO: video — point comments on maps, funnels, Sankey charts, tables, box plots and KPI values (GTM-270) */}
 
 <iframe
   width="100%"
@@ -210,7 +210,7 @@ The data point is identified by its measure and its dimension values, not by its
 position. When the chart changes, Cube finds the data point again:
 
 - If the value changed since the thread was started, the thread shows both
-  values, for example **12,480 (as seen on Oct 11, 2026)** and **14,020 (now)**.
+  values, for example **12,480 (as seen on Oct 11)** and **14,020 (now)**.
 - If the data point is not on the chart, for example because a filter removed
   it, the pin is not shown. In the panel, the data point is gray and shows the
   value from when the thread was started. When the data point comes back, the
@@ -223,6 +223,14 @@ Click the bar of the stage or its label and choose **Comment on this point**. Th
 pin is to the right of the stage, or above it when the funnel's **Direction** is
 **Horizontal**. The connectors between stages do not take comments. To comment
 on a drop between two stages, comment on the later stage.
+
+On a **KPI** chart, each [**Number**](/docs/explore-analyze/charts/chart-types/kpi#number)
+block that shows a measure is a data point, and so is the headline value of each
+[**Sparkline**](/docs/explore-analyze/charts/chart-types/kpi#sparkline) block.
+Click the value and choose **Comment on this point**. The pin is to the right of
+the value. **Comparison** and **Progress bar** blocks are not data points. A
+click anywhere else on the KPI, for example on a label, offers only **Comment on
+whole chart**.
 
 On a **Boxplot** chart, each box is a data point: the measure at that category.
 Its value is the median. Click the box, its median line or either whisker and
@@ -269,8 +277,8 @@ table:
 - Totals, subtotals, group rows, empty cells, sparklines, and period comparison
   columns do not take comments.
 
-Comments on a data point are not available on **KPI** and **HTML** charts. On
-these charts, comment on the whole chart instead.
+Comments on a data point are not available on **HTML** charts. On these
+charts, comment on the whole chart instead.
 
 ## Editing and deleting
 
