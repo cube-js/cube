@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.35](https://github.com/cube-js/cube/compare/v1.8.34...v1.8.35) (2026-11-27)
+
+### Bug Fixes
+
+- **cubesql:** support MSSQL space-trimmed filters ([#12083](https://github.com/cube-js/cube/issues/12083)) ([115c9ec](https://github.com/cube-js/cube/commit/115c9ec145f1a7e549f75ac64c8074aa539b34c9)), closes [#12082](https://github.com/cube-js/cube/issues/12082)
+- **schema-compiler:** Keep week components of an interval on Oracle ([#12905](https://github.com/cube-js/cube/issues/12905)) ([a47d9b7](https://github.com/cube-js/cube/commit/a47d9b7e6fddfeea5ab681894c68924f2dc6db87))
+- **schema-compiler:** Render negative interval offsets on Redshift and Oracle without a `--` comment ([#12904](https://github.com/cube-js/cube/issues/12904)) ([d678a31](https://github.com/cube-js/cube/commit/d678a3116caa4ea62c2da1b33ab841e5f136db72)), closes [#11474](https://github.com/cube-js/cube/issues/11474)
+- **schema-compiler:** Render week and quarter intervals as SQLite modifiers ([#12906](https://github.com/cube-js/cube/issues/12906)) ([f550853](https://github.com/cube-js/cube/commit/f550853acda1ffc96f59687857dbb23a5d71dbcc))
+- **schema-compiler:** Resolve join_path in nested view folders ([#12881](https://github.com/cube-js/cube/issues/12881)) ([a7a1bc4](https://github.com/cube-js/cube/commit/a7a1bc418e109895e3f559b69ba46866c447302b))
+- **tesseract:** Keep the HLL sketch in a rolling window's leaf over a Postgres rollup ([#12908](https://github.com/cube-js/cube/issues/12908)) ([0020831](https://github.com/cube-js/cube/commit/0020831c725b1f149df269f60f409519ea1edf09))
+
+### Features
+
+- **schema-compiler:** Support dynamic measure formats via format.sql ([#12457](https://github.com/cube-js/cube/issues/12457)) ([141ce3a](https://github.com/cube-js/cube/commit/141ce3a24732ddccf6b15fbb6e0ed6f8706e4bf5))
+
 ## [1.8.34](https://github.com/cube-js/cube/compare/v1.8.33...v1.8.34) (2026-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

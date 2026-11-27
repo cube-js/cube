@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.35](https://github.com/cube-js/cube/compare/v1.8.34...v1.8.35) (2026-11-27)
+
+### Bug Fixes
+
+- **cubesql:** Return an error for UNION branches with different column counts ([#12996](https://github.com/cube-js/cube/issues/12996)) ([4779711](https://github.com/cube-js/cube/commit/477971143a8300af7cdae2186383a759a348dbf7))
+- **tesseract:** Keep the HLL sketch in a rolling window's leaf over a Postgres rollup ([#12908](https://github.com/cube-js/cube/issues/12908)) ([0020831](https://github.com/cube-js/cube/commit/0020831c725b1f149df269f60f409519ea1edf09))
+
+### Features
+
+- **cubesql:** Name the data source of each pushed-down scan in EXPLAIN ([#12966](https://github.com/cube-js/cube/issues/12966)) ([17d1203](https://github.com/cube-js/cube/commit/17d1203965c115243eb112f43d05a9a3d8174ea7))
+
 ## [1.8.34](https://github.com/cube-js/cube/compare/v1.8.33...v1.8.34) (2026-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/native

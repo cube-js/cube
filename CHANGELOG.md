@@ -3,6 +3,50 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.35](https://github.com/cube-js/cube/compare/v1.8.34...v1.8.35) (2026-11-27)
+
+### Bug Fixes
+
+- **cubesql:** Keep join subquery pre-aggregations in push-to-Cube SQL ([#12993](https://github.com/cube-js/cube/issues/12993)) ([2eb008a](https://github.com/cube-js/cube/commit/2eb008a9250c3612b816764a575ce273da853f2b))
+- **cubesql:** Keep Tableau Sunday-start week instead of Monday `week` ([#13019](https://github.com/cube-js/cube/issues/13019)) ([239b228](https://github.com/cube-js/cube/commit/239b228f68f1215f344022af1de972372687d4ae))
+- **cubesql:** Return an error for UNION branches with different column counts ([#12996](https://github.com/cube-js/cube/issues/12996)) ([4779711](https://github.com/cube-js/cube/commit/477971143a8300af7cdae2186383a759a348dbf7))
+- **cubesql:** support MSSQL space-trimmed filters ([#12083](https://github.com/cube-js/cube/issues/12083)) ([115c9ec](https://github.com/cube-js/cube/commit/115c9ec145f1a7e549f75ac64c8074aa539b34c9)), closes [#12082](https://github.com/cube-js/cube/issues/12082)
+- **cubestore:** Reject unknown values for CUBESTORE*LOCATION*\* security flags ([#12945](https://github.com/cube-js/cube/issues/12945)) ([7fce7f7](https://github.com/cube-js/cube/commit/7fce7f74136e3042e71229da0b74521e63dbba5a))
+- **query-orchestrator:** Report drivers without stream() support on streaming queries ([#13002](https://github.com/cube-js/cube/issues/13002)) ([bd9b109](https://github.com/cube-js/cube/commit/bd9b109d0f016ef4670e484b1c13b3aa497e4c72))
+- **schema-compiler:** Keep week components of an interval on Oracle ([#12905](https://github.com/cube-js/cube/issues/12905)) ([a47d9b7](https://github.com/cube-js/cube/commit/a47d9b7e6fddfeea5ab681894c68924f2dc6db87))
+- **schema-compiler:** Render negative interval offsets on Redshift and Oracle without a `--` comment ([#12904](https://github.com/cube-js/cube/issues/12904)) ([d678a31](https://github.com/cube-js/cube/commit/d678a3116caa4ea62c2da1b33ab841e5f136db72)), closes [#11474](https://github.com/cube-js/cube/issues/11474)
+- **schema-compiler:** Render week and quarter intervals as SQLite modifiers ([#12906](https://github.com/cube-js/cube/issues/12906)) ([f550853](https://github.com/cube-js/cube/commit/f550853acda1ffc96f59687857dbb23a5d71dbcc))
+- **schema-compiler:** Resolve join_path in nested view folders ([#12881](https://github.com/cube-js/cube/issues/12881)) ([a7a1bc4](https://github.com/cube-js/cube/commit/a7a1bc418e109895e3f559b69ba46866c447302b))
+- **server-core:** Keep conditional masks for multi-stage filter directives ([#12929](https://github.com/cube-js/cube/issues/12929)) ([fc09f95](https://github.com/cube-js/cube/commit/fc09f953b971fcd6c76a2084b8a3cd03472d2ebf)), closes [#12711](https://github.com/cube-js/cube/issues/12711)
+- **server-core:** Prove conditional mask range bounds only on number dimensions ([#13017](https://github.com/cube-js/cube/issues/13017)) ([77f6280](https://github.com/cube-js/cube/commit/77f628021699b81a18601306823f82e6fb384550)), closes [#12711](https://github.com/cube-js/cube/issues/12711)
+- **tesseract:** Apply OR filter groups mixing multi-stage dimensions with other members ([#12899](https://github.com/cube-js/cube/issues/12899)) ([5e7917c](https://github.com/cube-js/cube/commit/5e7917cebffad2821e8ec7b32484358dfc182f2e))
+- **tesseract:** Keep GROUP BY on plain-aggregate multi-stage stages in ungrouped queries ([#12897](https://github.com/cube-js/cube/issues/12897)) ([234d8c9](https://github.com/cube-js/cube/commit/234d8c950da182e6cc1293365e837ac23d32add4)), closes [#11328](https://github.com/cube-js/cube/issues/11328) [#11327](https://github.com/cube-js/cube/issues/11327)
+- **tesseract:** Keep the HLL sketch in a rolling window's leaf over a Postgres rollup ([#12908](https://github.com/cube-js/cube/issues/12908)) ([0020831](https://github.com/cube-js/cube/commit/0020831c725b1f149df269f60f409519ea1edf09))
+- **tesseract:** Reject non-decimal values in filters on number members ([#13041](https://github.com/cube-js/cube/issues/13041))
+- **tesseract:** Return the row value of a count under an ungrouped time shift ([#12907](https://github.com/cube-js/cube/issues/12907)) ([f9e4ced](https://github.com/cube-js/cube/commit/f9e4cedad5198fb7b17c6f3116a2b56c39859aee))
+
+### Features
+
+- **cube-cli:** Show a failed view's Databricks error class and statement in the dbx-mv run table ([#12994](https://github.com/cube-js/cube/issues/12994)) ([7d0c01e](https://github.com/cube-js/cube/commit/7d0c01eae820a6631a1b55e78e63de8b11e2244b))
+- **cubesql:** Name the data source of each pushed-down scan in EXPLAIN ([#12966](https://github.com/cube-js/cube/issues/12966)) ([17d1203](https://github.com/cube-js/cube/commit/17d1203965c115243eb112f43d05a9a3d8174ea7))
+- **cubestore:** Metastore-side chunk, GC, scheduler-lag and streaming metrics ([#12884](https://github.com/cube-js/cube/issues/12884)) ([68e5ce5](https://github.com/cube-js/cube/commit/68e5ce5a94070db883f8ae49007b1bdb00aff718))
+- **pinot-driver:** Send request id as clientQueryId ([#12999](https://github.com/cube-js/cube/issues/12999)) ([a56b684](https://github.com/cube-js/cube/commit/a56b684b8c45e36598eb3814870981ef221e5026))
+- **pinot-driver:** Support applicationName and workloadName query options ([#13014](https://github.com/cube-js/cube/issues/13014)) ([a86c70e](https://github.com/cube-js/cube/commit/a86c70ed2fb09021f123843bf4fc8e3796dad3c0))
+- **pinot-driver:** Support streaming via broker cursors ([#13016](https://github.com/cube-js/cube/issues/13016)) ([0935310](https://github.com/cube-js/cube/commit/09353101301f6303f9af55a30eba2f156e46513b))
+- **schema-compiler:** Support dynamic measure formats via format.sql ([#12457](https://github.com/cube-js/cube/issues/12457)) ([141ce3a](https://github.com/cube-js/cube/commit/141ce3a24732ddccf6b15fbb6e0ed6f8706e4bf5))
+- **snowflake-driver:** Support object queryTag merged with request id ([#13065](https://github.com/cube-js/cube/issues/13065)) ([d5c9856](https://github.com/cube-js/cube/commit/d5c9856b893ad8bebdd3516c53608bd9511efdf6))
+
+### Performance Improvements
+
+- **cubestore:** Cut per-chunk cost of scans over many in-memory chunks ([#12926](https://github.com/cube-js/cube/issues/12926)) ([78c0647](https://github.com/cube-js/cube/commit/78c0647884f2f18b40b9f513c1e1edc455547b8b))
+
+### BREAKING CHANGES
+
+- **tesseract:** a measure declared `type: number` is held to number values
+  even when its SQL returns text or a date, e.g. `MAX({CUBE}.created_at)`
+  declared as `type: number` and filtered with `gt '2024-01-01'` now fails with
+  a user error; declare such measures as `type: time` or `type: string`.
+
 ## [1.8.34](https://github.com/cube-js/cube/compare/v1.8.33...v1.8.34) (2026-11-24)
 
 ### Features

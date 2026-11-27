@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.35](https://github.com/cube-js/cube/compare/v1.8.34...v1.8.35) (2026-11-27)
+
+### Bug Fixes
+
+- **schema-compiler:** Resolve join_path in nested view folders ([#12881](https://github.com/cube-js/cube/issues/12881)) ([a7a1bc4](https://github.com/cube-js/cube/commit/a7a1bc418e109895e3f559b69ba46866c447302b))
+
+### Features
+
+- **schema-compiler:** Support dynamic measure formats via format.sql ([#12457](https://github.com/cube-js/cube/issues/12457)) ([141ce3a](https://github.com/cube-js/cube/commit/141ce3a24732ddccf6b15fbb6e0ed6f8706e4bf5))
+
 ## [1.8.34](https://github.com/cube-js/cube/compare/v1.8.33...v1.8.34) (2026-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/model-schema

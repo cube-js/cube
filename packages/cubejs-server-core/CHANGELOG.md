@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.35](https://github.com/cube-js/cube/compare/v1.8.34...v1.8.35) (2026-11-27)
+
+### Bug Fixes
+
+- **server-core:** Keep conditional masks for multi-stage filter directives ([#12929](https://github.com/cube-js/cube/issues/12929)) ([fc09f95](https://github.com/cube-js/cube/commit/fc09f953b971fcd6c76a2084b8a3cd03472d2ebf)), closes [#12711](https://github.com/cube-js/cube/issues/12711)
+- **server-core:** Prove conditional mask range bounds only on number dimensions ([#13017](https://github.com/cube-js/cube/issues/13017)) ([77f6280](https://github.com/cube-js/cube/commit/77f628021699b81a18601306823f82e6fb384550)), closes [#12711](https://github.com/cube-js/cube/issues/12711)
+
 ## [1.8.34](https://github.com/cube-js/cube/compare/v1.8.33...v1.8.34) (2026-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

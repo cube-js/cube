@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.35](https://github.com/cube-js/cube/compare/v1.8.34...v1.8.35) (2026-11-27)
+
+### Features
+
+- **pinot-driver:** Send request id as clientQueryId ([#12999](https://github.com/cube-js/cube/issues/12999)) ([a56b684](https://github.com/cube-js/cube/commit/a56b684b8c45e36598eb3814870981ef221e5026))
+- **pinot-driver:** Support applicationName and workloadName query options ([#13014](https://github.com/cube-js/cube/issues/13014)) ([a86c70e](https://github.com/cube-js/cube/commit/a86c70ed2fb09021f123843bf4fc8e3796dad3c0))
+- **pinot-driver:** Support streaming via broker cursors ([#13016](https://github.com/cube-js/cube/issues/13016)) ([0935310](https://github.com/cube-js/cube/commit/09353101301f6303f9af55a30eba2f156e46513b))
+
 ## [1.8.34](https://github.com/cube-js/cube/compare/v1.8.33...v1.8.34) (2026-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/pinot-driver

@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.35](https://github.com/cube-js/cube/compare/v1.8.34...v1.8.35) (2026-11-27)
+
+### Bug Fixes
+
+- **cubesql:** Keep join subquery pre-aggregations in push-to-Cube SQL ([#12993](https://github.com/cube-js/cube/issues/12993)) ([2eb008a](https://github.com/cube-js/cube/commit/2eb008a9250c3612b816764a575ce273da853f2b))
+- **cubesql:** Keep Tableau Sunday-start week instead of Monday `week` ([#13019](https://github.com/cube-js/cube/issues/13019)) ([239b228](https://github.com/cube-js/cube/commit/239b228f68f1215f344022af1de972372687d4ae))
+- **cubesql:** Return an error for UNION branches with different column counts ([#12996](https://github.com/cube-js/cube/issues/12996)) ([4779711](https://github.com/cube-js/cube/commit/477971143a8300af7cdae2186383a759a348dbf7))
+
+### Features
+
+- **cubesql:** Name the data source of each pushed-down scan in EXPLAIN ([#12966](https://github.com/cube-js/cube/issues/12966)) ([17d1203](https://github.com/cube-js/cube/commit/17d1203965c115243eb112f43d05a9a3d8174ea7))
+- **schema-compiler:** Support dynamic measure formats via format.sql ([#12457](https://github.com/cube-js/cube/issues/12457)) ([141ce3a](https://github.com/cube-js/cube/commit/141ce3a24732ddccf6b15fbb6e0ed6f8706e4bf5))
+
 ## [1.8.34](https://github.com/cube-js/cube/compare/v1.8.33...v1.8.34) (2026-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

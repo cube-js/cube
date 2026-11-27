@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.35](https://github.com/cube-js/cube/compare/v1.8.34...v1.8.35) (2026-11-27)
+
+### Bug Fixes
+
+- **query-orchestrator:** Report drivers without stream() support on streaming queries ([#13002](https://github.com/cube-js/cube/issues/13002)) ([bd9b109](https://github.com/cube-js/cube/commit/bd9b109d0f016ef4670e484b1c13b3aa497e4c72))
+
 ## [1.8.34](https://github.com/cube-js/cube/compare/v1.8.33...v1.8.34) (2026-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.35](https://github.com/cube-js/cube/compare/v1.8.34...v1.8.35) (2026-11-27)
+
+### Bug Fixes
+
+- **cubestore:** Reject unknown values for CUBESTORE*LOCATION*\* security flags ([#12945](https://github.com/cube-js/cube/issues/12945)) ([7fce7f7](https://github.com/cube-js/cube/commit/7fce7f74136e3042e71229da0b74521e63dbba5a))
+
+### Features
+
+- **cubestore:** Metastore-side chunk, GC, scheduler-lag and streaming metrics ([#12884](https://github.com/cube-js/cube/issues/12884)) ([68e5ce5](https://github.com/cube-js/cube/commit/68e5ce5a94070db883f8ae49007b1bdb00aff718))
+
+### Performance Improvements
+
+- **cubestore:** Cut per-chunk cost of scans over many in-memory chunks ([#12926](https://github.com/cube-js/cube/issues/12926)) ([78c0647](https://github.com/cube-js/cube/commit/78c0647884f2f18b40b9f513c1e1edc455547b8b))
+
 ## [1.8.34](https://github.com/cube-js/cube/compare/v1.8.33...v1.8.34) (2026-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

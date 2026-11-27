@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.35](https://github.com/cube-js/cube/compare/v1.8.34...v1.8.35) (2026-11-27)
+
+### Bug Fixes
+
+- **cubesql:** support MSSQL space-trimmed filters ([#12083](https://github.com/cube-js/cube/issues/12083)) ([115c9ec](https://github.com/cube-js/cube/commit/115c9ec145f1a7e549f75ac64c8074aa539b34c9)), closes [#12082](https://github.com/cube-js/cube/issues/12082)
+- **schema-compiler:** Keep week components of an interval on Oracle ([#12905](https://github.com/cube-js/cube/issues/12905)) ([a47d9b7](https://github.com/cube-js/cube/commit/a47d9b7e6fddfeea5ab681894c68924f2dc6db87))
+- **tesseract:** Reject non-decimal values in filters on number members ([#13041](https://github.com/cube-js/cube/issues/13041))
+
+### Features
+
+- **snowflake-driver:** Support object queryTag merged with request id ([#13065](https://github.com/cube-js/cube/issues/13065)) ([d5c9856](https://github.com/cube-js/cube/commit/d5c9856b893ad8bebdd3516c53608bd9511efdf6))
+
+### BREAKING CHANGES
+
+- **tesseract:** a measure declared `type: number` is held to number values
+  even when its SQL returns text or a date, e.g. `MAX({CUBE}.created_at)`
+  declared as `type: number` and filtered with `gt '2024-01-01'` now fails with
+  a user error; declare such measures as `type: time` or `type: string`.
+
 ## [1.8.34](https://github.com/cube-js/cube/compare/v1.8.33...v1.8.34) (2026-11-24)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers
