@@ -812,10 +812,9 @@ emails** at the bottom of the email.
 
 When a sync that a webhook started fails, Cube emails the first failure in a row. The
 email names the deployment, shows the sync's error, and has an **Open dbt settings**
-button. It goes to the admins among the users on the notification list, or to all
-admins when no list is configured. Users on the list who aren't admins get the failure
-in their inbox only, and an address on the list that doesn't belong to a Cube user
-gets nothing.
+button. It goes to every Cube user on the notification list, admin or not, or to all
+admins when no list is configured. An address on the list that doesn't belong to a Cube
+user gets nothing.
 
 Later failures send no email, so a broken integration doesn't flood anyone's mailbox.
 After any sync succeeds, including a manual pull or a webhook sync that finds no
@@ -823,7 +822,8 @@ changes, the next failure of a webhook sync emails again. Syncs that start manua
 from Analytics Chat, or through the CLI or API never send a failure email, since
 someone is already watching them. **Model syncs** under [Preferences →
 Notifications](/docs/preferences#notifications) and the unsubscribe link in the email
-turn this email off as well.
+turn this email off as well. Users who aren't admins don't see **Model syncs** in
+Preferences, so they turn the email off with the unsubscribe link.
 
 ## Review sync history
 
@@ -1262,10 +1262,11 @@ notification is still in their [inbox](/docs/inbox).
 
 <Accordion title="A webhook sync failed but nobody got an email">
 
-Only the first failure in a row of a webhook sync sends an email, and only to admins
-(see [Review notifications](#review-notifications)). Check
+Only the first failure in a row of a webhook sync sends an email, to the users on the
+notification list, or to all admins when there is no list (see
+[Review notifications](#review-notifications)). Check
 [sync history](#review-sync-history): if the last finished sync before it also failed,
-no email is expected. An admin who got no email may have turned off **Model syncs**
+no email is expected. A recipient who got no email may have turned off **Model syncs**
 under [Preferences → Notifications](/docs/preferences#notifications) or unsubscribed
 from the email. The failure is still in their [inbox](/docs/inbox).
 

@@ -104,7 +104,7 @@ see the **Model syncs** switch, since only admins get these emails:
 | Alerts | An [alert][ref-alerts] that lists you as a recipient fires or resolves, or usage crosses a [budget][ref-budgets] threshold you get notifications for | On |
 | Mentions in comments | Someone [mentions you][ref-mentions] in a dashboard comment | On |
 | Replies to comments | Someone replies [in a comment thread][ref-replies] you wrote in | On |
-| Model syncs | A [dbt sync][ref-dbt-review] that a webhook started has changes ready to review and the dbt project has no notification list, or a webhook dbt sync starts failing, with or without a list. Admins only | On |
+| Model syncs | A [dbt sync][ref-dbt-review] that a webhook started has changes ready to review and the dbt project has no notification list, or a webhook dbt sync starts failing, with or without a list. Admins only; others on a notification list stop the failure email with its unsubscribe link | On |
 | Shared with you | Someone [shares][ref-sharing] a workbook, a folder, or a chat with you, or approves your access request | On |
 | Access requests | Someone [requests access][ref-request-access] to an item you can share, or declines your request | On |
 | Dashboard reviews | Someone [requests your review][ref-reviews] of a dashboard, or comments on, approves, requests changes to, or publishes a review you take part in | On |
@@ -120,8 +120,8 @@ turn the switch back on here.
 
 The email is in the language you set under [Language](#language) and links to the
 comment, the item, the review or the changes. Cube doesn't email you about a
-comment, a shared item or a dashboard you can no longer open, or about a dbt sync
-once you're no longer an admin. An email about a declined request doesn't name
+comment, a shared item or a dashboard you can no longer open, or about a dbt sync's
+changes once you're no longer an admin. An email about a declined request doesn't name
 the item.
 
 An email address on an alert or a budget that doesn't belong to a Cube user
