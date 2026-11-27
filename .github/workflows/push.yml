@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/actions/smoke.sh'
       - '.github/actions/integration/**'
+      - '.github/actions/attest-image/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
@@ -24,6 +25,7 @@ on:
     paths:
       - '.github/actions/smoke.sh'
       - '.github/actions/integration/**'
+      - '.github/actions/attest-image/**'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
@@ -622,9 +624,14 @@ jobs:
   docker-dev:
     needs: [latest-tag-sha, build-native-linux]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
-    name: Build & Test :dev for ${{ matrix.name }} without pushing
+    name: Build & Test :dev for ${{ matrix.name }}
     runs-on: ubuntu-22.04
     timeout-minutes: 60
+    outputs:
+      ci-image-digest: ${{ steps.ci-image.outputs.digest }}
+    env:
+      # Fork and Dependabot PRs get a read-only token, so only other same-repo builds push and attest.
+      ATTEST_CI_IMAGE: ${{ github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') }}
     services:
       registry:
         image: registry:2
@@ -698,6 +705,34 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
+      - name: Install crane
+        if: env.ATTEST_CI_IMAGE == 'true'
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
+        with:
+          version: v0.22.1
+      - name: Export image for attestation
+        id: ci-image
+        if: env.ATTEST_CI_IMAGE == 'true'
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          SOURCE: localhost:5000/cubejs/cube:${{ matrix.tag }}
+        run: |
+          crane pull --format=oci "$SOURCE" "${RUNNER_TEMP}/ci-image"
+          echo "digest=$(crane digest "$SOURCE")" >> "$GITHUB_OUTPUT"
+      - name: Upload image for attestation
+        if: steps.ci-image.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-image
+          path: ${{ runner.temp }}/ci-image
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
       - name: Testing CubeJS (container mode) via BirdBox
         run: |
           cd packages/cubejs-testing/
@@ -761,6 +796,87 @@ jobs:
         with:
           name: cypress-screenshots-docker-dev-${{ matrix.name }}
           path: packages/cubejs-testing/cypress/screenshots
+
+  docker-dev-attest:
+    needs: [docker-dev]
+    # A separate job so no project code (yarn install, tests) runs with OIDC or package write.
+    if: needs.docker-dev.outputs.ci-image-digest != ''
+    name: Push & attest :dev CI image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    continue-on-error: true
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Download image
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: actions/download-artifact@v8
+        with:
+          name: ci-image
+          path: ${{ runner.temp }}/ci-image
+      - name: Login to GitHub Container Registry
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Install crane
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
+        with:
+          version: v0.22.1
+      - name: Push image to GHCR
+        id: ci-image
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          TESTED_DIGEST: ${{ needs.docker-dev.outputs.ci-image-digest }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ -n "$PR_NUMBER" ]; then
+            TAG="pr-${PR_NUMBER}-${SHA::7}"
+          else
+            TAG="master-${SHA::7}"
+          fi
+          crane push "${RUNNER_TEMP}/ci-image" "ghcr.io/cube-js/cube-ci:${TAG}"
+          PUSHED_DIGEST="$(crane digest "ghcr.io/cube-js/cube-ci:${TAG}")"
+          echo "Tested image: ${TESTED_DIGEST}"
+          echo "Pushed image: ${PUSHED_DIGEST}"
+          if [ "$PUSHED_DIGEST" != "$TESTED_DIGEST" ]; then
+            echo "::error::ghcr.io/cube-js/cube-ci:${TAG} is not the image docker-dev tested"
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+      - name: Attest CI image
+        if: steps.ci-image.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: ./.github/actions/attest-image
+        with:
+          image: ghcr.io/cube-js/cube-ci
+          ref: ":${{ steps.ci-image.outputs.tag }}"
+      - name: Prune old CI images
+        if: steps.ci-image.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: cube-ci
+          package-type: container
+          # Versions, not images: each build adds its manifests and attestations as separate versions.
+          min-versions-to-keep: 300
 
   upload-coverage:
     name: Upload merged coverage to Codecov

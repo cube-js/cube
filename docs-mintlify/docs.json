@@ -633,6 +633,7 @@
             "pages": [
               "cube-core/architecture",
               "cube-core/deployment",
+              "cube-core/verifying-images",
               "cube-core/running-in-production"
             ]
           }

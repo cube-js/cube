@@ -1,0 +1,125 @@
+---
+title: Verifying Cube images
+description: Check that a Cube or Cube Store Docker image was built by Cube's GitHub Actions workflows, and read its SBOM.
+---
+
+Every Docker image that Cube publishes to Docker Hub carries signed
+[GitHub artifact attestations][link-gh-attestations]:
+
+- **Build provenance** ([SLSA v1][link-slsa]): the repository, workflow, Git ref
+  and commit that built the image.
+- **SBOM** ([SPDX 2.3][link-spdx]): the packages inside the image.
+
+They are signed keylessly with [Sigstore][link-sigstore]: the signing certificate
+is issued to the GitHub Actions workflow run itself, and every signature is
+recorded in the public [Rekor][link-rekor] transparency log. There is no
+long-lived key to distribute or trust.
+
+This covers [`cubejs/cube`][link-dockerhub-cube] (release, `-jdk` and `dev`
+tags) and [`cubejs/cubestore`][link-dockerhub-cubestore] (release, `-non-avx`,
+`-arm64v8` and `edge` tags). Images published before attestations were
+introduced have none, and fail verification. Replace `vX.Y.Z` in the examples
+below with the tag you run.
+
+## With the GitHub CLI
+
+Install the [GitHub CLI][link-gh-cli] and verify that the image was built by
+the release workflow from its tag:
+
+```bash
+gh attestation verify oci://cubejs/cube:vX.Y.Z \
+  --repo cube-js/cube \
+  --signer-workflow cube-js/cube/.github/workflows/publish.yml \
+  --source-ref refs/tags/vX.Y.Z
+```
+
+Pin the workflow and ref as shown. CI runs for pull requests in `cube-js/cube`
+also sign attestations, so `--owner cube-js` or `--repo` on their own would
+accept those too.
+
+| Tags | `--signer-workflow` | `--source-ref` |
+| --- | --- | --- |
+| Releases (`cubejs/cube`, `cubejs/cubestore`) | `cube-js/cube/.github/workflows/publish.yml` | `refs/tags/vX.Y.Z` |
+| `cubejs/cube:dev` | `cube-js/cube/.github/workflows/master.yml` | `refs/heads/master` |
+| `cubejs/cubestore:edge` | `cube-js/cube/.github/workflows/rust-cubestore-master.yml` | `refs/heads/master` |
+
+To verify and print the SBOM, add its predicate type:
+
+```bash
+gh attestation verify oci://cubejs/cube:vX.Y.Z \
+  --repo cube-js/cube \
+  --signer-workflow cube-js/cube/.github/workflows/publish.yml \
+  --source-ref refs/tags/vX.Y.Z \
+  --predicate-type https://spdx.dev/Document/v2.3 \
+  --format json --jq '.[].verificationResult.statement.predicate'
+```
+
+Add `--bundle-from-oci` to read the attestations from the registry, where they
+are stored next to the image, rather than from the GitHub API.
+
+On the multi-architecture tags (`cubejs/cube` and `cubejs/cubestore`
+releases, and `cubejs/cubestore:edge`), the SBOM attested on the tag describes
+`linux/amd64`. Their `linux/amd64` and `linux/arm64` manifests carry their own:
+verify `oci://<image>@<digest>`, with the same flags as above, using the platform
+digest that `docker buildx imagetools inspect <image>:<tag>` lists.
+
+## With cosign
+
+[cosign][link-cosign] v3 or later reads the same attestations. Pin the identity
+to the release workflow and a tag:
+
+```bash
+cosign verify-attestation cubejs/cube:vX.Y.Z \
+  --type https://slsa.dev/provenance/v1 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity 'https://github.com/cube-js/cube/.github/workflows/publish.yml@refs/tags/vX.Y.Z'
+```
+
+Use `--type https://spdx.dev/Document/v2.3` for the SBOM. For `dev` and `edge`,
+use the workflow from the table above with `@refs/heads/master`.
+
+## In an air-gapped environment
+
+Verification needs Sigstore's trusted root and the attestations, both of which
+can be carried across with the image.
+
+<Steps>
+  <Step title="Export the trusted root">
+    On a machine with internet access:
+
+    ```bash
+    gh attestation trusted-root > trusted_root.jsonl
+    ```
+  </Step>
+  <Step title="Copy the image with its attestations">
+    `oras cp -r` copies the image together with the attestations that refer
+    to it:
+
+    ```bash
+    oras cp -r cubejs/cube:vX.Y.Z registry.internal.example.com/cubejs/cube:vX.Y.Z
+    ```
+  </Step>
+  <Step title="Verify from your registry">
+    ```bash
+    gh attestation verify oci://registry.internal.example.com/cubejs/cube:vX.Y.Z \
+      --repo cube-js/cube \
+      --signer-workflow cube-js/cube/.github/workflows/publish.yml \
+      --source-ref refs/tags/vX.Y.Z \
+      --bundle-from-oci \
+      --custom-trusted-root trusted_root.jsonl
+    ```
+  </Step>
+</Steps>
+
+Refresh `trusted_root.jsonl` periodically: Sigstore rotates its keys and
+certificate authorities.
+
+[link-gh-attestations]: https://docs.github.com/en/actions/concepts/security/artifact-attestations
+[link-slsa]: https://slsa.dev/spec/v1.0/provenance
+[link-spdx]: https://spdx.github.io/spdx-spec/v2.3/
+[link-sigstore]: https://www.sigstore.dev
+[link-rekor]: https://search.sigstore.dev
+[link-gh-cli]: https://cli.github.com
+[link-cosign]: https://github.com/sigstore/cosign
+[link-dockerhub-cube]: https://hub.docker.com/r/cubejs/cube/tags
+[link-dockerhub-cubestore]: https://hub.docker.com/r/cubejs/cubestore/tags

@@ -434,6 +434,10 @@ jobs:
             target: x86_64-unknown-linux-gnu
             platforms: linux/amd64,linux/arm64
     timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
@@ -489,6 +493,7 @@ jobs:
           cp yarn.lock .yarnrc.yml packages/cubejs-docker
           mkdir -p packages/cubejs-docker/.yarn && cp -R .yarn/releases packages/cubejs-docker/.yarn/
       - name: Push to Docker Hub
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: ./packages/cubejs-docker
@@ -507,6 +512,29 @@ jobs:
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
+      - name: Attest image
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cube
+          ref: "@${{ steps.build.outputs.digest }}"
+      - name: Attest image (linux/amd64)
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cube
+          ref: "@${{ steps.build.outputs.digest }}"
+          platform: linux/amd64
+      - name: Attest image (linux/arm64)
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cube
+          ref: "@${{ steps.build.outputs.digest }}"
+          platform: linux/arm64
 
   docker-debian-jdk:
     needs: [npm-wait, cubestore_linux, native_linux, detect_branch]
@@ -515,6 +543,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
@@ -572,6 +602,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Push to Docker Hub
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: ./packages/cubejs-docker
@@ -590,6 +621,13 @@ jobs:
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
+      - name: Attest image
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cube
+          ref: "@${{ steps.build.outputs.digest }}"
 
   docker-cubestore-prepare:
     name: Cube Store Docker (prepare)
@@ -701,6 +739,10 @@ jobs:
             postfix: "-non-avx"
             tag: "non-avx"
     timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
@@ -740,6 +782,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Push to Docker Hub
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: ./rust/
@@ -759,12 +802,23 @@ jobs:
             org.opencontainers.image.created=${{ needs.docker-cubestore-prepare.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
+      - name: Attest image
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cubestore
+          ref: "@${{ steps.build.outputs.digest }}"
 
   docker-cubestore-manifest:
     name: Cube Store Docker (multi-arch manifest)
     runs-on: ubuntu-24.04
     needs: [docker-cubestore-prepare, docker-cubestore, detect_branch]
     timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
       matrix:
         # -arm64v8 tags used to be a separate arm64-only image, keep publishing
@@ -822,6 +876,34 @@ jobs:
           docker buildx imagetools create $(printf -- '-t %s ' ${TAGS//,/ }) $(printf "${IMAGE}@sha256:%s " *)
       - name: Inspect image
         run: docker buildx imagetools inspect ${{ steps.prep.outputs.image }}:${{ needs.docker-cubestore-prepare.outputs.version }}${{ matrix.postfix }}
+      # The -arm64v8 leg tags the same index, so attest it once.
+      # Three bounded attest steps must fit in this job's 15-minute budget.
+      - name: Attest image
+        if: matrix.postfix == ''
+        continue-on-error: true
+        timeout-minutes: 4
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cubestore
+          ref: ":${{ needs.docker-cubestore-prepare.outputs.version }}"
+      - name: Attest image (linux/amd64)
+        if: matrix.postfix == ''
+        continue-on-error: true
+        timeout-minutes: 4
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cubestore
+          ref: ":${{ needs.docker-cubestore-prepare.outputs.version }}"
+          platform: linux/amd64
+      - name: Attest image (linux/arm64)
+        if: matrix.postfix == ''
+        continue-on-error: true
+        timeout-minutes: 4
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cubestore
+          ref: ":${{ needs.docker-cubestore-prepare.outputs.version }}"
+          platform: linux/arm64
       - name: Update repo description
         if: matrix.postfix == ''
         uses: peter-evans/dockerhub-description@v5

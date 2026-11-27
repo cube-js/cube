@@ -92,6 +92,10 @@ jobs:
     needs: [latest-tag-sha, build_native_linux]
     runs-on: ubuntu-24.04
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - name: Check out the repo
         uses: actions/checkout@v7
@@ -120,6 +124,14 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: cubejs/cube:dev
+      # No buildx builder here, so the build's digest output is not the registry digest; resolve the tag.
+      - name: Attest image
+        continue-on-error: true
+        timeout-minutes: 10
+        uses: ./.github/actions/attest-image
+        with:
+          image: docker.io/cubejs/cube
+          ref: ":dev"
       - name: Update repo description
         uses: peter-evans/dockerhub-description@v5
         with:
