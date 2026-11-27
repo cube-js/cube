@@ -20,6 +20,36 @@ describe('CubeStoreHandler', () => {
     }
   });
 
+  // https://github.com/cube-js/cube/issues/9073: readiness is detected from an INFO-level log line,
+  // so Cube Store never "starts" with a documented lower verbosity.
+  it('acquire with CUBESTORE_LOG_LEVEL=error', async () => {
+    const prev = process.env.CUBESTORE_LOG_LEVEL;
+    process.env.CUBESTORE_LOG_LEVEL = 'error';
+
+    try {
+      const handler = new CubeStoreHandlerOpen({
+        stdout: (v) => {
+          console.log(v.toString());
+        },
+        stderr: (v) => {
+          console.log(v.toString());
+        },
+        onRestart: () => {
+          throw new Error('Process should not restart, while we are testing it!');
+        },
+      });
+
+      await handler.acquire();
+      await handler.release(true);
+    } finally {
+      if (prev === undefined) {
+        delete process.env.CUBESTORE_LOG_LEVEL;
+      } else {
+        process.env.CUBESTORE_LOG_LEVEL = prev;
+      }
+    }
+  });
+
   it('acquire with release', async () => {
     const handler = new CubeStoreHandlerOpen({
       stdout: (v) => {

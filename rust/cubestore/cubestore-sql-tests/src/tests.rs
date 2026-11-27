@@ -165,6 +165,10 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             partitioned_index_if_not_exists,
         ),
         t("drop_partitioned_index", drop_partitioned_index),
+        t(
+            "drop_table_quoted_identifiers",
+            drop_table_quoted_identifiers,
+        ),
         t("planning_simple", planning_simple),
         t("planning_joins", planning_joins),
         t("planning_3_table_joins", planning_3_table_joins),
@@ -435,6 +439,7 @@ lazy_static::lazy_static! {
         "hyperloglog_inserts",
         "partitioned_index_if_not_exists",
         "drop_partitioned_index",
+        "drop_table_quoted_identifiers",
         "dump",
         "panic_worker",
 
@@ -3753,6 +3758,24 @@ async fn partitioned_index_if_not_exists(service: Box<dyn SqlClient>) -> Result<
     service
         .exec_query("CREATE PARTITIONED INDEX IF NOT EXISTS s.other_ind(id int, url text)")
         .await?;
+    Ok(())
+}
+
+// https://github.com/cube-js/cube/issues/11212: DROP TABLE / DROP SCHEMA keep the quote characters
+// of quoted identifiers, so the metastore lookup by name fails.
+async fn drop_table_quoted_identifiers(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA `Foo`").await?;
+    service
+        .exec_query("CREATE TABLE `Foo`.`Bar` (a int)")
+        .await?;
+    service.exec_query("CREATE TABLE Foo.Baz (a int)").await?;
+    service.exec_query("DROP TABLE `Foo`.`Bar`").await?;
+    service.exec_query("DROP TABLE \"Foo\".\"Baz\"").await?;
+    let r = service
+        .exec_query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'Foo'")
+        .await?;
+    assert!(r.get_rows().is_empty());
+    service.exec_query("DROP SCHEMA `Foo`").await?;
     Ok(())
 }
 
