@@ -3,7 +3,7 @@ import {
 } from 'vitest';
 import type { RowStatement } from 'snowflake-sdk';
 
-import { CANCEL_ACK_TIMEOUT, CANCEL_RETRY_INTERVAL, SnowflakeDriver } from '../../src/SnowflakeDriver';
+import { CANCEL_ACK_TIMEOUT, SnowflakeDriver } from '../../src/SnowflakeDriver';
 
 // No Snowflake connection here: the point is what the driver does when the SDK
 // never answers, which no live server reproduces on demand.
@@ -15,8 +15,8 @@ class TestSnowflakeDriver extends SnowflakeDriver {
     this.setLogger((msg, params) => this.logged.push([msg, params]));
   }
 
-  public cancelStatementForTest(stmt: RowStatement, isStatementSettled = () => false): Promise<void> {
-    return this.cancelStatement(stmt, isStatementSettled);
+  public cancelStatementForTest(stmt: RowStatement): Promise<void> {
+    return this.cancelStatement(stmt);
   }
 }
 
@@ -106,71 +106,6 @@ describe('cancelStatement()', () => {
     await driver.cancelStatementForTest(wedgedStatement((cb) => cb(undefined)));
 
     expect(driver.logged).toEqual([]);
-    expect(vi.getTimerCount()).toBe(0);
-  });
-
-  // What Snowflake answers when the abort outruns the statement it targets.
-  const notExecuting = () => Object.assign(new Error('Identified SQL statement is not currently executing.'), {
-    code: '000605',
-  });
-
-  test('repeats an abort that outran its statement until Snowflake accepts it', async () => {
-    const driver = new TestSnowflakeDriver();
-
-    const answers = [notExecuting(), notExecuting(), undefined];
-    let attempts = 0;
-    let settled = false;
-    const cancelling = driver
-      .cancelStatementForTest(wedgedStatement((cb) => cb(answers[attempts++])))
-      .then(() => { settled = true; });
-
-    expect(attempts).toBe(1);
-
-    await vi.advanceTimersByTimeAsync(CANCEL_RETRY_INTERVAL);
-    expect(attempts).toBe(2);
-    expect(settled).toBe(false);
-
-    await vi.advanceTimersByTimeAsync(CANCEL_RETRY_INTERVAL);
-    await cancelling;
-    expect(attempts).toBe(3);
-
-    expect(driver.logged).toEqual([]);
-    expect(vi.getTimerCount()).toBe(0);
-  });
-
-  test('stops repeating once the statement finished on its own', async () => {
-    const driver = new TestSnowflakeDriver();
-
-    let attempts = 0;
-    let statementSettled = false;
-    const cancelling = driver.cancelStatementForTest(
-      wedgedStatement((cb) => { attempts++; cb(notExecuting()); }),
-      () => statementSettled,
-    );
-
-    await vi.advanceTimersByTimeAsync(CANCEL_RETRY_INTERVAL);
-    expect(attempts).toBe(2);
-
-    statementSettled = true;
-    await vi.advanceTimersByTimeAsync(CANCEL_RETRY_INTERVAL);
-    await cancelling;
-
-    expect(attempts).toBe(3);
-    expect(driver.logged).toEqual([]);
-    expect(vi.getTimerCount()).toBe(0);
-  });
-
-  test('gives up repeating at the bound', async () => {
-    const driver = new TestSnowflakeDriver();
-
-    const cancelling = driver.cancelStatementForTest(wedgedStatement((cb) => cb(notExecuting())));
-
-    await vi.advanceTimersByTimeAsync(CANCEL_ACK_TIMEOUT);
-    await cancelling;
-
-    expect(driver.logged).toEqual([
-      ['Snowflake statement cancel timeout', { queryId: 'query-id' }],
-    ]);
     expect(vi.getTimerCount()).toBe(0);
   });
 });

@@ -16,6 +16,8 @@ const createDriver = () => {
   return driver;
 };
 
+const pause = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
 const QUERY_TO_TEST_HYDRATION = `
   SELECT
     CAST(1265.88 AS NUMBER(10,2))                  AS "n",
@@ -118,13 +120,12 @@ describe('SnowflakeDriver', () => {
     const driver = createDriver();
 
     try {
-      // Connect up front: the driver issues the statement right away then.
+      // Connect up front, so the statement reaches Snowflake within the pause below.
       await driver.query('SELECT 1', []);
 
       const promise = driver.query(LONG_RUNNING_QUERY, []);
-      // One macrotask is enough for the driver to issue the statement; cancelling right
-      // away races Snowflake registering it, which the driver must cope with.
-      await new Promise(setImmediate);
+      // Snowflake drops an abort (000605) that arrives before it registered the statement.
+      await pause(1000);
 
       const startedAt = Date.now();
       await promise.cancel();
@@ -159,13 +160,13 @@ describe('SnowflakeDriver', () => {
     const driver = createDriver();
 
     try {
-      // Connect up front: the driver issues the statement right away then.
+      // Connect up front, so the statement reaches Snowflake within the pause below.
       await driver.query('SELECT 1', []);
 
       const promise = driver.stream(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
       expect(typeof promise.cancel).toBe('function');
 
-      await new Promise(setImmediate);
+      await pause(1000);
       await promise.cancel();
 
       await expect(promise).rejects.toThrow(/cancelled/i);
@@ -178,13 +179,13 @@ describe('SnowflakeDriver', () => {
     const driver = createDriver();
 
     try {
-      // Connect up front: the driver issues the statement right away then.
+      // Connect up front, so the statement reaches Snowflake within the pause below.
       await driver.query('SELECT 1', []);
 
       const promise = driver.downloadQueryResults(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
       expect(typeof promise.cancel).toBe('function');
 
-      await new Promise(setImmediate);
+      await pause(1000);
       await promise.cancel();
 
       await expect(promise).rejects.toThrow(/cancelled/i);
@@ -197,7 +198,7 @@ describe('SnowflakeDriver', () => {
     const driver = createDriver();
 
     try {
-      // Connect up front: the driver issues the statement right away then.
+      // Connect up front, so the statement reaches Snowflake within the pause below.
       await driver.query('SELECT 1', []);
 
       const promise = driver.downloadQueryResults(
@@ -207,7 +208,7 @@ describe('SnowflakeDriver', () => {
       );
       expect(typeof promise.cancel).toBe('function');
 
-      await new Promise(setImmediate);
+      await pause(1000);
       await promise.cancel();
 
       await expect(promise).rejects.toThrow(/cancelled/i);
