@@ -1,0 +1,60 @@
+# GH #11574: a row_level filter on the optional (joined) side of a LEFT JOIN
+# must restrict which rows of that cube are visible, not drop rows of the
+# main cube that have no match.
+cubes:
+  - name: rls_join_orders
+    sql: >
+      SELECT 'o1' AS id, 'CA' AS region
+      UNION ALL
+      SELECT 'o2' AS id, 'CA' AS region
+
+    joins:
+      - name: rls_join_shipments
+        sql: "{CUBE}.id = {rls_join_shipments}.order_id"
+        relationship: one_to_one
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+        public: true
+
+    access_policy:
+      - group: "*"
+        member_level:
+          includes: "*"
+        row_level:
+          allow_all: true
+
+  - name: rls_join_shipments
+    sql: >
+      SELECT 'o1' AS order_id, 'CA' AS region, 'ups' AS carrier
+
+    dimensions:
+      - name: order_id
+        sql: order_id
+        type: string
+        primary_key: true
+
+      - name: region
+        sql: region
+        type: string
+
+      - name: carrier
+        sql: carrier
+        type: string
+
+    access_policy:
+      - group: "*"
+        member_level:
+          includes: "*"
+        row_level:
+          filters:
+            - member: region
+              operator: equals
+              values: ["{ securityContext.auth.userAttributes.region }"]
