@@ -8,6 +8,10 @@ import { SnowflakeDriver } from '../../src/SnowflakeDriver';
 class TestSnowflakeDriver extends SnowflakeDriver {
   public statements: StatementOption[] = [];
 
+  public override prepareConnectOptions() {
+    return super.prepareConnectOptions();
+  }
+
   protected override async getConnection(): Promise<Connection> {
     return <Connection>(<unknown>{
       execute: (options: StatementOption) => {
@@ -90,5 +94,49 @@ describe('QUERY_TAG from requestId', () => {
     await driver.query('SELECT 1', [], { requestId: REQUEST_ID });
 
     expect(driver.statements[0].parameters).toBeUndefined();
+    expect(await driver.prepareConnectOptions()).toMatchObject({ queryTag: 'static-tag' });
+  });
+
+  test('merges an object queryTag with the request UUID', async () => {
+    const driver = new TestSnowflakeDriver({ queryTag: { app: 'cube', workload_id: 7 } });
+
+    await driver.query('SELECT 1', [], { requestId: REQUEST_ID });
+
+    expect(JSON.parse(driver.statements[0].parameters!.QUERY_TAG)).toEqual({
+      app: 'cube',
+      workload_id: 7,
+      requestId: REQUEST_UUID,
+    });
+  });
+
+  test('sends an object queryTag as is without a requestId', async () => {
+    const driver = new TestSnowflakeDriver({ queryTag: { app: 'cube' } });
+
+    await driver.query('SELECT 1', []);
+
+    expect(driver.statements[0].parameters).toEqual({ QUERY_TAG: '{"app":"cube"}' });
+  });
+
+  test('keeps a requestId defined by an object queryTag', async () => {
+    const driver = new TestSnowflakeDriver({ queryTag: { app: 'cube', requestId: 'mine' } });
+
+    await driver.query('SELECT 1', [], { requestId: REQUEST_ID });
+
+    expect(JSON.parse(driver.statements[0].parameters!.QUERY_TAG)).toEqual({
+      app: 'cube',
+      requestId: 'mine',
+    });
+  });
+
+  test('keeps an object queryTag out of the connection options', async () => {
+    const driver = new TestSnowflakeDriver({ queryTag: { app: 'cube' } });
+
+    expect(await driver.prepareConnectOptions()).not.toHaveProperty('queryTag');
+  });
+
+  test('rejects an object queryTag that cannot fit together with a request id', () => {
+    expect(() => new TestSnowflakeDriver({ queryTag: { app: 'x'.repeat(1900) } })).toThrow(
+      /queryTag is too long/
+    );
   });
 });

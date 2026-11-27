@@ -9,6 +9,7 @@ import {
   getEnv,
   CancelablePromise,
   extractRequestUUID,
+  REQUEST_ID_MAX_LENGTH,
 } from '@cubejs-backend/shared';
 import snowflake, { Column, Connection, DataType, RowStatement, StatementOption } from 'snowflake-sdk';
 import {
@@ -35,6 +36,9 @@ import { hydrators } from './type-parsers';
 import { ConnectionError } from './errors';
 
 const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
+
+// Snowflake rejects a longer QUERY_TAG.
+const QUERY_TAG_MAX_LENGTH = 2000;
 export const CANCEL_ACK_TIMEOUT = 30 * 1000;
 
 const FETCH_AS_STRING: DataType[] = [
@@ -125,7 +129,11 @@ export interface SnowflakeDriverOptions {
   identIgnoreCase?: boolean,
   application: string,
   readOnly?: boolean,
-  queryTag?: string,
+  /**
+   * A string is a static tag for the whole connection. An object is sent as JSON
+   * with the Cube request id merged in under `requestId`.
+   */
+  queryTag?: string | Record<string, unknown>,
 
   /**
    * The export bucket CSV file escape symbol.
@@ -257,6 +265,16 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       application: 'CubeDev_Cube',
       ...config
     };
+
+    const { queryTag } = this.config;
+    if (queryTag && typeof queryTag !== 'string') {
+      const longest = JSON.stringify({ requestId: 'x'.repeat(REQUEST_ID_MAX_LENGTH), ...queryTag });
+      if (longest.length > QUERY_TAG_MAX_LENGTH) {
+        throw new Error(
+          `Snowflake queryTag is too long: with the request id it must fit into ${QUERY_TAG_MAX_LENGTH} characters as JSON.`
+        );
+      }
+    }
   }
 
   /**
@@ -405,7 +423,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return token.trim();
   }
 
-  private async prepareConnectOptions(): Promise<snowflake.ConnectionOptions> {
+  protected async prepareConnectOptions(): Promise<snowflake.ConnectionOptions> {
     const config: Record<string, any> = {
       account: this.config.account,
       region: this.config.region,
@@ -419,7 +437,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       resultPrefetch: this.config.resultPrefetch,
     };
 
-    if (this.config.queryTag) {
+    // An object tag is sent per statement: a connection level tag would overwrite it in the SDK.
+    if (typeof this.config.queryTag === 'string' && this.config.queryTag) {
       config.queryTag = this.config.queryTag;
     }
 
@@ -1048,10 +1067,21 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
   /**
    * Tags the statement with the Cube request id, so it can be traced in Snowflake `QUERY_HISTORY`.
-   * A configured `queryTag` wins: the SDK overwrites the statement `QUERY_TAG` with it anyway.
+   * A string `queryTag` wins: the SDK overwrites the statement `QUERY_TAG` with it anyway.
+   * An object `queryTag` is merged with the request id, its own `requestId` key taking priority.
    */
   protected statementParameters(requestId?: string): StatementOption['parameters'] {
-    if (!requestId || this.config.queryTag) {
+    const { queryTag } = this.config;
+
+    if (queryTag && typeof queryTag !== 'string') {
+      return {
+        QUERY_TAG: JSON.stringify(
+          requestId ? { requestId: extractRequestUUID(requestId), ...queryTag } : queryTag
+        ),
+      };
+    }
+
+    if (!requestId || queryTag) {
       return undefined;
     }
 
