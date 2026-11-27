@@ -114,9 +114,12 @@ describe('SnowflakeDriver', () => {
     const driver = createDriver();
 
     try {
+      // Connect up front, so the long-running statement reaches Snowflake within the short pause below.
+      await driver.query('SELECT 1', []);
+
       const promise = driver.query(LONG_RUNNING_QUERY, []);
       // Let the statement actually reach Snowflake before aborting it.
-      await pause(5000);
+      await pause(1000);
 
       const startedAt = Date.now();
       await promise.cancel();
@@ -151,10 +154,13 @@ describe('SnowflakeDriver', () => {
     const driver = createDriver();
 
     try {
+      // Connect up front, so the long-running statement reaches Snowflake within the short pause below.
+      await driver.query('SELECT 1', []);
+
       const promise = driver.stream(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
       expect(typeof promise.cancel).toBe('function');
 
-      await pause(5000);
+      await pause(1000);
       await promise.cancel();
 
       await expect(promise).rejects.toThrow(/cancelled/i);
@@ -167,10 +173,13 @@ describe('SnowflakeDriver', () => {
     const driver = createDriver();
 
     try {
+      // Connect up front, so the long-running statement reaches Snowflake within the short pause below.
+      await driver.query('SELECT 1', []);
+
       const promise = driver.downloadQueryResults(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
       expect(typeof promise.cancel).toBe('function');
 
-      await pause(5000);
+      await pause(1000);
       await promise.cancel();
 
       await expect(promise).rejects.toThrow(/cancelled/i);
@@ -183,6 +192,9 @@ describe('SnowflakeDriver', () => {
     const driver = createDriver();
 
     try {
+      // Connect up front, so the long-running statement reaches Snowflake within the short pause below.
+      await driver.query('SELECT 1', []);
+
       const promise = driver.downloadQueryResults(
         LONG_RUNNING_QUERY,
         [],
@@ -190,7 +202,7 @@ describe('SnowflakeDriver', () => {
       );
       expect(typeof promise.cancel).toBe('function');
 
-      await pause(5000);
+      await pause(1000);
       await promise.cancel();
 
       await expect(promise).rejects.toThrow(/cancelled/i);
