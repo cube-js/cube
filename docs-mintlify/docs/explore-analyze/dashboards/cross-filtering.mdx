@@ -3,7 +3,7 @@ title: Cross-filtering
 description: Let viewers click a chart's data to filter the other charts on a published dashboard.
 ---
 
-With cross-filtering on, a viewer of a published dashboard can click a bar, a slice, a point, a map region or a table cell and filter every other chart on the dashboard by it; bar, funnel, pie and donut charts [highlight](#highlighting) the selection instead. The chart they clicked isn't filtered: it dims the data outside the selection instead.
+With cross-filtering on, a viewer of a published dashboard can click a bar, a slice, a point, a map region or a table cell and filter every other chart on the dashboard by it; bar, funnel, pie and donut charts [highlight](#highlighting) the selection instead. The chart they clicked isn't filtered: it dims the data outside the selection.
 
 <iframe
   width="100%"
@@ -34,7 +34,7 @@ Every other chart that can take the filter re-runs its query with it. A bar, fun
 
 A plain click on another value of the same chart opens the menu again, and **Filter dashboard by this point** there replaces the chart's selection with that value.
 
-Bar, line, area, scatter, pie and composite charts, maps and tables can start a cross-filter. Heatmaps, box plots, funnels, KPIs, Sankey charts and HTML charts can't, but the other charts' cross-filters filter them like any other chart. Over the bars, lines, areas, points and slices of a chart that can start one, the pointer turns into a hand.
+Bar, line, area, scatter, pie and composite charts, maps and tables can start a cross-filter. Heatmaps, box plots, funnels, KPIs, Sankey charts and HTML charts can't, but they still take the other charts' cross-filters. Over the bars, lines, areas, points and slices of a chart that can start one, the pointer turns into a hand.
 
 ### Highlighting
 
