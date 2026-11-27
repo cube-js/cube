@@ -136,6 +136,7 @@ views:
         prefix: true
         includes:
           - city
+          - secret
 `;
 
 describe('CompilerApi row level security through join aliases', () => {
@@ -225,6 +226,29 @@ describe('CompilerApi row level security through join aliases', () => {
     expect(dataSource).toBe('default');
     expect(sql[0]).toContain('"orders__customer".city = $');
   });
+
+  test('exposes a hidden member through a view of an alias and retains the instance row filter', async () => {
+    const { query, denied } = await applyRls({
+      measures: ['orders_view.count'],
+      dimensions: ['orders_view.customer_secret'],
+    });
+    expect(denied).toBe(false);
+    expect(JSON.stringify(query.filters)).toContain('"member":"orders.customer.city","operator":"equals","values":["Berlin"]');
+    const { sql } = await compilerApi.getSql(query as any);
+    expect(sql[0]).toContain('"orders__customer".city = $');
+    expect(sql[0]).toContain('"orders__customer".secret');
+    expect(sql[1]).toEqual(['Berlin']);
+  });
+
+  test.each(['orders.customer.secret', 'orders.manager.secret'])(
+    'does not grant direct access to %s through a view of the customer alias', async (member) => {
+      const { denied } = await applyRls({
+        measures: ['orders_view.count'],
+        dimensions: ['orders_view.customer_secret', member],
+      });
+      expect(denied).toBe(true);
+    }
+  );
 
   test('constrains an instance reached through an alias inside another instance', async () => {
     const { query } = await applyRls({
