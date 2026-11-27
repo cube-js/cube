@@ -389,18 +389,31 @@ error. Options that `driver_factory` doesn't return, such as the account,
 warehouse and role, come from the environment variables. Set
 `CUBEJS_DB_SNOWFLAKE_ROLE` to the **Role** of the OAuth app: Snowflake
 rejects the connection when the role differs from the one in the token.
+In `context_to_orchestrator_id`, read `issuedAt` from the same app's
+credentials, here `userCredentials.snowflake`, so that a new token gets a
+new driver.
 
 ```python cube.py
-# "snowflake" is the Name of the OAuth app
-if snowflake_creds.get("status") == "active":
-    return {
-        "type": "snowflake",
-        "authenticator": "OAUTH",
-        "oauthToken": snowflake_creds["accessToken"],
-    }
+@config("driver_factory")
+def driver_factory(ctx: dict) -> dict:
+    # "snowflake" is the Name of the OAuth app
+    snowflake_creds = (
+        ctx
+        .get("securityContext", {})
+        .get("cubeCloud", {})
+        .get("userCredentials", {})
+        .get("snowflake", {})
+    )
 
-# Fall back to the service account
-return {"type": "snowflake"}
+    if snowflake_creds.get("status") == "active":
+        return {
+            "type": "snowflake",
+            "authenticator": "OAUTH",
+            "oauthToken": snowflake_creds["accessToken"],
+        }
+
+    # Fall back to the service account
+    return {"type": "snowflake"}
 ```
 
 ## How it works
