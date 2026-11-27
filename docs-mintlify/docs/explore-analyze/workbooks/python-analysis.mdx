@@ -129,8 +129,8 @@ restores the starter template.
   after the last run. Run to refresh the saved result."*
 - **Run** executes the stored script in the sandbox and persists the refreshed
   result.
-- On a workbook report, the input SQL can use the workbook's SQL parameters
-  (`:name` placeholders). **Run** fills each one with the value set on the report,
+- On a workbook report, the input SQL can use the workbook's [SQL
+  parameters](/docs/explore-analyze/workbooks/sql-parameters) (`:name` placeholders). **Run** fills each one with the value set on the report,
   or with the parameter's default if the report doesn't set one, and passes the
   filled SQL to the sandbox. Changing the value of a parameter that the input SQL
   uses counts as a change to the input SQL, so it marks the result **Outdated**.
