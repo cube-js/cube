@@ -25,7 +25,7 @@ or an agent, use the [API or the CLI](#reading-query-history-programmatically).
 <br/>
 <video width="100%" controls>
   <source
-    src="https://ucarecdn.com/ceba0bdc-298b-44e6-8491-2b0e39985465/video.mp4"
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/ceba0bdc.mp4"
     type="video/mp4"
   />
 </video>
@@ -39,13 +39,13 @@ You can navigate throughout the query history by using the date picker in the
 top right corner of the page and selecting a time period:
 
 <Frame>
-  <img src="https://ucarecdn.com/393dfa47-033d-421b-87ce-fcf5617ac1c8/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/393dfa47.png" />
 </Frame>
 
 To go back to live mode, click **▶**:
 
 <Frame>
-  <img src="https://ucarecdn.com/393dfa47-033d-421b-87ce-fcf5617ac1c8/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/393dfa47.png" />
 </Frame>
 
 ## Exploring queries
@@ -55,7 +55,7 @@ You can switch between [queries made to the API](#inspecting-api-queries) and
 switching between the **API** and **Database** tabs.
 
 <Frame>
-  <img src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/951a2a64.png" />
 </Frame>
 
 ### All queries and top queries
@@ -64,7 +64,7 @@ Clicking **All queries** will show all queries in order of recency,
 while **Top queries** will show the queries with the largest total duration (hits * avg duration) in the selected time frame. Both results are limited to 100 unique queries. 
 
 <Frame>
-  <img src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/951a2a64.png" />
 </Frame>
 
 ### Filtering
@@ -93,7 +93,7 @@ The **Source** filter shows the product that sent the query:
 The request details page also shows the source of the query.
 
 <Frame>
-  <img src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/951a2a64.png" />
 </Frame>
 
 ## Inspecting API queries
@@ -103,7 +103,7 @@ To see an expanded view of a query, click on the&nbsp;**❯** button
 to the left of any query.
 
 <Frame>
-  <img src="https://ucarecdn.com/fe755749-9eff-4b58-b7b0-c79de2510499/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/fe755749.png" />
 </Frame>
 
 Check the columns to see the details:
@@ -125,7 +125,7 @@ The **Query** tab shows the raw JSON query sent to the Cube Cloud
 deployment.
 
 <Frame>
-  <img src="https://ucarecdn.com/3c0490be-757d-46cd-ba2d-d7c93a7acf4e/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/3c0490be.png" />
 </Frame>
 
 ### Errors
@@ -134,7 +134,7 @@ If the query failed, the **Errors** tab will show you the error message
 and stacktrace:
 
 <Frame>
-  <img src="https://ucarecdn.com/858633a0-4ee3-4dec-adb6-1d91ca30919f/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/858633a0.png" />
 </Frame>
 
 ### SQL
@@ -144,14 +144,14 @@ data source **or** Cube Store if the query was accelerated with a
 pre-aggregation:
 
 <Frame>
-  <img src="https://ucarecdn.com/537f7269-654d-479c-a0cc-abc2941f9b5a/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/537f7269.png" />
 </Frame>
 
 You can also run the SQL query directly against your data source using the [SQL
 Runner][ref-workspace-sqlrunner] by clicking **▶️**:
 
 <Frame>
-  <img src="https://ucarecdn.com/537f7269-654d-479c-a0cc-abc2941f9b5a/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/537f7269.png" />
 </Frame>
 
 ### Pre-aggregations
@@ -161,14 +161,14 @@ The **Pre-Aggregations** tab shows the
 was used:
 
 <Frame>
-  <img src="https://ucarecdn.com/e0a8d722-d43a-4d6f-8d3c-dbdd3173638e/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/e0a8d722.png" />
 </Frame>
 
 If no pre-aggregations were used for this query, you should see the following
 screen:
 
 <Frame>
-  <img src="https://ucarecdn.com/b5cadb89-fbda-404a-806c-da99dc046845/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/b5cadb89.png" />
 </Frame>
 
 Clicking **Accelerate** allows you to add a pre-aggregation to
@@ -180,7 +180,7 @@ The **Security context** tab shows the [security context][ref-security-context]
 that was used to process this query:
 
 <Frame>
-  <img src="https://ucarecdn.com/4ea5f5b6-f5a0-4d62-93f9-b9adfe5a2a07/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/4ea5f5b6.png" />
 </Frame>
 
 This is helpful in case [multitenancy][ref-multitenancy] is configured.
@@ -192,7 +192,7 @@ processing the query. This may include other queries that were being processed
 or were waiting in the queue by Cube Cloud at the same time as this query:
 
 <Frame>
-  <img src="https://ucarecdn.com/dbac27fa-5722-415f-9374-11682b4159d7/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/dbac27fa.png" />
 </Frame>
 
 A large number of queries in the queue may indicate that your deployment is
@@ -206,7 +206,7 @@ extremely useful for diagnosing where time is being spent in a query, and can
 help identify bottlenecks in your Cube deployment or data source.
 
 <Frame>
-  <img src="https://ucarecdn.com/56188be4-0614-48e1-97c8-6d8d89639849/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/56188be4.png" />
 </Frame>
 
 ## Inspecting database queries
@@ -217,7 +217,7 @@ For Database requests, the **Query** tab shows the SQL query compiled by
 Cube that is executed on the data source:
 
 <Frame>
-  <img src="https://ucarecdn.com/5a5779f6-b484-49bc-9269-6e145b89f5eb/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/5a5779f6.png" />
 </Frame>
 
 This can be useful for debugging queries that are failing or taking a long time,
@@ -229,7 +229,7 @@ If the query failed, the **Errors** tab will show you the error message
 and stacktrace:
 
 <Frame>
-  <img src="https://ucarecdn.com/efd45e3a-8b44-4ee9-9f9e-284f0fd8eb96/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/efd45e3a.png" />
 </Frame>
 
 Errors here generally indicate a problem with querying the data source. The
@@ -242,7 +242,7 @@ The **Events** tab shows all data source-related events that occurred
 while the query is in the query execution queue:
 
 <Frame>
-  <img src="https://ucarecdn.com/24eb11a1-4312-4d06-ac1b-6a0575c7dbe6/" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/24eb11a1.png" />
 </Frame>
 
 ## Reading Query History programmatically

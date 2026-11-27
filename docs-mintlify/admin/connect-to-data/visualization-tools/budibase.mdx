@@ -42,14 +42,14 @@ won't expire soon.
 Create a new "REST API" data source in Budibase.
 
 <Frame>
-  <img src="https://ucarecdn.com/381542a0-3d74-4ad6-9f3a-599be5d369f4/" />
+  <img src="https://static.cube.dev/docs/admin/connect-to-data/visualization-tools/budibase/381542a0.png" />
 </Frame>
 
 Next, add a "Authorization" header for the REST (JSON) API. Copy and paste Cube's
 Authorization token.
 
 <Frame>
-  <img src="https://ucarecdn.com/30f74134-1fd4-4d0c-af63-81f6e6aaebb5/" />
+  <img src="https://static.cube.dev/docs/admin/connect-to-data/visualization-tools/budibase/30f74134.png" />
 </Frame>
 
 ### Add a query
@@ -60,7 +60,7 @@ Copy and paste the Cube REST (JSON) API, including the `/load` path, in the API 
 Make sure to select "POST" as the request.
 
 <Frame>
-  <img src="https://ucarecdn.com/55fbd232-9eb4-4b5b-a15b-611da4381e7f/" />
+  <img src="https://static.cube.dev/docs/admin/connect-to-data/visualization-tools/budibase/55fbd232.png" />
 </Frame>
 
 Get your Cube query in the JSON
@@ -71,7 +71,7 @@ Paste the JSON query in the **Body** as "raw(JSON)". Make sure to add a `query`
 parameter for your JSON query.
 
 <Frame>
-  <img src="https://ucarecdn.com/5d937df8-6b5f-4b45-ac20-6abcbbb5449a/" />
+  <img src="https://static.cube.dev/docs/admin/connect-to-data/visualization-tools/budibase/5d937df8.png" />
 </Frame>
 
 Edit the **Transform** to return the data of the request.
@@ -81,7 +81,7 @@ return data.data;
 ```
 
 <Frame>
-  <img src="https://ucarecdn.com/cda3e40a-ee99-4243-8a67-54e80d749270/" />
+  <img src="https://static.cube.dev/docs/admin/connect-to-data/visualization-tools/budibase/cda3e40a.png" />
 </Frame>
 
 You can also give the query a name. In this sample it's called `OrdersByMonth`.
@@ -97,7 +97,7 @@ First, add a Data Provider. Select the query from above. In this sample it's
 called `OrdersByMonth`.
 
 <Frame>
-  <img src="https://ucarecdn.com/a882ca72-0b75-4a2a-87a0-8a8c0036dc96/" />
+  <img src="https://static.cube.dev/docs/admin/connect-to-data/visualization-tools/budibase/a882ca72.png" />
 </Frame>
 
 ### Display the data
@@ -109,11 +109,11 @@ Then, you set the "label column" and "data columns". In this sample you can set
 `Orders.createdAt` as the label column and `Orders.count` as the data columns.
 
 <Frame>
-  <img src="https://ucarecdn.com/2f0ef897-13eb-4dc2-8869-e847618df4d9/" />
+  <img src="https://static.cube.dev/docs/admin/connect-to-data/visualization-tools/budibase/2f0ef897.png" />
 </Frame>
 
 You'll see a nicely rendered chart show up.
 
 <Frame>
-  <img src="https://ucarecdn.com/ee32dd7c-65ad-43cd-982c-1f3e5e50d057/" />
+  <img src="https://static.cube.dev/docs/admin/connect-to-data/visualization-tools/budibase/ee32dd7c.png" />
 </Frame>
