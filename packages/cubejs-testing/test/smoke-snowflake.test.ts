@@ -29,6 +29,7 @@ describe('snowflake', () => {
       },
       {
         schemaDir: 'snowflake/schema',
+        cubejsConfig: 'snowflake/cube.js',
       }
     );
     client = cubejs(async () => DEFAULT_API_TOKEN, {
