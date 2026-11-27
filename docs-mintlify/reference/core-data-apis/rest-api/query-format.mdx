@@ -35,7 +35,7 @@ A Query has the following properties:
 return the total number of rows as if no row limit or offset are set in the query.
 The default value is `false`.
 - `offset`: The number of initial rows to be skipped for your query. The default
-  value is `0`.
+  value is `0`, the maximum `4294967295`.
 - `order`: An object, where the keys are measures or dimensions to order by and
   their corresponding values are either `asc` or `desc`. For [time dimensions][ref-default-granularities],
   a granularity can be optionally provided, e.g., `orders.created_at.month`.

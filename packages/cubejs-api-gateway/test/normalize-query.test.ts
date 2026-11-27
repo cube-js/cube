@@ -341,3 +341,20 @@ describe('member paths through joins', () => {
     ]);
   });
 });
+
+describe('limit and offset bounds', () => {
+  test.each(['limit', 'offset'])('rejects a %s beyond u32 as a user error', (key) => {
+    // Why: the result transform reads both as u32.
+    expect(() => normalizeQuery({ ...baseQuery, [key]: 4294967296 }, true))
+      .toThrow(expect.objectContaining({ status: 400, message: expect.stringMatching(/Invalid query format/) }));
+  });
+
+  test('accepts an offset at the u32 maximum', () => {
+    expect(normalizeQuery({ ...baseQuery, offset: 4294967295 }, false).offset).toBe(4294967295);
+  });
+
+  test('rejects a limit over the query limit as a user error', () => {
+    expect(() => normalizeQuery({ ...baseQuery, limit: 50001 }, false))
+      .toThrow(expect.objectContaining({ status: 400, message: expect.stringMatching(/query limit has been exceeded/) }));
+  });
+});
