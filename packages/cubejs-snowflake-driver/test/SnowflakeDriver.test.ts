@@ -3,7 +3,7 @@ import { streamToArray } from '@cubejs-backend/shared';
 
 import { SnowflakeDriver } from '../src';
 
-const LONG_RUNNING_QUERY = 'SELECT SYSTEM$WAIT(120)';
+const LONG_RUNNING_QUERY = 'SELECT SYSTEM$WAIT(30)';
 
 // Labels the statements in Snowflake QUERY_HISTORY, so test load can be told apart in usage stats.
 const createDriver = () => new SnowflakeDriver({
@@ -125,8 +125,8 @@ describe('SnowflakeDriver', () => {
       await promise.cancel();
       await expect(promise).rejects.toThrow(/cancelled/i);
 
-      // The query would otherwise hold the warehouse for 120s.
-      expect(Date.now() - startedAt).toBeLessThan(30 * 1000);
+      // The query would otherwise hold the warehouse for 30s.
+      expect(Date.now() - startedAt).toBeLessThan(10 * 1000);
 
       // Cancelling one statement must not poison the shared connection.
       expect(await driver.query('SELECT 1 AS "one"', [])).toHaveLength(1);
