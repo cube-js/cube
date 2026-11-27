@@ -261,7 +261,7 @@ export class ServerContainer {
     });
 
     // CUBEJS_DEV_MODE also gates the SQL API's default port and its password check,
-    // neither of which `cubejs dev-server` turned on before, so it asks for dev mode
+    // neither of which `cubejs-server dev-server` turned on before, so it asks for dev mode
     // through CreateOptions.devServer instead. Read after dotenv, so a .env value wins
     const devServer = this.configuration.devMode && process.env.CUBEJS_DEV_MODE === undefined
       ? true

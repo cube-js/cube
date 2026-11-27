@@ -68,14 +68,14 @@ describe('ServerContainer dev mode resolution', () => {
     });
   });
 
-  test('`cubejs dev-server` asks for dev mode through CreateOptions.devServer', async () => {
+  test('`cubejs-server dev-server` asks for dev mode through CreateOptions.devServer', async () => {
     const config = await lookupConfiguration(true);
 
     expect(config.devServer).toBe(true);
     expect(process.env.NODE_ENV).toEqual('development');
   });
 
-  test('`cubejs dev-server` does not write CUBEJS_DEV_MODE', async () => {
+  test('`cubejs-server dev-server` does not write CUBEJS_DEV_MODE', async () => {
     await lookupConfiguration(true);
 
     // The variable also gates the SQL API's default port and its password check, so
@@ -84,7 +84,7 @@ describe('ServerContainer dev mode resolution', () => {
     expect(getEnv('devMode')).toBe(false);
   });
 
-  test('`cubejs dev-server` leaves every SQL API port source alone', async () => {
+  test('`cubejs-server dev-server` leaves every SQL API port source alone', async () => {
     await lookupConfiguration(true);
 
     // Nothing configured: no SQL API, because `pgSqlPort` keys off CUBEJS_DEV_MODE
@@ -142,7 +142,7 @@ describe('ServerContainer dev mode resolution', () => {
   });
 
   // CubejsServerCore pins it, from the config that wins rather than the command's request
-  test('`cubejs dev-server` does not pin the pre-aggregation schema itself', async () => {
+  test('`cubejs-server dev-server` does not pin the pre-aggregation schema itself', async () => {
     await lookupConfiguration(true);
 
     expect(process.env.CUBEJS_PRE_AGGREGATIONS_SCHEMA).toBeUndefined();
@@ -221,7 +221,7 @@ describe('ServerContainer dev mode resolution', () => {
     try {
       process.chdir(projectDir);
 
-      // `cubejs dev-server` with dev mode explicitly off: nothing writes NODE_ENV here,
+      // `cubejs-server dev-server` with dev mode explicitly off: nothing writes NODE_ENV here,
       // so the cube.js assignment below is the only one, and it is not this run's to undo
       process.env.CUBEJS_DEV_MODE = 'false';
       container.stubConfigurationFile({});
@@ -324,7 +324,7 @@ describe('ServerContainer dev mode resolution', () => {
     }
   });
 
-  test('`cubejs server` asks for nothing', async () => {
+  test('`cubejs-server` asks for nothing', async () => {
     const config = await lookupConfiguration();
 
     expect(config.devServer).toBeUndefined();

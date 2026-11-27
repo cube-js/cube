@@ -99,18 +99,17 @@ Cube is written in a mixture of JavaScript, TypeScript, and Rust. TypeScript and
 7. Run `yarn install` in `packages/cubejs-<pkg>` to install dependencies for drivers and dependent packages.
 8. Run `yarn link @cubejs-backend/<pkg>` in `packages/cubejs-server-core` to link drivers and dependent packages.
 9. Run `yarn link` in `packages/cubejs-server-core`.
-10. Create or choose an existing project for testing. You can generate a new one with 
-    [cubejs-cli](https://docs.cube.dev/cube-core/getting-started/create-a-project) tool.
+10. Create or choose an existing project for testing. See
+    [Create a project](https://docs.cube.dev/cube-core/getting-started/create-a-project).
 11. Run `yarn link @cubejs-backend/server-core` in your project directory. 
 12. Run `yarn dev` to start your testing project and verify changes.
 
 Instead of running all of the above commands manually you can use the `dev-env.sh` script:
 
 1. Clone the Cube repository, `git clone https://github.com/cube-js/cube`.
-2. Navigate to your working projects directory and run `/path/to/cube/repo//dev-env.sh setup`. The script will
-   ask you some questions and run all the required commands. In case you decide to create a new testing project,
-   it will be created in the current directory (that is why you probably don't want to run this script within 
-   cube repo directory).
+2. Navigate to the directory that contains your testing project and run
+   `/path/to/cube/repo/dev-env.sh setup <project-dir>`. The script installs dependencies, builds the packages
+   and links them into the project.
 
 ### Debugging with WebStorm
 

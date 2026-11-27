@@ -51,7 +51,6 @@ COPY packages/cubejs-backend-cloud/package.json packages/cubejs-backend-cloud/pa
 COPY packages/cubejs-api-gateway/package.json packages/cubejs-api-gateway/package.json
 COPY packages/cubejs-athena-driver/package.json packages/cubejs-athena-driver/package.json
 COPY packages/cubejs-bigquery-driver/package.json packages/cubejs-bigquery-driver/package.json
-COPY packages/cubejs-cli/package.json packages/cubejs-cli/package.json
 COPY packages/cubejs-clickhouse-driver/package.json packages/cubejs-clickhouse-driver/package.json
 COPY packages/cubejs-crate-driver/package.json packages/cubejs-crate-driver/package.json
 COPY packages/cubejs-dremio-driver/package.json packages/cubejs-dremio-driver/package.json
@@ -129,7 +128,6 @@ COPY packages/cubejs-backend-cloud/ packages/cubejs-backend-cloud/
 COPY packages/cubejs-api-gateway/ packages/cubejs-api-gateway/
 COPY packages/cubejs-athena-driver/ packages/cubejs-athena-driver/
 COPY packages/cubejs-bigquery-driver/ packages/cubejs-bigquery-driver/
-COPY packages/cubejs-cli/ packages/cubejs-cli/
 COPY packages/cubejs-clickhouse-driver/ packages/cubejs-clickhouse-driver/
 COPY packages/cubejs-crate-driver/ packages/cubejs-crate-driver/
 COPY packages/cubejs-dremio-driver/ packages/cubejs-dremio-driver/
@@ -190,8 +188,6 @@ RUN apt-get update \
 COPY --from=build /cubejs .
 COPY --from=prod_dependencies /cubejs .
 
-COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
-
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH=/cube/conf/node_modules:/cube/node_modules
 ENV PYTHONUNBUFFERED=1
@@ -199,9 +195,10 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
 RUN ln -s  /cubejs/rust/cubestore/bin/cubestore-dev /usr/local/bin/cubestore-dev
+RUN ln -s  /cubejs/packages/cubejs-server/bin/server /usr/local/bin/cubejs-server
 
 WORKDIR /cube/conf
 
 EXPOSE 4000
 
-CMD ["cubejs", "server"]
+CMD ["cubejs-server"]

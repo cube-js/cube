@@ -159,10 +159,6 @@ rust:
     - '**/*.toml'
     - rust/**/*
 
-backend:cli:
-- changed-files:
-  - any-glob-to-any-file: packages/cubejs-cli/**/*
-
 # Dependencies
 dependencies:
 - changed-files:

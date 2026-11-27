@@ -35,8 +35,7 @@
     "@cubejs-backend/snowflake-driver": "1.8.35",
     "@cubejs-backend/sqlite-driver": "1.8.35",
     "@cubejs-backend/trino-driver": "1.8.35",
-    "@cubejs-backend/vertica-driver": "1.8.35",
-    "cubejs-cli": "1.8.35"
+    "@cubejs-backend/vertica-driver": "1.8.35"
   },
   "resolutions": {
     "colors": "1.4.0",

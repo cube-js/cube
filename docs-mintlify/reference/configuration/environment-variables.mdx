@@ -14,8 +14,7 @@ please check the relevant page on [Connecting to Data Sources][ref-config-db].
 
 ## `CUBEJS_API_SECRET`
 
-The secret key used to sign and verify JWTs. Generated on project scaffold with
-`npx cubejs-cli create`.
+The secret key used to sign and verify JWTs.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -171,17 +170,6 @@ option](/reference/configuration/config#cache_and_queue_driver).
 Whether to attach a `trace_id` SQL comment, carrying the identifier of the API
 request, to queries sent to data sources. See [Query
 tracing](/admin/connect-to-data/query-tracing).
-
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `false`                | `false`               |
-
-## `CUBEJS_CLI_NO_DEPRECATION_WARNING`
-
-If `true` or `1`, the `cubejs` CLI does not print its deprecation warning. The `cubejs`
-CLI (the `cubejs-cli` npm package) is deprecated in favor of the
-[Cube CLI][ref-cli]. It prints the warning to stderr when it runs the `auth` or
-`deploy` command, with no command, or with `--help` or `-h`.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -1312,7 +1300,7 @@ option](/reference/configuration/config#context_to_api_scopes).
 ## `CUBEJS_DEV_MODE`
 
 If `true`, enables [development mode](/docs/data-modeling/dev-mode). Otherwise
-development mode is off, and `NODE_ENV` is ignored — except that the `cubejs dev-server`
+development mode is off, and `NODE_ENV` is ignored — except that the `cubejs-server dev-server`
 command and the `cubejs-dev-server` bin turn it on for themselves when this variable is
 unset, and code that embeds `@cubejs-backend/server-core` directly can do the same with
 the `devServer` option it passes to `CubejsServerCore`. Setting this variable to `false`
@@ -3059,5 +3047,4 @@ The port for a Cube deployment to listen to API connections on.
 [nodejs-docs-tls-options]: https://nodejs.org/docs/latest/api/tls.html#tls_tls_createsecurecontext_options
 [ref-sls]: /docs/integrations/semantic-layer-sync
 [ref-multi-stage]: /docs/data-modeling/measures#multi-stage-measures
-[ref-cli]: /reference/cli
 [ref-preagg-union-source]: /reference/data-modeling/pre-aggregations#union_with_source_data

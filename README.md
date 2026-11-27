@@ -60,7 +60,7 @@ Then open http://localhost:4000 in your browser to continue setup.
 > machine for ease of use and debugging. Never expose it to the internet or use it in
 > production. Using development mode in the Cube cloud platform is highly discouraged,
 > as it bypasses the platform's security model. Cube is also in development mode
-> whenever `NODE_ENV` is not `production`, but `cubejs server` and the official images
+> whenever `NODE_ENV` is not `production`, but `cubejs-server` and the official images
 > already set it to `production`. See
 > [`CUBEJS_DEV_MODE`](https://docs.cube.dev/reference/configuration/environment-variables#cubejs_dev_mode).
 
