@@ -63,6 +63,10 @@ const MSSqlToGenericType: Record<string, string> = {
  * MS SQL driver class.
  */
 export class MSSqlDriver extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'mssql';
+  }
+
   private readonly pool: ConnectionPool;
 
   private readonly initialConnectPromise: Promise<ConnectionPool>;

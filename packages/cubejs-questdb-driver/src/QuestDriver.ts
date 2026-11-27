@@ -40,6 +40,10 @@ export type QuestDriverConfiguration = Partial<PoolConfig> & {
  */
 export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverConfiguration>
   extends BaseDriver implements DriverInterface {
+  public dbType(): string {
+    return 'questdb';
+  }
+
   private readonly pool: Pool;
 
   private readonly config: Partial<Config>;
