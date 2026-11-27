@@ -67,16 +67,16 @@ To compare against a static number like a quarterly goal, add a calculated field
 
 ### Sparkline
 
-Renders a compact trend chart — either a bar or line — within the KPI tile. Use this to show the trend behind the headline number.
+Renders a compact trend chart — either a bar or line — within the KPI tile. Use this to show the trend behind a value.
 
-Above the chart, the block shows its headline value: a row of the series measure, or of another measure you pick with the headline settings below. A block with no headline set shows the latest value of the series measure.
+Above the chart, the block shows a headline value. By default, it's the series measure from the first row of the query result. Turn off **Headline uses sparkline measure** and pick a **Headline column** to show a different measure. If you turn it off and leave **Headline column** empty, the headline shows the last point of the trend.
 
 | Setting | Description |
 |---|---|
 | **Series measure** | The measure to plot |
 | **Headline uses sparkline measure** | Shows the series measure in the headline. Turn it off to pick a different measure |
 | **Headline column** | The measure the headline shows when **Headline uses sparkline measure** is off |
-| **Headline row** | The row of the headline measure to show: first or second |
+| **Headline row** | Which row of the query result the headline reads: 1st or 2nd, in the order the query returns rows |
 | **Show value** | Shows or hides the headline value |
 | **Series dimension** | The dimension to use as the X axis (typically a time dimension) |
 | **Chart type** | Bar or line |
