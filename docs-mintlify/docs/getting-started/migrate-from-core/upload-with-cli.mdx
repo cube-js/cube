@@ -1,30 +1,16 @@
 ---
 title: Import a local project to Cube Cloud with CLI
-description: This guide walks you through setting up Cube Cloud, importing an existing Cube project from a local machine via SSH, and connecting to your database.
+description: This guide walks you through creating a Cube deployment, connecting it to your database, and uploading an existing Cube project from your local machine with the Cube CLI.
 ---
 
-<iframe
-  width="100%"
-  height="400"
-  src="https://www.loom.com/embed/8ad76276b9d74e8283b7c319a22e4411"
-  title="Loom video"
-  frameBorder="0"
-  allowFullScreen
-/>
+## Step 1: Create a deployment
 
-## Step 1: Create Deployment
-
-Click **Create deployment**. Then give it a name and select the cloud
+Click **Create deployment**. Then give it a name and select the cloud
 provider and region of your choice.
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Cloud Create Deployment Screen"
-    src="https://cube.dev/downloads/images/cube-cloud-quickstart-1.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/create-deployment.png" alt="Create deployment step of the deployment wizard with the name, cloud platform and region" />
+</Frame>
 
 <Info>
 
@@ -33,12 +19,61 @@ Microsoft Azure is available on [Enterprise plan](https://cube.dev/pricing).
 
 </Info>
 
-## Step 2: Upload your Cube project
+## Step 2: Set up a Cube project
 
-The next step is to upload your existing Cube project to the Cube Cloud.
+Click **Create**. You'll replace the new project with your own one in Step 5.
 
-Use the [Cube CLI][ref-cli] to do it. Run the following commands from your
-Cube project directory:
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/set-up-cube-project.png" alt="Set up Cube project step with the Create, Import from a GitHub repository and Import Git repository via SSH / HTTP options" />
+</Frame>
+
+## Step 3: Connect your database
+
+Select your database and enter its credentials. Check the [connecting to
+databases][ref-cloud-connecting-to-databases] guide for more details.
+
+<Info>
+
+Want to use a sample database instead? We also have a sample database where you
+can try out Cube:
+
+<br />
+
+| Field    | Value              |
+| -------- | ------------------ |
+| Host     | `demo-db.cube.dev` |
+| Port     | `5432`             |
+| Database | `ecom`             |
+| Username | `cube`             |
+| Password | `12345`            |
+
+</Info>
+
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/postgres-connection.png" alt="PostgreSQL connection form filled in with the sample database credentials" />
+</Frame>
+
+Click **Apply**. You'll upload your own data model in Step 5, so on the next step
+click **Skip & deploy** instead of selecting tables. On the onboarding screen
+that follows, click **Skip** and confirm.
+
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/select-tables.png" alt="Select tables for AI generation step with the Skip & deploy and Generate buttons" />
+</Frame>
+
+## Step 4: Switch the deployment to CLI deploys
+
+Go to **Settings → Build & deploy**, select **Deploy with CLI**, and click
+**Apply**.
+
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/build-deploy-cli.png" alt="Deploy with section of the Build & deploy page with Deploy with CLI selected" />
+</Frame>
+
+## Step 5: Upload your Cube project
+
+Use the [Cube CLI][ref-cli] to upload your project. Run the following commands
+from your Cube project directory:
 
 ```bash
 cube login --url https://TENANT.cubecloud.dev
@@ -53,59 +88,16 @@ token: `npx cubejs-cli deploy --token <TOKEN>`. Use `cube deploy` instead.
 
 </Note>
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Cloud Upload Project Screen"
-    src="https://static.cube.dev/docs/shared/8cbf3ce0.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+## Step 6: Try out Cube
 
-## Step 3: Connect your Database
+The **Status** page shows the build and the deployment's resources:
 
-Enter your credentials to connect to your database. Check the [connecting to
-databases][ref-cloud-connecting-to-databases] guide for more details.
-
-<Info>
-
-Want to use a sample database instead? We also have a sample database where you
-can try out Cube Cloud:
-
-<br />
-
-| Field    | Value              |
-| -------- | ------------------ |
-| Host     | `demo-db.cube.dev` |
-| Port     | `5432`             |
-| Database | `ecom`             |
-| Username | `cube`             |
-| Password | `12345`            |
-
-</Info>
-
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Cloud Setup Database Screen"
-    src="https://cube.dev/downloads/images/cube-cloud-quickstart-3.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
-
-## Step 4: Try out Cube Cloud
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/status-page.png" alt="Status page of a new deployment with its integrations, resources and activity log" />
+</Frame>
 
 Now you can navigate to [the Playground][ref-cloud-playground] to try out your
-queries or connect your application to Cube Cloud API.
-
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Cloud Playground"
-    src="https://static.cube.dev/docs/shared/43bc545a.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+queries or connect your application to the Cube API.
 
 [ref-cloud-connecting-to-databases]: /admin/connect-to-data/data-sources
 [ref-cloud-playground]: /docs/explore-analyze/playground

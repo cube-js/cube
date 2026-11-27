@@ -1356,6 +1356,26 @@
   },
   "redirects": [
     {
+      "source": "/cube-core/migrate-from-core/import-github-repository",
+      "destination": "/docs/getting-started/migrate-from-core/import-github-repository"
+    },
+    {
+      "source": "/cube-core/migrate-from-core/import-git-repository-via-ssh",
+      "destination": "/docs/getting-started/migrate-from-core/import-git-repository-via-ssh"
+    },
+    {
+      "source": "/cube-core/migrate-from-core/import-bitbucket-repository-via-ssh",
+      "destination": "/docs/getting-started/migrate-from-core/import-bitbucket-repository-via-ssh"
+    },
+    {
+      "source": "/cube-core/migrate-from-core/import-gitlab-repository-via-ssh",
+      "destination": "/docs/getting-started/migrate-from-core/import-gitlab-repository-via-ssh"
+    },
+    {
+      "source": "/cube-core/migrate-from-core/upload-with-cli",
+      "destination": "/docs/getting-started/migrate-from-core/upload-with-cli"
+    },
+    {
       "source": "/docs/explore-analyze/dashboards/widgets/ai-summary",
       "destination": "/docs/explore-analyze/dashboards/widgets/analysis"
     },

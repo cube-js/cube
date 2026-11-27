@@ -56,14 +56,15 @@ When setting up a new deployment, select the SSL checkbox when entering database
 credentials:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/recipes/configuration/using-ssl-connections-to-data-source/a3edc952.png" alt="Cube Cloud Database Connection Screen for Postgres" />
+  <img src="https://static.cube.dev/docs/recipes/configuration/using-ssl-connections-to-data-source/postgres-ssl-connection.png" alt="PostgreSQL connection form in the deployment wizard with the SSL checkbox selected" />
 </Frame>
 
 To use custom SSL certificates between Cube Cloud and your database server, go
-to the **Configuration** tab in the **Settings** screen:
+to **Settings → Environment variables** and add them in the **Data source
+configuration** section:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/recipes/configuration/using-ssl-connections-to-data-source/1fd4354c.png" alt="Cube Cloud Database Connection Screen" />
+  <img src="https://static.cube.dev/docs/recipes/configuration/using-ssl-connections-to-data-source/data-source-ssl-env-vars.png" alt="Data source configuration section of the Environment variables page with CUBEJS_DB_SSL_CA, CUBEJS_DB_SSL_CERT and CUBEJS_DB_SSL_KEY added" />
 </Frame>
 
 Add the following environment variables:
