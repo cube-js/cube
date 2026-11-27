@@ -15,7 +15,12 @@ The table visualization presents query results in a structured grid. Unlike the 
   allowFullScreen
 />
 
-{/* TODO screenshot: styled table with pivot and conditional formatting (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/table-overview.png"
+    alt="Table pivoted by order status, with a two-tier traffic-light conditional format on the counts and a totals row and column"
+  />
+</Frame>
 
 ## Showing and hiding columns
 
@@ -43,7 +48,12 @@ the columns. The **Pivot** section holds:
 - A **Measures** placeholder that decides where the measure names go. Drag it to **Columns** to run
   them across the top, or to **Rows** to run them down the side.
 
-{/* TODO screenshot: table with pivot active — dimension values as column headers (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/pivot.png"
+    alt="Table with order status values as column headers, beside the Fields tab's Pivot section with Status and Measures in Columns, State in Rows and Count in Values"
+  />
+</Frame>
 
 Pivot behavior:
 - Pivot columns can be sorted by clicking the column header, including the totals column.
@@ -88,8 +98,8 @@ dimension's value is shown once for the whole group instead of repeated on every
   allowFullScreen
 />
 
-Turn it on with the **Group rows** toggle in the **Values** section of the **Style**
-tab. The toggle is disabled — with a tooltip explaining why — unless the table has at
+Turn it on with the **Group rows** toggle, the first button of the **Row grouping**
+section of the **Style** tab. The toggle is disabled — with a tooltip explaining why — unless the table has at
 least two row dimensions and no column pivot. You can also ask [Analytics
 Chat](/docs/explore-analyze/analytics-chat) to group the table's rows.
 
@@ -111,9 +121,9 @@ getting a header with a single row under it.
 - Which dimensions add rows depends on the data, so a refresh or a filter change can
   add or remove group levels.
 
-Turning it on also adds a **Row grouping** section to the **Style** tab, with:
+The rest of the **Row grouping** section applies while grouping is on:
 
-- **Expand all groups** / **Collapse all groups** — set every group's expand state at once.
+- **Expand** / **Collapse** — set every group's expand state at once.
 - **Subtotals** (Σ) — show an aggregated value for every measure on each group header row.
   See [Per-group subtotals](#per-group-subtotals).
 - Text color, background color, and text formatting for the group header rows.
@@ -124,7 +134,12 @@ open or closed. It only sets the default — a viewer's own expand/collapse of a
 individual group isn't affected by changing it afterwards. A dimension that stays on the
 row has no **Default state** control until the data makes it a group level.
 
-{/* TODO screenshot: table with collapsed row groups and the Style tab's Row grouping section */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/row-grouping.png"
+    alt="Table with rows grouped by state, one group expanded and the rest collapsed with subtotals, beside the Style tab's Row grouping section"
+  />
+</Frame>
 
 ### Per-group subtotals
 
@@ -197,7 +212,12 @@ You can mix the two: give a label column a fixed width and let the metric column
 
   </Note>
 
-{/* TODO: screenshot — a column card in the Columns section showing the Flex/Fix width control and the Fit button */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/column-width.png"
+    alt="Column card in the Style tab's Columns section, with the Flex/Fix width control set to Flex ×2 and the Fit button"
+  />
+</Frame>
 
 ### Bulk controls
 
@@ -246,7 +266,12 @@ A frozen column doesn't share the table's width by [weight](#column-width); to c
 width, switch it to **Fix**. If the frozen columns leave no room to scroll in a narrow tile, the
 table shows them unfrozen until the tile is wide enough again.
 
-{/* TODO: screenshot — a scrolled table with two frozen columns and the pressed pins on their cards */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/frozen-columns.png"
+    alt="Table scrolled horizontally with two frozen columns, and the pressed pins on their cards in the Columns section"
+  />
+</Frame>
 
 ## Showing columns as links, bars, sparklines, or images
 
@@ -262,8 +287,8 @@ By default, a column displays its value. It can also be drawn as an inline link,
   allowFullScreen
 />
 
-Each card has a **Value** toggle, a **Bars** / **Sparkline** pair, and separate **Link**
-and **Image** buttons:
+Each card has a **Value** toggle and, where they apply to the column, a **Bars** /
+**Sparkline** pair and separate **Link** and **Image** buttons:
 
 - **Value** shows the formatted value in the cell. It **composes** with a bar or a sparkline rather than excluding it — a cell can show a bar and its value together.
 - **Bars** and **Sparkline** are mutually exclusive: picking one replaces the other, and clicking the active one again clears it.
@@ -271,7 +296,12 @@ and **Image** buttons:
 - With nothing active, **Value** is forced on and its toggle disabled — so a plain column always shows its value.
 - Each button is offered only where it applies: bars and sparklines on **numeric** columns, **Link** only on a column whose dimension declares links or uses `format: link` (see [Inline links](#inline-links)), and **Image** where the dimension declares `format: imageUrl` or the column's values are image URLs (see [Images](#images)). In link mode the value *is* the link text, so **Value** stays forced on there too; image mode draws the thumbnail instead of the value, so **Value** is forced off and its toggle disabled. With **Link** and **Image** both on, image wins: the thumbnail replaces the link text and becomes the click target. Only bars and sparklines leave the toggle free, because only they draw something the value can sit beside.
 
-{/* TODO: screenshot — a column card showing the Value toggle beside the Bars / Sparkline / Link / Image buttons */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/column-display-buttons.png"
+    alt="Numeric column card in the Columns section with the Value toggle beside the Bars and Sparkline buttons, Bars selected"
+  />
+</Frame>
 
 ### Inline links
 
@@ -291,7 +321,12 @@ which of the declared links renders inline (inert when the dimension declares on
 Clicking the link text opens it; clicking elsewhere in the cell selects it and opens the
 cell menu as usual.
 
-{/* TODO: screenshot — a table with an inline link column and the Style tab's Link button selected */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/inline-links.png"
+    alt="Table with the Data source column rendered as inline links, and its column card with the Link button selected and the link picker"
+  />
+</Frame>
 
 ### Inline bars
 
@@ -317,7 +352,12 @@ Display a numeric column as a proportional in-cell bar by selecting the **Bars**
 
 When a column contains both positive and negative values, bars are drawn in both directions from a centered zero baseline — positive values to the right, negative to the left — using the positive and negative bar colors. Values outside the scale are clamped to a full or empty bar, but the displayed number is always the true value.
 
-{/* TODO screenshot: table with inline bar column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/inline-bars.png"
+    alt="Table with inline bars in the Revenue column, values shown beside the bars, and the column card's bar options"
+  />
+</Frame>
 
 ### Sparklines
 
@@ -366,7 +406,12 @@ Internally, sparklines are powered by additional queries grouped by time dimensi
 
 </Note>
 
-{/* TODO screenshot: table with a sparkline column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/sparklines.png"
+    alt="Table with a quarterly revenue sparkline in each row next to the value, and the column card's Sparkline settings"
+  />
+</Frame>
 
 ### Images
 
@@ -405,7 +450,12 @@ rendered inline and need no network access.
 
 </Info>
 
-{/* TODO screenshot: table with an image column and the Style tab's image controls */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/images.png"
+    alt="Table with data source logos rendered as image thumbnails, and the Logo column card with the Image button and the shape, fit and height controls"
+  />
+</Frame>
 
 ## Cell menu
 
@@ -489,7 +539,7 @@ panel, not just the table visualization.
 
 ## Style options
 
-The **Style** tab controls the visual appearance of the table. It is organized into sections — **Headers**, **Values**, **Totals**, **Columns**, **Borders**, and **Pagination** — each with its own **Reset** button in the section header that appears once you've changed anything in that section.
+The **Style** tab controls the visual appearance of the table. It is organized into sections — **Headers**, **Values**, **Row grouping**, **Totals**, **Borders**, **Pagination**, and **Columns** — each with its own **Reset** button in the section header that appears once you've changed anything in that section.
 
 ### Headers, Values, and Totals formatting
 
@@ -527,11 +577,11 @@ The **Borders** section of the **Style** tab controls which table borders are dr
 
 | Border | Description | Default |
 |---|---|---|
-| **Horizontal borders** | Lines between value rows | On |
-| **Vertical borders** | Lines between columns, running through the header, values, and totals | Off |
-| **Header border** | The line under the header row | On |
-| **Totals border** | The line above the totals row | On |
-| **Outer border** | The frame around the whole table | Off |
+| **Horizontal** | Lines between value rows | On |
+| **Vertical** | Lines between columns, running through the header, values, and totals | Off |
+| **Header** | The line under the header row | On |
+| **Totals** | The line above the totals row | On |
+| **Outer** | The frame around the whole table | Off |
 
 Each border is a row in the section: click the **icon button** to toggle the border on or off, and use the **color** swatch and **width** input next to it to style it. Color and width are only available while the border is on. When you don't pick a color, the border uses the theme's default border color, which adapts to light and dark mode automatically.
 
@@ -539,7 +589,12 @@ Next to the first border's width input is a **link** toggle that syncs all width
 
 Because every border has its own color and width, styles like a financial report — a thick line under the header, above the totals, and around the table, with thin lines between value rows — are a few clicks away. Or one: see presets below.
 
-{/* TODO screenshot: Borders section with the accounting preset applied (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/borders-accounting.png"
+    alt="Table with the Accounting border preset, beside the Style tab's Borders section with thick header, totals and outer borders and thin row lines"
+  />
+</Frame>
 
 #### Border presets
 
@@ -624,7 +679,12 @@ Each rule's **Format** control sets how far its styling reaches:
 
 Under a column pivot, a row spans several values of the same measure (one per pivot combination), so a row-spanning rule (**Entire row** or **Select columns**) styles each measure cell by its own combination's value. Cells with no single value to test — row headers, row dimensions, and any rule whose source dimension has been pivoted into columns — are left unstyled.
 
-{/* TODO screenshot: conditional formatting panel with a condition configured (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/conditional-formatting.png"
+    alt="Formatting tab with a conditional rule on the order count: greater than 500 gets green text, a green background and an arrow-up icon"
+  />
+</Frame>
 
 ### Rule presets
 
@@ -689,10 +749,10 @@ To add one quickly, open the [preset menu](#rule-presets) and pick from **Color 
 
 A color scale requires a **numeric source column**. For non-numeric columns (strings, dates, booleans), the **Scale** type is disabled — use conditional formatting instead.
 
-Configure the gradient with three stops, laid out top-to-bottom to mirror the column:
+Configure the gradient with up to three stops, laid out top-to-bottom to mirror the column. The **Color scale** swatch opens a popover with the stop colors, **More stops** / **Fewer stops** to add or remove the center stop, and **Reverse**:
 
 - **Start** (low end) — anchored at the column **Minimum** by default, or a custom **Number** or **Percentile**.
-- **Center** (optional middle) — **Disabled** by default, which produces a two-color gradient. Enable it for a three-color gradient anchored at the **Midpoint**, **Average**, **Median**, or a custom **Number** / **Percentile**.
+- **Center** (optional middle) — off by default, which produces a two-color gradient. Add it with **More stops** for a three-color gradient anchored at the **Midpoint**, **Average**, **Median**, or a custom **Number** / **Percentile**.
 - **End** (high end) — anchored at the column **Maximum** by default, or a custom **Number** or **Percentile**.
 
 Each stop has its own color. The anchor determines *which value* in the column the stop's color is pinned to:
@@ -706,11 +766,16 @@ Each stop has its own color. The anchor determines *which value* in the column t
 
 For the computed anchors (Minimum, Maximum, Midpoint, Average, Median), the dropdown previews the resolved value from your data.
 
-Use **Reverse color scale** to swap the Start and End colors. **Treat nulls as zero** is on by default, coloring null/blank cells as zero; turn it off to leave them uncolored.
+Use **Reverse** in the **Color scale** popover to swap the Start and End colors. **Treat nulls as zero** is on by default, coloring null/blank cells as zero; turn it off to leave them uncolored.
 
 The scale is normalized **per column** — each targeted column uses its own value range, taken from the column's data cells only. With [totals](#totals) enabled, the row totals and [pivot subtotal](#subtotals) columns are still colored by the scale of the measure they aggregate, but they don't widen its range: a total past the column's highest stop is clamped to that stop's color. Cells in the column totals row are never colored by a scale, since totals rows don't take formatting rules.
 
-{/* TODO screenshot: table with a color scale applied to a numeric column (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/table/color-scale.png"
+    alt="Table with an Outstanding values color scale on the Orders column, beside the Formatting tab's Scale rule with Start and End anchors"
+  />
+</Frame>
 
 ## Totals
 
