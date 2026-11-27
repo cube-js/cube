@@ -1213,6 +1213,7 @@ export class CubeEvaluator extends CubeSymbols {
           errorReporter.error(`Member '${cube.name}.${memberName}' references foreign cubes: ${foreignCubes.join(', ')}. Please split and move this definition to corresponding cubes.`);
         }
       }
+      this.checkMeasureFilterReferences(member, cube, memberName, errorReporter);
 
       if (ownedByCube && cube.isView) {
         errorReporter.error(`View '${cube.name}' defines own member '${cube.name}.${memberName}'. Please move this member definition to one of the cubes.`);
@@ -1251,6 +1252,25 @@ export class CubeEvaluator extends CubeSymbols {
         }
       }
     }
+  }
+
+  // A measure's `filters` are otherwise evaluated only when the measure is queried:
+  // resolve their references here so a stale one fails compile, as it does in `sql`.
+  protected checkMeasureFilterReferences(member: any, cube: any, memberName: string, errorReporter: ErrorReporter) {
+    if (!Array.isArray(member.filters)) {
+      return;
+    }
+    member.filters.forEach((filter: any, index: number) => {
+      if (typeof filter?.sql !== 'function') {
+        return;
+      }
+
+      try {
+        this.collectUsedCubeReferences(cube.name, filter.sql);
+      } catch (e: any) {
+        errorReporter.error(`Member '${cube.name}.${memberName}' filter ${index + 1}: ${e.message || e}`);
+      }
+    });
   }
 
   public cubesByFileName(fileName: string): CubeDefinitionExtended[] {
