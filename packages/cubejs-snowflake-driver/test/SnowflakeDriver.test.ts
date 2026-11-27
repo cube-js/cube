@@ -5,10 +5,16 @@ import { SnowflakeDriver } from '../src';
 
 const LONG_RUNNING_QUERY = 'SELECT SYSTEM$WAIT(30)';
 
-// Labels the statements in Snowflake QUERY_HISTORY, so test load can be told apart in usage stats.
-const createDriver = () => new SnowflakeDriver({
-  queryTag: { tenant: 'cube-ci-oss', deployment: 'snowflake-driver' },
-});
+const createDriver = () => {
+  // Labels the statements in Snowflake QUERY_HISTORY, so test load can be told apart in usage stats.
+  const driver = new SnowflakeDriver({
+    queryTag: { tenant: 'cube-ci-oss', deployment: 'snowflake-driver' },
+  });
+  // Cancel failures (e.g. Snowflake dropping an abort) are only logged, never thrown.
+  driver.setLogger((msg, params) => console.warn(msg, params));
+
+  return driver;
+};
 
 const QUERY_TO_TEST_HYDRATION = `
   SELECT
