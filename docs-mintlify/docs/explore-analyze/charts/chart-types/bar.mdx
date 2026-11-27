@@ -55,6 +55,23 @@ Assign one series to the right Y axis and set its mark type to **Line** in [seri
 
 {/* Screenshot: composite bar+line chart with dual Y axes — order count (bars, left axis) and average order value (line, right axis). Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
 
+### Histogram
+
+A histogram shows how the values of a number dimension are spread. Cube builds it from [bins][ref-bins] and a bar chart:
+
+1. Add a measure that counts rows, such as `Count`, and the number dimension to the query.
+2. Open the number dimension's menu and choose **Create bins…**. Choose **Bin count** or **Bin size**. The range is prefilled from the dimension's minimum and maximum. Choose **Create**.
+3. Remove the original number dimension from the query, so that the results have one row per bin.
+4. On the **Chart** tab, choose **Bar**.
+
+The bars follow the bin order. The first and last bins are open-ended, for example `Under 29` and `79 or more`. Sorting the results by the measure reorders the bars by height, so leave the sort on the bins field or clear it.
+
+A bin with no rows has no bar. To show it as a zero-height bar, choose **Fill in missing rows** on the bins column in the results. This also adds a bar for the `Unknown` bin, which holds empty values.
+
+To split each bar by a category, add that dimension to the query and set it as the measure's **Break down by** field on the **Fields** tab. The bars then stack.
+
+{/* Screenshot: histogram of user age — a bar chart of Users Age (bins) by Count, bins of 10 from 19 to 85. Place directly below this heading, full-width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+
 ## Stacking
 
 Stacking behavior is set in the **Color & stacking** section of the Style tab:
@@ -86,3 +103,5 @@ Bar charts support totals labels on stacked charts — showing the aggregate val
 Bar charts use an ordinal X axis — each bar is labeled independently, the axis is not time-aware, and categories not present in the result set are not plotted. With time fields, bars are ordered ascending automatically. For other data types, order follows the results table sort.
 
 Tooltips on stacked bars are scoped to the segment under the cursor, not the full stack total.
+
+[ref-bins]: /docs/explore-analyze/workbooks/calculated-fields#bins-and-value-groups
