@@ -627,6 +627,9 @@ pub trait ConfigObj: DIService {
 
     fn max_ingestion_data_frames(&self) -> usize;
 
+    /// Bytes of working memory that concurrent import index builds may use; 0 means unbounded.
+    fn import_index_memory_budget(&self) -> usize;
+
     fn upload_to_remote(&self) -> bool;
 
     fn enable_topk(&self) -> bool;
@@ -877,6 +880,7 @@ pub struct ConfigObjImpl {
     pub connection_timeout: u64,
     pub server_name: String,
     pub max_ingestion_data_frames: usize,
+    pub import_index_memory_budget: usize,
     pub upload_to_remote: bool,
     pub location_allow_local_fs: bool,
     pub location_allow_hosts: Vec<String>,
@@ -1233,6 +1237,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn max_ingestion_data_frames(&self) -> usize {
         self.max_ingestion_data_frames
+    }
+    fn import_index_memory_budget(&self) -> usize {
+        self.import_index_memory_budget
     }
     fn upload_to_remote(&self) -> bool {
         self.upload_to_remote
@@ -1704,6 +1711,25 @@ where
     };
 
     n
+}
+
+/// Like [env_parse_lenient] for human-readable byte sizes such as `512M`.
+pub fn env_parse_size_lenient(name: &str, default: usize) -> usize {
+    match env::var(name) {
+        Ok(v) => match parse_size::parse_size(v.trim()) {
+            Ok(n) => n as usize,
+            Err(e) => {
+                log::warn!(
+                    "Ignoring environment variable '{}' with '{}' value: {}; using default",
+                    name,
+                    v,
+                    e
+                );
+                default
+            }
+        },
+        Err(_) => default,
+    }
 }
 
 pub fn env_parse_size(name: &str, default: usize, max: Option<usize>, min: Option<usize>) -> usize {
@@ -2189,6 +2215,10 @@ impl Config {
                 upload_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_UPLOADS", 4),
                 download_concurrency: env_parse("CUBESTORE_MAX_ACTIVE_DOWNLOADS", 8),
                 max_ingestion_data_frames: env_parse("CUBESTORE_MAX_DATA_FRAMES", 4),
+                import_index_memory_budget: env_parse_size_lenient(
+                    "CUBESTORE_IMPORT_INDEX_MEMORY_BUDGET",
+                    0,
+                ),
                 wal_split_threshold: env_parse("CUBESTORE_WAL_SPLIT_THRESHOLD", 1048576 / 2),
                 wal_split_size_threshold_bytes: env_parse_optional_size(
                     "CUBESTORE_WAL_SPLIT_SIZE_THRESHOLD",
@@ -2509,6 +2539,7 @@ impl Config {
                 upload_concurrency: 4,
                 download_concurrency: 8,
                 max_ingestion_data_frames: 4,
+                import_index_memory_budget: 1024 * 1024 * 1024,
                 wal_split_threshold: 262144,
                 wal_split_size_threshold_bytes: None,
                 connection_timeout: 60,
