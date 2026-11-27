@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use protobuf::ProtobufError;
+use protobuf::Error as ProtobufError;
 use std::fmt::{Display, Formatter};
 use std::num::TryFromIntError;
 
