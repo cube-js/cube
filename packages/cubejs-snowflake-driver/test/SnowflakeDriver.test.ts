@@ -16,6 +16,12 @@ const createDriver = () => {
   return driver;
 };
 
+// These tests keep a SYSTEM$WAIT running for a while, which bills Snowflake cloud services,
+// so CI runs them only for master and lts/* builds, not for every pull request push.
+const testRunningStatementCancel = test.runIf(
+  !process.env.CI || /^(master|lts\/.+)$/.test(process.env.GITHUB_REF_NAME || ''),
+);
+
 const pause = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
 const QUERY_TO_TEST_HYDRATION = `
@@ -116,7 +122,7 @@ describe('SnowflakeDriver', () => {
     }
   }, 2 * 60 * 1000);
 
-  test('query() cancel aborts a running statement', async () => {
+  testRunningStatementCancel('query() cancel aborts a running statement', async () => {
     const driver = createDriver();
 
     try {
@@ -156,7 +162,7 @@ describe('SnowflakeDriver', () => {
     }
   }, 2 * 60 * 1000);
 
-  test('stream() cancel aborts a running statement', async () => {
+  testRunningStatementCancel('stream() cancel aborts a running statement', async () => {
     const driver = createDriver();
 
     try {
@@ -175,7 +181,7 @@ describe('SnowflakeDriver', () => {
     }
   }, 2 * 60 * 1000);
 
-  test('downloadQueryResults() cancel aborts a running statement (memory)', async () => {
+  testRunningStatementCancel('downloadQueryResults() cancel aborts a running statement (memory)', async () => {
     const driver = createDriver();
 
     try {
@@ -194,7 +200,7 @@ describe('SnowflakeDriver', () => {
     }
   }, 2 * 60 * 1000);
 
-  test('downloadQueryResults() cancel aborts a running statement (stream)', async () => {
+  testRunningStatementCancel('downloadQueryResults() cancel aborts a running statement (stream)', async () => {
     const driver = createDriver();
 
     try {
