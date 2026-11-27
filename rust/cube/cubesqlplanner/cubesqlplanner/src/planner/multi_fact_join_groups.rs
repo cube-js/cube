@@ -29,6 +29,7 @@ pub struct MeasuresJoinHintsBuilder {
     initial_hints: JoinHints,
     dimensions: Vec<Rc<MemberSymbol>>,
     filters: Vec<FilterItem>,
+    trailing_members: Vec<Rc<MemberSymbol>>,
 }
 
 impl MeasuresJoinHintsBuilder {
@@ -42,7 +43,20 @@ impl MeasuresJoinHintsBuilder {
         self
     }
 
+    /// Members whose cubes must be in the join but should not pick its root, such
+    /// as those a SQL-API sub-query join reads in its ON condition. Their hints
+    /// go after every other hint of each join tree, so they only decide the root
+    /// where the join graph ties.
+    pub fn add_trailing_members(mut self, members: &[Rc<MemberSymbol>]) -> Self {
+        self.trailing_members.extend(members.iter().cloned());
+        self
+    }
+
     pub fn build(self, measures: &[Rc<MemberSymbol>]) -> Result<MeasuresJoinHints, CubeError> {
+        let mut trailing_hints = JoinHints::new();
+        for sym in self.trailing_members.iter() {
+            trailing_hints.extend(&collect_join_hints(sym)?);
+        }
         let mut base_hints = self.initial_hints;
         let mut member_paths = Vec::new();
 
@@ -60,7 +74,7 @@ impl MeasuresJoinHintsBuilder {
             base_hints.extend(&hints);
         }
 
-        MeasuresJoinHints::from_base_hints(base_hints, member_paths, measures, None)
+        MeasuresJoinHints::from_base_hints(base_hints, trailing_hints, member_paths, measures, None)
     }
 }
 
@@ -68,6 +82,8 @@ impl MeasuresJoinHintsBuilder {
 ///
 /// - `base_hints` — hints shared across all measures (query-level
 ///   hints plus those collected from dimensions and filters).
+/// - `trailing_hints` — hints every join tree takes after all of its other
+///   hints, so they add cubes without choosing the root.
 /// - `measure_hints` — per-measure incremental hints, one entry per
 ///   non-multi-stage measure. Multi-stage measures plan their joins
 ///   separately and are skipped here.
@@ -85,13 +101,15 @@ impl MeasuresJoinHintsBuilder {
 ///   reaches the fallback in the first place. That also means the view grouping
 ///   only guards the case where `base_hints` is empty - a dimension of an
 ///   unrelated view still pulls a hint-less member expression into its join.
-/// - `query_hints` — `base_hints` plus every measure's hints: the single tree over all
-///   members, for a measure whose own hints have no root. Inherited like `hints_by_cube`.
+/// - `query_hints` — `base_hints`, every measure's hints, then `trailing_hints`:
+///   the single tree over all members, for a measure whose own hints have no
+///   root. Inherited like `hints_by_cube`.
 /// - `member_paths` — the join paths dimensions and filters bring in (a view's
 ///   `fact.dim`), by member, to name in a no-join-path error.
 #[derive(Clone, Debug)]
 pub struct MeasuresJoinHints {
     base_hints: JoinHints,
+    trailing_hints: JoinHints,
     member_paths: Vec<(String, Vec<CubeId>)>,
     measure_hints: Vec<MeasureJoinHints>,
     hints_by_cube: HashMap<CubeId, JoinHints>,
@@ -105,6 +123,7 @@ impl MeasuresJoinHints {
             initial_hints: query_join_hints.clone(),
             dimensions: Vec::new(),
             filters: Vec::new(),
+            trailing_members: Vec::new(),
         }
     }
 
@@ -114,6 +133,7 @@ impl MeasuresJoinHints {
     pub fn for_measures(&self, measures: &[Rc<MemberSymbol>]) -> Result<Self, CubeError> {
         Self::from_base_hints(
             self.base_hints.clone(),
+            self.trailing_hints.clone(),
             self.member_paths.clone(),
             measures,
             Some((self.hints_by_cube.clone(), self.query_hints.clone())),
@@ -124,6 +144,7 @@ impl MeasuresJoinHints {
     /// the measures add nothing to it; without it they are grouped from scratch.
     fn from_base_hints(
         base_hints: JoinHints,
+        trailing_hints: JoinHints,
         member_paths: Vec<(String, Vec<CubeId>)>,
         measures: &[Rc<MemberSymbol>],
         inherited: Option<(HashMap<CubeId, JoinHints>, JoinHints)>,
@@ -162,8 +183,13 @@ impl MeasuresJoinHints {
             });
         }
 
+        if !inherited {
+            query_hints.extend(&trailing_hints);
+        }
+
         Ok(Self {
             base_hints,
+            trailing_hints,
             member_paths,
             measure_hints,
             hints_by_cube,
@@ -327,19 +353,21 @@ impl MultiFactJoinGroups {
 
         let mut measures_to_join = Vec::new();
         if hints.measure_hints.is_empty() {
-            if !hints.base_hints.is_empty() {
-                let Some((key, join_tree)) = try_resolve(&hints.base_hints)? else {
+            let mut base_hints = hints.base_hints.clone();
+            base_hints.extend(&hints.trailing_hints);
+            if !base_hints.is_empty() {
+                let Some((key, join_tree)) = try_resolve(&base_hints)? else {
                     return Ok(Err(Self::no_join_path_error(
-                        &hints.base_hints,
+                        &base_hints,
                         None,
                         &try_resolve,
                     )?));
                 };
-                measures_to_join.push((Vec::new(), key, join_tree, hints.base_hints.clone()));
+                measures_to_join.push((Vec::new(), key, join_tree, base_hints));
             }
         } else {
             for mh in hints.measure_hints.iter() {
-                let measure_hints = if mh.hints.is_empty() {
+                let mut measure_hints = if mh.hints.is_empty() {
                     Self::fallback_hints_for_measure(query_tools, &mh.measure, hints)?
                 } else {
                     mh.hints.clone()
@@ -354,6 +382,7 @@ impl MultiFactJoinGroups {
                         mh.measure.cube_id()
                     )));
                 }
+                measure_hints.extend(&hints.trailing_hints);
                 // Directed joins can leave a measure's own hints rootless (spokes reached
                 // only through a hub another member names); read it through the query's tree.
                 let (key, join_tree, join_hints) = match try_resolve(&measure_hints)? {

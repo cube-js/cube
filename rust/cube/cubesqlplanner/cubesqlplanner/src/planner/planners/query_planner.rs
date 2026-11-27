@@ -62,6 +62,17 @@ impl QueryPlanner {
                 return planner.plan(scope);
             }
 
+            // Only `SimpleQueryPlanner` attaches sub-query joins; the merged legs
+            // would silently lose them.
+            if !self.request.subquery_joins().is_empty() {
+                return Err(CubeError::user(
+                    "Sub-query joins are not supported in queries with multiplied measures, \
+                     multi-stage members or measures from several cubes. The cubes a \
+                     sub-query join's ON condition reads count towards multiplied measures"
+                        .to_string(),
+                ));
+            }
+
             let merge_planner = MergeQueryPlanner::new(analysis);
             let result = merge_planner.plan_logical_plan(refs, scope)?;
 

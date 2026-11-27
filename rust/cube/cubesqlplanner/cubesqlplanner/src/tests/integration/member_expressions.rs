@@ -850,3 +850,233 @@ fn test_subquery_join_on_participates_in_equality() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+const TOP_CITIES_SUBQUERY: &str =
+    "SELECT city FROM customers GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 2";
+
+// The ON condition reads a member of a cube that no selected member touches, so
+// only the ON can bring that cube into the join tree. The root stays the cube
+// of the selected members.
+#[test]
+fn test_subquery_join_on_member_of_otherwise_unused_cube() -> Result<(), CubeError> {
+    let ctx = create_context();
+    let subquery_join = make_subquery_join(
+        TOP_CITIES_SUBQUERY,
+        "\"top_cities\"",
+        "LEFT",
+        "orders",
+        "{customers.city} = \"top_cities\".city",
+    )?;
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(members_from_strings(vec!["orders.count"])))
+            .dimensions(Some(members_from_strings(vec!["orders.status"])))
+            .subquery_joins(Some(vec![subquery_join]))
+            .build(),
+    );
+
+    let sql = normalize_sql(&ctx.build_sql_from_options(options)?);
+
+    let from = sql
+        .find("FROM orders AS \"orders\"")
+        .unwrap_or_else(|| panic!("expected orders as the join root, got: {sql}"));
+    let customers = sql
+        .find("LEFT JOIN customers AS \"customers\"")
+        .unwrap_or_else(|| panic!("expected customers to be joined, got: {sql}"));
+    let top_cities = sql
+        .find(&format!(
+            "LEFT JOIN ({TOP_CITIES_SUBQUERY}) AS \"top_cities\""
+        ))
+        .unwrap_or_else(|| panic!("expected the sub-query join, got: {sql}"));
+    assert!(
+        from < customers && customers < top_cities,
+        "customers must be joined before the sub-query whose ON reads it, got: {sql}"
+    );
+
+    Ok(())
+}
+
+fn create_views_context() -> TestContext {
+    let schema = MockSchema::from_yaml_file("common/integration_views.yaml");
+    TestContext::new(schema).unwrap()
+}
+
+// The same through a view: the ON reads a view member that comes from a joined
+// cube, while the selected members all come from the view's root cube.
+#[test]
+fn test_subquery_join_on_view_member_of_joined_cube() -> Result<(), CubeError> {
+    let ctx = create_views_context();
+    let subquery_join = make_subquery_join(
+        TOP_CITIES_SUBQUERY,
+        "\"top_cities\"",
+        "LEFT",
+        "orders_with_customers",
+        "{orders_with_customers.city} = \"top_cities\".city",
+    )?;
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(members_from_strings(vec![
+                "orders_with_customers.count",
+            ])))
+            .dimensions(Some(members_from_strings(vec![
+                "orders_with_customers.status",
+            ])))
+            .subquery_joins(Some(vec![subquery_join]))
+            .build(),
+    );
+
+    let sql = normalize_sql(&ctx.build_sql_from_options(options)?);
+
+    let customers = sql
+        .find("LEFT JOIN customers AS \"customers\"")
+        .unwrap_or_else(|| panic!("expected customers to be joined, got: {sql}"));
+    let top_cities = sql
+        .find(&format!(
+            "LEFT JOIN ({TOP_CITIES_SUBQUERY}) AS \"top_cities\""
+        ))
+        .unwrap_or_else(|| panic!("expected the sub-query join, got: {sql}"));
+    assert!(
+        customers < top_cities,
+        "customers must be joined before the sub-query whose ON reads it, got: {sql}"
+    );
+    assert!(
+        sql.contains("\"customers\".city = \"top_cities\".city"),
+        "expected the ON to read the joined cube's column, got: {sql}"
+    );
+
+    Ok(())
+}
+
+// With measures only, the ON hints still come after the measure's own: were they
+// first, `customers` would root the join and multiply `orders.count`.
+#[test]
+fn test_subquery_join_on_does_not_pick_the_root() -> Result<(), CubeError> {
+    let ctx = create_views_context();
+    let subquery_join = make_subquery_join(
+        TOP_CITIES_SUBQUERY,
+        "\"top_cities\"",
+        "INNER",
+        "orders",
+        "{customers.city} = \"top_cities\".city",
+    )?;
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(members_from_strings(vec!["orders.count"])))
+            .subquery_joins(Some(vec![subquery_join]))
+            .build(),
+    );
+
+    let sql = normalize_sql(&ctx.build_sql_from_options(options)?);
+
+    assert!(
+        sql.contains("FROM orders AS \"orders\" LEFT JOIN customers AS \"customers\""),
+        "expected orders as the root with customers joined to it, got: {sql}"
+    );
+    assert!(
+        sql.contains(&format!(
+            "INNER JOIN ({TOP_CITIES_SUBQUERY}) AS \"top_cities\""
+        )),
+        "expected the sub-query join, got: {sql}"
+    );
+
+    Ok(())
+}
+
+// Measures of two fact cubes plan the query in legs, which do not carry
+// sub-query joins: that is an error, not a silently dropped join.
+#[test]
+fn test_subquery_join_rejected_when_query_is_not_simple() -> Result<(), CubeError> {
+    let ctx = create_views_context();
+    let subquery_join = make_subquery_join(
+        TOP_CITIES_SUBQUERY,
+        "\"top_cities\"",
+        "INNER",
+        "customers",
+        "{customers.city} = \"top_cities\".city",
+    )?;
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(members_from_strings(vec![
+                "orders.count",
+                "returns.count",
+            ])))
+            .dimensions(Some(members_from_strings(vec!["customers.name"])))
+            .subquery_joins(Some(vec![subquery_join]))
+            .build(),
+    );
+
+    let err = ctx
+        .build_sql_from_options(options)
+        .expect_err("a sub-query join must not be dropped from a multi-fact query");
+    assert!(
+        err.message.contains("Sub-query joins are not supported"),
+        "expected the unsupported sub-query join error, got: {}",
+        err.message
+    );
+
+    Ok(())
+}
+
+// Ungrouped queries build their join groups separately, so check the ON's cube
+// is joined there too.
+#[test]
+fn test_subquery_join_on_member_of_otherwise_unused_cube_ungrouped() -> Result<(), CubeError> {
+    let ctx = create_context();
+    let subquery_join = make_subquery_join(
+        TOP_CITIES_SUBQUERY,
+        "\"top_cities\"",
+        "INNER",
+        "orders",
+        "{customers.city} = \"top_cities\".city",
+    )?;
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .dimensions(Some(members_from_strings(vec![
+                "orders.id",
+                "orders.status",
+            ])))
+            .ungrouped(Some(true))
+            .subquery_joins(Some(vec![subquery_join]))
+            .build(),
+    );
+
+    let sql = normalize_sql(&ctx.build_sql_from_options(options)?);
+
+    assert!(
+        sql.contains("FROM orders AS \"orders\" LEFT JOIN customers AS \"customers\""),
+        "expected orders as the root with customers joined to it, got: {sql}"
+    );
+    assert!(
+        sql.contains(&format!(
+            "INNER JOIN ({TOP_CITIES_SUBQUERY}) AS \"top_cities\""
+        )),
+        "expected the sub-query join, got: {sql}"
+    );
+
+    Ok(())
+}

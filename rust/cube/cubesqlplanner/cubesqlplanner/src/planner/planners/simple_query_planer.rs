@@ -1,7 +1,6 @@
-use super::{DimensionSubqueryPlanner, JoinPlanner};
+use super::DimensionSubqueryPlanner;
 use crate::logical_plan::*;
-use crate::planner::collectors::{collect_join_hints, collect_sub_query_dimensions_from_symbols};
-use crate::planner::join_hints::JoinHints;
+use crate::planner::collectors::collect_sub_query_dimensions_from_symbols;
 use crate::planner::planners::multi_stage::PlanningScope;
 use crate::planner::state::State;
 use crate::planner::{QueryAnalysis, QueryProperties};
@@ -14,12 +13,10 @@ use std::rc::Rc;
 pub struct SimpleQueryPlanner {
     query_tools: Rc<State>,
     analysis: Rc<QueryAnalysis>,
-    join_planner: JoinPlanner,
 }
 impl SimpleQueryPlanner {
     pub fn new(query_tools: Rc<State>, analysis: Rc<QueryAnalysis>) -> Self {
         Self {
-            join_planner: JoinPlanner::new(query_tools.clone()),
             analysis,
             query_tools,
         }
@@ -92,32 +89,16 @@ impl SimpleQueryPlanner {
         // Query-level SQL-API sub-query joins (from `subqueryJoins`) extend the
         // FROM clause with opaque joined sub-queries.
         let subquery_joins = self.analysis.query().subquery_joins();
-        let join = if join.is_some() || subquery_joins.is_empty() {
-            join
-        } else {
-            // No selected member resolves the base cube, but the sub-query joins'
-            // ON conditions reference it (e.g. `SELECT t.col FROM Cube JOIN (...) t
-            // ON Cube.x = t.x`). Derive the join root from those ON references so
-            // the base cube — and the sub-query joins below — are emitted.
-            let mut hints = JoinHints::new();
-
-            for subquery_join in subquery_joins {
-                for dep in subquery_join.on_sql.get_dependencies() {
-                    hints.extend(&collect_join_hints(&dep)?);
-                }
-            }
-
-            if hints.is_empty() {
-                return Err(CubeError::user(
-                    "Sub-query join requires its ON condition to reference at least one \
-                     cube member so the base table can be resolved \
-                     (e.g. `{cube.field} = alias.field`)"
-                        .to_string(),
-                ));
-            }
-
-            Some(self.join_planner.join_tree_for_hints(hints)?)
-        };
+        // The ON conditions' members are join hints too, so a join is missing only
+        // when they reference no cube member at all.
+        if join.is_none() && !subquery_joins.is_empty() {
+            return Err(CubeError::user(
+                "Sub-query join requires its ON condition to reference at least one \
+                 cube member so the base table can be resolved \
+                 (e.g. `{cube.field} = alias.field`)"
+                    .to_string(),
+            ));
+        }
         Ok(LogicalFrom::over_join(join)
             .dimension_inputs(dimension_inputs)
             .subquery_joins(subquery_joins.clone()))
