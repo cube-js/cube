@@ -33,7 +33,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.98.1
+          toolchain: 1.100.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt, clippy
@@ -155,7 +155,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.98.1
+          toolchain: 1.100.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -265,7 +265,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.98.1
+          toolchain: 1.100.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -346,7 +346,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.98.1
+          toolchain: 1.100.0
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt

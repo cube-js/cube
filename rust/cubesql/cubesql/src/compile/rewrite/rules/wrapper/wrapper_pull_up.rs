@@ -438,17 +438,13 @@ impl WrapperRules {
                 return false;
             }
 
-            if !Self::replace_aliases(
+            Self::replace_aliases(
                 egraph,
                 subst,
                 alias_to_cube_var,
                 select_alias_var,
                 alias_to_cube_out_var,
-            ) {
-                return false;
-            }
-
-            true
+            )
         }
     }
 

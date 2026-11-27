@@ -894,8 +894,8 @@ mod tests {
             DBResponsePrimitive::Null,
             DBResponsePrimitive::String("0x".to_string()),
         ];
-        for idx in 0..3 {
-            assert_eq!(result.data[idx].as_slice(), expected.as_slice());
+        for row in &result.data[..3] {
+            assert_eq!(row.as_slice(), expected.as_slice());
         }
         assert_eq!(
             result.data[3].as_slice(),
