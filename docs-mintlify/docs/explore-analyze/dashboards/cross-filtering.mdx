@@ -30,7 +30,7 @@ Click a data point and choose **Filter dashboard by this point**. The cross-filt
 - a map region filters by the region, and a point on a point map by its dimension values;
 - a table cell of a dimension column filters by that value, and a cell of a measure column by every dimension value in its row. In a pivot table, a value cell filters by its row's and its column's values.
 
-Every other chart that can take the filter re-runs its query with it. A bar, column, funnel, pie, donut or sunburst chart [highlights](#highlighting) the filtered part of its data, and every other chart, such as a line, a table or a KPI, shows only the filtered numbers, totals and comparisons included. The chart you clicked shows the selected data at full strength and the rest dimmed.
+Every other chart that can take the filter re-runs its query with it. A bar, funnel, pie or donut chart [highlights](#highlighting) the filtered part of its data. Any other chart, such as a line, a table or a KPI, shows only the filtered numbers; a table's totals and a KPI's comparison are filtered too. The chart you clicked shows the selected data at full strength and the rest dimmed.
 
 A plain click on another value of the same chart opens the menu again, and **Filter dashboard by this point** there replaces the chart's selection with that value.
 
@@ -38,9 +38,9 @@ Bar, line, area, scatter, pie and composite charts, maps and tables can start a 
 
 ### Highlighting
 
-A bar, column, funnel, pie, donut or sunburst chart that another chart's cross-filter reaches keeps all of its data, dimmed, and draws the filtered part over it at full strength, so you can see each category's share of the selection. Stacked, grouped and small-multiples bars highlight each segment. The tooltip of a bar or slice gives the filtered value next to the full one. A bar or column chart's axes stay put when you set, change or reset the cross-filter.
+A bar, funnel, pie or donut chart that another chart's cross-filter reaches keeps all of its data, dimmed, and draws the filtered part over it at full strength, so you can see each category's share of the selection. Stacked, grouped and small-multiples bars highlight each segment. The tooltip of a bar or slice gives the filtered value next to the full one. A bar chart's axes stay put when you set, change or reset the cross-filter.
 
-Some of these charts filter instead, like a line chart: a chart with a row limit, a Top N field or filter, or a filter on a measure, since the cross-filter can change which rows it shows, and a chart with a period comparison. A [download][ref-downloads] as CSV holds the filtered rows, as do a schedule's AI summary and an alert's check.
+Some of these charts filter instead, like a line chart: a chart with a period comparison, and a chart with a row limit, a Top N field or filter, or a filter on a measure, since the cross-filter can change which rows it shows. A [download][ref-downloads] as CSV holds the filtered rows, as do a schedule's AI summary and an alert's check.
 
 ### Adding and removing values
 
