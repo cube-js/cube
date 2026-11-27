@@ -156,7 +156,7 @@ impl TempTableManager {
         // update of the other: a compare-and-swap retries its closure, which would
         // then count the same bytes towards the server total more than once
         self.cached_size
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current_size| {
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |current_size| {
                 match current_size + size > size_session_limit * 1024 * 1024 {
                     true => None,
                     false => Some(current_size + size),
@@ -164,7 +164,7 @@ impl TempTableManager {
             })
             .map_err(|_| limit_reached())?;
 
-        let total = session_manager.temp_table_size.fetch_update(
+        let total = session_manager.temp_table_size.try_update(
             Ordering::SeqCst,
             Ordering::SeqCst,
             |current_size| match current_size + size > size_total_limit * 1024 * 1024 {
