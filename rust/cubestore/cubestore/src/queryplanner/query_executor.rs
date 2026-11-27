@@ -77,8 +77,8 @@ use datafusion::physical_plan::sorts::sort::SortExec;
 use datafusion::physical_plan::sorts::sort_preserving_merge::SortPreservingMergeExec;
 use datafusion::physical_plan::stream::RecordBatchStreamAdapter;
 use datafusion::physical_plan::{
-    collect, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning, PhysicalExpr,
-    PlanProperties, SendableRecordBatchStream,
+    collect, execute_stream, DisplayAs, DisplayFormatType, ExecutionPlan, Partitioning,
+    PhysicalExpr, PlanProperties, SendableRecordBatchStream,
 };
 use datafusion::prelude::{and, SessionConfig, SessionContext};
 use datafusion_datasource::memory::MemorySourceConfig;
@@ -185,6 +185,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         &self,
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
+        max_result_size: MaxResultSize,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
 
     /// Like [execute_router_plan], but runs under detailed tracing: the worker-trace
@@ -315,6 +316,7 @@ impl QueryExecutor for QueryExecutorImpl {
         &self,
         plan: SerializedPlan,
         cluster: Arc<dyn Cluster>,
+        max_result_size: MaxResultSize,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
         let trace_obj = plan.trace_obj();
@@ -340,9 +342,13 @@ impl QueryExecutor for QueryExecutorImpl {
 
         let memory_pool = TrackingMemoryPool::new();
         let session_context = self.execution_context(memory_pool.clone())?;
-        let results = collect(split_plan.clone(), session_context.task_ctx())
-            .instrument(collect_span)
-            .await;
+        let results = collect_with_size_limit(
+            split_plan.clone(),
+            session_context.task_ctx(),
+            max_result_size,
+        )
+        .instrument(collect_span)
+        .await;
         record_pool_peak(&memory_pool);
         let execution_time = execution_time.elapsed()?;
         debug!("Query data processing time: {:?}", execution_time,);
@@ -2229,6 +2235,115 @@ macro_rules! convert_array {
     }};
 }
 
+/// Largest query result, in bytes of its Arrow data, that may be built in memory.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MaxResultSize {
+    bytes: usize,
+    // Only a client-side knob is named: Cube Store's own bound is the operator's call, and
+    // in Cube Cloud the user cannot change it.
+    knob: Option<&'static str>,
+}
+
+impl MaxResultSize {
+    /// A client limit applies only when it is tighter than Cube Store's own bound.
+    pub fn new(cube_store_bound: usize, client_limit: Option<usize>) -> Self {
+        let bound = Self {
+            bytes: cube_store_bound,
+            knob: None,
+        };
+        match client_limit {
+            Some(bytes) if bytes < bound.bytes => Self {
+                bytes,
+                knob: Some("CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE"),
+            },
+            _ => bound,
+        }
+    }
+
+    pub fn check(&self, size: usize) -> Result<(), CubeError> {
+        if size <= self.bytes {
+            return Ok(());
+        }
+        let raise = self
+            .knob
+            .map(|knob| format!(", or raise {}", knob))
+            .unwrap_or_default();
+        Err(CubeError::user(format!(
+            "Query result exceeds the maximum result size of {}. Reduce the amount of data \
+             the query returns, e.g. by adding filters or a limit{}.",
+            format_size(self.bytes),
+            raise
+        )))
+    }
+
+    /// Decodes a worker's result, failing at the first batch that takes it past the limit.
+    pub fn read_batches(
+        &self,
+        streams: Vec<SerializedRecordBatchStream>,
+    ) -> Result<Vec<RecordBatch>, CubeError> {
+        let mut size = 0;
+        streams
+            .into_iter()
+            .map(|s| {
+                let batch = s.read()?;
+                size += record_batch_size(&batch);
+                self.check(size)?;
+                Ok(batch)
+            })
+            .collect()
+    }
+}
+
+fn format_size(bytes: usize) -> String {
+    for (unit, name) in [(1 << 20, "MB"), (1 << 10, "KB")] {
+        if bytes >= unit {
+            return format!(
+                "{} {}",
+                (bytes as f64 / unit as f64 * 10.0).round() / 10.0,
+                name
+            );
+        }
+    }
+    format!("{} bytes", bytes)
+}
+
+// Bytes of the rows the batch holds, not of the buffers it may share with other batches.
+fn record_batch_size(batch: &RecordBatch) -> usize {
+    batch
+        .columns()
+        .iter()
+        .map(|a| {
+            a.to_data()
+                .get_slice_memory_size()
+                .unwrap_or_else(|_| a.get_array_memory_size())
+        })
+        .sum()
+}
+
+// Like `collect`, but fails as soon as the result outgrows `max_result_size`, dropping
+// what was buffered so far.
+async fn collect_with_size_limit(
+    plan: Arc<dyn ExecutionPlan>,
+    task_ctx: Arc<TaskContext>,
+    max_result_size: MaxResultSize,
+) -> Result<Vec<RecordBatch>, CubeError> {
+    collect_stream_with_size_limit(execute_stream(plan, task_ctx)?, max_result_size).await
+}
+
+async fn collect_stream_with_size_limit(
+    mut stream: SendableRecordBatchStream,
+    max_result_size: MaxResultSize,
+) -> Result<Vec<RecordBatch>, CubeError> {
+    let mut batches = Vec::new();
+    let mut size = 0;
+    while let Some(batch) = stream.next().await.transpose()? {
+        size += record_batch_size(&batch);
+        max_result_size.check(size)?;
+        batches.push(batch);
+    }
+    Ok(batches)
+}
+
 pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, CubeError> {
     let mut cols = vec![];
     let mut all_rows = vec![];
@@ -2873,5 +2988,99 @@ mod tests {
         }
         assert_eq!(rows, 3);
         Ok(())
+    }
+
+    fn int_batches(count: usize, rows: usize) -> (SchemaRef, Vec<RecordBatch>) {
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int64, false)]));
+        let batches = (0..count)
+            .map(|_| {
+                let column: ArrayRef = Arc::new(Int64Array::from(vec![1i64; rows]));
+                RecordBatch::try_new(schema.clone(), vec![column]).unwrap()
+            })
+            .collect();
+        (schema, batches)
+    }
+
+    fn batch_stream(schema: SchemaRef, batches: Vec<RecordBatch>) -> SendableRecordBatchStream {
+        Box::pin(RecordBatchStreamAdapter::new(
+            schema,
+            stream::iter(batches.into_iter().map(Ok)),
+        ))
+    }
+
+    #[tokio::test]
+    async fn result_under_the_limit_is_collected_whole() -> Result<(), CubeError> {
+        // 4 batches of 1000 Int64 values: 32000 bytes.
+        let (schema, batches) = int_batches(4, 1000);
+        let collected = collect_stream_with_size_limit(
+            batch_stream(schema, batches),
+            MaxResultSize::new(32_000, None),
+        )
+        .await?;
+        assert_eq!(collected.iter().map(|b| b.num_rows()).sum::<usize>(), 4000);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn oversized_result_fails_and_frees_what_it_buffered() {
+        let (schema, batches) = int_batches(4, 1000);
+        let arrays = batches
+            .iter()
+            .map(|b| Arc::downgrade(b.column(0)))
+            .collect::<Vec<_>>();
+
+        let err = collect_stream_with_size_limit(
+            batch_stream(schema, batches),
+            MaxResultSize::new(1 << 20, Some(20_000)),
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(
+            err.message,
+            "Query result exceeds the maximum result size of 19.5 KB. Reduce the amount of data \
+             the query returns, e.g. by adding filters or a limit, or raise \
+             CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE."
+        );
+        // Both the batches collected before the limit tripped and the ones still in the
+        // stream are gone.
+        assert!(arrays.iter().all(|a| a.upgrade().is_none()));
+    }
+
+    #[test]
+    fn client_cannot_raise_the_cube_store_bound() {
+        let bound = MaxResultSize::new(100 << 20, Some(700 << 20));
+        assert_eq!(bound, MaxResultSize::new(100 << 20, None));
+        assert!(bound.check(100 << 20).is_ok());
+        assert_eq!(
+            bound.check((100 << 20) + 1).unwrap_err().message,
+            "Query result exceeds the maximum result size of 100 MB. Reduce the amount of data \
+             the query returns, e.g. by adding filters or a limit."
+        );
+    }
+
+    #[test]
+    fn worker_result_fails_at_the_first_batch_over_the_limit() -> Result<(), CubeError> {
+        let (schema, batches) = int_batches(4, 1000);
+
+        let streams = SerializedRecordBatchStream::write(&schema, batches.clone())?;
+        let read = MaxResultSize::new(32_000, None).read_batches(streams)?;
+        assert_eq!(read.len(), 4);
+
+        let streams = SerializedRecordBatchStream::write(&schema, batches)?;
+        let err = MaxResultSize::new(1 << 20, Some(20_000))
+            .read_batches(streams)
+            .unwrap_err();
+        assert!(err.message.contains("maximum result size of 19.5 KB"));
+        Ok(())
+    }
+
+    #[test]
+    fn sliced_batches_count_only_their_rows() {
+        let (_, batches) = int_batches(1, 1000);
+        let slices = (0..10)
+            .map(|i| batches[0].slice(i * 100, 100))
+            .collect::<Vec<_>>();
+        assert_eq!(slices.iter().map(record_batch_size).sum::<usize>(), 8000);
     }
 }

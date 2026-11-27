@@ -460,6 +460,7 @@ impl HttpServer {
                                 parameters: None,
                                 trace_obj: None,
                                 process_id,
+                                max_result_size: None,
                             }),
                             Err(_) => Err(warp::reject::custom(CubeRejection::NotAuthorized)),
                         }
@@ -1002,13 +1003,15 @@ impl HttpServer {
                 trace_obj,
                 parameters,
                 response_format,
+                max_result_size,
             } => {
                 let query_result = sql_service
                     .exec_query_with_context(
                         sql_query_context
                             .with_trace_obj(trace_obj)
                             .with_inline_tables(&inline_tables)
-                            .with_parameters(&parameters),
+                            .with_parameters(&parameters)
+                            .with_max_result_size(max_result_size),
                         &query,
                     )
                     .await?;
@@ -1084,6 +1087,7 @@ pub enum HttpCommand {
         trace_obj: Option<String>,
         parameters: Option<QueryParameters>,
         response_format: QueryResultFormat,
+        max_result_size: Option<usize>,
     },
     ResultSet {
         data_frame: Arc<DataFrame>,
@@ -1129,6 +1133,7 @@ impl HttpMessage {
                     trace_obj,
                     parameters,
                     response_format,
+                    max_result_size,
                 } => {
                     let query_offset = builder.create_string(&query);
                     let trace_obj_offset = trace_obj.as_ref().map(|o| builder.create_string(o));
@@ -1150,6 +1155,7 @@ impl HttpMessage {
                                 trace_obj: trace_obj_offset,
                                 parameters: None,
                                 response_format: *response_format,
+                                max_result_size: max_result_size.unwrap_or(0) as u64,
                             },
                         )
                         .as_union_value(),
@@ -1425,6 +1431,10 @@ impl HttpMessage {
                         inline_tables,
                         parameters,
                         response_format: query.response_format(),
+                        max_result_size: match query.max_result_size() {
+                            0 => None,
+                            n => Some(usize::try_from(n).unwrap_or(usize::MAX)),
+                        },
                     }
                 }
                 cubeshared::codegen::HttpCommand::HttpResultSet => {
@@ -1812,6 +1822,7 @@ mod tests {
                 trace_obj: Some("test trace".to_string()),
                 parameters: None,
                 response_format: QueryResultFormat::Legacy,
+                max_result_size: Some(100 << 20),
             },
             connection_id: Some("foo".to_string()),
         };
@@ -1883,6 +1894,7 @@ mod tests {
                 trace_obj: None,
                 parameters: None,
                 response_format: QueryResultFormat::Legacy,
+                max_result_size: 0,
             },
         );
         let args = HttpMessageArgs {
@@ -1909,6 +1921,7 @@ mod tests {
                     trace_obj: None,
                     parameters: None,
                     response_format: QueryResultFormat::Legacy,
+                    max_result_size: None,
                 },
                 connection_id: Some("foo".to_string()),
             }
@@ -1989,6 +2002,7 @@ mod tests {
                 trace_obj: None,
                 parameters: None,
                 response_format: QueryResultFormat::Arrow,
+                max_result_size: None,
             },
         )
         .await?;
@@ -2053,6 +2067,7 @@ mod tests {
                 trace_obj: None,
                 parameters: None,
                 response_format: QueryResultFormat::Arrow,
+                max_result_size: None,
             },
         )
         .await?;
@@ -2194,6 +2209,7 @@ mod tests {
                             trace_obj: None,
                             parameters: None,
                             response_format: QueryResultFormat::Legacy,
+                            max_result_size: None,
                         },
                         connection_id,
                     }
@@ -2530,6 +2546,7 @@ mod tests {
                         trace_obj: None,
                         parameters: None,
                         response_format: QueryResultFormat::Legacy,
+                        max_result_size: None,
                     },
                     connection_id: Some("foo".to_string()),
                 }
@@ -2609,6 +2626,7 @@ mod tests {
                         trace_obj: None,
                         parameters: None,
                         response_format: QueryResultFormat::Legacy,
+                        max_result_size: None,
                     },
                     connection_id: Some("foo".to_string()),
                 }
@@ -2684,6 +2702,7 @@ mod tests {
                         trace_obj: None,
                         parameters: None,
                         response_format: QueryResultFormat::Legacy,
+                        max_result_size: None,
                     },
                     connection_id: Some("foo".to_string()),
                 }
@@ -2724,6 +2743,7 @@ mod tests {
                         trace_obj: None,
                         parameters: None,
                         response_format: QueryResultFormat::Legacy,
+                        max_result_size: None,
                     },
                     connection_id: Some("foo".to_string()),
                 }

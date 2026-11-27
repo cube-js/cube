@@ -729,6 +729,9 @@ pub trait ConfigObj: DIService {
 
     fn query_cache_max_capacity_bytes(&self) -> u64;
 
+    /// Upper bound on a query result's in-memory size; a client can only lower it.
+    fn max_query_result_size(&self) -> usize;
+
     fn query_queue_cache_max_capacity(&self) -> u64;
 
     fn query_cache_time_to_idle_secs(&self) -> Option<u64>;
@@ -904,6 +907,7 @@ pub struct ConfigObjImpl {
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
     pub query_cache_max_capacity_bytes: u64,
+    pub max_query_result_size: usize,
     pub query_queue_cache_max_capacity: u64,
     pub query_cache_time_to_idle_secs: Option<u64>,
     pub query_cache_stale_while_revalidate_secs: Option<u64>,
@@ -1314,6 +1318,10 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn query_cache_max_capacity_bytes(&self) -> u64 {
         self.query_cache_max_capacity_bytes
+    }
+
+    fn max_query_result_size(&self) -> usize {
+        self.max_query_result_size
     }
     fn query_queue_cache_max_capacity(&self) -> u64 {
         self.query_queue_cache_max_capacity
@@ -2269,6 +2277,12 @@ impl Config {
                     Some(16384 << 20),
                     Some(0),
                 ) as u64,
+                max_query_result_size: env_parse_size(
+                    "CUBESTORE_MAX_QUERY_RESULT_SIZE",
+                    256 << 20,
+                    None,
+                    Some(1 << 20),
+                ),
                 query_queue_cache_max_capacity: env_parse(
                     "CUBESTORE_QUEUE_CACHE_MAX_CAPACITY",
                     10000,
@@ -2543,6 +2557,7 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 query_cache_max_capacity_bytes: 512 << 20,
+                max_query_result_size: 256 << 20,
                 query_queue_cache_max_capacity: 10000,
                 query_cache_time_to_idle_secs: Some(600),
                 query_cache_stale_while_revalidate_secs: None,

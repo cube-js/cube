@@ -332,7 +332,9 @@ exceeds the maximum message size`; see
 [message size limits](/docs/pre-aggregations/cube-store-architecture#message-size-limits).
 This is Cube's own limit and is independent of
 [`CUBESTORE_TRANSPORT_MAX_MESSAGE_SIZE`](#cubestore_transport_max_message_size),
-which Cube Store applies to what it receives.
+which Cube Store applies to what it receives. Cube sends it with each query, so
+Cube Store fails an oversized result before building it, up to
+[`CUBESTORE_MAX_QUERY_RESULT_SIZE`](#cubestore_max_query_result_size).
 
 | Possible Values      | Default in Development | Default in Production |
 | -------------------- | ---------------------- | --------------------- |
@@ -2551,6 +2553,19 @@ increase this limit, increase both values too. See also
 | Possible Values    | Default in Development | Default in Production |
 | ------------------ | ---------------------- | --------------------- |
 | A positive integer | `150`                  | `150`                 |
+
+## `CUBESTORE_MAX_QUERY_RESULT_SIZE`
+
+The maximum size of a query result Cube Store will build in memory. A query
+whose result grows past it fails with `Query result exceeds the maximum result
+size`. Cube sends its own
+[`CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE`](#cubejs_cubestore_max_message_size) with
+each query and Cube Store applies the lower of the two, so a client cannot raise
+this limit.
+
+| Possible Values             | Default in Development | Default in Production |
+| --------------------------- | ---------------------- | --------------------- |
+| A size of at least `1MiB`   | `256MiB`               | `256MiB`              |
 
 ## `CUBESTORE_MAX_QUEUED_QUERY_PLANS`
 

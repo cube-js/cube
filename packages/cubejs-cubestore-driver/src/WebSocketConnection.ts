@@ -623,6 +623,8 @@ export class WebSocketConnection {
     }
 
     HttpQuery.addResponseFormat(builder, responseFormat);
+    // Lets Cube Store fail an oversized result before building it in memory.
+    HttpQuery.addMaxResultSize(builder, BigInt(this.maxMessageSize));
 
     const httpQueryOffset = HttpQuery.endHttpQuery(builder);
     const messageId = this.messageCounter++;

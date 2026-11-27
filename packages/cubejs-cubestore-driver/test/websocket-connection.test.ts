@@ -426,6 +426,18 @@ describe('WebSocketConnection', () => {
       delete process.env.CUBEJS_CUBESTORE_MAX_MESSAGE_SIZE;
     });
 
+    it('sends the limit with the query, so Cube Store can fail an oversized result early', async () => {
+      connection = new WebSocketConnection(server.url);
+
+      server.handler = (message, mockConnection) => {
+        mockConnection.ws.send(buildResultMessage(message.messageId));
+      };
+
+      await query('SELECT 1');
+
+      expect(server.received[0].maxResultSize).toBe(BigInt(MAX_MESSAGE_SIZE));
+    }, JEST_TIMEOUT);
+
     it('reports a response that is over the limit once its extra round is spent', async () => {
       connection = new WebSocketConnection(server.url);
 
