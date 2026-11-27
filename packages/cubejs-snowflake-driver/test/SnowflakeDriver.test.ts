@@ -3,12 +3,24 @@ import { streamToArray } from '@cubejs-backend/shared';
 
 import { SnowflakeDriver } from '../src';
 
-const LONG_RUNNING_QUERY = 'SELECT SYSTEM$WAIT(120)';
+const LONG_RUNNING_QUERY = 'SELECT SYSTEM$WAIT(30)';
 
-// Labels the statements in Snowflake QUERY_HISTORY, so test load can be told apart in usage stats.
-const createDriver = () => new SnowflakeDriver({
-  queryTag: { tenant: 'cube-ci-oss', deployment: 'snowflake-driver' },
-});
+const createDriver = () => {
+  // Labels the statements in Snowflake QUERY_HISTORY, so test load can be told apart in usage stats.
+  const driver = new SnowflakeDriver({
+    queryTag: { tenant: 'cube-ci-oss', deployment: 'snowflake-driver' },
+  });
+  // Cancel failures (e.g. Snowflake dropping an abort) are only logged, never thrown.
+  driver.setLogger((msg, params) => console.warn(msg, params));
+
+  return driver;
+};
+
+// These tests keep a SYSTEM$WAIT running for a while, which bills Snowflake cloud services,
+// so CI runs them only for master and lts/* builds, not for every pull request push.
+const testRunningStatementCancel = test.runIf(
+  !process.env.CI || /^(master|lts\/.+)$/.test(process.env.GITHUB_REF_NAME || ''),
+);
 
 const pause = (ms: number) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
@@ -110,20 +122,23 @@ describe('SnowflakeDriver', () => {
     }
   }, 2 * 60 * 1000);
 
-  test('query() cancel aborts a running statement', async () => {
+  testRunningStatementCancel('query() cancel aborts a running statement', async () => {
     const driver = createDriver();
 
     try {
+      // Connect up front, so the statement reaches Snowflake within the pause below.
+      await driver.query('SELECT 1', []);
+
       const promise = driver.query(LONG_RUNNING_QUERY, []);
-      // Let the statement actually reach Snowflake before aborting it.
-      await pause(5000);
+      // Snowflake drops an abort (000605) that arrives before it registered the statement.
+      await pause(1000);
 
       const startedAt = Date.now();
       await promise.cancel();
       await expect(promise).rejects.toThrow(/cancelled/i);
 
-      // The query would otherwise hold the warehouse for 120s.
-      expect(Date.now() - startedAt).toBeLessThan(30 * 1000);
+      // The query would otherwise hold the warehouse for 30s.
+      expect(Date.now() - startedAt).toBeLessThan(10 * 1000);
 
       // Cancelling one statement must not poison the shared connection.
       expect(await driver.query('SELECT 1 AS "one"', [])).toHaveLength(1);
@@ -147,14 +162,17 @@ describe('SnowflakeDriver', () => {
     }
   }, 2 * 60 * 1000);
 
-  test('stream() cancel aborts a running statement', async () => {
+  testRunningStatementCancel('stream() cancel aborts a running statement', async () => {
     const driver = createDriver();
 
     try {
+      // Connect up front, so the statement reaches Snowflake within the pause below.
+      await driver.query('SELECT 1', []);
+
       const promise = driver.stream(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
       expect(typeof promise.cancel).toBe('function');
 
-      await pause(5000);
+      await pause(1000);
       await promise.cancel();
 
       await expect(promise).rejects.toThrow(/cancelled/i);
@@ -163,14 +181,17 @@ describe('SnowflakeDriver', () => {
     }
   }, 2 * 60 * 1000);
 
-  test('downloadQueryResults() cancel aborts a running statement (memory)', async () => {
+  testRunningStatementCancel('downloadQueryResults() cancel aborts a running statement (memory)', async () => {
     const driver = createDriver();
 
     try {
+      // Connect up front, so the statement reaches Snowflake within the pause below.
+      await driver.query('SELECT 1', []);
+
       const promise = driver.downloadQueryResults(LONG_RUNNING_QUERY, [], { highWaterMark: 100 });
       expect(typeof promise.cancel).toBe('function');
 
-      await pause(5000);
+      await pause(1000);
       await promise.cancel();
 
       await expect(promise).rejects.toThrow(/cancelled/i);
@@ -179,10 +200,13 @@ describe('SnowflakeDriver', () => {
     }
   }, 2 * 60 * 1000);
 
-  test('downloadQueryResults() cancel aborts a running statement (stream)', async () => {
+  testRunningStatementCancel('downloadQueryResults() cancel aborts a running statement (stream)', async () => {
     const driver = createDriver();
 
     try {
+      // Connect up front, so the statement reaches Snowflake within the pause below.
+      await driver.query('SELECT 1', []);
+
       const promise = driver.downloadQueryResults(
         LONG_RUNNING_QUERY,
         [],
@@ -190,7 +214,7 @@ describe('SnowflakeDriver', () => {
       );
       expect(typeof promise.cancel).toBe('function');
 
-      await pause(5000);
+      await pause(1000);
       await promise.cancel();
 
       await expect(promise).rejects.toThrow(/cancelled/i);
