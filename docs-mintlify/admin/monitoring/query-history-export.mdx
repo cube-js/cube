@@ -225,11 +225,22 @@ cubes:
 
 ## Result
 
-Example query in Playground:
+Once the model is deployed, query the `requests` cube like any other cube, in
+[Explore][ref-explore] or via the [SQL API][ref-sql-api]. For example, this
+query shows the number of requests and their average duration by API type,
+cache type, and status:
 
-<Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history-export/327373f0.png" />
-</Frame>
+```sql
+SELECT
+  requests.api_type,
+  requests.cache_type,
+  requests.status,
+  MEASURE(requests.count) AS count,
+  MEASURE(requests.avg_duration) AS avg_duration
+FROM requests
+GROUP BY 1, 2, 3
+ORDER BY 5 DESC;
+```
 
 <Tip>
 
@@ -244,6 +255,8 @@ your data source's own query history.
 
 [ref-query-history-export]: /admin/monitoring/monitoring-integrations#query-history-export
 [ref-query-tracing]: /admin/connect-to-data/query-tracing
+[ref-explore]: /docs/explore-analyze/explore
+[ref-sql-api]: /reference/core-data-apis/sql-api
 [ref-query-history]: /admin/monitoring/query-history
 [ref-vector-configuration]: /admin/monitoring/monitoring-integrations#configuration
 [ref-keyless-auth]: /admin/monitoring/monitoring-integrations/cloudwatch#keyless-authentication

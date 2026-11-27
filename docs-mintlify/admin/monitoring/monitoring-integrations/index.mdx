@@ -69,11 +69,11 @@ following guides and configuration examples to get tool-specific instructions:
 ## Configuration
 
 To enable monitoring integrations, navigate to **Settings → Monitoring
-Integrations** and click **Enable Vector** to add a Vector agent to
+integrations** and turn on **Enable Vector** to add a Vector agent to
 your deployment.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/monitoring-integrations/index/bf05182f.png" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/monitoring-integrations/index/monitoring-integrations.png" alt="Monitoring integrations page with Enable Vector turned on and the Metrics export credentials" />
 </Frame>
 
 Under **Metrics export**, you will see credentials for the
@@ -388,11 +388,11 @@ inputs = [
 ]
 ```
 
-Navigate to **Settings → Monitoring Integrations** to take the
+Navigate to **Settings → Monitoring integrations** to take the
 credentials `prometheus_exporter` under **Metrics export**:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/monitoring-integrations/index/7db3949b.png" />
+  <img src="https://static.cube.dev/docs/admin/monitoring/monitoring-integrations/index/metrics-export.png" alt="Metrics export section with the URL, user and password for the prometheus_exporter sink" />
 </Frame>
 
 You can also customize the user name and password for `prometheus_exporter` by
@@ -418,7 +418,7 @@ Query History export is part of Monitoring Integrations, available on the
 
 Query History export requires the M [Monitoring Integrations tier](/admin/account-billing/pricing#monitoring-integrations-tiers) of your
 deployment, shown as **Medium (Up to 50 GB/mo)**. You can find it under
-**Settings → Monitoring Integrations**; deployments default to **X-Small (Up to 10
+**Settings → Monitoring integrations**; deployments default to **X-Small (Up to 10
 GB/mo)**.
 
 On **X-Small** or **Small**, Query History export fails silently: no events reach
@@ -515,7 +515,7 @@ Reach out to the [Cube support team][ref-support] to activate it for your accoun
 
 To configure chat history export:
 
-1. Under **Settings → Monitoring Integrations**, set the **Monitoring Integrations
+1. Under **Settings → Monitoring integrations**, set the **Monitoring Integrations
    Tier** to **Medium (Up to 50 GB/mo)**, as for [Query History
    export](#query-history-export), and turn on **Export chat history**. Without
    both, no chat records reach any sink.

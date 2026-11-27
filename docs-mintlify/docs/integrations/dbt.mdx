@@ -148,8 +148,8 @@ at pull time — your Git credentials never reach the browser.
 
 <Frame>
   <img
-    src="https://static.cube.dev/docs/integrations/dbt/4b82b61a.png"
-    alt="dbt project settings card with the SSH authentication method selected and the generated public deploy key"
+    src="https://static.cube.dev/docs/integrations/dbt/dbt-project-settings.png"
+    alt="dbt project card in Settings → Data sources with the HTTPS token method, the repository URL, project path and dbt target schema"
   />
 </Frame>
 
@@ -433,7 +433,7 @@ env, are resolved server-side at sync time, and never reach the browser.
 
 <Step title="Define the variable on the deployment">
 
-In **Settings → Configuration**, add the environment variable (e.g.
+In **Settings → Environment variables**, add the environment variable (e.g.
 `DBT_PACKAGES_TOKEN`) with its value, if it isn't set already.
 
 </Step>
@@ -473,7 +473,7 @@ Cube — the artifact is produced by whatever dbt version your pipeline runs.
 The sandbox runs a pinned dbt Core version — currently **1.12.3** — together with the
 adapter for your deployment's warehouse. To run a pull on a different version — to match
 the version your dbt project is built against — set `DBT_SANDBOX_VERSION` on the
-deployment under **Settings → Configuration**:
+deployment under **Settings → Environment variables**:
 
 ```text
 DBT_SANDBOX_VERSION=1.9.2

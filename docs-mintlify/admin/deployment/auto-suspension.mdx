@@ -31,8 +31,8 @@ Auto-suspension will hibernate the deployment when **no** API
 requests are received after a period of time, and automatically resume the
 deployment when API requests start coming in again:
 
-<Frame caption="Cube Cloud auto-suspend flowchart">
-  <img src="https://static.cube.dev/docs/admin/deployment/auto-suspension/e9a22d59.png" alt="Cube Cloud auto-suspend flowchart" />
+<Frame caption="Auto-suspension flowchart">
+  <img src="https://static.cube.dev/docs/admin/deployment/auto-suspension/auto-suspension-flowchart.png" alt="Auto-suspension flowchart: if the deployment received no API requests within the threshold period, it is suspended" />
 </Frame>
 
 [Shared deployments][ref-deployment-dev-instance] are auto-suspended
@@ -74,15 +74,15 @@ on-demand API instances with limited performance. There are no guarantees for th
 ## Configuration
 
 To enable auto-suspension, navigate to **Settings → Configuration**
-of your Cube Cloud deployment and ensure that **Enable auto-suspend**
+of your Cube Cloud deployment and ensure that **Enable auto-suspension**
 is turned on:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/deployment/auto-suspension/b0a3f38d.png" />
+  <img src="https://static.cube.dev/docs/admin/deployment/auto-suspension/configuration-flags.png" alt="Configuration flags in Settings → Configuration with Enable auto-suspension turned on and the Auto-suspension threshold drop-down" />
 </Frame>
 
 To configure how long Cube Cloud should wait before suspending
-the deployment, adjust **Auto-suspend threshold**. For best experience,
+the deployment, adjust **Auto-suspension threshold**. For best experience,
 it's not recommended to choose anything below 1 hour.
 
 The deployment will temporarily become unavailable for reconfiguration; this
