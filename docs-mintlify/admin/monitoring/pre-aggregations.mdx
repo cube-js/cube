@@ -10,7 +10,10 @@ refreshed][ref-caching-using-preaggs-refresh], along with the last 24 hours of
 build history.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/eb10de99.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/pre-aggregations-list.png"
+    alt="Pre-Aggregations page listing pre-aggregations with their last build time, duration, partition size and partitions"
+  />
 </Frame>
 
 The built-in Admin and Developer roles can open this page and build
@@ -18,7 +21,7 @@ pre-aggregations; the Explorer and Viewer roles can't open it. To let other user
 check pre-aggregation status without building, give them a [custom
 role][ref-custom-roles-deployment-permissions] (Enterprise plan) with
 **Access deployment** and **View pre-aggregations**. They see the page
-read-only: **Build all**, **Build Selected**, and the controls that cancel
+read-only: **Build all**, **Build N selected**, and the controls that cancel
 queued or running builds are hidden.
 
 ## Exploring pre-aggregations
@@ -44,14 +47,20 @@ pre-aggregation. In the example below, the pre-aggregation has a single
 partition:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/d65d5910.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/partitions-single.png"
+    alt="Partitions tab of a pre-aggregation with a single partition and the Build all button"
+  />
 </Frame>
 
 Pre-aggregations with multiple partitions show a list of all partitions, which
 is helpful for checking pre-aggregation partition build times and sizes:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/84c2989b.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/partitions-multiple.png"
+    alt="Partitions tab of a pre-aggregation partitioned by year, with each partition build time and size"
+  />
 </Frame>
 
 Ideally partitions should be of a similar size and build time. If a partition is
@@ -60,17 +69,16 @@ why.
 
 If the pre-aggregation requires rebuilding (usually due to the underlying data
 changing in a significant way), clicking **Build all** rebuilds **all**
-partitions of the pre-aggregation:
-
-<Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/d65d5910.png" />
-</Frame>
+partitions of the pre-aggregation.
 
 You can also choose to rebuild **specific** partitions by selecting them and
-then clicking the **Build Selected** button:
+then clicking the **Build N selected** button:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/99c72537.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/build-selected.png"
+    alt="Partitions tab with three partitions selected and the Build 3 selected button"
+  />
 </Frame>
 
 Builds started from a staging or development environment land in the same
@@ -87,7 +95,10 @@ data model][ref-model-ref-preaggs] without having to switch to the **Data
 Model** page:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/4e8f203a.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/definition.png"
+    alt="Definition tab of a pre-aggregation showing its definition as JSON"
+  />
 </Frame>
 
 ### Preview
@@ -96,7 +107,10 @@ To see a sample of the data contained in the pre-aggregation, click the 
 ​**Preview** tab:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/7f5059bb.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/preview.png"
+    alt="Preview tab of a pre-aggregation showing sample rows of pre-aggregated data"
+  />
 </Frame>
 
 This can be used to verify that the data within the pre-aggregation is being
@@ -108,7 +122,10 @@ The **Used by** tab shows recent queries that used this pre-aggregation
 for acceleration:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/1dcef348.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/used-by.png"
+    alt="Used by tab of a pre-aggregation listing recent queries that it accelerated"
+  />
 </Frame>
 
 This is especially useful for checking that the pre-aggregation is being used as
@@ -121,7 +138,10 @@ configured pre-aggregations. The **Indexes** tab displays any configured
 indexes for this pre-aggregation:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/f7e306e2.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/indexes.png"
+    alt="Indexes tab of a pre-aggregation listing an index and its columns"
+  />
 </Frame>
 
 ## Build History
@@ -132,13 +152,19 @@ pre-aggregation build succeeded (or failed), how the build was triggered, when
 the build started, and how long it took to complete.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/9a9f88fb.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/build-history.png"
+    alt="Build History tab listing pre-aggregation partition builds with their status, trigger, start time, duration and size"
+  />
 </Frame>
 
 To see more information about a specific build, click on it:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/2f2d4366.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/pre-aggregations/build-details.png"
+    alt="Build details page with the build status, trigger, table name, partition size and build steps"
+  />
 </Frame>
 
 [ref-caching-gs-preaggs]: /docs/pre-aggregations/getting-started-pre-aggregations
