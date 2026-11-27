@@ -266,9 +266,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       ...config
     };
 
-    const { queryTag } = this.config;
-    if (queryTag && typeof queryTag !== 'string') {
-      const longest = JSON.stringify({ requestId: 'x'.repeat(REQUEST_ID_MAX_LENGTH), ...queryTag });
+    if (this.config.queryTag && typeof this.config.queryTag !== 'string') {
+      const longest = JSON.stringify({
+        requestId: 'x'.repeat(REQUEST_ID_MAX_LENGTH),
+        ...this.config.queryTag,
+      });
       if (longest.length > QUERY_TAG_MAX_LENGTH) {
         throw new Error(
           `Snowflake queryTag is too long: with the request id it must fit into ${QUERY_TAG_MAX_LENGTH} characters as JSON.`
@@ -1071,17 +1073,17 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * An object `queryTag` is merged with the request id, its own `requestId` key taking priority.
    */
   protected statementParameters(requestId?: string): StatementOption['parameters'] {
-    const { queryTag } = this.config;
-
-    if (queryTag && typeof queryTag !== 'string') {
+    if (this.config.queryTag && typeof this.config.queryTag !== 'string') {
       return {
         QUERY_TAG: JSON.stringify(
-          requestId ? { requestId: extractRequestUUID(requestId), ...queryTag } : queryTag
+          requestId
+            ? { requestId: extractRequestUUID(requestId), ...this.config.queryTag }
+            : this.config.queryTag
         ),
       };
     }
 
-    if (!requestId || queryTag) {
+    if (!requestId || this.config.queryTag) {
       return undefined;
     }
 
