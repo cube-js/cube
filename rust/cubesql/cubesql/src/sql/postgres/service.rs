@@ -89,6 +89,12 @@ impl ProcessingLoop for PostgresServer {
                 }
             };
 
+            // Replies are written as several small messages; without TCP_NODELAY, Nagle holds each
+            // one until the client's delayed ACK (~40 ms on Linux), on every statement.
+            if let Err(e) = socket.set_nodelay(true) {
+                error!("[pg] Error while setting TCP_NODELAY on TcpStream: {}", e);
+            }
+
             let (client_addr, client_port) = match socket.peer_addr() {
                 Ok(peer_addr) => (peer_addr.ip().to_string(), peer_addr.port()),
                 Err(e) => {
