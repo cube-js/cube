@@ -108,9 +108,9 @@ model and credentials.
 ### Assigning a small LLM to an agent
 
 Set the agent's small LLM with the `small_llm` property in the agents YAML
-configuration. It accepts `auto`, a built-in model (`claude-haiku-5-5`,
-`gpt-6-luna`, `kimi_k3` or `glm_5_3`), or a BYOM reference to a model of type
-**Small LLM**:
+configuration. It accepts `auto`, a built-in small model (`claude-haiku-5-5` or
+`gpt-6-luna`), a built-in [`llm`](/admin/ai#llm) name such as `glm_5_3` or
+`claude_5_5_sonnet`, or a BYOM reference to a model of type **Small LLM**:
 
 ```yaml
 agents:
@@ -123,14 +123,14 @@ agents:
         name: "anthropic-haiku"
 ```
 
-The built-in Claude and GPT small LLM ids use hyphens, unlike the
-[`llm`](/admin/ai#llm) names: write `claude-haiku-5-5`, not
-`claude_5_5_haiku`. `kimi_k3` and `glm_5_3` are the same names as in `llm`.
+The two built-in small models use hyphens, unlike the `llm` names: write
+`claude-haiku-5-5`, not `claude_5_5_haiku`. Every other `llm` name works as is,
+except `claude_3_5_sonnetv2`, `claude_3_7_sonnet_thinking` and `o3`.
 
 With `small_llm: auto`, the default, an agent whose `llm` is `auto`, a Claude
 model, `glm_5_3` or `kimi_k3` runs short tasks on `claude-haiku-5-5`. Any other
-built-in LLM runs them on `gpt-6-luna`. To run short tasks on GLM 5.3 or Kimi K3
-instead, set the small LLM to the same model:
+built-in LLM runs them on `gpt-6-luna`. To run short tasks on the agent's own
+model instead, set the small LLM to the same name as `llm`:
 
 ```yaml
 agents:
