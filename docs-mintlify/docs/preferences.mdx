@@ -88,8 +88,7 @@ These switches control email only. Alerts, budgets, mentions, replies, shares,
 access requests, dashboard reviews and dbt syncs arrive in your
 [inbox][ref-inbox] whatever you choose here. In the **Notifications** section of
 the **Preferences** page, choose which of them also arrive by email. Only admins
-see the **Model syncs** switch. Users on a dbt notification list who aren't
-admins turn off the failure email with its unsubscribe link:
+see the **Model syncs** switch:
 
 {/* TODO: video — Preferences → Notifications, with the Skip email if already read switch and an email skipped after reading it in the Inbox (GTM-321) */}
 
@@ -105,7 +104,7 @@ admins turn off the failure email with its unsubscribe link:
 | Alerts | An [alert][ref-alerts] that lists you as a recipient fires or resolves, or usage crosses a [budget][ref-budgets] threshold you get notifications for | On |
 | Mentions in comments | Someone [mentions you][ref-mentions] in a dashboard comment | On |
 | Replies to comments | Someone replies [in a comment thread][ref-replies] you wrote in | On |
-| Model syncs | A [dbt sync][ref-dbt-review] that a webhook started has changes ready to review and the dbt project has no notification list, or a webhook dbt sync starts failing, with or without a list. Admins only; others on a notification list stop the failure email with its unsubscribe link | On |
+| Model syncs | A [dbt sync][ref-dbt-review] that a webhook started has changes ready to review and the dbt project has no notification list, or a webhook dbt sync starts failing, with or without a list. Only admins see this switch | On |
 | Shared with you | Someone [shares][ref-sharing] a workbook, a folder, or a chat with you, or approves your access request | On |
 | Access requests | Someone [requests access][ref-request-access] to an item you can share, or declines your request | On |
 | Dashboard reviews | Someone [requests your review][ref-reviews] of a dashboard, or comments on, approves, requests changes to, or publishes a review you take part in | On |
@@ -123,9 +122,9 @@ unsubscribing.
 
 The email is in the language you set under [Language](#language) and links to the
 comment, the item, the review or the changes. Cube doesn't email you about a
-comment, a shared item or a dashboard you can no longer open, or about a dbt sync's
-changes once you're no longer an admin. An email about a declined request doesn't name
-the item.
+comment, a shared item or a dashboard you can no longer open, or, once you're no
+longer an admin, about a dbt sync's changes in a project without a notification
+list. An email about a declined request doesn't name the item.
 
 An email address on an alert or a budget that doesn't belong to a Cube user
 always gets its email, whatever the Alerts switch says.
