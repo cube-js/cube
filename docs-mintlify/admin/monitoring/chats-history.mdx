@@ -32,6 +32,23 @@ export][ref-chat-history-export].
   src="https://ucarecdn.com/c0a5f8ac-9c3c-41d7-80c3-95f533476ad4/"
 ></video>
 
+## Linking to a thread
+
+To link to a thread from another tool, such as an alert built on [chat history
+export][ref-chat-history-export], put its chat UUID in the URL:
+
+```text
+https://your-tenant.cubecloud.dev/d/<deployment_id>/chat-history/<chat_uuid>
+```
+
+`<chat_uuid>` is the `chatId` of an exported record or of a thread in the [Chat
+History API][ref-chat-history-api], the same UUID as in the chat's own
+`/chat/<chat_uuid>` URL. An exported record also carries the `deploymentId`.
+
+The link opens the thread with its **Context window** usage. Opening it
+requires the same access as **Monitoring → Chat history**.
+
 [ref-custom-roles]: /admin/users-and-permissions/custom-roles#actions
 [ref-chat-history-export]: /admin/monitoring/monitoring-integrations#chat-history-export
 [ref-context-usage]: /docs/explore-analyze/analytics-chat#context-usage
+[ref-chat-history-api]: /api-reference/chat-history/list-chat-threads
