@@ -46,6 +46,7 @@ regex = "1.5"
 uuid = { version = "1", features = ["serde", "v4"] }
 bincode = "1.3.1"
 chrono = "0.4.39"
+chrono-tz = { git = "https://github.com/cube-js/chrono-tz", rev = "eec5a8cadb1b40e139195581be5f0b16afa61145" }
 tokio-util = { version = "0.7", features = ["compat"] }
 comfy-table = "7.1.0"
 bitflags = "1.3.2"

@@ -49,8 +49,8 @@ async fn test_metabase_cast_date_to_timestamp_group_by_day() {
                 dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                 granularity: Some("day".to_string()),
                 date_range: Some(json!(vec![
-                    "2021-12-02T00:00:00.000Z".to_string(),
-                    "2021-12-31T23:59:59.999Z".to_string(),
+                    "2021-12-02T00:00:00.000".to_string(),
+                    "2021-12-31T23:59:59.999".to_string(),
                 ])),
             }]),
             order: Some(vec![vec![

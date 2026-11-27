@@ -487,8 +487,8 @@ async fn test_join_two_subqueries_filter_push_down() {
                 dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
                 granularity: None,
                 date_range: Some(json!(vec![
-                    "2022-06-13T12:30:00.000Z".to_string(),
-                    "2022-06-29T12:30:00.000Z".to_string()
+                    "2022-06-13T12:30:00.000".to_string(),
+                    "2022-06-29T12:30:00.000".to_string()
                 ]))
             }]),
             order: Some(vec![vec![
