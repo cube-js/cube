@@ -389,6 +389,10 @@ async fn handle_sql_query(
                 .await?;
         }
 
+        session
+            .state
+            .set_introspection_disabled(!config.rest_introspection());
+
         {
             let mut cm = session
                 .state

@@ -129,6 +129,9 @@ pub trait ConfigObj: DIService + Debug {
     fn enable_tesseract_sql_planner(&self) -> bool;
 
     fn log_redaction(&self) -> bool;
+
+    /// Whether `/v1/cubesql` resolves the catalog tables that exist for Postgres clients
+    fn rest_introspection(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -155,6 +158,7 @@ pub struct ConfigObjImpl {
     pub no_implicit_order: bool,
     pub tesseract_sql_planner: bool,
     pub log_redaction: bool,
+    pub rest_introspection: bool,
 }
 
 impl ConfigObjImpl {
@@ -229,6 +233,7 @@ impl ConfigObjImpl {
             no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
             tesseract_sql_planner: env_parse("CUBEJS_TESSERACT_SQL_PLANNER", true),
             log_redaction: env_parse_bool("CUBEJS_LOG_REDACTION", !dev_mode),
+            rest_introspection: env_parse_bool("CUBESQL_REST_INTROSPECTION", false),
         }
     }
 }
@@ -319,6 +324,10 @@ impl ConfigObj for ConfigObjImpl {
     fn log_redaction(&self) -> bool {
         self.log_redaction
     }
+
+    fn rest_introspection(&self) -> bool {
+        self.rest_introspection
+    }
 }
 
 impl Config {
@@ -357,6 +366,7 @@ impl Config {
                 no_implicit_order: true,
                 tesseract_sql_planner: false,
                 log_redaction: false,
+                rest_introspection: false,
             }),
         }
     }

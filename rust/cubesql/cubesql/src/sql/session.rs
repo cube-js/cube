@@ -4,7 +4,7 @@ use rand::Rng;
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, LazyLock, RwLock as RwLockSync, Weak,
     },
     time::{Duration, SystemTime},
@@ -101,6 +101,9 @@ pub struct SessionState {
     pub query_timezone: RwLockSync<Option<String>>,
 
     pub throw_continue_wait: RwLockSync<bool>,
+
+    // Catalog tables exist for Postgres clients; other entry points can turn them off
+    introspection_disabled: AtomicBool,
 }
 
 impl SessionState {
@@ -136,7 +139,17 @@ impl SessionState {
             cache_mode: RwLockSync::new(None),
             query_timezone: RwLockSync::new(None),
             throw_continue_wait: RwLockSync::new(false),
+            introspection_disabled: AtomicBool::new(false),
         }
+    }
+
+    pub fn introspection_disabled(&self) -> bool {
+        self.introspection_disabled.load(Ordering::Relaxed)
+    }
+
+    pub fn set_introspection_disabled(&self, disabled: bool) {
+        self.introspection_disabled
+            .store(disabled, Ordering::Relaxed);
     }
 
     pub fn is_in_transaction(&self) -> bool {

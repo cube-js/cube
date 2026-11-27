@@ -1024,6 +1024,57 @@ describe('SQLInterface', () => {
       await native.shutdownInterface(instance, 'fast');
     }
   });
+
+  // Jest keeps its own copy of process.env, so the addon only sees the variable when the
+  // whole run is started with it
+  test('introspection tables are resolved only with CUBESQL_REST_INTROSPECTION', async () => {
+    const enabled = process.env.CUBESQL_REST_INTROSPECTION === 'true';
+
+    const instance = await native.registerInterface({
+      ...interfaceMethods(),
+      canSwitchUserForSession: (_payload) => true,
+      preAggregationMatch: async ({ queries }) => ({ matches: queries.map(() => false) }),
+    });
+
+    const exec = async (sql: string) => {
+      const lines: any[] = [];
+      await native.execSql(instance, sql, new Writable({
+        write: (chunk, _, callback) => {
+          lines.push(...chunk.toString('utf-8').split('\n').filter((l: string) => l.trim()).map((l: string) => JSON.parse(l)));
+          callback();
+        },
+      }), { foo: 'bar' });
+      return lines;
+    };
+
+    try {
+      for (const sql of [
+        'SELECT table_name FROM information_schema.tables',
+        'SELECT relname FROM pg_catalog.pg_class',
+        'SELECT typname FROM pg_type',
+        'SELECT table_name FROM svv_tables',
+      ]) {
+        const lines = await exec(sql);
+        const described = await native.describeSqlParams(instance, sql, { foo: 'bar' });
+
+        if (enabled) {
+          expect(lines.find((l) => l.error)).toBeUndefined();
+          expect(lines.find((l) => l.schema)).toBeDefined();
+          expect(described).toEqual({ params: [] });
+        } else {
+          expect(lines.find((l) => l.error)?.error).toMatch(/not found/);
+          expect(lines.find((l) => l.schema)).toBeUndefined();
+          expect(described).toEqual({ error: expect.stringMatching(/not found/) });
+        }
+      }
+
+      const lines = await exec('SELECT 1 AS a');
+      expect(lines.find((l) => l.error)).toBeUndefined();
+      expect(lines.find((l) => l.schema)).toBeDefined();
+    } finally {
+      await native.shutdownInterface(instance, 'fast');
+    }
+  });
 });
 
 describe('security context argument of the native entry points', () => {

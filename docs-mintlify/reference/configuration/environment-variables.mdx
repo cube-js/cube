@@ -1915,6 +1915,17 @@ Queries with a `LIMIT` at or below that limit are not streamed.
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | `false`                | `false`               |
 
+## `CUBESQL_REST_INTROSPECTION`
+
+If `true`, the [`/v1/cubesql`][ref-ref-cubesql] and `/v1/cubesql/params` endpoints can
+query introspection tables, i.e., `information_schema.*`, `pg_catalog.*`, and the Redshift
+system tables. Otherwise, these tables are only available to clients connected to the
+[SQL API][ref-sql-api] over the Postgres protocol.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBESQL_FAIL_ON_LIMITLESS_POST_PROCESSING`
 
 If `true`, the [SQL API][ref-sql-api] rejects a query when part of it has to run outside

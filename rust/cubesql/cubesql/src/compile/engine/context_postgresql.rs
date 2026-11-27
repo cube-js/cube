@@ -252,6 +252,8 @@ impl DatabaseProtocol {
             }
         };
 
+        let introspection_disabled = context.session_state.introspection_disabled();
+
         match schema.as_str() {
             "pg_temp_3" => {
                 if let Some(temp_table) = context.session_state.temp_tables().get(&table) {
@@ -268,6 +270,10 @@ impl DatabaseProtocol {
                     return Some(Arc::new(CubeTableProvider::new(cube.clone())));
                     // TODO .clone()
                 };
+
+                if introspection_disabled {
+                    return None;
+                }
 
                 // TODO: Move to pg_catalog, support SEARCH PATH.
                 // Redshift
@@ -297,6 +303,7 @@ impl DatabaseProtocol {
                     _ => {}
                 };
             }
+            _ if introspection_disabled => return None,
             "information_schema" => match table.as_str() {
                 "columns" => {
                     return Some(Arc::new(PostgresSchemaColumnsProvider::new(
