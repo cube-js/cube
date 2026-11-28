@@ -28,7 +28,7 @@ Permissions stack: a user gets the union of every role assigned to them, so a us
 To see the list of custom roles, go to **Admin → Custom roles** in your Cube account. Click on a role to edit it, or click **Create role** to create a new one.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/custom-roles/roles-list.png" alt="Custom roles page with a list of roles, their member and resource counts, and the Create role button" />
+  <img src="https://static.cube.dev/docs/admin/custom-roles/roles-list-v2.png" alt="Custom roles page with a list of roles, their member and resource counts and descriptions, and the Create role button" />
 </Frame>
 
 ## Anatomy of a custom role
@@ -36,7 +36,7 @@ To see the list of custom roles, go to **Admin → Custom roles** in your Cube a
 The role builder uses a two-column layout. The left column (sticky as you scroll) holds the role's identity and the **Create / Update** button. The right column (scrollable) holds the permission cards.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/custom-roles/create-role.png" alt="Create role page with the Role card and the Create button on the left, and the Global permissions and Deployment permissions cards on the right" />
+  <img src="https://static.cube.dev/docs/admin/custom-roles/create-role-v2.png" alt="Create role page with the Role card and the Create button on the left, and the Global permissions card on the right" />
 </Frame>
 
 ### Name and description
@@ -62,7 +62,7 @@ The tier is hierarchical, so a higher one satisfies a requirement for a lower:
 - **Developer** meets any Explorer or Viewer requirement.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/custom-roles/base-role.png" alt="Base role dropdown open with the Viewer, Explorer and Developer options" />
+  <img src="https://static.cube.dev/docs/admin/custom-roles/base-role-v2.png" alt="Base role drop-down open on the Role card with the Viewer, Explorer and Developer options" />
 </Frame>
 
 <Note>
@@ -80,7 +80,7 @@ Eight deployment-scoped actions can be checked at every tier: **Access deploymen
 Removing the elevated action re-enables the lower tiers. This is a rule of the builder, not of the server: nothing rejects a role whose tier is lower than its deployment actions, so a role written [through the API](#managing-roles-through-the-api) keeps whatever tier it was sent with.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/custom-roles/auto-bump.png" alt="Role builder with Edit deployment checked, the Base role set to Developer, and the disabled Viewer option showing the tooltip Selected permissions require Developer access" />
+  <img src="https://static.cube.dev/docs/admin/custom-roles/auto-bump-v2.png" alt="Base role set to Developer with the Viewer and Explorer options disabled and the tooltip Selected permissions require Developer access" />
 </Frame>
 
 ### Global permissions
@@ -88,7 +88,7 @@ Removing the elevated action re-enables the lower tiers. This is a rule of the b
 Global permissions are org-wide. Check any number of them on the **Global permissions** card.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/custom-roles/global-permissions-email.png" alt="Global permissions card of the role editor with Send email to yourself checked in the AI group" />
+  <img src="https://static.cube.dev/docs/admin/custom-roles/global-permissions-email-v2.png" alt="Global permissions card of the role editor with Send email to yourself checked in the AI group" />
 </Frame>
 
 | Group                                | Permission                          | What it grants                                            |
@@ -139,7 +139,7 @@ Choose which deployments the policy applies to:
 - **Specific deployments** — pick deployments from a searchable multi-select picker.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/custom-roles/policy-specific.png" alt="Deployment policy card with Specific deployments selected and three deployments checked in the picker" />
+  <img src="https://static.cube.dev/docs/admin/custom-roles/policy-specific-v2.png" alt="Deployment policy card with Specific deployments selected and three deployments checked in the picker" />
 </Frame>
 
 #### Actions
@@ -169,7 +169,7 @@ Either grant **Full access** (a shortcut that enables every current and future d
 When **Full access** is checked, the granular checkboxes appear checked and disabled — granting Full access today also covers any deployment-scoped permissions added in the future.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/custom-roles/policy-full.png" alt="Deployment policy card with Full access checked and every granular action checked and disabled" />
+  <img src="https://static.cube.dev/docs/admin/custom-roles/policy-full-v2.png" alt="Deployment policy card with Full access checked and the granular actions checked and disabled" />
 </Frame>
 
 <Note>
