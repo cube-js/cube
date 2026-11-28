@@ -18,12 +18,11 @@ https://<deployment-id>.<region>.cubecloudapp.dev/dev-mode/<dev-branch-name>/cub
 ```
 
 To test your REST (JSON) API from your terminal, you can use [curl](https://curl.se/).
-Click on “How to connect your application” next to the REST (JSON) API, and it will
-display a code snippet that you can run in your terminal to test the endpoint
-with curl.
+The **REST API** tab of **API credentials** shows a curl command that you can run
+in your terminal to test the endpoint.
 
-<Frame caption="Querying Cube with curl">
-  <img src="https://static.cube.dev/docs/shared/30f90999.png" alt="Querying Cube with curl" />
+<Frame>
+  <img src="https://static.cube.dev/docs/admin/deployment/environments/api-credentials-v2.png" alt="Settings → API credentials page with tabs for each API; the REST API tab shows the deployment's endpoint and a sample curl command." />
 </Frame>
 
 Cube offers a frontend JavaScript SDK, as well as a React integration that you
@@ -38,8 +37,8 @@ Next, initialize `cubeApi` within your application.
 
 Please note that you must sign your request with the correct authentication
 token. Cube uses the [JSON Web Token (JWT)](https://jwt.io/) standard by default
-to authenticate requests. You can copy a temporary token from the "How to
-connect to your application" modal window. For production use, you must generate
+to authenticate requests. You can copy a temporary token from the curl command
+on the **REST API** tab of **API credentials**. For production use, you must generate
 this token from your secret key. You can learn more about this in the
 [Authentication & Authorization](/docs/data-modeling/access-control) section of the documentation.
 

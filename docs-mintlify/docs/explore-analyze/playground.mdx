@@ -35,7 +35,7 @@ You can see a list of all cubes or views in the sidebar on the left. Choose eith
 on a cube or a view to view a list of its members.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/playground/08d5cc69.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/playground/data-model-sidebar.png" alt="Playground sidebar with the Views tab selected, the orders view expanded, and its description in a tooltip" />
 </Frame>
 
 Members of cubes and views (i.e., measures, dimensions, hierarchies, folders, etc.)
@@ -58,7 +58,7 @@ change the security context. Changing the security context can affect the conten
 of the sidebar that you see:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/playground/1a0721e8.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/playground/security-context-dialog.png" alt="Security context dialog in Playground with the JSON editor, Groups, Token, and the Apply button" />
 </Frame>
 
 ## Searching the data model
@@ -68,7 +68,7 @@ sidebar on the left. Click on the element in the search results to add it to a n
 or existing query.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/playground/c9e3a8e5.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/playground/member-search.png" alt="Playground sidebar search for "count" with matching members highlighted in two views" />
 </Frame>
 
 ## Composing queries
@@ -78,18 +78,18 @@ in the sidebar on the left. Click on the _funnel_ icon next to any member to add
 for it to the query or use the **Filters** pane to add filters, including filters
 with [advanced boolean logic][ref-boolean-filters].
 
-Click **All members** or **Used members** to show only members of the
-query or all available members. Click **Reset** to remove all members from the query.
+Click **All members** or **Used only** to switch between all available members
+and only members of the query. Click **Reset** to remove all members from the query.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/playground/1f052da4.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/playground/compose-query.png" alt="Playground with a query composed in the sidebar and its members as columns on the Results tab" />
 </Frame>
 
 Use the **Order** drop-down on the right to specify how the
 [results](#viewing-results) shall be sorted.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/playground/82719c33.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/playground/order-dropdown.png" alt="Order drop-down in Playground with a sort direction for each member of the query" />
 </Frame>
 
 Use the **Options** drop-down on the right to specify if the query shall be
@@ -98,7 +98,7 @@ a [row limit][ref-row-limit] and an offset. You can also request the count of al
 in the result set as if there's no limit present.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/playground/92dac6aa.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/playground/options-dropdown.png" alt="Options drop-down in Playground with Ungrouped, Show total number of rows, Time zone, Limit, and Offset" />
 </Frame>
 
 ### Pasting a query
@@ -108,7 +108,7 @@ left and pasting a [REST (JSON) API][ref-rest-api] query or a [GraphQL API][ref-
 query from the clipboard and clicking **Apply**.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/playground/d34949a1.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/playground/apply-query-dialog.png" alt="Apply query dialog in Playground with JSON and GraphQL tabs and a pasted JSON query" />
 </Frame>
 
 Pasting a [SQL API][ref-sql-api] query is not supported.
@@ -139,7 +139,7 @@ View query results on the **Results** tab. Check the number of rows in the resul
 set on the bottom and use the pagination control in the bottom right corner, if needed.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/playground/399016dc.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/playground/results-tab.png" alt="Results tab in Playground with query results, the querying time, and pagination at the bottom" />
 </Frame>
 
 Expand the **Chart** pane to visualize the results. Choose one of visualization
@@ -147,7 +147,7 @@ types and pivot data via the **Pivot** drop-down, if needed. Click **Code**
 to generate front-end code in [Chart Prototyping][ref-chart-prototyping].
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/playground/368ceb39.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/playground/chart-pane-pivot.png" alt="Chart pane in Playground with a bar chart, the Pivot drop-down open, and the Code button" />
 </Frame>
 
 ## Viewing a generated query
@@ -171,11 +171,11 @@ that Cube passes to an underlying data source driver later when executing the qu
 
 ## Copying API queries
 
-View the queries for respective data APIs on the **SQL API**, **REST (JSON) API**,
+View the queries for respective data APIs on the **SQL API**, **REST API**,
 and **GraphQL API** tabs. Click **Copy** to put one of them into your clipboard.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/playground/1b32fe0d.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/playground/sql-api-tab.png" alt="SQL API tab in Playground with the equivalent SQL API query and the Copy button" />
 </Frame>
 
 {/*

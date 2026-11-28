@@ -188,13 +188,13 @@ and marks data model entities that are not accessible for querying through
 Here's what `Alice` *sees*:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/recipes/configuration/custom-data-model-per-tenant/f7b311b0.png" />
+  <img src="https://static.cube.dev/docs/recipes/configuration/custom-data-model-per-tenant/member-access-alice.png" alt="Playground with the tenant_id Alice security context: cube_b and count_b are marked with a lock" />
 </Frame>
 
 And here's the *perspective* of `Bob`:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/recipes/configuration/custom-data-model-per-tenant/4a848cb7.png" />
+  <img src="https://static.cube.dev/docs/recipes/configuration/custom-data-model-per-tenant/member-access-bob.png" alt="Playground with the tenant_id Bob security context: cube_a and count_a are marked with a lock" />
 </Frame>
 
 ### Customizing other parameters
@@ -246,13 +246,13 @@ cube(`cube_x`, {
 Here's the generated SQL for `Alice`:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/recipes/configuration/custom-data-model-per-tenant/96efaca8.png" />
+  <img src="https://static.cube.dev/docs/recipes/configuration/custom-data-model-per-tenant/sql-table-alice.png" alt="Generated SQL tab in Playground for Alice, reading from Alice.table_x" />
 </Frame>
 
 And here's the generated SQL for `Bob`:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/recipes/configuration/custom-data-model-per-tenant/5fe23769.png" />
+  <img src="https://static.cube.dev/docs/recipes/configuration/custom-data-model-per-tenant/sql-table-bob.png" alt="Generated SQL tab in Playground for Bob, reading from Bob.table_x" />
 </Frame>
 
 ### Dynamic data modeling
@@ -278,15 +278,15 @@ cubes:
         type: count
 
       {% if tenant_id == 'Alice' %}
-        - name: count_a
-          sql: column_a
-          type: count
+      - name: count_a
+        sql: column_a
+        type: count
       {% endif %}
 
       {% if tenant_id == 'Bob' %}
-        - name: count_b
-          sql: column_b
-          type: count
+      - name: count_b
+        sql: column_b
+        type: count
       {% endif %}
 ```
 
@@ -325,13 +325,13 @@ cube(`cube_x`, {
 Here's the data model and the generated SQL for `Alice`:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/recipes/configuration/custom-data-model-per-tenant/0789b03a.png" />
+  <img src="https://static.cube.dev/docs/recipes/configuration/custom-data-model-per-tenant/dynamic-model-alice.png" alt="Playground for Alice with the count and count_a measures of cube_x and their generated SQL" />
 </Frame>
 
 And here's the data model and the generated SQL for `Bob`:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/recipes/configuration/custom-data-model-per-tenant/2a07330d.png" />
+  <img src="https://static.cube.dev/docs/recipes/configuration/custom-data-model-per-tenant/dynamic-model-bob.png" alt="Playground for Bob with the count and count_b measures of cube_x and their generated SQL" />
 </Frame>
 
 ### Loading from disk
