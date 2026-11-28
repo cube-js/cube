@@ -123,18 +123,25 @@ time between two time dimensions, see [durations](#durations-between-dates).
   />
 </Frame>
 
-**Bins** take their boundaries either as a list (**Custom ranges**) or from a
-**Range start** and **Range end** (**Equal intervals**), which are prefilled
-from the column's own minimum and maximum. For equal intervals, choose whether
-the range is split by **Number of bins** or by a fixed **Bin size**. Each
-boundary opens a bucket that includes its lower bound and excludes the upper
-one, and two open-ended buckets are added at the edges—so `0, 18, 25` yields
-`< 0`, `[0, 18)`, `[18, 25)`, `>= 25`, and no row is dropped. **Label style**
-renders a bucket as `[10, 20)`, `>= 10 and < 20`, `10 to 19` (offered only while
-every boundary is a whole number), or **Custom**, which lets you type your own
-label for each bucket. Turn off **Label empty values separately** to fold rows
-where the dimension is `NULL` into the last bucket instead of reporting them
-under their own label (`Unknown` by default).
+**Bins** split a number dimension into ranges. A histogram at the top of the
+panel shows how the column's values are spread, with a pin at each boundary.
+Choose how to define the bins:
+
+- **Boundaries** — type the values to split at under **Split values at these
+  boundaries**. Separate them with commas, spaces, or semicolons.
+- **Bin count** — split a range into a number of equal bins, from 2 to 100.
+- **Bin size** — split a range into bins of a fixed width.
+
+For **Bin count** and **Bin size**, the start and end of the range are prefilled
+from the column's own minimum and maximum. Each boundary opens a bin that
+includes its lower bound and excludes the upper one, and two open-ended bins are
+added at the edges—so `0, 18, 25` yields `Under 0`, `0 to under 18`,
+`18 to under 25`, `25 or more`, and no row is dropped.
+
+The panel lists the bins with the number of rows in each. To rename a bin, type
+over its label; resetting the label brings the generated one back. Rows where the
+dimension is `NULL` always get a bin of their own, listed below the others and
+labeled `Unknown` by default.
 
 **Value groups** collect the dimension's values into named sets. A group is
 defined either by the values you pick or by a rule, chosen with the operator in
@@ -159,14 +166,12 @@ value does not change any rule, so a rule in an earlier group can still catch it
 A value can match more than one group, for example two overlapping rules. It
 joins the first group that matches it, so the order of the groups is their
 precedence. A new group is added after the existing ones, so add the narrower
-rule first. By default, whatever matches no group—including `NULL` values—falls
-under **Everything else**, which defaults to `Other`; turn off **Group remaining
-values** to have those rows return `NULL` instead.
+rule first. Whatever matches no group—including `NULL` values—falls under
+**Everything else**, which defaults to `Other`.
 
-Bucket labels carry their position as a prefix (`1.`, `2.`, zero-padded past nine
-buckets) so that sorting the column sorts it by value rather than alphabetically,
-which would put `>= 25` before `[0, 18)`. The prefix is visible in results, chart
-legends, and axes.
+Bins come back in the order of their ranges, and value groups in the order the
+groups were defined, not in the alphabetical order of their labels. Sorting the
+field descending reverses that order.
 
 <Frame>
   <img
@@ -179,9 +184,9 @@ The panel previews the Semantic SQL it generates as you build:
 
 ```sql
 CASE WHEN orders_view.age IS NULL THEN 'Unknown'
-  WHEN orders_view.age < 0 THEN '1. < 0'
-  WHEN orders_view.age < 18 THEN '2. [0, 18)'
-  ELSE '3. >= 18' END
+  WHEN orders_view.age < 0 THEN 'Under 0'
+  WHEN orders_view.age < 18 THEN '0 to under 18'
+  ELSE '18 or more' END
 ```
 
 Value groups render each group as a branch: picked values as `IN`, text rules as
@@ -195,9 +200,9 @@ CASE WHEN orders_view.status IN ('new', 'processing') THEN 'Open'
 
 <Info>
 
-**Equal intervals** ranges are resolved into boundaries when the field is created, not
-recomputed from the data. Values arriving later outside the range join the first
-and last buckets instead of extending them.
+A **Bin count** or **Bin size** range is resolved into boundaries when the field
+is created, not recomputed from the data. Values arriving later outside the
+range join the first and last bins instead of extending them.
 
 </Info>
 
