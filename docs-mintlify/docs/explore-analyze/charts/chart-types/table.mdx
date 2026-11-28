@@ -26,6 +26,31 @@ The table visualization presents query results in a structured grid. Unlike the 
 
 Hide a column with the eye button on its row in the **Fields** section of the **Fields** tab, and press it again to show the column. A hidden column keeps its place in the [pivot](#pivots), so it comes back where it was.
 
+## Column menu
+
+In a workbook, hover a column header and press **⋮** at its right edge to act on that column
+without opening the chart settings:
+
+- **Freeze up to this column**, or **Unfreeze from this column** on a frozen column — the same as
+  the pin on the column's card. See [Freezing columns](#freezing-columns). The item is disabled,
+  with a tooltip explaining why, on a column that can't be frozen.
+- **Fit to content** — the same as the **Fit** button on the column's card. See
+  [Column width](#column-width).
+- **Reset width** — returns the column to the default flexible width. It shows only on a column
+  with a width of its own that isn't frozen.
+- **Rename…** — sets the column's **Label**. Press Enter or click outside to save, or Esc to
+  cancel. Clear the name to show the field's own title again.
+- **Hide field** — hides the column. Show it again from the **Fields** tab, as described in
+  [Showing and hiding columns](#showing-and-hiding-columns).
+- **Column style…** — opens the **Style** tab on the column's card, for the options the menu
+  doesn't have.
+
+In a [pivot](#pivots), the titles of the row and column dimensions have the menu too. The title of
+a dimension in **Columns** offers only **Rename…** and **Hide field**. On a measure under a column
+pivot, an action applies to every column generated for that measure.
+
+The menu is available to users who can edit the workbook. It doesn't appear on dashboards.
+
 ## Reordering columns
 
 The table shows its columns in the order of the **Pivot** section of the **Fields** tab: the dimensions in **Rows** first, then the measures in **Values**. Drag a field within its list to reorder the columns. Moving a field to another list changes the [pivot](#pivots).
@@ -204,7 +229,7 @@ You can mix the two: give a label column a fixed width and let the metric column
 
 - **In the panel** — pick **Flex** or **Fix** for a column and enter its weight or pixel value. Switching to **Fix** reuses the column's last fixed width if it had one, and otherwise starts from the width it's currently drawn at.
 - **By dragging** — drag the border between two column headers on the table. The change is saved into the column's current mode (a flexible column keeps flexing at its new relative size; a fixed column updates its pixel width).
-- **Fit** — the **Fit** button on a column's card sizes it to its content and switches it to **Fix** at that width.
+- **Fit** — the **Fit** button on a column's card, or **Fit to content** in the [column menu](#column-menu), sizes the column to its content and switches it to **Fix** at that width.
 
   <Note>
 
@@ -247,6 +272,8 @@ its header:
   column, this clears the freeze.
 - **Reset** in the **Columns** section restores the default freeze, together with the column
   widths.
+
+The [column menu](#column-menu) on a header freezes and unfreezes the same way.
 
 A line on the right edge of the last frozen column shows where the scrolling part starts. The
 row-number column freezes along with the frozen columns. The freeze is saved with the chart, so
