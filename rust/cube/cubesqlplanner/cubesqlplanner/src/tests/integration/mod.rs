@@ -29,6 +29,7 @@ mod single_cube;
 mod subquery_dimensions;
 mod subquery_in_join;
 mod subquery_join_filter;
+mod switch_values_column_collision;
 mod time_dimensions;
 mod transitive_joins;
 mod ungrouped_forms;

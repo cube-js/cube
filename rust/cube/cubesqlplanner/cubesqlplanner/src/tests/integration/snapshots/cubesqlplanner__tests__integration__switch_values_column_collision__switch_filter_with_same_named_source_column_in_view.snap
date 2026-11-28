@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/switch_values_column_collision.rs
+expression: result
+---
+facts_view__amount_by_kind | facts_view__total
+---------------------------+------------------
+30                         | 130

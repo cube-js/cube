@@ -1,0 +1,43 @@
+cubes:
+    - name: facts
+      sql: "SELECT * FROM switch_collision_facts"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: kind
+            type: switch
+            values: ["a", "b"]
+      measures:
+          - name: amount_a
+            type: sum
+            sql: amount
+            filters:
+                - sql: "{CUBE}.kind = 'a'"
+          - name: amount_b
+            type: sum
+            sql: amount
+            filters:
+                - sql: "{CUBE}.kind = 'b'"
+          - name: total
+            type: sum
+            sql: amount
+          - name: amount_by_kind
+            multi_stage: true
+            type: number
+            case:
+                switch: "{CUBE.kind}"
+                when:
+                    - value: a
+                      sql: "{CUBE.amount_a}"
+                    - value: b
+                      sql: "{CUBE.amount_b}"
+                else:
+                    sql: "{CUBE.amount_a}"
+
+views:
+    - name: facts_view
+      cubes:
+          - join_path: facts
+            includes: "*"
