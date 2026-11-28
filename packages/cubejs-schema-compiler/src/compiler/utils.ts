@@ -32,21 +32,27 @@ const IGNORE_CAMELIZE: Record<number, Record<string, boolean>> = {
   }
 };
 
-function camelizeObjectPart(obj: unknown, camelizeKeys: boolean, level = 0): unknown {
+const DRILL_QUERIES_KEYS = new Set(['drill_queries', 'drillQueries']);
+
+// `parentKey` is the key the object or list sits under; a list's items share it
+function camelizeObjectPart(obj: unknown, camelizeKeys: boolean, level = 0, parentKey?: string): unknown {
   if (!obj) {
     return obj;
   }
 
   if (Array.isArray(obj)) {
     for (let i = 0; i < obj.length; i++) {
-      obj[i] = camelizeObjectPart(obj[i], true, level + 1);
+      obj[i] = camelizeObjectPart(obj[i], true, level + 1, parentKey);
     }
   } else if (typeof obj === 'object') {
     const record = obj as Record<string, unknown>;
 
     for (const key of Object.keys(record)) {
       if (!(level === 1 && key === 'meta')) {
-        record[key] = camelizeObjectPart(record[key], !IGNORE_CAMELIZE[level]?.[key], level + 1);
+        // A drill query's `order` is keyed by member names, which stay as written
+        const isDrillQueryOrder = key === 'order' && parentKey !== undefined && DRILL_QUERIES_KEYS.has(parentKey);
+        const camelizeChildKeys = !IGNORE_CAMELIZE[level]?.[key] && !isDrillQueryOrder;
+        record[key] = camelizeObjectPart(record[key], camelizeChildKeys, level + 1, key);
       }
 
       if (camelizeKeys) {
@@ -77,6 +83,7 @@ export function camelizeCube(cube: any): unknown {
   camelizeObjectPart(cube.cubes, false);
   camelizeObjectPart(cube.accessPolicy, false);
   camelizeObjectPart(cube.folders, false);
+  camelizeObjectPart(cube.memberSets, false);
 
   return cube;
 }

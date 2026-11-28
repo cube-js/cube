@@ -334,6 +334,21 @@ cubes:
     measures:
       - name: count
         type: count
+        drill_queries:
+          - name: by_status
+            members: [status, count]
+          - name: by_region
+            members: [region, count]
+          - name: filtered_by_status
+            members: [region, count]
+            filters: [{ member: status, operator: equals, values: [completed] }]
+          - name: by_customer_city
+            members: [customer.city, count]
+    joins:
+      - name: users
+        alias: customer
+        relationship: many_to_one
+        sql: "{CUBE}.customer_id = {customer.id}"
     access_policy:
       - group: admin
         member_level:
@@ -343,6 +358,25 @@ cubes:
           includes:
             - region
             - count
+
+  - name: users
+    sql: SELECT * FROM users
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: city
+        sql: city
+        type: string
+    access_policy:
+      - group: admin
+        member_level:
+          includes: "*"
+      - group: basic
+        member_level:
+          includes:
+            - id
 `;
 
     let compilerApi: CompilerApi;
@@ -431,6 +465,16 @@ cubes:
       expect(visible(admin)).toEqual(['orders.status', 'orders.region']);
       expect(visible(basic)).toEqual(['orders.region']);
       expect(admin.compilerId).not.toBe(basic.compilerId);
+    });
+
+    test('offers only the drill queries whose members the user can access', async () => {
+      const drillQueryNames = (result: any) => result.cubes[0].config.measures[0].drillQueries
+        .map((q: any) => q.name);
+
+      // `orders.customer.city` goes through a join alias and is checked as `users.city`
+      expect(drillQueryNames(await meta('request-1', ['admin'])))
+        .toEqual(['by_status', 'by_region', 'filtered_by_status', 'by_customer_city']);
+      expect(drillQueryNames(await meta('request-2', ['basic']))).toEqual(['by_region']);
     });
   });
 

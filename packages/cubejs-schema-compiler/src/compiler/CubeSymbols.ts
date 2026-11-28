@@ -11,6 +11,13 @@ import {
   isQueryContextPredicate,
 } from './QueryContext';
 import { camelizeCube } from './utils';
+import {
+  DrillQueryModel,
+  ResolvedDrillQuery,
+  mapDrillQuery,
+  resolveCubeName,
+  resolveDrillQuery,
+} from './DrillQueries';
 
 import type { ErrorReporter } from './ErrorReporter';
 import { TranspilerSymbolResolver } from './transpilers';
@@ -1120,13 +1127,14 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
 
           memberSets.resolvedMembers.add(name);
 
-          const override = (include.title || include.description || include.format || include.meta || include.currency)
+          const override = (include.title || include.description || include.format || include.meta || include.currency || include.drillQueries)
             ? {
               title: include.title,
               description: include.description,
               format: include.format,
               meta: include.meta,
               currency: include.currency,
+              drillQueries: include.drillQueries,
             }
             : undefined;
 
@@ -1260,6 +1268,10 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
         processedDrillMembers = () => filteredDrillMembers;
       }
 
+      const inheritedDrillQueries = type === 'measures' && targetCube.isView && Array.isArray(resolvedMember.drillQueries)
+        ? this.inheritDrillQueries(sourceCubeName, resolvedMember.drillQueries, path.slice(0, -1), targetCube.name, viewAllMembers)
+        : [];
+
       // eslint-disable-next-line no-new-func
       const sql = new Function(path[0], `return \`\${${memberRef.member}}\`;`);
       let memberDefinition;
@@ -1285,6 +1297,8 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
           ...(resolvedMember.orderBy && { orderBy: resolvedMember.orderBy }),
           ...(processedDrillMembers && { drillMembers: processedDrillMembers }),
           ...(resolvedMember.drillMembersGrouped && { drillMembersGrouped: resolvedMember.drillMembersGrouped }),
+          ...(inheritedDrillQueries.length ? { inheritedDrillQueries } : {}),
+          ...(memberRef.override?.drillQueries ? { drillQueries: memberRef.override.drillQueries } : {}),
           ...(resolvedMember.mask !== undefined ? { mask: resolvedMember.mask } : {}),
           ...(resolvedMember.synthetic ? { synthetic: true } : {}),
         };
@@ -1324,6 +1338,75 @@ export class CubeSymbols implements TranspilerSymbolResolver, CompilerInterface 
       }
       return [memberRef.name || path[path.length - 1], memberDefinition];
     });
+  }
+
+  /**
+   * Maps each member to the view member included through exactly the same join path;
+   * a drill query the cube defines invalidly is reported on the cube, so it's skipped here.
+   */
+  protected inheritDrillQueries(
+    sourceCubeName: string,
+    drillQueries: unknown[],
+    includePath: string[],
+    viewName: string,
+    viewAllMembers: ViewResolvedMember[]
+  ): ResolvedDrillQuery[] {
+    const model = this.drillQueryModel();
+    const viewMemberNames = new Map(viewAllMembers.map(v => [v.member, v.name]));
+
+    return drillQueries.flatMap(definition => {
+      let resolved: ResolvedDrillQuery;
+      try {
+        resolved = resolveDrillQuery(
+          model,
+          definition,
+          (name, allowSets) => resolveCubeName(model, sourceCubeName, name, allowSets)
+        );
+      } catch {
+        return [];
+      }
+
+      const inherited = mapDrillQuery(resolved, target => {
+        const viewMemberName = viewMemberNames.get([...includePath, target.key].join('.'));
+        return viewMemberName === undefined ? undefined : `${viewName}.${viewMemberName}`;
+      });
+      return inherited ? [inherited] : [];
+    });
+  }
+
+  /**
+   * The model as drill queries see it, read off the cube symbols.
+   */
+  public drillQueryModel(): DrillQueryModel {
+    const cubeObj = (name: string): any => this.symbols[name]?.cubeObj?.();
+    const own = (obj: any, key: string) => (obj && Object.prototype.hasOwnProperty.call(obj, key) ? obj[key] : undefined);
+
+    return {
+      isView: (name) => {
+        const cube = cubeObj(name);
+        return cube ? !!cube.isView : undefined;
+      },
+      member: (cubeName, memberName) => {
+        const cube = cubeObj(cubeName);
+        for (const kind of ['dimensions', 'measures', 'segments'] as const) {
+          const member = own(cube?.[kind], memberName);
+          if (member) {
+            return { kind, type: member.type };
+          }
+        }
+        return undefined;
+      },
+      memberSets: (name) => {
+        const sets = cubeObj(name)?.memberSets;
+        return Array.isArray(sets) ? sets : [];
+      },
+      joinTarget: (cubeName, joinName) => {
+        const joins = cubeObj(cubeName)?.joins;
+        const join = Array.isArray(joins) ? joins.find(j => (j.alias ?? j.name) === joinName) : undefined;
+        return join ? { cube: join.name, aliased: !!join.alias } : undefined;
+      },
+      funcArguments: (fn) => this.funcArguments(fn),
+    };
   }
 
   /**

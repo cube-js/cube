@@ -638,3 +638,79 @@ describe('drill down query', () => {
     });
   });
 });
+
+describe('drill down with a named drill query', () => {
+  const withDrillQueries = (drillMembers: string[]) => {
+    const response: any = loadResponse({
+      filters: [{ member: 'Users.country', operator: 'equals', values: ['US'] }],
+    });
+    response.results[0].annotation.measures['Orders.count'] = {
+      ...response.results[0].annotation.measures['Orders.count'],
+      drillMembers,
+      drillMembersGrouped: { measures: [], dimensions: drillMembers },
+      drillQueries: [{
+        name: 'top_customers',
+        title: 'Top customers',
+        members: ['Customers.name', 'Orders.count'],
+        membersGrouped: { dimensions: ['Customers.name'], measures: ['Orders.count'] },
+        order: { 'Orders.count': 'desc' },
+        limit: 10,
+        filters: [{ member: 'Orders.status', operator: 'equals', values: ['completed'] }],
+      }],
+    };
+    return new ResultSet(response);
+  };
+
+  it('uses the drill query members, order, limit and filters, plus the clicked cell', () => {
+    expect(
+      withDrillQueries(['Orders.id']).drillDown(
+        { xValues: ['2020-08-01T00:00:00.000'] },
+        undefined,
+        { drillQuery: 'top_customers' }
+      )
+    ).toEqual({
+      dimensions: ['Customers.name'],
+      measures: ['Orders.count'],
+      order: { 'Orders.count': 'desc' },
+      limit: 10,
+      segments: [],
+      filters: [
+        { member: 'Orders.status', operator: 'equals', values: ['completed'] },
+        { member: 'Orders.count', operator: 'measureFilter' },
+        { member: 'Users.country', operator: 'equals', values: ['US'] },
+      ],
+      timeDimensions: [
+        {
+          dimension: 'Orders.ts',
+          dateRange: ['2020-08-01T00:00:00.000', '2020-08-01T23:59:59.999'],
+        },
+      ],
+      timezone: 'UTC',
+    });
+  });
+
+  it('works on a measure without drill members', () => {
+    const query = withDrillQueries([]).drillDown(
+      { xValues: ['2020-08-01T00:00:00.000'] },
+      undefined,
+      { drillQuery: 'top_customers' }
+    );
+
+    expect(query?.dimensions).toEqual(['Customers.name']);
+    expect(withDrillQueries([]).drillDown({ xValues: ['2020-08-01T00:00:00.000'] })).toBeNull();
+  });
+
+  it('keeps the default drill without a drill query name', () => {
+    expect(
+      withDrillQueries(['Orders.id']).drillDown({ xValues: ['2020-08-01T00:00:00.000'] })
+    ).toMatchObject({ dimensions: ['Orders.id'], measures: [] });
+  });
+
+  it('throws on an unknown drill query', () => {
+    expect(() => withDrillQueries(['Orders.id']).drillDown(
+      { xValues: ['2020-08-01T00:00:00.000'] },
+      undefined,
+      { drillQuery: 'nope' }
+    )).toThrow("Measure 'Orders.count' has no drill query 'nope'");
+  });
+});

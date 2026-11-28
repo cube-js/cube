@@ -19,6 +19,8 @@ import type { CubeEvaluator, RollingWindow } from './CubeEvaluator';
 import type { ContextEvaluator } from './ContextEvaluator';
 import type { ViewGroupEvaluator, CompiledViewGroup } from './ViewGroupEvaluator';
 import type { JoinGraph } from './JoinGraph';
+import type { DrillQueryEvaluator } from './DrillQueryEvaluator';
+import { DrillQueryConfig, drillQueryConfig } from './DrillQueries';
 import type { ErrorReporter } from './ErrorReporter';
 import { CompilerInterface } from './PrepareCompiler';
 import { resolveNamedNumericFormat, STANDARD_FORMAT_SPECIFIERS, DEFAULT_FORMAT_SPECIFIER } from './named-numeric-formats';
@@ -106,6 +108,7 @@ export type MeasureConfig = {
     measures: string[];
     dimensions: string[];
   };
+  drillQueries?: DrillQueryConfig[];
   aliasMember?: string;
   meta?: any;
   isVisible: boolean;
@@ -219,6 +222,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
     viewGroupEvaluator: ViewGroupEvaluator,
     joinGraph: JoinGraph,
     private readonly options: { internStrings?: boolean } = {},
+    protected readonly drillQueryEvaluator?: DrillQueryEvaluator,
   ) {
     this.cubeValidator = cubeValidator;
     this.cubeSymbols = cubeEvaluator;
@@ -466,6 +470,8 @@ export class CubeToMetaTransformer implements CompilerInterface {
 
     const format = this.transformMeasureFormat(extendedMetricDef.format);
     const currency = extendedMetricDef.currency?.toUpperCase();
+    const drillQueries = (this.drillQueryEvaluator?.drillQueries(name) || [])
+      .map(query => drillQueryConfig(query, titleize));
 
     return {
       name,
@@ -481,6 +487,7 @@ export class CubeToMetaTransformer implements CompilerInterface {
       aggType: extendedMetricDef.aggType || extendedMetricDef.type || '',
       drillMembers: drillMembersArray,
       drillMembersGrouped,
+      ...(drillQueries.length ? { drillQueries } : {}),
       aliasMember: extendedMetricDef.aliasMember,
       meta: extendedMetricDef.meta,
       ...(extendedMetricDef.synthetic ? { synthetic: true } : {}),
