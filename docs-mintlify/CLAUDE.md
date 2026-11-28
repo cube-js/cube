@@ -351,7 +351,7 @@ Wrap screenshots in `<Frame>`. When a screenshot is needed but not yet available
 an MDX comment placeholder: `{/* TODO: screenshot — ... */}`.
 
 The `Docs` workflow runs `scripts/check_media_hosts.py`, which fails the PR when an
-`<img>`, `<video>`, `<source>` or Markdown image points anywhere other than
+`<img>`, `<video>`, `<source>`, `<Card img>` or Markdown image points anywhere other than
 `https://static.cube.dev/`, including files committed under `/images/`. Embeds in an
 `<iframe>` are allowed only from YouTube, Loom and CodeSandbox.
 

@@ -111,7 +111,7 @@ Avoid `--force` for anything already live.
 Fails when a page references an image or video that isn't on
 `https://static.cube.dev/`: a file committed to the repo (`/images/...`), or a
 link to any other host. It checks `<img>`, `<video>`, `<source>` and `<audio>`
-tags and Markdown images, and lets `<iframe>` embeds through only for YouTube,
+tags, the `img` prop of components such as `<Card>`, and Markdown images, and lets `<iframe>` embeds through only for YouTube,
 Loom and CodeSandbox. The `Docs` workflow runs it on every PR that touches
 `docs-mintlify/`.
 

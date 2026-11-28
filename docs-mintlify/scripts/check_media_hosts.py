@@ -7,6 +7,7 @@ https://static.cube.dev/<key>. This check catches media committed to the repo
 
 Checked:
   - src / poster attributes on <img>, <video>, <source> and <audio>
+  - img attributes on components, such as <Card img="...">
   - Markdown images: ![alt](url)
   - <iframe src>, which must point to an allowlisted video player
 
@@ -29,7 +30,8 @@ IFRAME_HOSTS = (
 
 MEDIA_TAG = re.compile(r"<(?:img|video|source|audio)\b[^>]*>", re.IGNORECASE | re.DOTALL)
 IFRAME_TAG = re.compile(r"<iframe\b[^>]*>", re.IGNORECASE | re.DOTALL)
-ATTR = re.compile(r"\b(src|poster)\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|\{\s*[\"'`]([^\"'`]*)[\"'`]\s*\})")
+COMPONENT_TAG = re.compile(r"<[A-Z][A-Za-z0-9.]*\b[^>]*>", re.DOTALL)
+ATTR = re.compile(r"(?<![-\w])(src|poster|img)\s*=\s*(?:\"([^\"]*)\"|'([^']*)'|\{\s*[\"'`]([^\"'`]*)[\"'`]\s*\})")
 MD_IMAGE = re.compile(r"!\[[^\]]*\]\(\s*<?([^)\s>]+)")
 FENCE = re.compile(r"^\s*(```|~~~)")
 MDX_COMMENT = re.compile(r"\{/\*.*?\*/\}", re.DOTALL)
@@ -64,6 +66,14 @@ def check_file(path):
 
     for tag in MEDIA_TAG.finditer(text):
         for attr in ATTR.finditer(tag.group(0)):
+            url = next(g for g in attr.groups()[1:] if g is not None)
+            if not url.startswith(MEDIA_PREFIX):
+                problems.append((line_of(text, tag.start()), url))
+
+    for tag in COMPONENT_TAG.finditer(text):
+        for attr in ATTR.finditer(tag.group(0)):
+            if attr.group(1) != "img":
+                continue
             url = next(g for g in attr.groups()[1:] if g is not None)
             if not url.startswith(MEDIA_PREFIX):
                 problems.append((line_of(text, tag.start()), url))
