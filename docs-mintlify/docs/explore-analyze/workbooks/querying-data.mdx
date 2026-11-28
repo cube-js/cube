@@ -4,7 +4,7 @@ description: In the Semantic Query tab, you can query the semantic layer. On the
 ---
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/querying-data/935959a9.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/querying-data/workbook-semantic-query.png" alt="Order analysis workbook with the Customers view in the data pane, the Results, Chart and SQL toolbar, and a stacked bar chart of monthly orders by status" />
 </Frame>
 
 On the left side, you can select a semantic view you would like to query. Inside the semantic view, you can see the measures and dimensions grouped either by cubes or folders. You can search within your semantic view to find the relevant member.
@@ -290,7 +290,7 @@ query changes so the pivot no longer qualifies, subtotals switch off
 automatically.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/querying-data/61d36ecc.png" alt="Pivoted results table with subtotal columns" />
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/querying-data/totals-menu-subtotals.png" alt="Totals menu with Subtotals checked over a table pivoted by year and status, with a bold Total for 2019 column" />
 </Frame>
 
 Subtotal values are computed by the database — one extra query per pivot
@@ -347,12 +347,12 @@ If a column has sorting applied, a chevron icon on the header indicates the curr
 
 ### Sorting control
 
-The sorting control, available via the **Sort** button, lists all query members and their current state:
+The sorting control, available via the **Order & limit** button, lists all query members and their current state:
 unsorted, sorted ascending, or sorted descending. Use it to apply or
 change the sort order for any member. Drag and drop members within the sorting control to change their priority in the sort order.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/querying-data/3a0454cb.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/querying-data/order-and-limit-popover.png" alt="Order & limit popover with None, ASC and DESC for each member, the pivot dimensions in their own section, and the Row limit field" />
 </Frame>
 
 When a [pivot](#pivoting) is applied, an additional section with pivot dimensions appears.
@@ -381,7 +381,7 @@ it off, select **Stop filling missing rows** from the same menu. While the
 fill is active, an icon on the column header indicates it.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/querying-data/f32deed8.png" alt="Results table column menu with the Fill in missing rows action" />
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/querying-data/column-menu-fill-missing-rows.png" alt="Column menu of the Created at (Month) column with Fill in missing rows highlighted" />
 </Frame>
 
 The fill works on time dimensions with a year, quarter, month, week, or day
@@ -430,7 +430,7 @@ the comparison to all measures at once.
 />
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/querying-data/b54e66aa.png" alt="Results table with period comparison columns" />
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/querying-data/column-menu-compare-periods.png" alt="Count column menu with the Compare periods submenu: Same period previous year and Previous value checked, next to the Count (1 year earlier) column" />
 </Frame>
 
 The menu is available when the query includes a time dimension with a year,
@@ -480,7 +480,7 @@ and the [MCP server][ref-mcp-period-comparisons] return these columns too.
 Every query in the Semantic Query tab can be inspected as code. Open the SQL panel via the **SQL** button in the toolbar, next to the Results and Chart tabs, to see the query that the workbook generates, switch between representations, and copy it for use elsewhere.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/inspect-query-tabs-v2.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/inspect-query-tabs-v3.png" alt="SQL panel with the Semantic SQL and Generated SQL tabs and the Semantic SQL dropdown open on Semantic JSON and Semantic GraphQL" />
 </Frame>
 
 The panel exposes two top-level tabs:
@@ -504,7 +504,7 @@ Cube's own post-processing. The **Generated SQL** tab shows where each part runs
 {/* TODO: video — where each part of Generated SQL runs (GTM-333) */}
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/generated-sql-where-each-part-runs.png" alt="Generated SQL tab with a default data source part tinted green, a Cube Store part tinted amber, and the legend under the SQL" />
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/generated-sql-where-each-part-runs-v2.png" alt="Generated SQL tab with a Cube Store part tinted amber, a default data source part tinted green, and the Data sources legend under the SQL" />
 </Frame>
 
 - A legend under the SQL names each place: a data source by its name, or
@@ -586,7 +586,7 @@ The SQL can use the workbook's [SQL parameters][ref-sql-parameters] as `:name` p
 />
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/edit-semantic-sql-v2.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/edit-semantic-sql-v3.png" alt="Semantic SQL editor with an edited ORDER BY clause and the Save and run and Discard buttons" />
 </Frame>
 
 When you save a hand-edited query, the workbook keeps the Semantic SQL as the source of truth, and the visual controls (members panel, sort, pivot) stay in sync with what's expressible in the UI. Anything that goes beyond the interactive controls — see [Advanced semantic queries](#advanced-semantic-queries) below — disables the affected UI controls but keeps the rest of the workbook fully functional.
@@ -596,7 +596,7 @@ When you save a hand-edited query, the workbook keeps the Semantic SQL as the so
 Advanced semantic queries typically can contain CTEs (Common Table Expressions) and unions, and can contain multiple semantic views. In many cases for advanced semantic queries, the interactive components of the UI would be disabled—not the whole UI—as these complex queries require manual SQL editing.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/querying-data/5ad155f8.png" />
+  <img src="https://static.cube.dev/docs/explore-analyze/workbooks/querying-data/advanced-query-banner.png" alt="Advanced query banner in the data pane next to a Semantic SQL editor holding a query with a CTE and a window function" />
 </Frame>
 
 <Info>
