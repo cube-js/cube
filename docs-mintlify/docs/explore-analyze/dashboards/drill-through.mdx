@@ -56,19 +56,21 @@ The target opens with one [filter parameter][ref-url-params] for each dimension 
 - a table cell of a dimension column carries that value, and a cell of a measure column carries every dimension value in its row. In a pivot table, a value cell carries its row's and its column's values. A group row offers no **Open in** item;
 - a map marker carries its row's dimension values, and a map region carries the region. A cluster of markers offers no **Open in** item.
 
-Each value is an `is` filter, except a date shown at a granularity, which is a `between` filter over the period you clicked: the March 2024 bar of a monthly chart opens the target filtered from `2024-03-01T00:00:00.000` to `2024-03-31T23:59:59.999`. In a table, **Open in** comes after the links that the column's [data model][ref-dimension-links] defines.
+Each value is an `is` filter, except a date shown at a granularity, which is a `between` filter over the period you clicked: the March 2024 bar of a monthly chart opens the target filtered from `2024-03-01T00:00:00.000` to `2024-03-31T23:59:59.999`. At a [custom granularity][ref-custom-granularities], such as a fiscal year, the filter covers exactly the rows the chart grouped into the bucket you clicked: it runs from the first of those rows' times up to, but not including, one millisecond after the last, for example `{"type":"between","value":["2026-01-01T00:00:00.000","2026-01-02T00:00:00.001"],"startInclusive":true,"endInclusive":false}`. The target's date filter names the days that range includes, **Jan 1 – Jan 2**. In a table, **Open in** comes after the links that the column's [data model][ref-dimension-links] defines.
 
 Drill-through works on published dashboards in Cube and on [embedded dashboards][ref-embedding], with private and signed embedding alike. An embedded dashboard opens the embedded target, inside the embed. In a signed embed, the item always opens the target in the same tab, **Cmd**/**Ctrl**+click included. In the dashboard builder, the version history and a review's preview, a click on a chart does what it does on a chart with no drill-through.
 
-The item is shown disabled, with a tooltip saying why, when it can't open the target:
+The item is shown disabled, with the reason under its label, when it can't open the target:
 
-| Item | Tooltip | When |
+| Item | Reason | When |
 |---|---|---|
 | **Open in …** | Loading the target dashboard | The target's title is still loading. The open menu shows the title as soon as it arrives. |
 | **Open in** and the title | Drill-through doesn't apply to empty values | A value of the clicked point is empty (null). |
 | **Open in dashboard** | You don't have access to the target dashboard | The viewer can't open the target. In a signed embed, also when signed embedding isn't allowed on the target. |
 | **Open in dashboard** | The target dashboard isn't published or no longer exists | No published dashboard holds the slug. |
 | **Open in dashboard** | Couldn't load the target dashboard | Any other error. |
+| **Open in** and the title | Finding the rows of this Fiscal Year bucket | You clicked a bucket of a custom granularity, here **Fiscal Year**, and Cube is still asking the data source which rows it holds. The open menu enables the item as soon as they arrive. |
+| **Open in dashboard** | Couldn't find the rows of this Fiscal Year bucket | The data source couldn't say which rows the bucket holds. |
 
 The title is read from the slug when the dashboard opens, so once another dashboard takes over the slug, the item names and opens that dashboard.
 
@@ -91,6 +93,7 @@ The dashboard builder warns you before you change or clear a slug that drill-thr
 When you take over a slug another dashboard holds, the dialog says that the charts drilling through to that slug will then open your dashboard.
 
 [ref-dimension-links]: /docs/data-modeling/dimensions#links
+[ref-custom-granularities]: /docs/data-modeling/dimensions#custom-granularities
 [ref-slug]: /docs/explore-analyze/dashboards#dashboard-slug
 [ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
 [ref-value-menu]: /docs/explore-analyze/charts#clicking-a-value

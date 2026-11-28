@@ -528,6 +528,21 @@ a value in a chart opens the same menu; see
 Because a week can straddle two months or quarters, **Week** is never a drill
 target from a coarser granularity — a week cell drills only to **Day** and finer.
 
+On a row whose time column is at a
+[custom granularity](/docs/data-modeling/dimensions#custom-granularities), such
+as a fiscal year, either drill keeps to exactly the rows the table grouped into
+that row's bucket, and so does a second drill inside the dialog. The dialog's
+filter names the days those rows span, for example **Split Created at is Jan 1 –
+Jan 2**, and **Explore from here** opens with the same words on its filter. The
+dialog shows its loading state while Cube asks the data source which rows the
+bucket holds. If the data source can't say, the dialog runs no drill and shows
+"Couldn't find which rows belong to this Fiscal Year bucket, so the drill-down
+did not run:" followed by the data source's error.
+
+From the keyboard, press <kbd>Shift</kbd>+<kbd>F10</kbd> or the context-menu key
+on a focused cell to open its menu; see
+[Opening the menu from the keyboard](/docs/explore-analyze/charts#opening-the-menu-from-the-keyboard).
+
 ## Selecting and copying cells
 
 You can copy a single cell or a rectangular block of cells straight out of the

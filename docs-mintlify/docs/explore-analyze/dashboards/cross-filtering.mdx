@@ -23,7 +23,7 @@ Cross-filtering works on published dashboards in Cube and on [embedded dashboard
 
 ## Filtering by a data point
 
-Click a data point and choose **Filter dashboard by this point**. The cross-filter items come after **Drill down** and **Copy value** in the [menu][ref-value-menu], and before the comment items, **Comment on this point** and **Comment on whole chart**, when the chart offers them; a chart with a [drill-through][ref-drill-through] lists its **Open in** item first. The point's values become the chart's cross-filter:
+Click a data point and choose **Filter dashboard by this point**. From the keyboard, the same menu opens on a focused table cell or chart point: see [Opening the menu from the keyboard][ref-value-menu-keyboard]. The cross-filter items come after **Drill down** and **Copy value** in the [menu][ref-value-menu], and before the comment items, **Comment on this point** and **Comment on whole chart**, when the chart offers them; a chart with a [drill-through][ref-drill-through] lists its **Open in** item first. The point's values become the chart's cross-filter:
 
 - a bar, a line or area point, or a pie slice filters by its category, plus its color or series value on a stacked, grouped or multi-series chart;
 - a scatter point filters by every dimension it carries;
@@ -61,7 +61,11 @@ A click on a value outside the chart's cross-filter offers only **Filter dashboa
 
 ### Empty values
 
-A data point whose value is empty (null) can't start a cross-filter: **Filter dashboard by this point** is disabled, with the tooltip "Cross-filters don't apply to empty values", and Cmd/Ctrl+click on it adds nothing.
+A data point whose value is empty (null) can't start a cross-filter: **Filter dashboard by this point** is disabled, with "Cross-filters don't apply to empty values" under it, and Cmd/Ctrl+click on it adds nothing.
+
+### Buckets of a custom granularity
+
+A data point on a bucket of a [custom granularity][ref-custom-granularities], such as a fiscal year, filters the other charts to exactly the rows its chart grouped into that bucket. Cube asks the data source which rows those are, so the charts the cross-filter reaches show their loading placeholder until it answers, and so does the value list of a [faceted filter][ref-faceted-filters] the cross-filter narrows. If the data source can't say, each of those charts shows "Couldn't find which rows belong to the Fiscal Year bucket of this cross-filter, so this chart did not run." with the data source's error under it, and the faceted filter's list isn't narrowed by that cross-filter. Several buckets of the same chart filter to the rows of any of them.
 
 ## Seeing and removing cross-filters
 
@@ -88,7 +92,7 @@ Other features read your cross-filters as they read your control selections:
 
 - [Drill down][ref-drill-down] on another chart shows only rows that match them.
 - A chart's **Explore** button and its **Edit in workbook** item open its query with them applied.
-- A [download][ref-downloads] of the whole dashboard with **Control values** on **Current** (the default) renders the dashboard with them, and its [print version][ref-print-version] states them on the line under the title, after the controls, for example `Status is completed`. **Default** and **Custom** leave them out. A single chart's PNG or PDF download renders with them.
+- A [download][ref-downloads] of the whole dashboard with **Control values** on **Current** (the default) renders the dashboard with them, and its [print version][ref-print-version] states them on the line under the title, after the controls, for example `Status is completed`. A cross-filter on a bucket of a custom granularity is stated as the range of days its rows span. **Default** and **Custom** leave them out. A single chart's PNG or PDF download renders with them.
 - The [Dashboard Agent][ref-dashboard-agent] can set and remove them for you.
 - A [schedule][ref-schedule-cross-filters] you create from the page, or an [alert][ref-data-alerts] from a chart's **Create alert**, lists each of them under **Control values**, set to your selection, which you can change there. Saved, the schedule's notifications and an alert's check apply them.
 
@@ -106,6 +110,8 @@ Other features read your cross-filters as they read your control selections:
 [ref-analysis]: /docs/explore-analyze/dashboards/widgets/analysis
 [ref-drill-down]: /docs/explore-analyze/charts/chart-types/table#cell-menu
 [ref-value-menu]: /docs/explore-analyze/charts#clicking-a-value
+[ref-value-menu-keyboard]: /docs/explore-analyze/charts#opening-the-menu-from-the-keyboard
+[ref-custom-granularities]: /docs/data-modeling/dimensions#custom-granularities
 [ref-drill-through]: /docs/explore-analyze/dashboards/drill-through
 [ref-downloads]: /docs/explore-analyze/dashboards#download-as-png-or-pdf
 [ref-print-version]: /docs/explore-analyze/dashboards#print-version
