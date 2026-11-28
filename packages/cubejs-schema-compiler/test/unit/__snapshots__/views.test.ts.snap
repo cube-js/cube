@@ -7,6 +7,7 @@ Object {
   "dimensions": Array [
     Object {
       "aliasMember": "CubeA.id",
+      "aliasMemberPath": "CubeA.id",
       "currency": undefined,
       "description": "Description for CubeA.id",
       "format": "imageUrl",
@@ -31,6 +32,7 @@ Object {
     },
     Object {
       "aliasMember": "CubeB.other_id",
+      "aliasMemberPath": "CubeB.other_id",
       "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
@@ -130,6 +132,7 @@ Object {
   "dimensions": Array [
     Object {
       "aliasMember": "CubeB.other_id",
+      "aliasMemberPath": "CubeB.other_id",
       "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
@@ -229,6 +232,7 @@ Object {
   "dimensions": Array [
     Object {
       "aliasMember": "CubeA.id",
+      "aliasMemberPath": "CubeA.id",
       "currency": undefined,
       "description": "Description for CubeA.id",
       "format": "imageUrl",
@@ -253,6 +257,7 @@ Object {
     },
     Object {
       "aliasMember": "CubeB.id",
+      "aliasMemberPath": "CubeB.id",
       "currency": undefined,
       "description": "Description for CubeB.id",
       "format": "imageUrl",
@@ -277,6 +282,7 @@ Object {
     },
     Object {
       "aliasMember": "CubeB.other_id",
+      "aliasMemberPath": "CubeB.other_id",
       "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",
@@ -376,6 +382,7 @@ Object {
   "dimensions": Array [
     Object {
       "aliasMember": "CubeB.other_id",
+      "aliasMemberPath": "CubeB.other_id",
       "currency": undefined,
       "description": "Description for CubeB.other_id",
       "format": "imageUrl",

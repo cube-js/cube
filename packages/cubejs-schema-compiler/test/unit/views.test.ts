@@ -142,6 +142,7 @@ describe('Views YAML', () => {
       included: true,
       sql: expect.any(Function),
       aliasMember: aliasName,
+      aliasMemberPath: expect.any(String),
       format: 'imageUrl',
       title: `Title for ${name}`,
       type: 'number',
@@ -623,6 +624,16 @@ describe('Views YAML', () => {
       'orders_view_of_view.total': { cumulative: false, cumulativeTotal: false },
       'orders_view_of_view.running_total': { cumulative: true, cumulativeTotal: true },
     });
+  });
+
+  it('keeps the cube join path of a member included through another view', async () => {
+    const compilers = await schemaCompile([
+      { name: 'inner_view', cubes: [{ join_path: 'CubeA.CubeC', includes: ['dimension_1'] }] },
+      { name: 'outer_view', cubes: [{ join_path: 'inner_view', includes: '*' }] },
+    ]);
+
+    const outerView = compilers.metaTransformer.cubes.map((def) => def.config).find((def) => def.name === 'outer_view');
+    expect(outerView?.dimensions[0]?.aliasMemberPath).toBe('CubeA.CubeC.dimension_1');
   });
 
   it('throws error for unresolved members', async () => {
