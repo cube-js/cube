@@ -667,7 +667,10 @@ calculated measures, and many-to-one and one-to-one joins. Beyond that:
   `{CUBE.users.tier}` on `orders`, and is published with that cube joined along the path. Measure
   SQL can contain a subquery, such as
   `{CUBE}.id IN (SELECT order_id FROM returns WHERE returned_on = {CUBE}.created_at)` or a
-  `GROUP BY ... HAVING` subquery.
+  `GROUP BY ... HAVING` subquery. A [multi-stage](/reference/data-modeling/measures#multi_stage)
+  measure of `type: number` without a stage modifier, such as a ratio of two other measures, is
+  published as a calculated measure: it is computed from the measures it references at the query's
+  grain, so the values match Cube's.
 - **Cube `sql`:** a cube's `sql` can read another cube's SQL with `{other_cube.sql()}`: it is
   expanded as Cube compiles it, so the published `source` is plain SQL.
 
