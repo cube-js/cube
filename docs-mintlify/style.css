@@ -141,3 +141,29 @@ html.dark .cube-consent :focus-visible {
 .dark .zoom-image-content [data-ramka-media] img {
   border-color: rgb(255 255 255 / 0.1);
 }
+
+/* Mermaid house style: nodes opt in with :::start, :::ask, :::out, :::tile, :::hub */
+svg[id^="mermaid-"] { --d-tile: #f3f3fb; --d-ink: #141446; --d-line: #6f6f7b; --d-violet: #7a77ff; --d-orange: #f4982b; --d-ask: #fff; --d-bg: #fff; }
+html.dark svg[id^="mermaid-"] { --d-tile: #22223a; --d-ink: #e6e6f4; --d-line: #9a9aaa; --d-ask: #0c0c10; --d-bg: #0c0c10; }
+svg[id^="mermaid-"] .node:is(.tile, .hub, .start, .out) :is(rect, polygon, path) { stroke: none !important; }
+svg[id^="mermaid-"] .node.tile :is(rect, polygon, path) { fill: var(--d-tile) !important; }
+svg[id^="mermaid-"] .node:is(.start, .out) :is(rect, polygon, path) { fill: var(--d-violet) !important; }
+svg[id^="mermaid-"] .node.ask :is(rect, polygon, path) { fill: var(--d-ask) !important; stroke: var(--d-ink) !important; stroke-width: 1px !important; }
+svg[id^="mermaid-"] .nodeLabel, svg[id^="mermaid-"] .edgeLabel { color: var(--d-ink) !important; }
+svg[id^="mermaid-"] .node:is(.start, .out) .nodeLabel { color: #fff !important; font-weight: 700; }
+svg[id^="mermaid-"] .flowchart-link { stroke: var(--d-line) !important; stroke-width: 1.2px !important; }
+svg[id^="mermaid-"] .flowchart-link[class*="dotted"] { stroke: var(--d-ink) !important; stroke-width: 1.5px !important; stroke-dasharray: 0.1 5 !important; stroke-linecap: round; }
+svg[id^="mermaid-"] marker path { fill: var(--d-ink) !important; stroke: none !important; }
+svg[id^="mermaid-"] :is(.labelBkg, .edgeLabel, .edgeLabel p) { background: var(--d-bg) !important; }
+svg[id^="mermaid-"] .edgeLabel rect { fill: var(--d-bg) !important; }
+svg[id^="mermaid-"] foreignObject { overflow: visible; }
+svg[id^="mermaid-"] :is(.yes, .no) { display: inline-block; margin: 2px; padding: 3px 9px; border-radius: 6px; color: #fff; }
+svg[id^="mermaid-"] .yes { background: var(--d-violet); }
+svg[id^="mermaid-"] .no { background: var(--d-orange); }
+svg[id^="mermaid-"] code { font-size: 0.85em; padding: 0; background: none; border: 0; color: inherit; white-space: nowrap; }
+svg[id^="mermaid-"] .node:is(.tile, .hub, .out) rect { rx: 10px; ry: 10px; }
+svg[id^="mermaid-"] .node .label div { max-width: 360px !important; }
+svg[id^="mermaid-"] .node.tile img { display: inline-block !important; width: 26px !important; height: 26px !important; margin: 0 10px 0 0; vertical-align: middle; }
+svg[id^="mermaid-"] .node.hub img { display: block !important; width: 44px !important; height: 44px !important; margin: 4px auto 6px; }
+svg[id^="mermaid-"] .node.hub rect { fill: var(--d-tile) !important; }
+svg[id^="mermaid-"] .node.hub .nodeLabel { display: block; padding: 14px 18px; }

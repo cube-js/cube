@@ -121,6 +121,20 @@ query hasn't changed, the cached value will be returned. Otherwise, an SQL query
 will be executed against either the pre-aggregations storage or the source
 database to populate the cache with the results and return them.
 
+```mermaid actions={false}
+flowchart TB
+  A(["<b>A query arrives</b>"]):::start
+  Q1{{"Is the result of this query<br/>in the in-memory cache?"}}:::ask
+  Q2{{"Has the <code>refresh_key</code><br/>value changed?"}}:::ask
+  R1["<b>Run the query against pre-aggregations or<br/>the data source, cache the result, return it</b>"]:::out
+  R2["<b>Return the cached result</b>"]:::out
+  A -.-> Q1
+  Q1 -.->|<b class=no>No</b>| R1
+  Q1 -.->|<b class=yes>Yes</b>| Q2
+  Q2 -.->|<b class=yes>Yes</b>| R1
+  Q2 -.->|<b class=no>No</b>| R2
+```
+
 ### Refresh Keys
 
 Cube takes great care to prevent unnecessary queries from hitting your database.

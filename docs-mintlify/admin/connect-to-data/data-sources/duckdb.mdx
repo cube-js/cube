@@ -10,18 +10,37 @@ Google Cloud Storage, or Cloudflare R2][duckdb-docs-s3-import].
 You can also use the [`CUBEJS_DB_DUCKDB_DATABASE_PATH`](/reference/configuration/environment-variables#cubejs_db_duckdb_database_path) environment variable to
 connect to a local DuckDB database.
 
-<Frame>
-  <img src="https://static.cube.dev/docs/admin/connect-to-data/data-sources/duckdb/d3e42677.png" />
-</Frame>
+```mermaid actions={false}
+flowchart LR
+  S3["<img src='https://static.cube.dev/icons/aws-s3.svg' /><b>AWS S3</b>"]:::tile
+  GCS["<img src='https://static.cube.dev/icons/google-cloud-storage.svg' /><b>Google Cloud Storage</b>"]:::tile
+  R2["<img src='https://static.cube.dev/icons/cloudflare-r2.svg' /><b>Cloudflare R2</b>"]:::tile
+  D["<img src='https://static.cube.dev/icons/duckdb.svg' /><b>DuckDB</b><br/>Bundled with Cube,<br/>runs in-process"]:::hub
+  C["<img src='https://static.cube.dev/icons/cube.svg' /><b>Cube</b>"]:::hub
+  S3 --> D
+  GCS --> D
+  R2 --> D
+  D --> C
+```
 
 Cube can also connect to [MotherDuck][motherduck], a cloud-based serverless
 analytics platform built on DuckDB. When connected to MotherDuck, DuckDB uses
 [hybrid execution][motherduck-docs-architecture] and routes queries to S3
 through MotherDuck for better performance.
 
-<Frame>
-  <img src="https://static.cube.dev/docs/admin/connect-to-data/data-sources/duckdb/4fbb7247.png" />
-</Frame>
+```mermaid actions={false}
+flowchart LR
+  S3["<img src='https://static.cube.dev/icons/aws-s3.svg' /><b>AWS S3</b>"]:::tile
+  GCS["<img src='https://static.cube.dev/icons/google-cloud-storage.svg' /><b>Google Cloud Storage</b>"]:::tile
+  R2["<img src='https://static.cube.dev/icons/cloudflare-r2.svg' /><b>Cloudflare R2</b>"]:::tile
+  MD["<img src='https://static.cube.dev/icons/motherduck.svg' /><b>MotherDuck</b>"]:::hub
+  D["<img src='https://static.cube.dev/icons/duckdb.svg' /><b>DuckDB</b><br/>Bundled with Cube,<br/>runs in-process"]:::hub
+  C["<img src='https://static.cube.dev/icons/cube.svg' /><b>Cube</b>"]:::hub
+  S3 --> MD
+  GCS --> MD
+  R2 --> MD
+  MD --> D --> C
+```
 
 ## Prerequisites
 
