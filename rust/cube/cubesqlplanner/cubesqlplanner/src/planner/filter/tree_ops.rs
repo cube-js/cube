@@ -1,4 +1,4 @@
-use crate::planner::filter::{BaseSegment, FilterGroup, FilterItem};
+use crate::planner::filter::{BaseSegment, FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::{MemberId, MemberSymbol};
 use std::rc::Rc;
 
@@ -26,59 +26,59 @@ fn segment_matches(member_ids: &[MemberId], seg: &Rc<BaseSegment>) -> bool {
 }
 
 pub fn exclude_members(member_ids: &[MemberId], filters: &[FilterItem]) -> Vec<FilterItem> {
-    let mut result = Vec::new();
-    for item in filters.iter() {
-        match item {
-            FilterItem::Group(group) => {
-                let new_items = exclude_members(member_ids, &group.items);
-                if !new_items.is_empty() {
-                    result.push(FilterItem::Group(Rc::new(FilterGroup::new(
-                        group.operator.clone(),
-                        new_items,
-                    ))));
-                }
-            }
-            FilterItem::Item(itm) => {
-                if !chain_contains(member_ids, &itm.member_evaluator()) {
-                    result.push(FilterItem::Item(itm.clone()));
-                }
-            }
-            FilterItem::Segment(seg) => {
-                if !segment_matches(member_ids, seg) {
-                    result.push(FilterItem::Segment(seg.clone()));
-                }
-            }
-        }
-    }
-    result
+    drop_leaves(filters, &|leaf| leaf_matches(member_ids, leaf))
 }
 
 pub fn keep_only_members(member_ids: &[MemberId], filters: &[FilterItem]) -> Vec<FilterItem> {
-    let mut result = Vec::new();
-    for item in filters.iter() {
-        match item {
-            FilterItem::Group(group) => {
-                let new_items = keep_only_members(member_ids, &group.items);
-                if !new_items.is_empty() {
-                    result.push(FilterItem::Group(Rc::new(FilterGroup::new(
-                        group.operator.clone(),
-                        new_items,
-                    ))));
+    drop_leaves(filters, &|leaf| !leaf_matches(member_ids, leaf))
+}
+
+fn leaf_matches(member_ids: &[MemberId], leaf: &FilterItem) -> bool {
+    match leaf {
+        FilterItem::Item(itm) => chain_contains(member_ids, &itm.member_evaluator()),
+        FilterItem::Segment(seg) => segment_matches(member_ids, seg),
+        FilterItem::Group(_) => false,
+    }
+}
+
+// A dropped leaf counts as true, so the result is never stricter than the
+// input: an AND loses it, and an OR holding it is true as a whole and goes too.
+fn drop_leaves(
+    filters: &[FilterItem],
+    is_dropped: &dyn Fn(&FilterItem) -> bool,
+) -> Vec<FilterItem> {
+    filters
+        .iter()
+        .filter_map(|item| drop_leaves_in_item(item, is_dropped))
+        .collect()
+}
+
+// None when `item` is always true once the dropped leaves are.
+fn drop_leaves_in_item(
+    item: &FilterItem,
+    is_dropped: &dyn Fn(&FilterItem) -> bool,
+) -> Option<FilterItem> {
+    match item {
+        FilterItem::Group(group) => {
+            let mut items = Vec::new();
+            for child in group.items.iter() {
+                match drop_leaves_in_item(child, is_dropped) {
+                    Some(child) => items.push(child),
+                    None if group.operator == FilterGroupOperator::Or => return None,
+                    None => {}
                 }
             }
-            FilterItem::Item(itm) => {
-                if chain_contains(member_ids, &itm.member_evaluator()) {
-                    result.push(FilterItem::Item(itm.clone()));
-                }
-            }
-            FilterItem::Segment(seg) => {
-                if segment_matches(member_ids, seg) {
-                    result.push(FilterItem::Segment(seg.clone()));
-                }
+            if items.is_empty() {
+                None
+            } else {
+                Some(FilterItem::Group(Rc::new(FilterGroup::new(
+                    group.operator.clone(),
+                    items,
+                ))))
             }
         }
+        leaf => (!is_dropped(leaf)).then(|| leaf.clone()),
     }
-    result
 }
 
 pub fn has_filter_for_member(member: &MemberId, filters: &[FilterItem]) -> bool {
