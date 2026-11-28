@@ -88,17 +88,18 @@ impl MeasureLeaf {
                 [] => (self.measure.cube_id().clone(), false),
                 [cube_id] => (cube_id.clone(), join.is_multiplied(cube_id)),
                 _ => {
-                    if cube_ids.iter().any(|cube_id| join.is_multiplied(cube_id)) {
+                    // The join gives one row per row of a cube it does not
+                    // multiply, so the expression is evaluated once per row of
+                    // that cube, whichever side the other cubes are on.
+                    let Some(grain) = cube_ids.iter().find(|cube_id| !join.is_multiplied(cube_id))
+                    else {
                         return Err(CubeError::user(format!(
                             "Dimension-only measure {} references cubes {:?} that lead to row multiplication. Please rewrite it using sub query.",
                             self.measure.full_name(),
                             cube_ids
                         )));
-                    }
-                    // Dimensions from several cubes, but none of them is on the
-                    // multiplied side of a join - safe to evaluate the expression
-                    // on top of the join tree as a regular measure.
-                    (self.measure.cube_id().clone(), false)
+                    };
+                    (grain.clone(), false)
                 }
             },
         };

@@ -850,3 +850,105 @@ fn test_subquery_join_on_participates_in_equality() -> Result<(), CubeError> {
 
     Ok(())
 }
+
+// `orders` many_to_one `customers` repeats customers' rows, but an expression
+// over both is evaluated once per `orders` row, which the join does not repeat.
+// Σ amount × customer id over the 9 orders = 4595.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_dim_only_measure_over_many_to_one_join() {
+    use crate::cube_bridge::join_hints::JoinHintItem;
+
+    let ctx = create_context();
+    let expr = make_measure_expression(
+        "amount_by_customer_id",
+        "orders",
+        "SUM(({orders.amount} * {customers.id}))",
+    );
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(vec![expr]))
+            .join_hints(Some(vec![JoinHintItem::Vector(vec![
+                "orders".to_string(),
+                "customers".to_string(),
+            ])]))
+            .build(),
+    );
+
+    ctx.build_sql_from_options(options.clone()).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Grouped by the multiplied side: New York 1200, San Francisco 700, Boston 2500,
+// NULL city 195.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_dim_only_measure_over_many_to_one_join_by_one_side_dimension() {
+    let ctx = create_context();
+    let expr = make_measure_expression(
+        "amount_by_customer_id",
+        "orders",
+        "SUM(({orders.amount} * {customers.id}))",
+    );
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(vec![expr]))
+            .dimensions(Some(members_from_strings(vec!["customers.city"])))
+            .build(),
+    );
+
+    ctx.build_sql_from_options(options.clone()).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg_from_options(options, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Customers fans out to both Orders and CustomerOrders, so every cube the
+// expression reads repeats; the root, which no hint ends at, repeats too.
+#[test]
+fn test_dim_only_measure_rejected_when_every_cube_is_multiplied() {
+    use crate::cube_bridge::join_hints::JoinHintItem;
+
+    let schema = MockSchema::from_yaml_file("common/integration_combo.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+    let expr = make_measure_expression(
+        "amount_by_customer_id",
+        "Orders",
+        "SUM(({Customers.id} * {Orders.customerId}))",
+    );
+
+    let options = Rc::new(
+        MockBaseQueryOptions::builder()
+            .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+            .base_tools(ctx.query_tools().base_tools().clone())
+            .join_graph(ctx.query_tools().join_graph().clone())
+            .security_context(ctx.security_context().clone())
+            .measures(Some(vec![expr]))
+            .join_hints(Some(vec![
+                JoinHintItem::Vector(vec!["Customers".to_string(), "Orders".to_string()]),
+                JoinHintItem::Vector(vec!["Customers".to_string(), "CustomerOrders".to_string()]),
+            ]))
+            .build(),
+    );
+
+    let err = ctx
+        .build_sql_from_options(options)
+        .expect_err("the join repeats every cube the expression reads");
+    assert!(
+        err.message.contains("lead to row multiplication"),
+        "unexpected error: {}",
+        err.message
+    );
+}

@@ -1,0 +1,7 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/member_expressions.rs
+expression: result
+---
+amount_by_customer_id
+---------------------
+4595.00
