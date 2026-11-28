@@ -142,7 +142,8 @@
             "group": "Organize content",
             "pages": [
               "docs/organize-content/folders",
-              "docs/organize-content/sharing"
+              "docs/organize-content/sharing",
+              "docs/organize-content/trash"
             ]
           },
           {
