@@ -14,14 +14,9 @@ Click **Create deployment** button. This is the first step in the
 deployment creation. Give it a name and select the cloud provider and region of
 your choice.
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Cloud Create Deployment Screen"
-    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/f5b73cc7-ac72-49ff-a3cd-491c6ab89bbc.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/create-deployment.png" alt="Create deployment step of the deployment wizard with the name, cloud platform and region" />
+</Frame>
 
 <Info>
 
@@ -33,42 +28,27 @@ Microsoft Azure is available on [Enterprise plan](https://cube.dev/pricing).
 ## Step 3: Import Git repository
 
 Next up, the second step in creating a Cube App from scratch in Cube Cloud is to
-click **Import Git repository via SSH** button.
+click **Import Git repository via SSH / HTTP** button.
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Cloud Upload Project Screen"
-    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/4e212151-527b-4435-892c-257a11842e03.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/set-up-cube-project.png" alt="Set up Cube project step with the Create, Import from a GitHub repository and Import Git repository via SSH / HTTP options" />
+</Frame>
 
 Enter the SSH URL of your Git repository, and click **Generate SSH key**:
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Getting SSH key from Cube Cloud"
-    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/ff06ef69-74bf-4259-ba4b-2499d3d5d265.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/git-ssh-key.png" alt="SSH tab of the Git import step with the generated SSH key, the Git repo URL and the Connect button" />
+</Frame>
 
 Copy the SSH key and add it to your hosted Git repository. Back in Cube Cloud,
 click **Connect**. After a connection is successfully established, you
 should see the next screen:
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Getting webhook URL from Cube Cloud"
-    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/eda31adf-fd36-4757-a2a2-d9b919b890d3.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/git-webhook.png" alt="Webhook step of the Git import with the Cube Git webhook URL and the Connect button" />
+</Frame>
 
-Copy the **Cube Cloud Git Webhook URL** and add it your hosted Git
+Copy the **Cube Git webhook URL** and add it your hosted Git
 repository's webhooks. Ensure that the Git repository can push events which
 should trigger a build on Cube Cloud. Back in Cube Cloud,
 click **Connect** to test the webhook.
@@ -130,57 +110,29 @@ can try out Cube Cloud:
 
 </Info>
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Cloud Setup Database Screen"
-    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/1375f9f1-0860-412a-a436-e2e775ec10fa.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/database-picker.png" alt="Set up a database connection step with the grid of data sources" />
+</Frame>
 
 In the UI it'll look exactly like the image below.
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Cloud Setup Database Screen"
-    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/031bb948-d706-412c-b714-5bf28df01312.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/postgres-connection.png" alt="PostgreSQL connection form filled in with the sample database credentials" />
+</Frame>
 
 If you run into issues here, make sure to allow the Cube Cloud IPs to access
 your database. This means you need to enable these IPs in your firewall. If you
 are using AWS, this would mean adding a security group with allowed IPs.
 
-## Step 5: Generate the Data Model
+## Step 5: Check the deployment
 
-Step five in this case consists of generating data models. Start by selecting
-the database tables to generate the data models from, then
-hit **Generate**.
+Cube builds the data model from your repository and spins up your
+deployment. The **Status** page shows the build, the deployment's resources,
+and the activity log:
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Cloud Setup Database Screen"
-    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/a906434b-c4da-414a-adb3-f010b1fa45d1.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
-
-Cube Cloud will generate the data models and spin up your Cube deployment. With
-this, you're done. You've created a Cube deployment, configured a database
-connection, and generated data models!
-
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Cloud Setup Database Screen"
-    src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/b6addada-cc77-4940-aa0c-a0a9c3df6fd1.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+<Frame>
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/status-page.png" alt="Status page of a new deployment with its integrations, resources and activity log" />
+</Frame>
 
 You're ready for the last step, running queries in the Playground.
 
@@ -188,14 +140,5 @@ You're ready for the last step, running queries in the Playground.
 
 Now you can navigate to Playground to try out your queries or connect your
 application to the Cube Cloud API.
-
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Cube Cloud Playground"
-    src="https://static.cube.dev/docs/shared/43bc545a.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
 
 [link-connecting-to-databases]: /admin/connect-to-data/data-sources
