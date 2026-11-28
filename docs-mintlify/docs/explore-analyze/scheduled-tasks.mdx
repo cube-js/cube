@@ -447,10 +447,11 @@ you so. With the Platform API, set the task's `notification` field.
 
 Beyond querying the semantic model, the agent in a scheduled run can:
 
-- **Send email to workspace members** — for example, *"summarize yesterday's
-  signups and email the summary to me."* This requires the agent email tool
-  to be enabled for the workspace; recipients are restricted to workspace
-  members.
+- **Send email** — for example, *"summarize yesterday's signups and email
+  the summary to me."* This requires the agent email tool to be enabled for
+  the workspace. The task creator's
+  [role](/admin/users-and-permissions/custom-roles#global-permissions) decides
+  who the agent can email: only the creator, or any active workspace member.
 - **Use web search**.
 - **Create and update reports, workbooks, and dashboards**, using the task
   creator's permissions.
