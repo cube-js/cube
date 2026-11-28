@@ -63,8 +63,8 @@ async function sqlApiLoad(
   await apiGateway.sqlApiLoad({
     query: { measures: ['Foo.bar'] },
     sqlQuery,
-    ...request,
     streaming: false,
+    ...request,
     memberExpressions: true,
     context: {
       requestId: 'sql-api-load-test',
@@ -256,6 +256,67 @@ describe('sqlApiLoad over Cube Store pre-aggregations', () => {
     const [executed] = adapterApi.executedQueries;
     expect(executed.external).toBeFalsy();
     expect(executed.preAggregations).toBeUndefined();
+  });
+});
+
+describe('sqlApiLoad in stream mode', () => {
+  class StreamAdapterApiMock extends FreshnessAdapterApiMock {
+    public streamedQueries: any[] = [];
+
+    public async streamQuery(query: any) {
+      this.streamedQueries.push(query);
+      return { pipe: () => undefined };
+    }
+  }
+
+  async function load(streaming: boolean, sqlQuery?: [string, any[]]) {
+    const getSql = jest.fn(async (query: any) => ({
+      sql: ['SELECT * FROM test', []],
+      external: !query.disableExternalPreAggregations,
+      aliasNameToMember: { foo__bar: 'Foo.bar' },
+      order: [],
+      dataSource: 'default',
+    }));
+    const adapterApi = new StreamAdapterApiMock();
+    const apiGateway = new ApiGateway('secret', jest.fn().mockImplementation(async () => ({
+      ...(await compilerApi()),
+      getSql,
+    })), async () => adapterApi, testLogger, {
+      standalone: true,
+      dataSourceStorage: new DataSourceStorageMock(),
+      basePath: '/cubejs-api',
+      refreshScheduler: {},
+    });
+
+    await apiGateway.sqlApiLoad({
+      query: { measures: ['Foo.bar'] },
+      sqlQuery,
+      streaming,
+      memberExpressions: true,
+      context: { requestId: 'sql-api-stream-test', securityContext: {} } as any,
+      res: () => undefined,
+      apiType: 'sql',
+    } as any);
+
+    return { disabled: getSql.mock.calls[0][0].disableExternalPreAggregations, adapterApi };
+  }
+
+  test('streamed query reads the data source', async () => {
+    for (const sqlQuery of [undefined, ['SELECT 1', []] as [string, any[]]]) {
+      const { disabled, adapterApi } = await load(true, sqlQuery);
+
+      expect(disabled).toBe(true);
+      expect(adapterApi.streamedQueries).toHaveLength(1);
+      expect(adapterApi.streamedQueries[0].external).toBe(false);
+    }
+  });
+
+  test('non-streamed query still reads Cube Store pre-aggregations', async () => {
+    const { disabled, adapterApi } = await load(false);
+
+    expect(disabled).toBe(false);
+    expect(adapterApi.streamedQueries).toHaveLength(0);
+    expect(adapterApi.executedQueries[0].external).toBe(true);
   });
 });
 

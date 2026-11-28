@@ -2341,6 +2341,73 @@ cubes:
     });
   });
 
+  // A streamed query compiles with external pre-aggregations disabled: Cube Store can't stream
+  describe('disableExternalPreAggregations', () => {
+    const compilers = prepareJsCompiler(`
+      cube('visits', {
+        sql: \`SELECT 1 AS id, 'a' AS source, 'b' AS browser\`,
+        measures: { count: { type: 'count' } },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          source: { sql: 'source', type: 'string' },
+          browser: { sql: 'browser', type: 'string' },
+        },
+        preAggregations: {
+          bySource: { measures: [CUBE.count], dimensions: [CUBE.source], external: true },
+          byBrowser: { measures: [CUBE.count], dimensions: [CUBE.browser], external: false },
+        },
+      });
+    `);
+
+    beforeAll(async () => {
+      await compilers.compile();
+    });
+
+    const build = (useNativeSqlPlanner: boolean, dimension: string, disableExternalPreAggregations: boolean) => {
+      const query = compilers.createQuery(PostgresQuery, {
+        measures: ['visits.count'],
+        dimensions: [dimension],
+        timezone: 'UTC',
+        preAggregationsSchema: '',
+        externalQueryClass: PostgresQuery,
+        useNativeSqlPlanner,
+        disableExternalPreAggregations,
+      } as any);
+      const [sql] = query.buildSqlAndParams();
+      return {
+        sql,
+        external: query.externalPreAggregationQuery(),
+        preAggregations: query.preAggregations.preAggregationsDescription().map(p => p.tableName),
+      };
+    };
+
+    for (const useNativeSqlPlanner of [true, false]) {
+      const planner = useNativeSqlPlanner ? 'tesseract' : 'legacy';
+
+      it(`[${planner}] reads the source instead of a Cube Store pre-aggregation`, () => {
+        const { sql, external, preAggregations } = build(useNativeSqlPlanner, 'visits.source', true);
+
+        expect(sql).not.toContain('visits_by_source');
+        expect(external).toEqual(false);
+        expect(preAggregations).toEqual([]);
+      });
+
+      it(`[${planner}] still reads a Cube Store pre-aggregation when allowed`, () => {
+        const { sql, external } = build(useNativeSqlPlanner, 'visits.source', false);
+
+        expect(sql).toContain('visits_by_source');
+        expect(external).toEqual(true);
+      });
+
+      it(`[${planner}] still reads a pre-aggregation in the data source`, () => {
+        const { sql, external } = build(useNativeSqlPlanner, 'visits.browser', true);
+
+        expect(sql).toContain('visits_by_browser');
+        expect(external).toEqual(false);
+      });
+    }
+  });
+
   describe('rollupJoin leg read on its own by another part of the query', () => {
     const compilers = prepareYamlCompiler(`
 cubes:

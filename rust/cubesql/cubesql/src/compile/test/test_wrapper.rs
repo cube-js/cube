@@ -7771,7 +7771,13 @@ async fn test_wrapper_cube_store_pre_aggregation_count_distinct_dimension() {
 /// A test context with one external rollup holding only `members` of
 /// `KibanaSampleDataEcommerce`, which Cube matches for any query it can serve
 async fn pre_aggregation_test_context_with_rollup(members: &[&str]) -> TestContext {
-    let mut config = ConfigObjImpl::default();
+    pre_aggregation_test_context_with_rollup_and_config(ConfigObjImpl::default(), members).await
+}
+
+async fn pre_aggregation_test_context_with_rollup_and_config(
+    mut config: ConfigObjImpl,
+    members: &[&str],
+) -> TestContext {
     config.sql_push_down_pre_aggregations = true;
     let context = TestContext::with_config_and_meta(
         DatabaseProtocol::PostgreSQL,
@@ -7836,6 +7842,150 @@ async fn test_wrapper_cube_store_pre_aggregation_push_to_cube() {
         assert!(!source_sql.external, "{}", query);
         assert!(source_sql.sql.contains("SqlFunction"));
         assert!(context.pre_aggregation_match_calls().await.is_empty());
+    }
+}
+
+/// Cube Store can't stream, so in stream mode a query that is streamed reads the data source,
+/// and one under the non-streaming row limit still reads the rollup
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_stream_mode() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // Pushed to Cube with the limit, and SQL over a grouped scan the limit stays outside of
+    let queries = [
+        "SELECT customer_gender, SUM(sumPrice) FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY customer_gender ORDER BY 2 DESC",
+        "SELECT customer_gender, s, ROW_NUMBER() OVER (ORDER BY s) rn FROM (SELECT customer_gender, SUM(sumPrice) s FROM KibanaSampleDataEcommerce GROUP BY 1) a ORDER BY rn",
+    ];
+    let limits = [("", false), (" LIMIT 50001", false), (" LIMIT 5000", true)];
+    for (query, (limit, external)) in queries
+        .iter()
+        .flat_map(|query| limits.iter().map(move |limit| (query, limit)))
+    {
+        let mut config = ConfigObjImpl::default();
+        config.stream_mode = true;
+        let context = pre_aggregation_test_context_with_rollup_and_config(
+            config,
+            &["customer_gender", "sumPrice"],
+        )
+        .await;
+        let query = format!("{query}{limit}");
+        let wrapped_sql = wrapped_sql(&context, &query).await;
+
+        assert_eq!(wrapped_sql.external, *external, "{}", query);
+        assert_eq!(
+            wrapped_sql
+                .sql
+                .contains("dev_pre_aggregations.kibana_sample_data_ecommerce_main"),
+            *external,
+            "{}",
+            query
+        );
+        assert_eq!(
+            !context.pre_aggregation_match_calls().await.is_empty(),
+            *external,
+            "{}",
+            query
+        );
+    }
+}
+
+/// A `LIMIT` below a join doesn't bound the rows the join returns, so in stream mode such a
+/// push down reads the data source unless a `LIMIT` is above the join
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_stream_mode_join() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    // One side limited, and both
+    let queries = [
+        "WITH o AS (SELECT gender, total, ROW_NUMBER() OVER (ORDER BY total) rn FROM (SELECT customer_gender AS gender, SUM(sumPrice) AS total FROM KibanaSampleDataEcommerce GROUP BY 1) x ORDER BY rn LIMIT 10), l AS (SELECT content AS gender, MEASURE(agentCount) AS agents FROM Logs GROUP BY 1) SELECT o.gender, o.total, l.agents FROM o INNER JOIN l ON o.gender = l.gender",
+        "WITH a AS (SELECT customer_gender AS gender, SUM(sumPrice) AS total FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 5000), b AS (SELECT content AS gender, MEASURE(agentCount) AS agents FROM Logs GROUP BY 1 LIMIT 5000) SELECT a.gender, a.total, b.agents FROM a INNER JOIN b ON a.gender = b.gender",
+    ];
+    let limits = [("", false), (" LIMIT 5000", true)];
+    for (query, (limit, external)) in queries
+        .iter()
+        .flat_map(|query| limits.iter().map(move |limit| (query, limit)))
+    {
+        assert_stream_mode_push_down(&format!("{query}{limit}"), *external).await;
+    }
+}
+
+/// Plans `query` in stream mode against a rollup matching any query, and checks that it is
+/// pushed down, and to Cube Store only when `external`, without asking Cube otherwise
+async fn assert_stream_mode_push_down(query: &str, external: bool) {
+    let mut config = ConfigObjImpl::default();
+    config.sql_push_down_pre_aggregations = true;
+    config.stream_mode = true;
+    let context = TestContext::with_config_and_meta(
+        DatabaseProtocol::PostgreSQL,
+        Arc::new(config),
+        get_test_tenant_ctx_with_cube_store_templates(vec![], vec![]),
+    )
+    .await;
+    context
+        .add_cube_store_pre_aggregation_mock_for_any_query(pre_aggregation_description())
+        .await;
+    let wrapped_sqls = context
+        .convert_sql_to_cube_query(query)
+        .await
+        .unwrap()
+        .as_logical_plan()
+        .find_cube_scan_wrapped_sqls_deep();
+
+    assert!(!wrapped_sqls.is_empty(), "{}", query);
+    assert_eq!(
+        wrapped_sqls.iter().any(|node| node.wrapped_sql.external),
+        external,
+        "{}",
+        query
+    );
+    if !external {
+        assert!(
+            context.pre_aggregation_match_calls().await.is_empty(),
+            "{}",
+            query
+        );
+    }
+}
+
+/// A push down's rows are bounded by a `LIMIT` on its chain of `FROM`s, unless a join or
+/// grouping sets above it multiply them, and the queries of a union add up. A plan sharing a
+/// node between a bounded and an unbounded push down reads the data source
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_stream_mode_bound() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let grouped =
+        "(SELECT customer_gender, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce GROUP BY 1)";
+    let core = "(SELECT customer_gender, notes FROM KibanaSampleDataEcommerce GROUP BY 1, 2)";
+    let queries = [
+        // Unions of bounded queries, over the limit together and under it, and one bounded by
+        // an outer limit
+        ("SELECT customer_gender, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM (SELECT customer_gender, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 100) a UNION ALL SELECT notes, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM (SELECT notes, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 100) a".to_string(), true),
+        ("SELECT customer_gender, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM (SELECT customer_gender, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 50000) a UNION ALL SELECT notes, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM (SELECT notes, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 50000) a".to_string(), false),
+        (format!("SELECT customer_gender, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM {grouped} a UNION ALL SELECT notes, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM (SELECT notes, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce GROUP BY 1) a LIMIT 10"), true),
+        // A join over a union of bounded queries
+        ("WITH u AS (SELECT * FROM (SELECT customer_gender AS g, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM (SELECT customer_gender, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 5000) a UNION ALL SELECT notes AS g, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM (SELECT notes, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 5000) a) uu), l AS (SELECT content AS lg, MEASURE(agentCount) AS agents FROM Logs GROUP BY 1 LIMIT 5000) SELECT u.g, u.mp, l.agents FROM u INNER JOIN l ON u.g = l.lg".to_string(), false),
+        // Grouping sets over a bounded query
+        ("SELECT customer_gender, notes, SUM(s) FROM (SELECT customer_gender, notes, SUM(sumPrice) s FROM KibanaSampleDataEcommerce GROUP BY 1, 2 LIMIT 50000) t GROUP BY ROLLUP(customer_gender, notes)".to_string(), false),
+        // A query used under a limit and without one
+        (format!("WITH base AS {grouped} SELECT base.customer_gender, base.mp, tp.rn FROM base LEFT JOIN (SELECT customer_gender, ROW_NUMBER() OVER (ORDER BY mp) rn FROM base ORDER BY rn LIMIT 10) tp ON base.customer_gender = tp.customer_gender"), false),
+        // A matrix of Power BI: top rows joined to the numbered top columns over the core
+        (format!("SELECT l.customer_gender, r.ci FROM (SELECT customer_gender FROM {core} c0 GROUP BY 1 ORDER BY 1 LIMIT 101) l LEFT JOIN (SELECT c.customer_gender, s.ci FROM {core} c INNER JOIN (SELECT notes, ROW_NUMBER() OVER (ORDER BY notes) - 1 AS ci FROM (SELECT notes FROM {core} c2 GROUP BY 1 ORDER BY 1 LIMIT 102) s0) s ON c.notes = s.notes) r ON l.customer_gender = r.customer_gender ORDER BY 1, 2"), false),
+        // A limit at the non-streaming row limit, and with an offset
+        (format!("SELECT customer_gender, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM {grouped} a ORDER BY rn LIMIT 50000"), true),
+        (format!("SELECT customer_gender, mp, ROW_NUMBER() OVER (ORDER BY mp) rn FROM {grouped} a ORDER BY rn LIMIT 50000 OFFSET 100"), true),
+    ];
+    for (query, external) in queries {
+        assert_stream_mode_push_down(&query, external).await;
     }
 }
 

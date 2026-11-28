@@ -1479,6 +1479,62 @@ fn test_rollup_build_without_use_original_sql_pre_aggregations_in_pre_aggregatio
     Ok(())
 }
 
+// With external pre-aggregations disabled, the query runs on the data source, so an
+// `originalSql` pre-aggregation stored in Cube Store is skipped and one in the data source
+// is still read
+#[test]
+fn test_original_sql_pre_aggregation_with_external_pre_aggregations_disabled(
+) -> Result<(), CubeError> {
+    for (external, disabled, reads_pre_aggregation) in [
+        (true, false, true),
+        (true, true, false),
+        (false, true, true),
+    ] {
+        let ctx = TestContext::new(MockSchema::from_yaml(&format!(
+            indoc! {"
+                cubes:
+                  - name: foo
+                    sql: SELECT * FROM foo_table
+                    dimensions:
+                      - name: time
+                        type: time
+                        sql: timestamp
+                    measures:
+                      - name: total
+                        type: sum
+                        sql: amount
+                    pre_aggregations:
+                      - name: main
+                        type: originalSql
+                        external: {}
+            "},
+            external
+        ))?)?;
+        let query_yaml = format!(
+            indoc! {"
+                measures:
+                  - foo.total
+                disable_external_pre_aggregations: {}
+            "},
+            disabled
+        );
+
+        let sql = ctx.build_sql(&query_yaml)?;
+
+        assert_eq!(
+            sql.contains("foo__main"),
+            reads_pre_aggregation,
+            "external: {external}, disabled: {disabled}, got:\n{sql}"
+        );
+        assert_eq!(
+            sql.contains("foo_table"),
+            !reads_pre_aggregation,
+            "external: {external}, disabled: {disabled}, got:\n{sql}"
+        );
+    }
+    Ok(())
+}
+
 // A measure referenced only in ORDER BY (not in the selected measures) is dropped
 // from the ORDER BY when reading a pre-aggregation. CubeStore cannot ORDER BY an
 // aggregate of a rollup column that isn't projected, and the legacy planner

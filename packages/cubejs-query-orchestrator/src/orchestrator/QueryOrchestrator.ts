@@ -225,6 +225,17 @@ export class QueryOrchestrator {
       preAggregationsTablesToTempTables,
       values,
     } = await this.preAggregations.loadAllPreAggregationsIfNeeded(query);
+    // A streamed query reads no Cube Store pre-aggregation, so without a rollup in the
+    // data source it would query the source itself
+    if (this.rollupOnlyMode && preAggregationsTablesToTempTables.length === 0) {
+      throw new Error(
+        'No pre-aggregation stored in the data source serves this streamed query, a streamed ' +
+        'query can\'t read Cube Store pre-aggregations, and rollup only mode doesn\'t allow ' +
+        'querying the data source. If a Cube Store pre-aggregation matches the query, add a ' +
+        'LIMIT at or below CUBESQL_NON_STREAMING_QUERY_MAX_ROW_LIMIT to the outermost query, ' +
+        'outside any join, or turn off CUBESQL_STREAM_MODE, which caps results at that limit.'
+      );
+    }
     query.values = values || query.values;
     const _stream = await this.queryCache.cachedQueryResult(
       query,

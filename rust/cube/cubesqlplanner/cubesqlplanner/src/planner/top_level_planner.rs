@@ -119,7 +119,7 @@ impl TopLevelPlanner {
             || options.use_original_sql_pre_aggregations_in_pre_aggregation()
         {
             OriginalSqlCollector::new(self.query_tools.query_tools().clone())
-                .collect(&optimized_plan)?
+                .collect(&optimized_plan, options.disable_external_pre_aggregations())?
         } else {
             HashMap::new()
         };

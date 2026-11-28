@@ -2555,7 +2555,10 @@ class ApiGateway {
     try {
       this.log({ type: 'Load Request', query, streaming: true }, context);
       const [, normalizedQueries] = await this.getNormalizedQueries(query, context, true);
-      const sqlQuery = (await this.getSqlQueriesInternal(context, normalizedQueries))[0];
+      const sqlQuery = (await this.getSqlQueriesInternal(
+        context,
+        normalizedQueries.map(q => ({ ...q, disableExternalPreAggregations: true }))
+      ))[0];
       const q: QueryBody = {
         ...sqlQuery,
         query: sqlQuery.sql[0],
@@ -2754,10 +2757,13 @@ class ApiGateway {
       // on, so its cube query can only read a Cube Store rollup when cubesql rendered the
       // SQL on top for Cube Store and says so with `external`
       const external = Boolean(request.sqlQuery && request.external);
+      // Cube Store returns a whole result in one message, so a streamed query reads the
+      // data source instead of a Cube Store rollup
+      const disableExternalPreAggregations = Boolean(request.streaming) || (Boolean(request.sqlQuery) && !external);
       const sqlQueries = await this
         .getSqlQueriesInternal(
           context,
-          normalizedQueries.map(q => ({ ...q, disableExternalPreAggregations: Boolean(request.sqlQuery) && !external }))
+          normalizedQueries.map(q => ({ ...q, disableExternalPreAggregations }))
         );
 
       let results: any[];

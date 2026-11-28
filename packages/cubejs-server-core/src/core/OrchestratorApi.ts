@@ -68,11 +68,26 @@ export class OrchestratorApi {
    * Returns stream object which will be used to stream results from
    * the data source if applicable. Throw otherwise.
    *
-   * @throw Error
+   * @throw ContinueWaitError, or `{ error }` for any other failure
    */
   public async streamQuery(query: QueryBody): Promise<stream.Writable> {
     // TODO merge with fetchQuery
-    return this.orchestrator.streamQuery(query);
+    try {
+      return await this.orchestrator.streamQuery(query);
+    } catch (err: any) {
+      // The caller retries on a continue wait, so it passes through as is
+      if (err instanceof ContinueWaitError) {
+        throw err;
+      }
+      this.logger('Error streaming query', {
+        query: query.query?.replace(/\s+/g, ' '),
+        params: query.values,
+        error: err.stack || err,
+        requestId: query.requestId
+      });
+      // Reported as an orchestrator error, as `executeQuery` does
+      throw { error: err.toString() };
+    }
   }
 
   /**
