@@ -237,6 +237,192 @@ describe('PostgresDriver', () => {
     }
   });
 
+  // https://github.com/cube-js/cube/issues/8337
+  // information_schema doesn't list materialized views, so they were missing from the
+  // Playground's db-schema and from data model generation.
+  describe('materialized views', () => {
+    const aggSql = 'SELECT status, SUM(amount)::numeric(12, 2) AS total, COUNT(*) AS orders_count, ' +
+      'ARRAY_AGG(id) AS ids, MAX(state) AS state FROM mv_8337.orders GROUP BY status';
+    let readerDriver: PostgresDriver;
+
+    beforeAll(async () => {
+      for (const schema of ['mv_8337', 'mv_8337_only']) {
+        await driver.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`, []);
+        await driver.query(`CREATE SCHEMA ${schema}`, []);
+      }
+
+      await driver.query('CREATE TYPE mv_8337.order_state AS ENUM (\'new\', \'done\')', []);
+      await driver.query('CREATE DOMAIN mv_8337.short_text AS varchar(16)', []);
+      await driver.query(
+        'CREATE TABLE mv_8337.orders (id INT, status mv_8337.short_text, amount NUMERIC(10, 2), state mv_8337.order_state)',
+        []
+      );
+      // The view and the materialized view share a definition, so their columns must match
+      await driver.query(`CREATE VIEW mv_8337.orders_agg_view AS ${aggSql}`, []);
+      await driver.query(`CREATE MATERIALIZED VIEW mv_8337.orders_agg_mv AS ${aggSql}`, []);
+      // A schema that holds nothing but a materialized view
+      await driver.query('CREATE MATERIALIZED VIEW mv_8337_only.numbers AS SELECT 1::int AS n', []);
+
+      // Like information_schema, only list materialized views the role can read
+      await driver.query('DROP ROLE IF EXISTS mv_reader', []);
+      await driver.query('CREATE ROLE mv_reader LOGIN PASSWORD \'mv_reader\'', []);
+      await driver.query('GRANT USAGE ON SCHEMA mv_8337 TO mv_reader', []);
+      await driver.query('GRANT SELECT ON mv_8337.orders_agg_view TO mv_reader', []);
+
+      readerDriver = new PostgresDriver({
+        host: container.getHost(),
+        port: container.getMappedPort(5432),
+        user: 'mv_reader',
+        password: 'mv_reader',
+        database: 'test',
+      });
+    });
+
+    afterAll(async () => {
+      await readerDriver?.release();
+
+      for (const schema of ['mv_8337', 'mv_8337_only']) {
+        await driver.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`, []);
+      }
+      await driver.query('DROP ROLE IF EXISTS mv_reader', []);
+    });
+
+    test('tablesSchema lists materialized views like views', async () => {
+      const schema = await driver.tablesSchema();
+
+      expect(Object.keys(schema.mv_8337).sort()).toEqual(['orders', 'orders_agg_mv', 'orders_agg_view']);
+      expect(schema.mv_8337.orders_agg_mv).toEqual(schema.mv_8337.orders_agg_view);
+      expect(schema.mv_8337.orders_agg_mv).toEqual([
+        { name: 'ids', type: 'ARRAY', attributes: [] },
+        { name: 'orders_count', type: 'bigint', attributes: [] },
+        { name: 'state', type: 'USER-DEFINED', attributes: [] },
+        { name: 'status', type: 'character varying', attributes: [] },
+        { name: 'total', type: 'numeric', attributes: [] },
+      ]);
+      expect(schema.mv_8337_only).toEqual({
+        numbers: [{ name: 'n', type: 'integer', attributes: [] }],
+      });
+    });
+
+    test('tablesSchema skips materialized views the role cannot read', async () => {
+      const schema = await readerDriver.tablesSchema();
+
+      expect(Object.keys(schema.mv_8337)).toEqual(['orders_agg_view']);
+      expect(schema.mv_8337_only).toBeUndefined();
+    });
+
+    test('getSchemas and getTablesForSpecificSchemas list materialized views', async () => {
+      const schemas = (await driver.getSchemas()).filter(s => s.schema_name.startsWith('mv_8337'));
+      expect(schemas.map(s => s.schema_name).sort()).toEqual(['mv_8337', 'mv_8337_only']);
+
+      const tables = await driver.getTablesForSpecificSchemas(schemas);
+      expect(tables.map(t => `${t.schema_name}.${t.table_name}`).sort()).toEqual([
+        'mv_8337.orders',
+        'mv_8337.orders_agg_mv',
+        'mv_8337.orders_agg_view',
+        'mv_8337_only.numbers',
+      ]);
+    });
+
+    test('getColumnsForSpecificTables returns materialized view columns', async () => {
+      const columns = await driver.getColumnsForSpecificTables([
+        { schema_name: 'mv_8337', table_name: 'orders_agg_mv' },
+        { schema_name: 'mv_8337', table_name: 'orders_agg_view' },
+        { schema_name: 'mv_8337_only', table_name: 'numbers' },
+      ]);
+      const pick = (table: string) => columns
+        .filter(c => c.table_name === table)
+        .map(({ schema_name, column_name, data_type, attributes, foreign_keys }) => ({
+          schema_name, column_name, data_type, attributes, foreign_keys,
+        }))
+        .sort((a, b) => a.column_name.localeCompare(b.column_name));
+
+      expect(pick('orders_agg_mv')).toEqual(pick('orders_agg_view'));
+      expect(pick('orders_agg_mv')).toHaveLength(5);
+      expect(pick('numbers')).toEqual([
+        { schema_name: 'mv_8337_only', column_name: 'n', data_type: 'integer', attributes: undefined, foreign_keys: [] },
+      ]);
+    });
+
+    test('tableColumnTypes returns materialized view columns in order', async () => {
+      const expected = [
+        { name: 'status', type: 'text' },
+        { name: 'total', type: 'decimal' },
+        { name: 'orders_count', type: 'bigint' },
+        { name: 'ids', type: 'ARRAY' },
+        { name: 'state', type: 'USER-DEFINED' },
+      ];
+
+      // CUBEJS_DB_FETCH_COLUMNS_BY_ORDINAL_POSITION defaults to true
+      expect(await driver.tableColumnTypes('mv_8337.orders_agg_view')).toEqual(expected);
+      expect(await driver.tableColumnTypes('mv_8337.orders_agg_mv')).toEqual(expected);
+    });
+
+    const connection = () => ({
+      host: container.getHost(),
+      port: container.getMappedPort(5432),
+      user: 'test',
+      password: 'test',
+      database: 'test',
+    });
+
+    // Postgres-compatible databases such as CockroachDB list materialized views in information_schema
+    // too. Stand in for one by reading tables from pg_catalog as well: none may come back twice.
+    test('skips relations information_schema already lists', async () => {
+      class TablesInCatalogDriver extends PostgresDriver {
+        protected materializedViewsQuery() {
+          return super.materializedViewsQuery().replace('c.relkind = \'m\'', 'c.relkind IN (\'m\', \'r\', \'v\')');
+        }
+
+        protected materializedViewColumnsQuery() {
+          return super.materializedViewColumnsQuery().replace('c.relkind = \'m\'', 'c.relkind IN (\'m\', \'r\', \'v\')');
+        }
+      }
+
+      const catalogDriver = new TablesInCatalogDriver(connection());
+
+      try {
+        expect(await catalogDriver.tablesSchema()).toEqual(await driver.tablesSchema());
+        expect(await catalogDriver.getTablesForSpecificSchemas([{ schema_name: 'mv_8337' }]))
+          .toEqual(await driver.getTablesForSpecificSchemas([{ schema_name: 'mv_8337' }]));
+        expect(await catalogDriver.tableColumnTypes('mv_8337.orders_agg_view'))
+          .toEqual(await driver.tableColumnTypes('mv_8337.orders_agg_view'));
+      } finally {
+        await catalogDriver.release();
+      }
+    });
+
+    // Postgres-compatible databases such as RisingWave lack the catalog functions the query uses
+    test('falls back to information_schema when the server rejects the catalog query', async () => {
+      class NoCatalogDriver extends PostgresDriver {
+        public catalogQueries = 0;
+
+        protected materializedViewsQuery() {
+          this.catalogQueries++;
+          return `${super.materializedViewsQuery()} AND pg_catalog.no_such_function()`;
+        }
+
+        protected materializedViewColumnsQuery() {
+          this.catalogQueries++;
+          return `${super.materializedViewColumnsQuery()} AND pg_catalog.no_such_function()`;
+        }
+      }
+
+      const noCatalogDriver = new NoCatalogDriver(connection());
+
+      try {
+        const schema = await noCatalogDriver.tablesSchema();
+        expect(Object.keys(schema.mv_8337).sort()).toEqual(['orders', 'orders_agg_view']);
+        expect(await noCatalogDriver.tableColumnTypes('mv_8337.orders_agg_view'))
+          .toEqual(await driver.tableColumnTypes('mv_8337.orders_agg_view'));
+        // Only the first query tried the catalog
+        expect(noCatalogDriver.catalogQueries).toEqual(1);
+      } finally {
+        await noCatalogDriver.release();
+      }
+    });
+  });
+
   describe('primary and foreign keys', () => {
     const schemas = ['fk_name', 'fk_tenant_a', 'fk_tenant_b', 'fk_composite', 'fk_partitioned'];
     let readerDriver: PostgresDriver;

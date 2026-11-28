@@ -127,6 +127,11 @@ export class MaterializeDriver extends PostgresDriver {
     return BaseDriver.prototype.uploadTableWithIndexes.bind(this)(table, columns, tableData, indexesSql, [], null, {});
   }
 
+  // Materialize's information_schema already lists its materialized views
+  protected override listMaterializedViews(): boolean {
+    return false;
+  }
+
   /**
    * Materialize queryable schema
    * Returns materialized sources, materialized views, and tables
