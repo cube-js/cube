@@ -1,21 +1,31 @@
 ---
 title: KPI
-description: Highlight key metrics with composable blocks — numbers, comparisons, progress bars, sparklines, text, and HTML.
+description: Highlight key metrics with composable blocks — numbers, comparisons, progress bars, sparklines, and HTML.
 ---
 
 KPI tiles highlight important metrics and key performance indicators. Rather than a single fixed layout, KPIs are **row-based and composable** — you build the tile by stacking blocks of different types, each configured independently.
 
-{/* TODO screenshot: KPI tile with Number + Comparison + Sparkline blocks stacked (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/kpi/kpi-tile-v2.png"
+    alt="KPI tile with a Number block, a Comparison block and a Sparkline block stacked vertically"
+  />
+</Frame>
 
 ## Getting started
 
-The KPI visualization starts with a **Number** block that compares the first and second rows of your result for the first numeric column.
+The KPI visualization starts with a **Number** block that shows the first row of your result for the first numeric column.
 
-To add a new block, click the **+** button inside the visualization and choose the block type. To edit a block, click it in the visualization — the configuration panel updates to show that block's settings.
+Click **Design** to open the chart builder. It lists every block of the tile as a card, in the order the blocks appear, with each block's settings on its **Data** and **Style** tabs. To add a block, click **Add block** below the cards and choose the block type.
 
-Reorder blocks by dragging the handle on the left side of each block. Delete a block with the trash icon in its configuration panel.
+Reorder blocks by dragging the handle on the left side of a card's title. Remove a block with the **×** button on the right side of its title.
 
-{/* TODO screenshot: KPI builder panel showing block list with drag handles (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/kpi/kpi-builder.png"
+    alt="KPI chart with the Design panel listing its Number and Comparison blocks as cards, each with a drag handle and a remove button, above the Add block button and the Chart layout settings"
+  />
+</Frame>
 
 ## Block types
 
@@ -31,7 +41,12 @@ Displays a single value from your query result.
 | **Font size / color** | Text appearance |
 | **Alignment** | Left, center, or right |
 
-{/* TODO screenshot: Number block (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/kpi/kpi-number-block.png"
+    alt="Number block showing revenue, with its Column, Label, Row and Format settings"
+  />
+</Frame>
 
 ### Comparison
 
@@ -46,7 +61,12 @@ Displays a current value alongside a previous value with a calculated difference
 
 To compare to a static goal, add a column to your query that always returns the same number (e.g. a calculated field with a constant), then select it as the **Previous** field.
 
-{/* TODO screenshot: Comparison block showing current vs. previous with colored delta (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/kpi/kpi-comparison-block.png"
+    alt="Comparison block showing a green percentage change under a Number block, with its Current column and Previous column settings"
+  />
+</Frame>
 
 ### Progress bar
 
@@ -63,7 +83,12 @@ Shows a value relative to a target as a progress bar or circle. Useful for goal 
 To compare against a static number like a quarterly goal, add a calculated field that always returns that number and use it as the **Target** field.
 </Tip>
 
-{/* TODO screenshot: Progress bar block (bar style) and circle style (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/kpi/kpi-progress-bar-block.png"
+    alt="Two Progress bar blocks against a custom goal, one in the bar style and one in the circle style, with the Progress bar settings"
+  />
+</Frame>
 
 ### Sparkline
 
@@ -84,21 +109,23 @@ Above the chart, the block shows a headline value. By default, it's the series m
 | **Max points** | Limits the number of data points rendered |
 | **Colors** | Line/fill colors |
 
-{/* TODO screenshot: Sparkline block showing a trend line (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
-
-### Text
-
-A Markdown-enabled text field for titles, headings, or descriptions within the tile. Supports standard Markdown formatting.
-
-Use text blocks for short labels and headings inside the KPI. For complex layouts with Markdown, use the [HTML block](#html) or consider the [Custom visualization](/docs/explore-analyze/charts/custom) instead.
-
-{/* TODO screenshot: Text block with a heading (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/kpi/kpi-sparkline-block-v2.png"
+    alt="Sparkline block with a headline value, a trend delta and a trend line over months, with its Sparkline measure and Sparkline dimension settings"
+  />
+</Frame>
 
 ### HTML
 
-A free-form HTML block rendered inside the KPI tile. Use this for advanced custom layouts that go beyond what the other block types support.
+A free-form block rendered inside the KPI tile. It accepts Markdown and HTML with CSS styling, so use it for titles, headings and descriptions, as well as custom layouts that go beyond what the other block types support. For complex layouts, consider the [Custom visualization](/docs/explore-analyze/charts/custom) instead.
 
-{/* TODO screenshot: HTML block with custom content (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/kpi/kpi-html-block.png"
+    alt="HTML block rendering a Markdown heading, a paragraph and an HTML badge, with the HTML and Markdown editor"
+  />
+</Frame>
 
 ## Layout controls
 
