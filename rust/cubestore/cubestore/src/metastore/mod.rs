@@ -1136,6 +1136,12 @@ pub trait MetaStore: DIService + Send + Sync {
         row_reference: RowKey,
         job_type: JobType,
     ) -> Result<Option<IdRow<Job>>, CubeError>;
+    /// Whether a job of any of `job_types` on `row_reference` is scheduled or running.
+    async fn has_active_jobs_by_ref(
+        &self,
+        row_reference: RowKey,
+        job_types: Vec<JobType>,
+    ) -> Result<bool, CubeError>;
     async fn get_orphaned_jobs(
         &self,
         orphaned_timeout: Duration,
@@ -1487,6 +1493,7 @@ pub struct RocksMetaStore {
     disk_space_compute_lock: Arc<tokio::sync::Mutex<()>>,
     in_memory_compaction_cache: Arc<RwLock<Option<(HashMap<String, Vec<u64>>, SystemTime)>>>,
     in_memory_compaction_compute_lock: Arc<tokio::sync::Mutex<()>>,
+    job_tables: Arc<Mutex<HashMap<u64, JobTable>>>,
     upload_loop: Arc<WorkerLoop>,
 }
 
@@ -1513,6 +1520,7 @@ impl RocksMetaStore {
             disk_space_compute_lock: Arc::new(tokio::sync::Mutex::new(())),
             in_memory_compaction_cache: Arc::new(RwLock::new(None)),
             in_memory_compaction_compute_lock: Arc::new(tokio::sync::Mutex::new(())),
+            job_tables: Arc::new(Mutex::new(HashMap::new())),
             upload_loop: Arc::new(WorkerLoop::new("Metastore upload")),
         })
     }
@@ -4415,6 +4423,33 @@ impl MetaStore for RocksMetaStore {
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
+    async fn has_active_jobs_by_ref(
+        &self,
+        row_reference: RowKey,
+        job_types: Vec<JobType>,
+    ) -> Result<bool, CubeError> {
+        self.read_operation("has_active_jobs_by_ref", move |db_ref| {
+            let jobs_table = JobRocksTable::new(db_ref);
+            for job_type in job_types {
+                let jobs = jobs_table.get_rows_by_index(
+                    &JobIndexKey::RowReference(row_reference.clone(), job_type),
+                    &JobRocksIndex::RowReference,
+                )?;
+                if jobs.iter().any(|j| {
+                    matches!(
+                        j.get_row().status(),
+                        JobStatus::Scheduled(_) | JobStatus::ProcessingBy(_)
+                    )
+                }) {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        })
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip_all)]
     async fn get_orphaned_jobs(
         &self,
         orphaned_timeout: Duration,
@@ -4470,10 +4505,13 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip_all)]
     async fn delete_job(&self, job_id: u64) -> Result<IdRow<Job>, CubeError> {
-        self.write_operation("delete_job", move |db_ref, batch_pipe| {
-            Ok(JobRocksTable::new(db_ref.clone()).delete(job_id, batch_pipe)?)
-        })
-        .await
+        let job = self
+            .write_operation("delete_job", move |db_ref, batch_pipe| {
+                Ok(JobRocksTable::new(db_ref.clone()).delete(job_id, batch_pipe)?)
+            })
+            .await;
+        self.job_tables.lock().unwrap().remove(&job_id);
+        job
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
@@ -4529,9 +4567,15 @@ impl MetaStore for RocksMetaStore {
         server_name: String,
         pool: JobRunnerPool,
     ) -> Result<Option<IdRow<Job>>, CubeError> {
+        let order_by_table = self.store.config.job_order_by_table_enabled();
+        let job_tables = self.job_tables.clone();
+        // Past the create-table deadline a table can no longer become ready, so boosting its jobs
+        // further would only delay everyone else.
+        let max_table_boost =
+            chrono::Duration::seconds(self.store.config.import_job_timeout() as i64 * 2);
         self.write_operation("start_processing_job", move |db_ref, batch_pipe| {
-            let table = JobRocksTable::new(db_ref);
-            let next_job = table
+            let table = JobRocksTable::new(db_ref.clone());
+            let candidates = table
                 .get_rows_by_index(
                     &JobIndexKey::ScheduledByShard(Some(server_name.to_string())),
                     &JobRocksIndex::ByShard,
@@ -4541,10 +4585,19 @@ impl MetaStore for RocksMetaStore {
                 // worker can't run them. Skip silently here — they are reported and
                 // removed by the scheduler's cleanup_unknown_jobs sweep.
                 .filter(|j| !matches!(j.get_row().job_type(), JobType::Unknown))
-                .filter(|j| j.get_row().matches_pool(pool))
+                .filter(|j| j.get_row().matches_pool(pool));
+            let next_job = if order_by_table {
+                let mut job_tables = job_tables.lock().unwrap();
+                let mut arrival = JobArrival::new(db_ref, &mut job_tables, max_table_boost);
+                let jobs = candidates
+                    .map(|j| Ok((arrival.of(&j)?, j)))
+                    .collect::<Result<Vec<_>, CubeError>>()?;
+                pick_job_by_arrival(jobs)
+            } else {
                 //We use min_by instead of the max_by because of min_by returns the first element
                 //if priority is equal while max_by returns the last element
-                .min_by(|a, b| b.get_row().priority().cmp(&a.get_row().priority()));
+                candidates.min_by(|a, b| b.get_row().priority().cmp(&a.get_row().priority()))
+            };
 
             if let Some(job) = next_job {
                 if let JobStatus::ProcessingBy(node) = job.get_row().status() {
@@ -4591,15 +4644,18 @@ impl MetaStore for RocksMetaStore {
 
     #[tracing::instrument(level = "trace", skip_all)]
     async fn delete_all_jobs(&self) -> Result<Vec<IdRow<Job>>, CubeError> {
-        self.write_operation("delete_all_jobs", move |db_ref, batch_pipe| {
-            let jobs_table = JobRocksTable::new(db_ref);
-            let all_jobs = jobs_table.all_rows()?;
-            for job in all_jobs.iter() {
-                jobs_table.delete(job.get_id(), batch_pipe)?;
-            }
-            Ok(all_jobs)
-        })
-        .await
+        let jobs = self
+            .write_operation("delete_all_jobs", move |db_ref, batch_pipe| {
+                let jobs_table = JobRocksTable::new(db_ref);
+                let all_jobs = jobs_table.all_rows()?;
+                for job in all_jobs.iter() {
+                    jobs_table.delete(job.get_id(), batch_pipe)?;
+                }
+                Ok(all_jobs)
+            })
+            .await;
+        self.job_tables.lock().unwrap().clear();
+        jobs
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
@@ -5473,6 +5529,166 @@ fn swap_active_partitions_impl(
     }
 
     Ok(())
+}
+
+// The table a job works on never changes, so it is resolved once per job.
+#[derive(Clone, Copy)]
+enum JobTable {
+    None,
+    Dropped,
+    Table(u64),
+}
+
+#[derive(Clone, Copy)]
+enum Arrival {
+    Plain(DateTime<Utc>),
+    Streaming(DateTime<Utc>),
+}
+
+// Picks by (priority, arrival). A job enqueued after the oldest streaming job of the same or lower
+// priority never goes first, so streaming jobs wait exactly as long as in FIFO order.
+fn pick_job_by_arrival(jobs: Vec<(Arrival, IdRow<Job>)>) -> Option<IdRow<Job>> {
+    let time = |a: &Arrival| match a {
+        Arrival::Plain(t) | Arrival::Streaming(t) => *t,
+    };
+    let enqueued = |j: &IdRow<Job>| *j.get_row().last_heart_beat();
+    let key = |(a, j): &&(Arrival, IdRow<Job>)| {
+        (
+            std::cmp::Reverse(j.get_row().priority()),
+            time(a),
+            j.get_id(),
+        )
+    };
+    let oldest_streaming = jobs
+        .iter()
+        .filter(|(a, _)| matches!(a, Arrival::Streaming(_)))
+        .min_by_key(key);
+    let best = jobs.iter().min_by_key(key)?;
+    let pick = match oldest_streaming {
+        Some((_, s))
+            if enqueued(&best.1) > enqueued(s)
+                && best.1.get_row().priority() <= s.get_row().priority() =>
+        {
+            jobs.iter()
+                .filter(|(_, j)| enqueued(j) <= enqueued(s))
+                .min_by_key(key)?
+        }
+        _ => best,
+    };
+    Some(pick.1.clone())
+}
+
+// Queue time for ordering jobs by table: a not-ready table's job takes the table's creation time,
+// but no earlier than `max_table_boost` before its own enqueue time; other jobs keep their own.
+struct JobArrival<'a, 'c> {
+    db_ref: DbTableRef<'a>,
+    job_tables: &'c mut HashMap<u64, JobTable>,
+    max_table_boost: chrono::Duration,
+    index_tables: HashMap<u64, Option<u64>>,
+    partition_tables: HashMap<u64, Option<u64>>,
+    tables: HashMap<u64, TableOrder>,
+}
+
+#[derive(Clone, Copy)]
+enum TableOrder {
+    Streaming,
+    NotReadySince(DateTime<Utc>),
+    Regular,
+}
+
+impl<'a, 'c> JobArrival<'a, 'c> {
+    fn new(
+        db_ref: DbTableRef<'a>,
+        job_tables: &'c mut HashMap<u64, JobTable>,
+        max_table_boost: chrono::Duration,
+    ) -> Self {
+        Self {
+            db_ref,
+            job_tables,
+            max_table_boost,
+            index_tables: HashMap::new(),
+            partition_tables: HashMap::new(),
+            tables: HashMap::new(),
+        }
+    }
+
+    fn of(&mut self, job: &IdRow<Job>) -> Result<Arrival, CubeError> {
+        let job_table = match self.job_tables.get(&job.get_id()) {
+            Some(t) => *t,
+            None => {
+                let t = self.resolve(job.get_row().row_reference())?;
+                self.job_tables.insert(job.get_id(), t);
+                t
+            }
+        };
+        let enqueued = *job.get_row().last_heart_beat();
+        Ok(match job_table {
+            JobTable::None => Arrival::Plain(enqueued),
+            // Run it first so it fails fast.
+            JobTable::Dropped => Arrival::Plain(DateTime::<Utc>::MIN_UTC),
+            JobTable::Table(table_id) => match self.table_order(table_id)? {
+                TableOrder::Streaming => Arrival::Streaming(enqueued),
+                TableOrder::NotReadySince(created) => {
+                    Arrival::Plain(created.max(enqueued - self.max_table_boost))
+                }
+                TableOrder::Regular => Arrival::Plain(enqueued),
+            },
+        })
+    }
+
+    fn resolve(&mut self, key: &RowKey) -> Result<JobTable, CubeError> {
+        let table_id = match key {
+            RowKey::Table(TableId::Tables, id) => Some(*id),
+            RowKey::Table(TableId::Partitions, id) => self.partition_table(*id)?,
+            RowKey::Table(TableId::Chunks, id) => {
+                match ChunkRocksTable::new(self.db_ref.clone()).get_row(*id)? {
+                    Some(c) => self.partition_table(c.get_row().get_partition_id())?,
+                    None => None,
+                }
+            }
+            _ => return Ok(JobTable::None),
+        };
+        Ok(table_id.map_or(JobTable::Dropped, JobTable::Table))
+    }
+
+    fn partition_table(&mut self, partition_id: u64) -> Result<Option<u64>, CubeError> {
+        if let Some(table_id) = self.partition_tables.get(&partition_id) {
+            return Ok(*table_id);
+        }
+        let table_id = match PartitionRocksTable::new(self.db_ref.clone()).get_row(partition_id)? {
+            Some(p) => self.index_table(p.get_row().get_index_id())?,
+            None => None,
+        };
+        self.partition_tables.insert(partition_id, table_id);
+        Ok(table_id)
+    }
+
+    fn index_table(&mut self, index_id: u64) -> Result<Option<u64>, CubeError> {
+        if let Some(table_id) = self.index_tables.get(&index_id) {
+            return Ok(*table_id);
+        }
+        let table_id = IndexRocksTable::new(self.db_ref.clone())
+            .get_row(index_id)?
+            .map(|i| i.get_row().table_id());
+        self.index_tables.insert(index_id, table_id);
+        Ok(table_id)
+    }
+
+    fn table_order(&mut self, table_id: u64) -> Result<TableOrder, CubeError> {
+        if let Some(order) = self.tables.get(&table_id) {
+            return Ok(*order);
+        }
+        let table = TableRocksTable::new(self.db_ref.clone()).get_row(table_id)?;
+        let order = match table.as_ref().map(|t| t.get_row()) {
+            Some(t) if t.is_streaming() => TableOrder::Streaming,
+            Some(t) if !t.is_ready() => t
+                .created_at()
+                .map_or(TableOrder::Regular, TableOrder::NotReadySince),
+            _ => TableOrder::Regular,
+        };
+        self.tables.insert(table_id, order);
+        Ok(order)
+    }
 }
 
 fn report_job_counts(jobs: &[IdRow<Job>]) {
@@ -8130,6 +8346,144 @@ mod tests {
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
+        Ok(())
+    }
+
+    async fn picked_job_order(
+        name: &str,
+        order_by_table: bool,
+        import_job_timeout: u64,
+    ) -> Result<Vec<String>, CubeError> {
+        let config = Config::test(name).update_config(|mut c| {
+            c.job_order_by_table_enabled = order_by_table;
+            c.import_job_timeout = import_job_timeout;
+            c
+        });
+        let store_path = env::current_dir()?.join(format!("{}-local", name));
+        let remote_store_path = env::current_dir()?.join(format!("{}-remote", name));
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        let mut picked = Vec::new();
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.clone().join("metastore").as_path(),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )?;
+            let mut names = HashMap::new();
+            let add = async |key: RowKey| {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+                meta_store
+                    .add_job(Job::new(
+                        key,
+                        JobType::PartitionCompaction,
+                        "node1".to_string(),
+                    ))
+                    .await
+            };
+            let create = async |table: &str, is_ready: bool, locations: Option<Vec<String>>| {
+                tokio::time::sleep(Duration::from_millis(2)).await;
+                meta_store
+                    .create_table(
+                        "s".to_string(),
+                        table.to_string(),
+                        vec![Column::new("c".to_string(), ColumnType::Int, 0)],
+                        locations,
+                        None,
+                        vec![],
+                        is_ready,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        false,
+                        None,
+                    )
+                    .await
+            };
+            meta_store.create_schema("s".to_string(), false).await?;
+            names.insert(RowKey::Table(TableId::WALs, 1), "wal_before");
+            add(RowKey::Table(TableId::WALs, 1)).await?;
+            let stream = create("stream", false, Some(vec!["stream://src/t".to_string()])).await?;
+            let first = create("first", false, None).await?;
+            let second = create("second", false, None).await?;
+            let ready = create("ready", true, None).await?;
+            let first_index = meta_store.get_table_indexes(first.get_id()).await?[0].get_id();
+            let first_partition = meta_store
+                .get_active_partitions_by_index_id(first_index)
+                .await?[0]
+                .get_id();
+            for (key, name) in [
+                (RowKey::Table(TableId::Tables, second.get_id()), "second"),
+                (RowKey::Table(TableId::Tables, ready.get_id()), "ready"),
+                (RowKey::Table(TableId::Partitions, first_partition), "first"),
+                (RowKey::Table(TableId::WALs, 2), "wal_after"),
+                (RowKey::Table(TableId::Tables, stream.get_id()), "stream"),
+                // Its partition is gone, as after a table drop.
+                (RowKey::Table(TableId::Partitions, 999), "dropped"),
+            ] {
+                names.insert(key.clone(), name);
+                add(key).await?;
+            }
+            while let Some(job) = meta_store
+                .start_processing_job("node1".to_string(), JobRunnerPool::Regular)
+                .await?
+            {
+                picked.push(names[job.get_row().row_reference()].to_string());
+            }
+        }
+        let _ = fs::remove_dir_all(store_path);
+        let _ = fs::remove_dir_all(remote_store_path);
+        Ok(picked)
+    }
+
+    #[tokio::test]
+    async fn start_processing_job_order_by_table() -> Result<(), CubeError> {
+        assert_eq!(
+            picked_job_order("start_processing_job_order_by_job_id", false, 600).await?,
+            vec![
+                "wal_before",
+                "second",
+                "ready",
+                "first",
+                "wal_after",
+                "stream",
+                "dropped"
+            ]
+        );
+        // Not-ready tables run in creation order; nothing enqueued after the streaming job,
+        // not even the dropped table's job, goes before it.
+        assert_eq!(
+            picked_job_order("start_processing_job_order_by_table", true, 600).await?,
+            vec![
+                "wal_before",
+                "first",
+                "second",
+                "ready",
+                "wal_after",
+                "stream",
+                "dropped"
+            ]
+        );
+        // With no time left before the create-table deadline, tables get no boost.
+        assert_eq!(
+            picked_job_order("start_processing_job_order_by_table_no_boost", true, 0).await?,
+            vec![
+                "wal_before",
+                "second",
+                "ready",
+                "first",
+                "wal_after",
+                "stream",
+                "dropped"
+            ]
+        );
         Ok(())
     }
 

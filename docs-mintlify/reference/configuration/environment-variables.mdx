@@ -2924,6 +2924,52 @@ it is not set.
 | --------------- | ---------------------- | --------------------- |
 | A valid number  | N/A                    | N/A                   |
 
+## `CUBESTORE_DEFERRED_TABLE_BUILD`
+
+If `true`, a table that is still being created is not compacted while its imports
+run. After the last import, its chunks are built into final partitions in one pass.
+This cuts the rewrites of large imported tables. Takes effect only when
+[`CUBESTORE_COMPACTION_READINESS_CHUNKS_THRESHOLD`](#cubestore_compaction_readiness_chunks_threshold)
+is set.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+## `CUBESTORE_DEFERRED_TABLE_BUILD_MAX_FANIN`
+
+The maximum number of chunks a single build reads at once when
+[`CUBESTORE_DEFERRED_TABLE_BUILD`](#cubestore_deferred_table_build) is enabled.
+Larger values use more memory per build; values below `2` are raised to `2`.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `64`                   | `64`                  |
+
+## `CUBESTORE_DEFERRED_TABLE_BUILD_MAX_ROWS`
+
+The maximum number of rows a single build or chunk merge rewrites when
+[`CUBESTORE_DEFERRED_TABLE_BUILD`](#cubestore_deferred_table_build) is enabled, so
+that each job finishes within the job timeout and merged chunks stay bounded. Rows
+beyond it are moved into the built partitions afterwards and compacted the regular
+way, so a larger table costs more rewrites than one within the limit.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | `250000000`            | `250000000`           |
+
+## `CUBESTORE_JOB_ORDER_BY_TABLE`
+
+If `true`, jobs of tables that are still being created run in the order the tables
+were created. Tables created at the same time then become ready one after another
+instead of all at once. Other jobs can wait for such tables, but no longer than the
+create-table timeout (twice `CUBESTORE_IMPORT_JOB_TIMEOUT`). Jobs of streaming
+tables are never delayed by it.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
 ## `CUBESTORE_WORKER_PORT`
 
 The port for Cube Store workers to listen to connections on. When set, the node

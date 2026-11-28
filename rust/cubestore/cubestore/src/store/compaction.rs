@@ -1,13 +1,14 @@
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::chunks::chunk_file_name;
+use crate::metastore::job::JobType;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::replay_handle::{union_seq_pointer_by_location, SeqPointerForLocation};
 use crate::metastore::table::AggregateColumn;
 use crate::metastore::{
     deactivate_table_on_corrupt_data, table::Table, Chunk, IdRow, Index, IndexType, MetaStore,
-    Partition, PartitionData,
+    Partition, PartitionData, RowKey, TableId,
 };
 use crate::queryplanner::merge_sort::LastRowByUniqueKeyExec;
 use crate::queryplanner::metadata_cache::MetadataCacheFactory;
@@ -493,6 +494,82 @@ impl CompactionServiceImpl {
     }
 }
 
+/// Whether partitions of a not-ready table are built once after all its imports finish rather
+/// than compacted chunk by chunk during the import.
+pub fn deferred_table_build(config: &dyn ConfigObj) -> bool {
+    config.compaction_readiness_chunks_threshold().is_some()
+        && config.deferred_table_build_enabled()
+}
+
+/// Whether any `TableImportCSV` job of `table` is still scheduled or running.
+pub async fn table_imports_pending(
+    meta_store: &dyn MetaStore,
+    table: &IdRow<Table>,
+) -> Result<bool, CubeError> {
+    let imports = table
+        .get_row()
+        .locations()
+        .into_iter()
+        .flatten()
+        .map(|location| JobType::TableImportCSV(location.clone()))
+        .collect::<Vec<_>>();
+    if imports.is_empty() {
+        return Ok(false);
+    }
+    meta_store
+        .has_active_jobs_by_ref(RowKey::Table(TableId::Tables, table.get_id()), imports)
+        .await
+}
+
+// How many of the smallest-first chunks one compaction merges: the first one always, then more
+// while their rows stay within `max_rows` and their count within `max_chunks`.
+fn chunks_to_merge(rows: &[u64], max_chunks: usize, max_rows: u64) -> usize {
+    let mut total = 0;
+    let mut n = 0;
+    for r in rows.iter().take(max_chunks) {
+        total += r;
+        if n > 0 && total > max_rows {
+            break;
+        }
+        n += 1;
+    }
+    n
+}
+
+#[derive(Debug, PartialEq)]
+enum DeferredMerge {
+    Wait,
+    // Merge this many smallest chunks into one chunk.
+    Tier(usize),
+    // Build final partitions from this many smallest chunks.
+    Build(usize),
+}
+
+// Merge streams cost memory per input, so a first build reads at most `max_fanin` chunks and
+// tier-merges the smallest ones until it can. While imports run, only import-sized chunks are
+// merged, to bound rewrites.
+fn deferred_merge(
+    rows: &[u64],
+    imports_pending: bool,
+    import_chunk_rows: u64,
+    max_fanin: usize,
+    max_rows: u64,
+) -> DeferredMerge {
+    let tier = chunks_to_merge(rows, max_fanin, max_rows);
+    let too_many = if imports_pending {
+        rows.iter().filter(|r| **r <= import_chunk_rows).count() >= max_fanin
+    } else {
+        rows.len() > max_fanin
+    };
+    if tier >= 2 && too_many {
+        DeferredMerge::Tier(tier)
+    } else if imports_pending {
+        DeferredMerge::Wait
+    } else {
+        DeferredMerge::Build(tier)
+    }
+}
+
 #[async_trait]
 impl CompactionService for CompactionServiceImpl {
     async fn compact(
@@ -521,25 +598,50 @@ impl CompactionService for CompactionServiceImpl {
                 return Ok(());
             }
         }
+        let deferred = deferred_table_build(self.config.as_ref())
+            && multi_part.is_none()
+            && !table.get_row().is_streaming();
+        let building = deferred && !table.get_row().is_ready();
+        let imports_pending =
+            building && table_imports_pending(self.meta_store.as_ref(), &table).await?;
+        // The first build of a deferred table writes all its chunks into final partitions at
+        // once, so it may split into any number of partitions.
+        let first_build = building && partition.get_row().main_table_row_count() == 0;
         let mut all_pending_chunks = self
             .meta_store
             .get_chunks_by_partition(partition_id, false)
             .await?;
         all_pending_chunks.sort_by_key(|c| c.get_row().get_row_count());
-        let mut size = 0;
-        let chunks = all_pending_chunks
+        let persistent_chunks = all_pending_chunks
             .iter()
             .filter(|c| !c.get_row().in_memory())
-            .take_while(|c| {
-                if size == 0 {
-                    size += c.get_row().get_row_count();
-                    true
-                } else {
-                    size += c.get_row().get_row_count();
-                    size <= self.config.compaction_chunks_total_size_threshold()
-                }
-            })
-            .map(|c| c.clone())
+            .collect::<Vec<_>>();
+        let rows = persistent_chunks
+            .iter()
+            .map(|c| c.get_row().get_row_count())
+            .collect::<Vec<_>>();
+        let (tier_merge, take) = if first_build {
+            match deferred_merge(
+                &rows,
+                imports_pending,
+                self.config.wal_split_threshold(),
+                self.config.deferred_table_build_max_fanin(),
+                self.config.deferred_table_build_max_rows(),
+            ) {
+                DeferredMerge::Wait => return Ok(()),
+                DeferredMerge::Tier(n) => (true, n),
+                DeferredMerge::Build(n) => (false, n),
+            }
+        } else if imports_pending {
+            return Ok(());
+        } else {
+            let max_rows = self.config.compaction_chunks_total_size_threshold();
+            (false, chunks_to_merge(&rows, usize::MAX, max_rows))
+        };
+        let chunks = persistent_chunks
+            .into_iter()
+            .take(take)
+            .cloned()
             .collect::<Vec<_>>();
 
         if chunks.is_empty() {
@@ -565,14 +667,12 @@ impl CompactionService for CompactionServiceImpl {
                 data_loaded_size.clone(),
             )));
             chunks_to_use.push(chunk.clone());
-            // This caps a single compaction by the chunks' on-disk (compressed parquet) byte size.
-            // The threshold (CUBESTORE_COMPACTION_CHUNKS_IN_MEMORY_SIZE_THRESHOLD) is expressed in
-            // uncompressed in-memory bytes, so for a given value this admits more data per merge by
-            // roughly the parquet compression ratio. That is acceptable because chunks are streamed
-            // and memory is not the binding constraint here; the row-count cap above bounds the
-            // merge regardless.
+            // Compressed file bytes against an in-memory threshold admit more per merge, which is
+            // fine for streamed chunks. A first build is bounded by its fan-in and row cap instead.
             chunks_total_file_size += chunk.get_row().file_size().unwrap_or(0);
-            if chunks_total_file_size > self.config.compaction_chunks_in_memory_size_threshold() {
+            if !first_build
+                && chunks_total_file_size > self.config.compaction_chunks_in_memory_size_threshold()
+            {
                 break;
             }
         }
@@ -586,6 +686,11 @@ impl CompactionService for CompactionServiceImpl {
         // For multi-partitions, we only compact chunks and never change the main table.
         // And we never split, multi-partitions have a different process for that.
         let new_chunk = match &multi_part {
+            None if tier_merge => Some(
+                self.meta_store
+                    .create_chunk(partition_id, chunks_row_count as usize, None, None, false)
+                    .await?,
+            ),
             None => None,
             Some(_) => {
                 if chunks.len() < 2 {
@@ -607,11 +712,17 @@ impl CompactionService for CompactionServiceImpl {
         }
         let mut new_partitions = Vec::new();
         if new_chunk.is_none() {
-            let pending_rows = all_pending_chunks
-                .iter()
-                .map(|c| c.get_row().get_row_count())
-                .sum::<u64>()
-                + partition.get_row().main_table_row_count();
+            let max_new_partitions = if first_build { usize::MAX } else { 16 };
+            // A capped first build splits only the rows it took: sizing for all pending rows would
+            // leave its partitions underfilled for good if the rest lands outside their ranges.
+            let pending_rows = if first_build {
+                chunks_row_count
+            } else {
+                all_pending_chunks
+                    .iter()
+                    .map(|c| c.get_row().get_row_count())
+                    .sum::<u64>()
+            } + partition.get_row().main_table_row_count();
             // Split partitions ahead for more than actual compaction size. The trade off here is partition accuracy vs write amplification
             let new_partitions_count_by_rows = (div_ceil(
                 pending_rows,
@@ -620,24 +731,24 @@ impl CompactionService for CompactionServiceImpl {
                     .partition_split_threshold_or_default(self.config.partition_split_threshold()),
             ) as usize)
                 // Do not allow to much of new partitions to limit partition accuracy trade off
-                .min(16);
+                .min(max_new_partitions);
             // Size the split by file size. By default this counts only the existing main table.
             // When compaction_split_by_total_file_size_enabled is on, the pending chunks merged in
             // this pass are added too, so a partition with a small (or empty) main table but large
             // accumulated chunks splits by size in a single pass instead of under-splitting and
             // re-splitting on the next round.
             let new_partitions_count_by_file_size = {
-                let pending_file_size = if self.config.compaction_split_by_total_file_size_enabled()
-                {
-                    chunks_total_file_size
-                } else {
-                    0
-                };
+                let pending_file_size =
+                    if first_build || self.config.compaction_split_by_total_file_size_enabled() {
+                        chunks_total_file_size
+                    } else {
+                        0
+                    };
                 let total_file_size =
                     partition.get_row().file_size().unwrap_or(0) + pending_file_size;
                 if total_file_size > 0 {
                     let threshold = self.config.partition_size_split_threshold_bytes();
-                    (div_ceil(total_file_size, threshold) as usize).min(16)
+                    (div_ceil(total_file_size, threshold) as usize).min(max_new_partitions)
                 } else {
                     1
                 }
@@ -1794,6 +1905,58 @@ pub async fn merge_replay_handles(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chunks_to_merge_limits() {
+        assert_eq!(chunks_to_merge(&[1, 2, 3], usize::MAX, 3), 2);
+        assert_eq!(chunks_to_merge(&[10, 10, 10], 3, 25), 2);
+        // The first chunk is taken even above the limit, so a merge always makes progress.
+        assert_eq!(chunks_to_merge(&[30, 30], 64, 25), 1);
+        assert_eq!(chunks_to_merge(&[5; 100], 64, 1000), 64);
+        assert_eq!(chunks_to_merge(&[], 64, 1000), 0);
+    }
+
+    #[test]
+    fn deferred_merge_keeps_chunks_within_max_rows() {
+        for (chunk_rows, chunks, max_fanin, max_rows) in
+            [(10, 200, 3, 25), (90, 100, 64, 100), (1, 5000, 4, 7)]
+        {
+            let mut rows = vec![chunk_rows; chunks];
+            let build = loop {
+                match deferred_merge(&rows, false, chunk_rows, max_fanin, max_rows) {
+                    DeferredMerge::Tier(n) => {
+                        assert!(n >= 2);
+                        let merged = rows.drain(..n).sum::<u64>();
+                        assert!(merged <= max_rows, "merged {} > {}", merged, max_rows);
+                        rows.push(merged);
+                        rows.sort();
+                    }
+                    DeferredMerge::Build(n) => break n,
+                    DeferredMerge::Wait => unreachable!(),
+                }
+            };
+            assert!((1..=max_fanin).contains(&build));
+            let built = rows[..build].iter().sum::<u64>();
+            assert!(build == 1 || built <= max_rows);
+        }
+    }
+
+    #[test]
+    fn deferred_merge_waits_for_imports() {
+        // Fewer fresh import chunks than the fan-in: nothing to do until imports end.
+        assert_eq!(
+            deferred_merge(&[10, 10, 500], true, 10, 3, 1000),
+            DeferredMerge::Wait
+        );
+        assert_eq!(
+            deferred_merge(&[10, 10, 10, 500], true, 10, 3, 1000),
+            DeferredMerge::Tier(3)
+        );
+        assert_eq!(
+            deferred_merge(&[10, 10, 500], false, 10, 3, 1000),
+            DeferredMerge::Build(3)
+        );
+    }
     use crate::cluster::MockCluster;
     use crate::config::Config;
     use crate::config::MockConfigObj;
@@ -1928,6 +2091,10 @@ mod tests {
         config
             .expect_compaction_split_by_total_file_size_enabled()
             .returning(|| false);
+
+        config
+            .expect_compaction_readiness_chunks_threshold()
+            .returning(|| None);
 
         // Exercise the batched create_partitions path for the split below.
         config.expect_metastore_batch_rpc().returning(|| true);

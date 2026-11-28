@@ -16,6 +16,7 @@ use crate::metastore::{
 };
 use crate::remotefs::RemoteFs;
 use crate::shared::deadline_queue::DeadlineQueue;
+use crate::store::compaction::{deferred_table_build, table_imports_pending};
 use crate::store::{ChunkStore, WALStore};
 use crate::util::lock::acquire_lock;
 use crate::util::time_span::warn_long_fut;
@@ -975,6 +976,21 @@ impl SchedulerImpl {
                 chunk_queue.push((SystemTime::now(), row_id))
             }
         }
+        if let MetaStoreEvent::DeleteJob(job) = &event {
+            if deferred_table_build(self.config.as_ref()) {
+                match (job.get_row().job_type(), job.get_row().row_reference()) {
+                    (JobType::TableImportCSV(_), RowKey::Table(TableId::Tables, table_id)) => {
+                        self.schedule_deferred_build(*table_id).await?;
+                    }
+                    // A compaction that saw the last import still running skips the partition,
+                    // and the build the import's end scheduled may have deduplicated against it.
+                    (JobType::PartitionCompaction, RowKey::Table(TableId::Partitions, id)) => {
+                        self.reschedule_deferred_build(*id).await?;
+                    }
+                    _ => {}
+                }
+            }
+        }
         if let MetaStoreEvent::Insert(TableId::Tables, row_id) = event {
             let table = self.meta_store.get_table_by_id(row_id).await?;
             if let Some(locations) = table.get_row().locations() {
@@ -1547,6 +1563,69 @@ impl SchedulerImpl {
         Ok(())
     }
 
+    // Schedules the first build of a deferred table once its last import is gone.
+    async fn schedule_deferred_build(&self, table_id: u64) -> Result<(), CubeError> {
+        let table = match self.meta_store.get_table_by_id(table_id).await {
+            Ok(t) => t,
+            // Dropped meanwhile.
+            Err(_) => return Ok(()),
+        };
+        if table.get_row().is_streaming()
+            || table_imports_pending(self.meta_store.as_ref(), &table).await?
+        {
+            return Ok(());
+        }
+        for index in self.meta_store.get_table_indexes(table_id).await? {
+            for p in self
+                .meta_store
+                .get_active_partitions_by_index_id(index.get_id())
+                .await?
+            {
+                if self
+                    .meta_store
+                    .get_chunks_by_partition(p.get_id(), false)
+                    .await?
+                    .iter()
+                    .any(|c| !c.get_row().in_memory())
+                {
+                    self.schedule_partition_to_compact(&p).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn reschedule_deferred_build(&self, partition_id: u64) -> Result<(), CubeError> {
+        let (partition, _, table, multi_part) = match self
+            .meta_store
+            .get_partition_for_compaction(partition_id)
+            .await
+        {
+            Ok(p) => p,
+            // Dropped meanwhile.
+            Err(_) => return Ok(()),
+        };
+        if table.get_row().is_ready()
+            || table.get_row().is_streaming()
+            || multi_part.is_some()
+            || !partition.get_row().is_active()
+            || table_imports_pending(self.meta_store.as_ref(), &table).await?
+        {
+            return Ok(());
+        }
+        // Compaction skips in-memory chunks, so rescheduling for them alone would loop.
+        if self
+            .meta_store
+            .get_chunks_by_partition(partition_id, false)
+            .await?
+            .iter()
+            .any(|c| !c.get_row().in_memory())
+        {
+            self.schedule_partition_to_compact(&partition).await?;
+        }
+        Ok(())
+    }
+
     pub async fn schedule_partition_to_compact(
         &self,
         p: &IdRow<Partition>,
@@ -1860,6 +1939,9 @@ mod tests {
         let meta_store: Arc<dyn MetaStore> = rocks;
         let mut cluster = MockCluster::new();
         cluster.expect_notify_job_runner().returning(|_| Ok(()));
+        cluster
+            .expect_node_name_by_partition()
+            .returning(|_| "node".to_string());
         let (tx, rx) = broadcast::channel(16);
         let scheduler =
             SchedulerImpl::new(meta_store.clone(), Arc::new(cluster), remote_fs, rx, config);
@@ -1958,6 +2040,120 @@ mod tests {
         drop(tx);
         join_all(loops).await;
         RocksMetaStore::cleanup_test_metastore(name);
+    }
+
+    #[tokio::test]
+    async fn deferred_build_survives_compaction_racing_last_import() {
+        assert!(
+            compaction_after_racing_last_import(
+                "deferred_build_survives_compaction_racing_last_import",
+                false
+            )
+            .await
+        );
+    }
+
+    // Compaction skips in-memory chunks, so they alone must not keep rescheduling it.
+    #[tokio::test]
+    async fn deferred_build_ignores_in_memory_chunks() {
+        assert!(
+            !compaction_after_racing_last_import("deferred_build_ignores_in_memory_chunks", true)
+                .await
+        );
+    }
+
+    // Whether a compaction is scheduled after the last import ends while a compaction that saw
+    // it running is still in flight.
+    async fn compaction_after_racing_last_import(name: &str, in_memory_chunk: bool) -> bool {
+        use crate::metastore::{Column, ColumnType};
+        let config = Config::test(name).update_config(|mut c| {
+            c.compaction_readiness_chunks_threshold = Some(1);
+            c.deferred_table_build_enabled = true;
+            c
+        });
+        let (meta_store, scheduler) = test_scheduler(name, config.config_obj());
+        meta_store
+            .create_schema("s".to_string(), false)
+            .await
+            .unwrap();
+        let table = meta_store
+            .create_table(
+                "s".to_string(),
+                "t".to_string(),
+                vec![Column::new("n".to_string(), ColumnType::Int, 0)],
+                Some(vec!["loc".to_string()]),
+                None,
+                vec![],
+                false,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                false,
+                None,
+            )
+            .await
+            .unwrap();
+        let index = meta_store.get_table_indexes(table.get_id()).await.unwrap()[0].get_id();
+        let partition = meta_store
+            .get_active_partitions_by_index_id(index)
+            .await
+            .unwrap()[0]
+            .get_id();
+        let chunk = meta_store
+            .create_chunk(partition, 10, None, None, in_memory_chunk)
+            .await
+            .unwrap();
+        meta_store.chunk_uploaded(chunk.get_id()).await.unwrap();
+        add_import_job(&meta_store, table.get_id(), "loc", "node").await;
+        let import = meta_store
+            .get_job_by_ref(
+                RowKey::Table(TableId::Tables, table.get_id()),
+                JobType::TableImportCSV("loc".to_string()),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        // A compaction that saw the import still running is in flight.
+        let compaction = meta_store
+            .add_job(Job::new(
+                RowKey::Table(TableId::Partitions, partition),
+                JobType::PartitionCompaction,
+                "node".to_string(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+
+        // The build scheduled by the import's end deduplicates against the running compaction.
+        let import = meta_store.delete_job(import.get_id()).await.unwrap();
+        scheduler
+            .process_event(MetaStoreEvent::DeleteJob(import))
+            .await
+            .unwrap();
+        let compaction = meta_store.delete_job(compaction.get_id()).await.unwrap();
+        scheduler
+            .process_event(MetaStoreEvent::DeleteJob(compaction))
+            .await
+            .unwrap();
+
+        let scheduled = meta_store
+            .get_job_by_ref(
+                RowKey::Table(TableId::Partitions, partition),
+                JobType::PartitionCompaction,
+            )
+            .await
+            .unwrap()
+            .is_some();
+        RocksMetaStore::cleanup_test_metastore(name);
+        let _ = fs::remove_dir_all(config.local_dir());
+        let _ = fs::remove_dir_all(config.remote_dir());
+        scheduled
     }
 
     #[tokio::test]
