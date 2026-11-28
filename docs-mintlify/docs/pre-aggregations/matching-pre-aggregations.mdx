@@ -56,7 +56,12 @@ measures from the query. [`switch` dimensions](#matching-switch-dimensions) are
 an exception: they don't have to be included in the pre-aggregation.
 - **Are any query measures multiplied in the cube's data model?** Cube checks
 if any measures are multiplied via a [`one_to_many`
-relationship][ref-schema-joins-rel] between cubes in the query.
+relationship][ref-schema-joins-rel] between cubes in the query. Members that the
+query only filters on count too: a filter can bring in a `one_to_many` join just
+like a dimension can.
+- **Are query members reached over the same join paths?** Each dimension and
+filter member must be reached over the same join path in the query as in the
+pre-aggregation. See [matching join paths](#matching-join-paths).
 - **Does the query specify granularity for its time dimension?** Cube checks
 that the time dimension granularity is set in the query.
 - **Are query filter dimensions included in its own dimensions?** Cube checks
@@ -111,6 +116,93 @@ queries][ref-ungrouped-queries]:
 cubes involved in the query.
 - If multiple cubes are referenced in the query, the pre-aggregation should
 include only members of these cubes.
+
+### Matching join paths
+
+A cube can be reached over more than one join path, and the same dimension
+reached over two paths can hold different values for the same row. A view
+picks the path with its [`join_path`][ref-view-join-path]; a pre-aggregation
+stores each dimension over the path its own cube's joins resolve to. Cube matches
+a query to a pre-aggregation only if every dimension and every filter member
+is reached over the same path in both. If a path differs, Cube skips that
+pre-aggregation and tries the next one, or queries the upstream data source.
+
+For example, `sales` joins `brands` directly, and also through `customers` and
+the `one_to_many` `customer_orders`. The rollup stores `brands.name` over the
+direct path. The `sales_by_order_brand` view reaches it through
+`customer_orders`:
+
+```yaml
+cubes:
+  - name: sales
+    # ...
+
+    joins:
+      - name: customers
+        relationship: many_to_one
+        sql: "{CUBE}.customer_id = {customers}.id"
+      - name: brands
+        relationship: many_to_one
+        sql: "{CUBE}.brand_id = {brands}.id"
+
+    pre_aggregations:
+      - name: by_brand
+        measures:
+          - amount
+        dimensions:
+          - brands.name
+
+views:
+  - name: sales_by_own_brand
+    cubes:
+      - join_path: sales
+        includes:
+          - amount
+      - join_path: sales.brands
+        includes:
+          - name
+
+  - name: sales_by_order_brand
+    cubes:
+      - join_path: sales
+        includes:
+          - amount
+      - join_path: sales.customers.customer_orders.brands
+        includes:
+          - name
+```
+
+A query to `sales_by_own_brand` that groups or filters by `name` matches
+`by_brand`. The same query to `sales_by_order_brand` does not match `by_brand`.
+It runs against the upstream data source, so its result uses the path of the
+view.
+
+This applies to filters, including filters inside `or` and `and` groups, and
+to segments, not only to dimensions.
+
+<Note>
+
+Since v1.8.26, Tesseract compares the join paths of filter members as well. In
+earlier versions, Tesseract compared the join paths of dimensions only. A filter
+on a member that the view reaches over another path could then match a
+pre-aggregation that stores the member over the default path. That query
+returned the total for the default path, while the same member as a dimension
+returned the total for the path of the view. The legacy SQL planner has always
+compared the join paths of filter members.
+
+Since v1.8.26, Tesseract also checks the members that a query only filters on
+when it decides whether a `one_to_many` join multiplies the measures. If a
+filter brings in such a join, Cube does not roll a pre-aggregation up across
+that filter member. For example, a filter with two values on `customer_orders.id`
+no longer sums two rollup rows that store the same sale. A query that filters on
+a single value of that member, or groups by it, still matches.
+
+After upgrading, some queries that matched a pre-aggregation before can go to the
+upstream data source. Their results can also change, because the earlier results
+came from the wrong path. If the view should use the path of the pre-aggregation,
+change the `join_path` of the view to that path.
+
+</Note>
 
 ### Matching switch dimensions
 
@@ -299,6 +391,11 @@ pitfalls](#common-pitfalls) to understand why that part was an issue.
 
   </Note>
 
+- If a query to a [view][ref-views] stopped matching after upgrading to v1.8.26
+or later, check whether the view reaches a dimension or filter member over a
+different join path than the pre-aggregation. See [matching join
+paths](#matching-join-paths).
+
 - If a query uses any time zone other than `UTC`, please check the section on
 [matching time dimensions](#matching-time-dimensions) and the
 [`scheduled_refresh_time_zones`][ref-conf-scheduled-refresh-time-zones]
@@ -318,6 +415,7 @@ configuration option.
 [ref-primary-key]: /reference/data-modeling/dimensions#primary_key
 [ref-custom-granularity]: /reference/data-modeling/dimensions#granularities
 [ref-views]: /docs/data-modeling/views
+[ref-view-join-path]: /reference/data-modeling/view#join_path
 [ref-multi-fact-views]: /docs/data-modeling/multi-fact-views
 [ref-multi-stage]: /docs/data-modeling/measures#multi_stage
 [ref-time-shift]: /reference/data-modeling/measures#time_shift
