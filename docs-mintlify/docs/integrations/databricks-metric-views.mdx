@@ -529,6 +529,13 @@ Then pick the target in the card, turn on **Use a separate connection** under
 target's Preview, Test access, and runs use this connection; targets without one, and your users'
 queries, keep using the data source's.
 
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/integrations/databricks-metric-views/target-separate-connection.png"
+    alt="Databricks Metric View sync card with the production target picked and the Use a separate connection switch on, showing the Server hostname, HTTP path, OAuth client ID, OAuth client secret and Default catalog fields"
+  />
+</Frame>
+
 A target with its own connection doesn't read `CUBEJS_DB_DATABRICKS_CATALOG`: if a cube uses a
 two-part `schema.table` name, enter its **Default catalog**. To go back to the data source's
 connection, turn **Use a separate connection** off and save, which removes the target's connection
