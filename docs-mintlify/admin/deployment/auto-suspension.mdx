@@ -31,9 +31,18 @@ Auto-suspension will hibernate the deployment when **no** API
 requests are received after a period of time, and automatically resume the
 deployment when API requests start coming in again:
 
-<Frame caption="Auto-suspension flowchart">
-  <img src="https://static.cube.dev/docs/admin/deployment/auto-suspension/auto-suspension-flowchart.png" alt="Auto-suspension flowchart: if the deployment received no API requests within the threshold period, it is suspended" />
-</Frame>
+```mermaid actions={false}
+flowchart TB
+  accTitle: Auto-suspension flowchart
+  accDescr: If the deployment received no API requests within the threshold period, it is suspended. Otherwise, nothing changes.
+  A(["<b>Begin auto-suspension check</b>"]):::start
+  Q{{"Has the deployment received<br/>any API requests within the<br/>threshold period?"}}:::ask
+  Y["<b>No change to deployment</b>"]:::out
+  N["<b>Deployment is suspended</b>"]:::out
+  A -.-> Q
+  Q -.->|<b class=yes>Yes</b>| Y
+  Q -.->|<b class=no>No</b>| N
+```
 
 [Shared deployments][ref-deployment-dev-instance] are auto-suspended
 automatically when not in use for 30 minutes, whereas [Dedicated

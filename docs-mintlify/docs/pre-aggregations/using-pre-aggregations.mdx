@@ -207,6 +207,16 @@ definition][ref-schema-ref-preaggs]. In the example below, the
 separate tables for each month's worth of data. Once built, it will continue to
 refresh on a daily basis the last 3 months of data.
 
+```mermaid actions={false}
+flowchart LR
+  accTitle: Partitions and the update window
+  accDescr: Older partitions are built once. The current partition and partitions that ended less than update_window ago are rebuilt on each refresh.
+  O["<b>Older partitions</b><br/>built once"]:::tile
+  U["<b>Current partition and those that<br/>ended less than <code>update_window</code> ago</b><br/>rebuilt on each refresh"]:::out
+  N(["<b>Now</b>"]):::start
+  O --> U --> N
+```
+
 <CodeGroup>
 
 ```yaml title="YAML"

@@ -40,28 +40,25 @@ A multi-agent setup introduces one new concept on top of the single-agent model:
 
 This means you choose a space's boundary based on what context should be shared. Two agents serving the same team usually live in one space; agents that need different rules — a different tone for a different audience, or context that must stay apart — live in different spaces.
 
-```mermaid
+```mermaid actions={false}
 flowchart LR
-    classDef deployment fill:#4f46e5,stroke:#3730a3,color:#fff
-    classDef space fill:#e0e7ff,stroke:#6366f1,color:#1e1b4b
-    classDef agent fill:#10b981,stroke:#047857,color:#fff
-    classDef resource fill:#fef3c7,stroke:#d97706,color:#78350f
+    accTitle: Spaces and agents in a deployment
+    accDescr: A deployment uses two spaces, sales-analytics and marketing-analytics. Each space has its own rules, certified queries and memories. The sales-assistant and sales-reporter agents use the sales-analytics space, and the marketing-analyst agent uses the marketing-analytics space.
+    D["<b>Deployment</b>"]:::start
 
-    D[Deployment]:::deployment
+    SA["<b>Space</b><br/><code>sales-analytics</code>"]:::tile
+    SM["<b>Space</b><br/><code>marketing-analytics</code>"]:::tile
 
-    SA[Space<br/>sales-analytics]:::space
-    SM[Space<br/>marketing-analytics]:::space
+    SAR["Rules"]:::ask
+    SAC["Certified queries"]:::ask
+    SAM["Memories"]:::ask
+    A1["<b>Agent</b><br/><code>sales-assistant</code>"]:::out
+    A2["<b>Agent</b><br/><code>sales-reporter</code>"]:::out
 
-    SAR[Rules]:::resource
-    SAC[Certified queries]:::resource
-    SAM[Memories]:::resource
-    A1[Agent<br/>sales-assistant]:::agent
-    A2[Agent<br/>sales-reporter]:::agent
-
-    SMR[Rules]:::resource
-    SMC[Certified queries]:::resource
-    SMM[Memories]:::resource
-    A3[Agent<br/>marketing-analyst]:::agent
+    SMR["Rules"]:::ask
+    SMC["Certified queries"]:::ask
+    SMM["Memories"]:::ask
+    A3["<b>Agent</b><br/><code>marketing-analyst</code>"]:::out
 
     D -->|uses| SA
     D -->|uses| SM

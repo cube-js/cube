@@ -29,6 +29,22 @@ organization, app, etc. By default, the
 [`securityContext`][ref-config-security-ctx] is defined by [Cube API
 Token][ref-security].
 
+The security context decides two things: which compiled data model serves the
+request, and which query orchestrator runs its queries:
+
+```mermaid actions={false}
+flowchart TB
+  accTitle: Multitenancy in Cube
+  accDescr: An API request with a security context goes through context_to_app_id, whose app ID selects a compiled data model, and through context_to_orchestrator_id, whose orchestrator ID selects a query orchestrator with its connections, query queues and cache.
+  R["<b>API request</b><br/>with a security context"]:::tile
+  F1["<code>context_to_app_id</code>"]:::tile
+  F2["<code>context_to_orchestrator_id</code>"]:::tile
+  M["<b>Compiled data model</b><br/>one per app ID, built with<br/><code>repository_factory</code>, <code>schema_version</code>,<br/><code>pre_aggregations_schema</code>"]:::tile
+  O["<b>Query orchestrator</b><br/>one per orchestrator ID: connections<br/>from <code>driver_factory</code>, query queues<br/>and the cache"]:::tile
+  R --> F1 -->|app ID| M
+  R --> F2 -->|orchestrator ID| O
+```
+
 There are several multitenancy setup scenarios that can be achieved by using
 combinations of these configuration options.
 
