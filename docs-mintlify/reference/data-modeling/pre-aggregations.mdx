@@ -154,7 +154,8 @@ window functions, and/or multiple joins).
 
 `originalSql` pre-aggregations **must only** be stored in the data source.
 While you can set `external: true` for `original_sql` pre-aggregation, this is
-not recommended or generally supported.
+not recommended or generally supported. Such a pre-aggregation is only used when
+every cube in the query has one; otherwise the cube is read from the data source.
 
 </Warning>
 
@@ -1295,7 +1296,8 @@ underlying SQL calculations every time it builds new rollup tables.
 
 `originalSql` pre-aggregations **must only** be stored in the data source.
 While you can set `external: true` for `original_sql` pre-aggregation, this is
-not recommended or generally supported.
+not recommended or generally supported. Such a pre-aggregation is only used when
+every cube in the query has one; otherwise the cube is read from the data source.
 
 </Warning>
 

@@ -1188,6 +1188,150 @@ describe('pre-aggregations', () => {
     expect(description?.loadSql[1]).toEqual(['tenant_1']);
   });
 
+  describe('external originalSql pre-aggregation joined to a cube read from the source database', () => {
+    const compilers = prepareJsCompiler(`
+      cube('t1', {
+        sql: 'SELECT * FROM analytics_db.t1',
+        joins: {
+          companies: {
+            relationship: 'many_to_one',
+            sql: \`\${CUBE}.company_id = \${companies}.id\`,
+          },
+          regions: {
+            relationship: 'many_to_one',
+            sql: \`\${CUBE}.region_id = \${regions}.id\`,
+          },
+        },
+        measures: {
+          sales: { sql: 'sales', type: 'sum' },
+        },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          report_date: { sql: 'report_date', type: 'time' },
+        },
+      });
+
+      cube('companies', {
+        sql: 'SELECT * FROM analytics_db.companies',
+        joins: {
+          countries: {
+            relationship: 'many_to_one',
+            sql: \`\${CUBE}.country_id = \${countries}.id\`,
+          },
+        },
+        measures: {
+          count: { type: 'count' },
+        },
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          company_id: { sql: 'company_id', type: 'string' },
+        },
+        preAggregations: {
+          main: {
+            type: 'originalSql',
+            external: true,
+          },
+        },
+      });
+
+      cube('countries', {
+        sql: 'SELECT * FROM analytics_db.countries',
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          name: { sql: 'name', type: 'string' },
+        },
+        preAggregations: {
+          main: {
+            type: 'originalSql',
+            external: true,
+          },
+        },
+      });
+
+      cube('regions', {
+        sql: 'SELECT * FROM analytics_db.regions',
+        dimensions: {
+          id: { sql: 'id', type: 'number', primaryKey: true },
+          name: { sql: 'name', type: 'string' },
+        },
+        preAggregations: {
+          main: {
+            type: 'originalSql',
+          },
+        },
+      });
+    `);
+
+    const buildQuery = (query: Record<string, unknown>) => new PostgresQuery(compilers, {
+      externalQueryClass: PostgresQuery,
+      timezone: 'UTC',
+      ...query,
+    });
+
+    beforeAll(() => compilers.compiler.compile());
+
+    it('reads the joined cube from the source database', () => {
+      const query = buildQuery({
+        measures: ['t1.sales'],
+        timeDimensions: [{ dimension: 't1.report_date', granularity: 'day', dateRange: ['2020-01-01', '2020-01-31'] }],
+        filters: [{ member: 'companies.company_id', operator: 'equals', values: ['1'] }],
+      });
+
+      expect(query.externalPreAggregationQuery()).toBe(false);
+      expect(query.preAggregations.preAggregationsDescription()).toEqual([]);
+
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).not.toContain('companies_main');
+      expect(sql).toContain('analytics_db.companies');
+      expect(sql).toContain('analytics_db.t1');
+    });
+
+    it('keeps a source-database originalSql pre-aggregation next to a raw cube', () => {
+      const query = buildQuery({
+        measures: ['t1.sales'],
+        dimensions: ['regions.name', 'companies.company_id'],
+      });
+
+      expect(query.externalPreAggregationQuery()).toBe(false);
+      expect(query.preAggregations.preAggregationsDescription().map(p => p.preAggregationId)).toEqual(['regions.main']);
+
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('regions_main');
+      expect(sql).not.toContain('companies_main');
+      expect(sql).toContain('analytics_db.companies');
+    });
+
+    it('reads a cube on its own from its external originalSql pre-aggregation', () => {
+      const query = buildQuery({
+        measures: ['companies.count'],
+        dimensions: ['companies.company_id'],
+      });
+
+      expect(query.externalPreAggregationQuery()).toBe(true);
+      expect(query.preAggregations.preAggregationsDescription().map(p => p.preAggregationId)).toEqual(['companies.main']);
+
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('companies_main');
+      expect(sql).not.toContain('analytics_db.companies');
+    });
+
+    it('joins two cubes that both read their external originalSql pre-aggregations', () => {
+      const query = buildQuery({
+        measures: ['companies.count'],
+        dimensions: ['countries.name'],
+      });
+
+      expect(query.externalPreAggregationQuery()).toBe(true);
+      expect(query.preAggregations.preAggregationsDescription().map(p => p.preAggregationId).sort())
+        .toEqual(['companies.main', 'countries.main']);
+
+      const [sql] = query.buildSqlAndParams();
+      expect(sql).toContain('companies_main');
+      expect(sql).toContain('countries_main');
+      expect(sql).not.toContain('analytics_db.');
+    });
+  });
+
   describe('pre-aggregation time dimension date range', () => {
     const compileEvents = () => prepareJsCompiler(
       `
