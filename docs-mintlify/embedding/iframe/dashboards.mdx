@@ -84,7 +84,8 @@ Type** is **Measure**. For filters, an omitted filter type defaults to `equals`.
 Granularities are lowercase and must be one of the switcher's [allowed
 granularities](/docs/explore-analyze/dashboards/widgets/controls#allowed-granularities) —
 `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour`
-for time dimensions that expose them.
+for time dimensions that expose them. A custom granularity is written by its
+name in the data model, such as `fiscal_year`, not by its title.
 
 A `tab_` parameter is read on a published dashboard only, embedded or not — in
 the dashboard builder it is ignored. It takes internal ids rather than tab

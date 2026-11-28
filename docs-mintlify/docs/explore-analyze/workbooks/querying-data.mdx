@@ -120,7 +120,12 @@ On a number member the comparisons appear on the chip as `=`, `≠`, `>`, `≥`,
   substring, prefix or suffix, ignoring case.
 - **between** includes both bounds. A range from `start of …` or `now` to the
   start of a period, such as **Last month**, stops just before that period; see
-  [`default_ui_filters`][ref-default-ui-filters] for the exact rule.
+  [`default_ui_filters`][ref-default-ui-filters] for the exact rule. A range
+  that leaves out its end, such as the one a dashboard drill-down opens Explore
+  with, or one carried from a dashboard, is named on the filter by the days it
+  includes, for example **Jan 1 – Jan 2**, and with a time where an end falls
+  inside a day, for example **Jan 1, 12:00 PM – 1:00 PM** for an hour drilled
+  down to minutes. The value's editor still shows the stored bounds.
 - **is null**, **is not null**, **is empty** and **is not empty** take no value.
   Empty means the empty string, which is not the same as null.
 - The period operators take any date inside the period — **in the year** with

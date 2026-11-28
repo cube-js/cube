@@ -364,7 +364,15 @@ By default, viewers can choose between **day**, **week**, **month**, **quarter**
 
 For time dimensions backed by a `TIMESTAMP` or `DATETIME` column, sub-day granularities (**second**, **minute**, **hour**) are also available. `DATE`-typed columns don't expose sub-day granularities, since they would bucket the entire day into a single point.
 
-Custom granularities defined in the [data model][ref-granularities] aren't offered in this list yet — the widget's settings list the built-in granularities only. A custom granularity already saved on the switcher, such as one written through the API, stays allowed when you check or uncheck built-in ones, and the settings show it by its name, for example `fiscal_year`.
+[Custom granularities][ref-custom-granularities] that the data model defines on the time dimension, such as a fiscal year, are listed too. They come first, by their titles in the data model and in the model's order, followed by the built-in granularities, shortest first. A new switcher starts with **Day** through **Year** checked and every custom granularity unchecked: check the ones viewers should get. Pointing the switcher at another time dimension keeps the checked granularities that dimension offers, so a custom granularity it doesn't define is unchecked, and switching back offers it again, unchecked. A granularity the data model defines under a built-in name, such as a calendar cube's `month`, is listed once, as the built-in. A viewer [adding their own](#adding-a-dynamic-control) time granularity switcher gets the same list.
+
+Viewers see a custom granularity by its title, such as **Fiscal Year**, in the switcher's dropdown, and picking it re-buckets every chart on the dimension by that granularity. Wherever a chart names the granularity, it uses the same title: a table's column header, an axis, legend or tooltip title, and the header of a CSV or Excel download read, for example, **Created at (Fiscal Year)**. So do a [parent control](#parent)'s **Set to**, a [dashboard delivery][ref-schedule-control-values]'s **Control values**, and the dashboard's [print version][ref-print-version].
+
+#### Granularities the data model no longer defines {#granularities-no-longer-defined}
+
+A switcher keeps the granularities it was saved with, even after the data model stops defining one of them, for example once `fiscal_year` is removed from the dimension. Cube never removes such a granularity from the switcher for you. The switcher's dropdown lists it under its name, **Fiscal_year**, greyed out, with "This time granularity is no longer defined in the data model." under it, and it can't be picked. The same holds in a [parent control](#parent)'s and a [dashboard delivery][ref-schedule-control-values]'s **Set to**. A switcher whose [default granularity](#default-granularity) is such a granularity still opens on it, and its charts show the error the data source returns for it instead of data.
+
+The switcher's settings list such a granularity after the dimension's own custom granularities, checked, with the same line under it. Uncheck it and **Save** to remove it from the switcher; if it was the default granularity, the switcher then has none.
 
 ### Default granularity
 
@@ -390,7 +398,7 @@ To configure it:
  </Step>
 </Steps>
 
-The attribute value is matched against the **granularity names** the switcher [allows](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, and `second`, `minute`, `hour` where the dimension exposes them — ignoring case and surrounding spaces, so an attribute reading `Week` resolves to `week`. The names are matched, not the labels the control displays, so one attribute works the same for viewers in every language.
+The attribute value is matched against the **granularity names** the switcher [allows](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, `second`, `minute`, `hour` where the dimension exposes them, and the name of each custom granularity it allows, such as `fiscal_year` — ignoring case and surrounding spaces, so an attribute reading `Week` resolves to `week`. The names are matched, not the labels the control displays, so one attribute works the same for viewers in every language.
 
 | Attribute type | How it's applied |
 |---|---|
@@ -465,6 +473,8 @@ When a dimension switcher offers **time** dimensions, each of them can carry its
 This exists because a swap otherwise inherits whatever granularity the chart already had. A viewer moving from **Created at** to a **Completed at** that only makes sense monthly would get the replaced dimension's daily buckets, and the author would have no way to say otherwise.
 
 Each time option is either pinned to a granularity or left at **Inherit from the chart**, which is the default and the behavior of every control configured before this setting existed. Non-time options don't have the setting, and a measure switcher has no granularities to speak of.
+
+An option's list offers the [custom granularities][ref-custom-granularities] its dimension defines first, by their titles, then the built-in granularities its column type allows, as a [time granularity switcher](#allowed-granularities) does. A custom granularity the option's dimension [no longer defines](#granularities-no-longer-defined) stays selected under its name, such as **Fiscal_year**, greyed out with "This time granularity is no longer defined in the data model." under it; pick **Inherit from the chart** or another granularity and **Save** to replace it.
 
 If the dashboard also has a [time granularity switcher](#time-granularity-switcher) pointed at the swapped-in dimension, the viewer's own pick wins over the per-option granularity — a granularity a viewer actively chose outranks one the author set as a starting point. A granularity control nobody has touched does not.
 
@@ -800,7 +810,7 @@ Each control type has its own parameter:
 | [Field switcher](#field-switcher) | `ms_<semantic_view>.<replaced_member>=<selected_member>` | `ms_orders.status=users_city` |
 | A control added to the [Dynamic controls](#dynamic-controls) widget | `dc_<key>=<JSON>`, beside the parameter of its type | `dc_h87irx={"type":"FILTER","config":{"dimension":"orders.status"}}` |
 
-The semantic view and member are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. The same goes for the member on the right-hand side of `ms_`: it is the internal name of the member to switch to, and it is a measure rather than a dimension when the switcher's **Field type** is **Measure**. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them.
+The semantic view and member are the **internal names** configured on the control — not the display titles you see in the picker. A view shown as `Orders` is usually `orders` in the parameter. The same goes for the member on the right-hand side of `ms_`: it is the internal name of the member to switch to, and it is a measure rather than a dimension when the switcher's **Field type** is **Measure**. Granularities are lowercase and must be one of the switcher's [allowed granularities](#allowed-granularities) — `day`, `week`, `month`, `quarter`, `year`, plus `second`, `minute`, and `hour` for time dimensions that expose them. A custom granularity is written by its name in the data model, such as `tg_orders.created_at=fiscal_year`, not by its title.
 
 A `p_` parameter is named after the SQL parameter's identifier, not a member, and its value is plain text rather than JSON, written the way the parameter's [type][ref-sql-parameter-types] takes it: any text for a **String**, a number such as `100`, `true` or `false`, a date such as `2026-01-31` for a **Date**, or a date and time such as `2026-01-31 08:30` for a **Date and time**. A date also takes a [relative date value][ref-relative-date-values] such as `7 days ago`, resolved each time the charts run. A filter that fills a range writes one `p_` parameter for each end, such as `p_start_date=2026-01-01&p_end_date=2026-01-31`.
 
@@ -958,6 +968,7 @@ Filtering an advanced query by members requires Cube Core 1.8.9 or newer on the 
 [ref-pre-aggregations]: /docs/pre-aggregations
 [ref-switch-dimensions]: /reference/data-modeling/dimensions#type
 [ref-granularities]: /docs/data-modeling/dimensions
+[ref-custom-granularities]: /docs/data-modeling/dimensions#custom-granularities
 [ref-user-attributes]: /admin/users-and-permissions/user-attributes
 [ref-schedule-control-values]: /docs/explore-analyze/dashboard-deliveries#control-values
 [ref-schedule-added-controls]: /docs/explore-analyze/dashboard-deliveries#added-controls

@@ -75,6 +75,15 @@ Each item appears only where it applies. Some values get a shorter menu:
 
 Dragging across a chart's axis [selects a range](/docs/explore-analyze/dashboards/cross-filtering#selecting-a-range), and the menu then has one item, **Filter dashboard by these points**. Cmd/Ctrl+click [adds a value](/docs/explore-analyze/dashboards/cross-filtering#adding-and-removing-values) to the chart's cross-filter without opening the menu.
 
+An item that can't run on the value you clicked, such as **Filter dashboard by this point** on an empty value, is greyed out, with the reason under its label, so you can read it on a touch screen and from the keyboard too.
+
+### Opening the menu from the keyboard
+
+The menu opens from the keyboard wherever a click opens it:
+
+- **Tables.** Move to a cell with <kbd>Tab</kbd> and the arrow keys, then press <kbd>Shift</kbd>+<kbd>F10</kbd> or the context-menu key. The cell's menu opens at the cell, and <kbd>Esc</kbd> closes it and puts the focus back on the cell. The keys work the same on a cell you clicked, once <kbd>Esc</kbd> has closed the menu the click opened. <kbd>Cmd</kbd>/<kbd>Ctrl</kbd>+<kbd>C</kbd> still copies the cell.
+- **Charts and maps.** A chart whose click opens the menu is one <kbd>Tab</kbd> stop, announced as "Use the arrow keys to move between points, and Enter or Shift+F10 to open a point's actions." On a chart, <kbd>←</kbd> and <kbd>→</kbd> step through the points in sight from left to right, and <kbd>↑</kbd> and <kbd>↓</kbd> to the nearest point above or below at the same position, such as another series. On a map, the arrow keys step through the markers, or the regions of a region map, from west to east and from north to south. The focused point shows its tooltip, where the chart has one, and <kbd>Enter</kbd>, <kbd>Shift</kbd>+<kbd>F10</kbd> or the context-menu key does what a click on it does: it opens the menu at the point. <kbd>Esc</kbd> leaves the point. A chart that draws no point is no <kbd>Tab</kbd> stop.
+
 ## Custom visualizations
 
 When the built-in chart types don't cover your use case, write a raw [Vega-Lite spec](/docs/explore-analyze/charts/custom) or use an HTML template with Handlebars. Both options give you complete control over the rendered output.

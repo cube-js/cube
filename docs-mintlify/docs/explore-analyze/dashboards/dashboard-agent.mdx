@@ -153,7 +153,11 @@ How it works and what to expect:
   **Disabled** also can't be changed.
 - **Time granularity stays within the control's allowed granularities.** If a
   time-granularity control restricts which granularities viewers can pick, the
-  agent only chooses from that set.
+  agent only chooses from that set, the
+  [custom granularities][ref-allowed-granularities] it allows included: asked
+  to *"show it by fiscal year"*, it sets the control to **Fiscal Year**. It
+  never applies a granularity the data model
+  [no longer defines][ref-granularities-no-longer-defined].
 - **A field switcher can only be set to one of its offered
   members.** The agent picks from the same
   [**Alternatives**][ref-field-switcher] a viewer could pick from by hand.
@@ -316,3 +320,5 @@ read-only.
 [ref-analysis]: /docs/explore-analyze/dashboards/widgets/analysis
 [ref-chart-follow-up]: #focusing-on-a-specific-chart
 [ref-cross-filtering]: /docs/explore-analyze/dashboards/cross-filtering
+[ref-allowed-granularities]: /docs/explore-analyze/dashboards/widgets/controls#allowed-granularities
+[ref-granularities-no-longer-defined]: /docs/explore-analyze/dashboards/widgets/controls#granularities-no-longer-defined
