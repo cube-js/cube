@@ -12,6 +12,8 @@ connect to a local DuckDB database.
 
 ```mermaid actions={false}
 flowchart LR
+  accTitle: DuckDB reading from object storage
+  accDescr: AWS S3, Google Cloud Storage and Cloudflare R2 feed DuckDB, which is bundled with Cube and runs in-process, and DuckDB feeds Cube.
   S3["<img src='https://static.cube.dev/icons/aws-s3.svg' /><b>AWS S3</b>"]:::tile
   GCS["<img src='https://static.cube.dev/icons/google-cloud-storage.svg' /><b>Google Cloud Storage</b>"]:::tile
   R2["<img src='https://static.cube.dev/icons/cloudflare-r2.svg' /><b>Cloudflare R2</b>"]:::tile
@@ -30,6 +32,8 @@ through MotherDuck for better performance.
 
 ```mermaid actions={false}
 flowchart LR
+  accTitle: DuckDB with MotherDuck
+  accDescr: AWS S3, Google Cloud Storage and Cloudflare R2 feed MotherDuck, which feeds DuckDB, bundled with Cube and running in-process, which feeds Cube.
   S3["<img src='https://static.cube.dev/icons/aws-s3.svg' /><b>AWS S3</b>"]:::tile
   GCS["<img src='https://static.cube.dev/icons/google-cloud-storage.svg' /><b>Google Cloud Storage</b>"]:::tile
   R2["<img src='https://static.cube.dev/icons/cloudflare-r2.svg' /><b>Cloudflare R2</b>"]:::tile

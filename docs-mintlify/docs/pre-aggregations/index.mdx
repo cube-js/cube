@@ -123,6 +123,8 @@ database to populate the cache with the results and return them.
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: In-memory cache flowchart
+  accDescr: When a query arrives, Cube returns the cached result if it is in the in-memory cache and its refresh_key value hasn't changed. Otherwise, it runs the query against pre-aggregations or the data source, caches the result and returns it.
   A(["<b>A query arrives</b>"]):::start
   Q1{{"Is the result of this query<br/>in the in-memory cache?"}}:::ask
   Q2{{"Has the <code>refresh_key</code><br/>value changed?"}}:::ask

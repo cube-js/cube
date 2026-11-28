@@ -33,6 +33,8 @@ deployment when API requests start coming in again:
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: Auto-suspension flowchart
+  accDescr: If the deployment received no API requests within the threshold period, it is suspended. Otherwise, nothing changes.
   A(["<b>Begin auto-suspension check</b>"]):::start
   Q{{"Has the deployment received<br/>any API requests within the<br/>threshold period?"}}:::ask
   Y["<b>No change to deployment</b>"]:::out

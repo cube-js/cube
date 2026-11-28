@@ -209,6 +209,8 @@ refresh on a daily basis the last 3 months of data.
 
 ```mermaid actions={false}
 flowchart LR
+  accTitle: Partitions and the update window
+  accDescr: Older partitions are built once. Partitions that ended less than update_window ago are rebuilt on each refresh, up to now.
   O["<b>Older partitions</b><br/>built once"]:::tile
   U["<b>Partitions that ended less than<br/><code>update_window</code> ago</b><br/>rebuilt on each refresh"]:::out
   N(["<b>Now</b>"]):::start
