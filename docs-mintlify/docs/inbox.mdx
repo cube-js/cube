@@ -92,14 +92,16 @@ delivered**, or the same partial titles ending in "did not get the alert". For
 a refresh, it reads **Sales refresh failed**.
 
 [Monitoring alerts][ref-alerts] and budgets, mentions and replies in comments,
-report deliveries that have **Email** notifications on, shared items, access
-requests, dashboard reviews, dbt syncs ready to review, and the first failure in
-a row of a webhook dbt sync
+report deliveries (for the owner, when the delivery has **Email**
+notifications on, and for admins, while the owner's Google account can't open
+the spreadsheet), shared items, access requests, dashboard reviews, dbt syncs
+ready to review, and the first failure in a row of a webhook dbt sync
 also arrive by email, unless you turn that off under
 [Notifications][ref-preferences-notifications] on the **Preferences** page.
 Cube waits 5 minutes before sending a mention, reply, share or access-request
 email and skips it if you read or delete the notification in the inbox by then.
 To get it at once, turn off [Skip email if already read][ref-preferences-skip-email].
+Other emails, report deliveries included, go out at once.
 The inbox does not send other notifications by email or Slack. End-of-support
 notices come with their own email. A scheduled task can also
 notify by email or Slack, as set up on the task. A report
