@@ -95,6 +95,15 @@ cubes:
           - name: amount_plus_100
             type: number
             sql: "{CUBE.total_amount} + 100"
+          # Drops `masked_status` from its grain, so a query grouped by it
+          # joins this measure back on the query's keys.
+          - name: total_amount_excl_masked_status
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                exclude:
+                    - orders.masked_status
       # A cube rollup naming view members instead of its own.
       pre_aggregations:
           - name: by_view_status
@@ -214,3 +223,29 @@ views:
             includes:
                 - status
                 - total_amount
+
+    # `masked_status` and `created_at` included twice: plain and aliased.
+    - name: orders_alias_view
+      cubes:
+          - join_path: orders
+            includes:
+                - masked_status
+                - name: masked_status
+                  alias: masked_status_copy
+                - created_at
+                - name: created_at
+                  alias: created_at_copy
+                - total_amount
+                - total_amount_excl_masked_status
+
+    # Rooted at customers, with `status` of the joined orders included twice.
+    - name: customers_alias_view
+      cubes:
+          - join_path: customers
+            includes:
+                - count
+          - join_path: customers.orders
+            includes:
+                - status
+                - name: status
+                  alias: status_copy

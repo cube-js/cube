@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: result
+---
+orders_alias_view__masked_status | orders_alias_view__created_at_copy_month | orders_alias_view__created_at_month | orders_alias_view__total_amount_excl_masked_status | orders_alias_view__total_amount
+---------------------------------+------------------------------------------+-------------------------------------+----------------------------------------------------+--------------------------------
+completed                        | 2025-03-01 00:00:00                      | 2025-03-01 00:00:00                 | 1375.00                                            | 1150.00                        
+pending                          | 2025-03-01 00:00:00                      | 2025-03-01 00:00:00                 | 1375.00                                            | 225.00

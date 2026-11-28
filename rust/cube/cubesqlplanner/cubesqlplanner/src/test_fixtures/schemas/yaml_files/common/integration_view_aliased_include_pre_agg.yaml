@@ -1,0 +1,47 @@
+# A view including `status` twice (plain and aliased) over a rollup that a
+# multi-stage measure dropping `status` from its grain reads.
+cubes:
+    - name: orders
+      sql: "SELECT * FROM ms_orders"
+      dimensions:
+          - name: id
+            type: number
+            sql: id
+            primary_key: true
+          - name: status
+            type: string
+            sql: status
+          - name: category
+            type: string
+            sql: category
+      measures:
+          - name: total_amount
+            type: sum
+            sql: amount
+          - name: amount_by_category
+            type: sum
+            sql: "{CUBE.total_amount}"
+            multi_stage: true
+            grain:
+                exclude:
+                    - orders.status
+      pre_aggregations:
+          - name: by_category_status
+            type: rollup
+            measures:
+                - total_amount
+            dimensions:
+                - category
+                - status
+
+views:
+    - name: orders_alias_view
+      cubes:
+          - join_path: orders
+            includes:
+                - category
+                - status
+                - name: status
+                  alias: status_copy
+                - total_amount
+                - amount_by_category

@@ -1,0 +1,8 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/view_members.rs
+expression: result
+---
+orders_alias_view__masked_status_copy | orders_alias_view__masked_status | orders_alias_view__total_amount_excl_masked_status | orders_alias_view__total_amount
+--------------------------------------+----------------------------------+----------------------------------------------------+--------------------------------
+completed                             | hidden                           | 1375.00                                            | 1150.00                        
+pending                               | hidden                           | 1375.00                                            | 225.00

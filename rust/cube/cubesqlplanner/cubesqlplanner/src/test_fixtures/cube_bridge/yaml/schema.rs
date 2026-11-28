@@ -105,7 +105,14 @@ struct YamlViewDefaultFilter {
 #[serde(untagged)]
 enum YamlIncludes {
     All(String),
-    List(Vec<String>),
+    List(Vec<YamlInclude>),
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum YamlInclude {
+    Name(String),
+    Aliased { name: String, alias: String },
 }
 
 #[derive(Debug, Deserialize)]
@@ -208,14 +215,31 @@ impl YamlSchema {
             }
 
             for view_cube in view.cubes {
-                let includes = match view_cube.includes {
-                    Some(YamlIncludes::All(ref s)) if s == "*" => vec![],
-                    Some(YamlIncludes::List(list)) => list,
-                    _ => vec![],
-                };
+                let mut includes = vec![];
+                let mut aliased_includes = vec![];
+                match view_cube.includes {
+                    Some(YamlIncludes::All(s)) if s != "*" => {
+                        panic!("View includes must be \"*\" or a list, got {s:?}")
+                    }
+                    Some(YamlIncludes::List(list)) => {
+                        for include in list {
+                            match include {
+                                YamlInclude::Name(name) => includes.push(name),
+                                YamlInclude::Aliased { name, alias } => {
+                                    aliased_includes.push((name, alias))
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
                 let prefix = view_cube.prefix.unwrap_or(false);
-                view_builder =
-                    view_builder.include_cube_with_prefix(view_cube.join_path, includes, prefix);
+                view_builder = view_builder.include_cube_with_aliases(
+                    view_cube.join_path,
+                    includes,
+                    aliased_includes,
+                    prefix,
+                );
             }
 
             for filter in view.default_filters {

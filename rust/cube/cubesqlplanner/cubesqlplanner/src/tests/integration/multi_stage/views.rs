@@ -497,3 +497,36 @@ async fn test_view_case_dimension_hidden_ref() {
         insta::assert_snapshot!(result);
     }
 }
+
+// A view dimension included twice (plain and aliased) next to a measure whose
+// grain drops it: the keys side of the multi-stage join must keep the two view
+// members as separate columns.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_view_aliased_duplicate_dimension_with_grain_exclude() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders_ms_alias_view.amount_grain_and_filter_exclude_status
+          - orders_ms_alias_view.total_amount
+        dimensions:
+          - orders_ms_alias_view.category
+          - orders_ms_alias_view.status_copy
+          - orders_ms_alias_view.status
+        order:
+          - id: orders_ms_alias_view.category
+          - id: orders_ms_alias_view.status
+    "#};
+
+    let sql = ctx.build_sql(query).unwrap();
+    assert!(
+        sql.contains(
+            r#""fk_aggregate_keys"."orders_ms_alias_view__status" "orders_ms_alias_view__status""#
+        ),
+        "expected `status` to be read from its own keys column, got SQL:\n{sql}"
+    );
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        insta::assert_snapshot!(result);
+    }
+}
