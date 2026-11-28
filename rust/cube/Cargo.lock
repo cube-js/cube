@@ -1069,6 +1069,7 @@ dependencies = [
  "anyhow",
  "arrow",
  "chrono",
+ "chrono-tz",
  "criterion",
  "cubeshared",
  "hex",
