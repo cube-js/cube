@@ -70,7 +70,7 @@ for which addresses apply to your infrastructure.
 The following fields are required when creating a Snowflake connection:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/shared/deployment-wizard/snowflake-connection.png" alt="Set up a database connection step of the deployment wizard with the Snowflake form: account URL, database, authentication method, role and warehouse" />
+  <img src="https://static.cube.dev/docs/shared/deployment-wizard/snowflake-connection-v2.png" alt="Set up a database connection step of the deployment wizard with the Snowflake form: account URL, database, authentication method, role and warehouse" />
 </Frame>
 
 #### OIDC workload identity
@@ -101,7 +101,7 @@ tenant, then:
     | **Target env var**       | `CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH`                                                           |
 
     <Frame>
-      <img src="https://static.cube.dev/docs/shared/snowflake-token-config-dialog.png" alt="Edit OIDC token config dialog in Cube Cloud for Snowflake: Custom audience type, the Snowflake account URL as the custom audience, a Target Env Var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
+      <img src="https://static.cube.dev/docs/shared/snowflake-token-config-dialog-v2.png" alt="Create OIDC token config dialog for Snowflake: Custom audience type, the Snowflake account URL as the custom audience, a Target env var of CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH, and a custom claim scp set to session:role-any." />
     </Frame>
 
     The `scp` claim is the part that's easy to miss: Snowflake grants
