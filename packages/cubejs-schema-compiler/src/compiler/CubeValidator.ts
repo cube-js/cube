@@ -841,11 +841,11 @@ const CubeRefreshKeySchema = condition(
 );
 
 const measureType = Joi.string().valid(
-  'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'countDistinctApprox'
+  'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'countDistinctApprox', 'numberAgg'
 );
 
 const measureTypeWithCount = Joi.string().valid(
-  'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'countDistinctApprox'
+  'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'countDistinctApprox', 'numberAgg'
 );
 
 const multiStageMeasureType = Joi.string().valid(
