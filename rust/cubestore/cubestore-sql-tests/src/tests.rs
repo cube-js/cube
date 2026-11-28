@@ -374,6 +374,18 @@ pub fn sql_tests(prefix: &str) -> Vec<(&'static str, TestFn)> {
             limit_pushdown_group_nonprefix_order,
         ),
         t(
+            "limit_pushdown_group_expr_key",
+            limit_pushdown_group_expr_key,
+        ),
+        t(
+            "limit_pushdown_group_expr_key_having",
+            limit_pushdown_group_expr_key_having,
+        ),
+        t(
+            "limit_pushdown_group_expr_key_measure_order",
+            limit_pushdown_group_expr_key_measure_order,
+        ),
+        t(
             "limit_pushdown_group_null_appended",
             limit_pushdown_group_null_appended,
         ),
@@ -10139,6 +10151,152 @@ async fn limit_pushdown_group_nonprefix_order(
             vec![TableValue::Int(3), TableValue::Int(3330)],
             vec![TableValue::Int(2), TableValue::Int(2220)],
         ]
+    );
+    Ok(())
+}
+
+/// `s.ek (k, ts, val)` over three chunks. Every `(k, day)` group for k in 1..=2, day in 1..=4 of
+/// 2024-01 appears in each chunk (at a different hour), with sum `(10 * k + day) * 111`.
+async fn create_expr_key_table(service: &dyn SqlClient) -> Result<(), CubeError> {
+    service.exec_query("CREATE SCHEMA s").await?;
+    service
+        .exec_query("CREATE TABLE s.ek (k int, ts timestamp, val int) INDEX kidx (k, ts)")
+        .await?;
+    for (chunk, scale) in [(1, 1), (2, 10), (3, 100)] {
+        let mut values = Vec::new();
+        for k in 1..=2 {
+            for day in 1..=4 {
+                values.push(format!(
+                    "({}, '2024-01-0{}T0{}:00:00Z', {})",
+                    k,
+                    day,
+                    chunk,
+                    (10 * k + day) * scale
+                ));
+            }
+        }
+        service
+            .exec_query(&format!(
+                "INSERT INTO s.ek (k, ts, val) VALUES {}",
+                values.join(", ")
+            ))
+            .await?;
+    }
+    Ok(())
+}
+
+fn expr_key_row(k: i64, day: i64, sum: i64) -> Vec<TableValue> {
+    const JAN_1_2024_NANOS: i64 = 1_704_067_200_000_000_000;
+    const DAY_NANOS: i64 = 86_400_000_000_000;
+    vec![
+        TableValue::Int(k),
+        TableValue::Timestamp(TimestampValue::new(
+            JAN_1_2024_NANOS + (day - 1) * DAY_NANOS,
+        )),
+        TableValue::Int(sum),
+    ]
+}
+
+/// A worker plan bounded by `worker_sort_and_limit`: either the hash trim or a per-partition
+/// fetch-limited sort above the partial aggregate. In-process, the plan above `Worker` is the
+/// router's.
+fn worker_plan_is_bounded(worker_pp: &str) -> bool {
+    worker_pp.split_once("Worker").map_or(false, |(_, worker)| {
+        worker.contains("GroupByLimitAggregate") || worker.contains("Sort, fetch:")
+    })
+}
+
+// ORDER BY an expression group key (`date_trunc`) is still a group-key order, so the worker bounded
+// sort applies. Every group spans all three chunks, so the per-worker cut must keep all of their
+// partial states for the sums to be exact.
+async fn limit_pushdown_group_expr_key(service: Box<dyn SqlClient>) -> Result<(), CubeError> {
+    create_expr_key_table(service.as_ref()).await?;
+    let query = "SELECT k, date_trunc('day', ts), sum(val) FROM s.ek \
+                 GROUP BY 1, 2 ORDER BY 2, 1 LIMIT 3";
+    let p = service.plan_query(query).await?;
+    let worker_pp = pp_phys_plan(p.worker.as_ref());
+    assert!(
+        worker_plan_is_bounded(&worker_pp),
+        "expected a bounded worker plan, got:\n{}",
+        worker_pp
+    );
+    let r = service.exec_query(query).await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![
+            expr_key_row(1, 1, 11 * 111),
+            expr_key_row(2, 1, 21 * 111),
+            expr_key_row(1, 2, 12 * 111),
+        ]
+    );
+
+    // Descending, the expression key alone in the ORDER BY: both day-4 groups, in either order.
+    let query = "SELECT date_trunc('day', ts) d, k, sum(val) FROM s.ek \
+                 GROUP BY 1, 2 ORDER BY d DESC LIMIT 2";
+    let p = service.plan_query(query).await?;
+    let worker_pp = pp_phys_plan(p.worker.as_ref());
+    assert!(
+        worker_plan_is_bounded(&worker_pp),
+        "expected a bounded worker plan, got:\n{}",
+        worker_pp
+    );
+    let r = service.exec_query(query).await?;
+    let mut rows: Vec<Vec<TableValue>> = to_rows(&r)
+        .into_iter()
+        .map(|r| vec![r[1].clone(), r[0].clone(), r[2].clone()])
+        .collect();
+    rows.sort_by_key(|r| format!("{:?}", r[0]));
+    assert_eq!(
+        rows,
+        vec![expr_key_row(1, 4, 14 * 111), expr_key_row(2, 4, 24 * 111)]
+    );
+    Ok(())
+}
+
+// HAVING above the aggregate drops groups after the worker cut, so it must keep blocking the
+// pushdown with an expression group key too. The k = 1 groups of days 1 and 2 fail the HAVING, so a
+// cut to the first two groups per worker would return a single row.
+async fn limit_pushdown_group_expr_key_having(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    create_expr_key_table(service.as_ref()).await?;
+
+    let query = "SELECT k, date_trunc('day', ts), sum(val) FROM s.ek \
+                 GROUP BY 1, 2 HAVING sum(val) > 13 * 111 - 1 ORDER BY 2, 1 LIMIT 2";
+    let p = service.plan_query(query).await?;
+    let worker_pp = pp_phys_plan(p.worker.as_ref());
+    assert!(
+        !worker_plan_is_bounded(&worker_pp),
+        "did not expect a bounded worker plan under HAVING, got:\n{}",
+        worker_pp
+    );
+    let r = service.exec_query(query).await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![expr_key_row(2, 1, 21 * 111), expr_key_row(2, 2, 22 * 111)]
+    );
+    Ok(())
+}
+
+// ORDER BY a measure is not a group-key order: no worker bound, even with an expression key.
+async fn limit_pushdown_group_expr_key_measure_order(
+    service: Box<dyn SqlClient>,
+) -> Result<(), CubeError> {
+    create_expr_key_table(service.as_ref()).await?;
+
+    let query = "SELECT k, date_trunc('day', ts), sum(val) FROM s.ek \
+                 GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 2";
+    let p = service.plan_query(query).await?;
+    let worker_pp = pp_phys_plan(p.worker.as_ref());
+    assert!(
+        !worker_plan_is_bounded(&worker_pp),
+        "did not expect a bounded worker plan when ordering by a measure, got:\n{}",
+        worker_pp
+    );
+    let r = service.exec_query(query).await?;
+    assert_eq!(
+        to_rows(&r),
+        vec![expr_key_row(2, 4, 24 * 111), expr_key_row(2, 3, 23 * 111)]
     );
     Ok(())
 }
