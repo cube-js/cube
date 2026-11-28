@@ -350,8 +350,10 @@ served from `https://static.cube.dev/<key>`. Reference that URL from the `.mdx`.
 Wrap screenshots in `<Frame>`. When a screenshot is needed but not yet available, leave
 an MDX comment placeholder: `{/* TODO: screenshot — ... */}`.
 
-> The `images/` directory holds a handful of older assets that predate this rule. Don't
-> add to it — and don't take it as precedent.
+The `Docs` workflow runs `scripts/check_media_hosts.py`, which fails the PR when an
+`<img>`, `<video>`, `<source>` or Markdown image points anywhere other than
+`https://static.cube.dev/`, including files committed under `/images/`. Embeds in an
+`<iframe>` are allowed only from YouTube, Loom and CodeSandbox.
 
 ### Uploading
 
