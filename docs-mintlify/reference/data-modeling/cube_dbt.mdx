@@ -14,20 +14,13 @@ them as [cubes][ref-cubes] in [YAML][ref-model-syntax].
 
 ## Installation
 
-{/*
-
 ### Cube Core
 
-Run the following command in the root directory of your Cube project:
-
-```bash
-echo "cube_dbt" > requirements.txt
-pip install -r requirements.txt
-```
-
-*/}
-
-{/* TODO: test and uncomment Cube Core installation instructions */}
+Add the `cube_dbt` package to the `requirements.txt` file in the root
+directory of your Cube project, then install it inside the Docker container
+by running `pip install -r requirements.txt`. See [runtimes and
+dependencies][ref-runtimes-dependencies] for other ways to install
+dependencies.
 
 ### Cube Cloud
 
@@ -510,6 +503,7 @@ cubes:
 [link-dbt-materializations]: https://docs.getdbt.com/docs/build/materializations
 
 [ref-cubes]: /reference/data-modeling/cube
+[ref-runtimes-dependencies]: /admin#runtimes-and-dependencies
 [ref-model-syntax]: /docs/data-modeling/concepts/syntax#model-syntax
 [ref-cube-sql-table]: /reference/data-modeling/cube#sql_table
 [ref-dimension-sql]: /reference/data-modeling/dimensions#sql
