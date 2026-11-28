@@ -342,7 +342,18 @@ The panel has two tabs:
   internet". See [Governed data access](#governed-data-access) for how to
   include such files in the app. In **Files**, each file that has a problem
   shows an error mark.
+
+  An attempt to open another site shows as **Blocked navigation to** and the
+  site's origin, with the hint "Apps can't open other sites. Remove the
+  navigation from the code." See [Blocked navigations](#blocked-navigations).
 - **Console** shows what the app writes to the browser console.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/apps/problems-blocked-navigation.png"
+    alt="Problems panel with a blocked image row and a Blocked navigation to https://example.com row that shows its file and line and the Clear flag button"
+  />
+</Frame>
 
 Click the copy button to copy the contents of the open tab.
 
@@ -358,6 +369,24 @@ After you fix the code, click **Run**. The problems that are fixed go away.
 
 Only people who can edit the app see problems. Viewers of a published app do
 not.
+
+### Blocked navigations
+
+An app can't navigate to another site, for example with a link or by setting
+`window.location`. When it tries, the browser blocks the navigation, and Cube
+flags the app with the site's origin, such as `https://example.com`. The flag
+is saved on the app, so the **Problems** tab shows a blocked navigation even
+when it happened while someone viewed the published app. Such a row shows how
+long ago the app last tried. When the code names the origin, the row shows the
+file and line instead. Click the row to open the file at that line.
+
+The row is an error while the app keeps trying or its code still names the
+origin. After you remove the navigation and click **Run**, the row turns into
+a warning. It stays until an admin clears the flag: point at the row and click
+**Clear flag**. If the app tries again later, Cube flags it again.
+
+Admins also get an [inbox notification][ref-inbox-types] when an app is
+flagged.
 
 ## Publish the app
 
@@ -419,6 +448,8 @@ Apps run in a sandbox, isolated from the Cube interface:
 - An app cannot load external scripts, stylesheets, images, or fonts. Put
   everything the app needs in its files. Images and fonts can be embedded as
   `data:` URLs.
+- An app cannot navigate to another site. Cube flags the app when it tries,
+  see [Blocked navigations](#blocked-navigations).
 - An app cannot read Cube cookies, storage, or the page around it.
 
 ## Apps in embedded analytics
@@ -508,6 +539,7 @@ responsible for what its code does with the data.
 - Apps can read workbook report results but cannot write data back to a source.
 
 [ref-dashboards]: /docs/explore-analyze/dashboards
+[ref-inbox-types]: /docs/inbox#notification-types
 [ref-publishing]: /docs/explore-analyze/dashboards#publishing-and-versions
 [ref-embedding]: /embedding
 [ref-user-attributes]: /embedding/iframe/auth/signed#user-attributes
