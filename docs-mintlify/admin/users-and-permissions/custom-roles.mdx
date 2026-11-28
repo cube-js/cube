@@ -105,7 +105,7 @@ Global permissions are org-wide. Check any number of them on the **Global permis
 | AI                                   | Send email to yourself              | Have the agent send email to the address on your Cube account only. |
 | AI                                   | Send email to workspace members     | Have the agent send email to yourself and to other active members of the workspace. |
 
-The email permissions decide who the agent can email, in chats and in [scheduled runs][ref-scheduled-tasks-agent], and who you can email with `POST /api/v1/email` in the [Platform API][ref-platform-api]. The email tool must also be enabled for the workspace: while it is off, nobody can send email, admins included. Admins can email any workspace member. A new custom role sends no email until you check one of the permissions.
+The email permissions decide who the agent can email, in chats and in [scheduled runs][ref-scheduled-tasks-agent], and who you can email with `POST /api/v1/email` in the [Platform API][ref-platform-api]. The email tool must also be enabled for the workspace: while it is off, nobody can send email, admins included. Admins can email any active workspace member. A new custom role sends no email until you check one of the permissions.
 
 <Note>
 
