@@ -89,14 +89,14 @@ deliveries with **Inbox** or **Email** notifications on, shares, access
 requests, dashboard reviews and dbt syncs arrive in your
 [inbox][ref-inbox] whatever you choose here. In the **Notifications** section of
 the **Preferences** page, choose which of them also arrive by email. Only admins
-see the **Model syncs** switch:
+see the **End of support**, **Model syncs** and **AI tokens** switches:
 
 {/* TODO: video — Preferences → Notifications, with the Skip email if already read switch and an email skipped after reading it in the Inbox (GTM-321) */}
 
 <Frame>
   <img
-    src="https://static.cube.dev/docs/preferences/notifications/notifications-section-v5.png"
-    alt="Notifications section of the Preferences page with the email switches, including Alerts, Report deliveries and Model syncs with its ready-to-review or starts-failing description, and the Skip email if already read switch"
+    src="https://static.cube.dev/docs/preferences/notifications/notifications-section-v6.png"
+    alt="Notifications section of the Preferences page with the email switches for Alerts, Mentions in comments, Replies to comments, End of support, Report deliveries, Automations and Model syncs"
   />
 </Frame>
 
@@ -105,10 +105,13 @@ see the **Model syncs** switch:
 | Alerts | An [alert][ref-alerts] that lists you as a recipient fires or resolves, or usage crosses a [budget][ref-budgets] threshold you get notifications for | On |
 | Mentions in comments | Someone [mentions you][ref-mentions] in a dashboard comment | On |
 | Replies to comments | Someone replies [in a comment thread][ref-replies] you wrote in | On |
+| End of support | A deployment's Cube version is about to reach end of support. Only admins see this switch | On |
 | Report deliveries | A [report delivery][ref-report-deliveries] you own fails or starts working again, and the delivery has **Email** notifications on. As an admin, also while a delivery's owner can't open its spreadsheet, at most once a day | On |
+| Automations | An automation fails, is paused, or works again, and its failure settings email you. Shown when automations are on for your account | On |
 | Model syncs | A [dbt sync][ref-dbt-review] that a webhook started has changes ready to review and the dbt project has no notification list, or a webhook dbt sync starts failing, with or without a list. Only admins see this switch | On |
 | Shared with you | Someone [shares][ref-sharing] a workbook, a folder, or a chat with you, or approves your access request | On |
 | Access requests | Someone [requests access][ref-request-access] to an item you can share, or declines your request | On |
+| AI tokens | An automatic AI tokens top-up fails. Only admins see this switch | On |
 | Dashboard reviews | Someone [requests your review][ref-reviews] of a dashboard, or comments on, approves, requests changes to, or publishes a review you take part in | On |
 
 A switch saves as soon as you change it. Turning a switch off stops the email
@@ -131,8 +134,8 @@ list. An email about a declined request doesn't name the item.
 An email address on an alert or a budget that doesn't belong to a Cube user
 always gets its email, whatever the Alerts switch says.
 
-End-of-support notices and scheduled tasks send their own email, as set up on
-each of them, and have no switch here.
+Scheduled tasks send their own email, as set up on each of them, and have no
+switch here.
 
 ### Skip email if already read
 
@@ -143,6 +146,13 @@ in the inbox counts, whether you select it, choose **Mark read** in its **⋮**
 menu or choose **Mark all read**. Opening the comment or the item from
 somewhere else does not. Alert, budget, report delivery, dashboard review and
 model sync emails don't wait and go out at once.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/preferences/notifications/notifications-section-v6-skip-email.png"
+    alt="Rest of the Notifications section with the Shared with you, Access requests, AI tokens and Dashboard reviews switches, and the Skip email if already read switch"
+  />
+</Frame>
 
 The switch is on by default. Turn it off to get each email as soon as the
 notification arrives. Unlike the other switches, it can't be turned off from

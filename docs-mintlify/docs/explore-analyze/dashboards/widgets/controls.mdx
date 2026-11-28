@@ -63,7 +63,7 @@ A phrase with two common meanings gives two rows: "last 3 months" reads as **Pas
 When neither these rules nor the presets read the text, and AI features are available for your account, Cube asks the Auto agent's [small LLM][ref-small-llm], or the [default agent][ref-default-agent]'s when Auto is turned off. It reads phrases such as "Q3", "H1 2026", "since Black Friday" or "same 30 days last year", and gives at most two readings. They are rows like any other reading, with their dates, and Enter or a click applies one. While Cube is asking, the list reads "Reading “…”…". A named period, such as a quarter, a month or a holiday, is stored as specific dates, so "Q3" typed in 2026 stays Q3 2026 after the year turns. Without AI features, the search field reads only the phrases above, and no text is sent to a model.
 
 <Frame>
-![Date range popover with "Q3" typed in the search field and two readings, Jul 1 – Sep 30 and Jul 1 – Sep 30, 2025, above the Up to now box](https://static.cube.dev/docs/explore-analyze/dashboards/widgets/controls/date-range-filter-model-readings.png)
+![Date range popover with "Q3" typed in the search field and two readings, Jul 1 – Sep 30 and Jul 1 – Sep 30, 2025](https://static.cube.dev/docs/explore-analyze/dashboards/widgets/controls/date-range-filter-model-readings-v2.png)
 </Frame>
 
 Text that nothing reads, the small LLM included, shows "Can't read … as dates." with examples to try; click one to type it.
@@ -328,7 +328,7 @@ says *This workbook has no parameters yet. Create one in the data pane.*
 
 <Frame>
   <img
-    src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/controls/filter-by-parameter.png"
+    src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/controls/filter-by-parameter-v2.png"
     alt="Configure filter panel set to Parameter, with the Parameter, End of range and Title fields, next to a date range filter on the dashboard"
   />
 </Frame>
@@ -413,8 +413,8 @@ Not every preset exists at every granularity. When the granularity a viewer pick
 
 <Frame>
   <img
-    src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/period-comparison-unavailable-at-week.png"
-    alt="Table chart switched to Week with a Count (1 week earlier) column, an empty Count (1 quarter earlier, n/a at Week) column, and the crossed-out adjustments icon's tooltip"
+    src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/period-comparison-unavailable-at-week-v2.png"
+    alt="Table chart with the time granularity switcher on Week, an empty Count (1 quarter earlier, n/a at Week) column, and the crossed-out adjustments icon's tooltip"
   />
 </Frame>
 
@@ -924,7 +924,7 @@ The controls icon on a chart counts these filters along with the other controls,
 A chart built on an [advanced semantic query][ref-advanced-queries] takes filters when its query names exactly one semantic view. A [filter](#filter) reaches the chart under the same rules as on any other chart: it's mapped automatically when its member is on that view, you can map it onto another dimension of the view, and you can turn it off for the chart. This works in the dashboard builder and on published and embedded dashboards.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/controls/controls-mapping-advanced-query-v2.png" alt="Controls mapping for a chart on an advanced query, with the Status filter mapped automatically and the chart showing only the selected statuses" />
+  <img src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/controls/controls-mapping-advanced-query-v3.png" alt="Controls mapping for a chart on an advanced query, with the Status filter mapped automatically and the chart showing only the selected statuses" />
 </Frame>
 
 Some controls don't apply to such a chart, and the controls icon counts them as not applied:
