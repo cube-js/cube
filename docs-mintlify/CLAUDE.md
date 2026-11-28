@@ -353,7 +353,7 @@ an MDX comment placeholder: `{/* TODO: screenshot — ... */}`.
 The `Docs` workflow runs `scripts/check_media_hosts.py`, which fails the PR when an
 `<img>`, `<video>`, `<source>`, `poster`, `<Card img>` or Markdown image points anywhere other than
 `https://static.cube.dev/`, including files committed under `/images/`. Embeds in an
-`<iframe>` are allowed only from YouTube, Loom and CodeSandbox. Write these URLs as
+`<iframe>` are allowed only from YouTube (on `youtube-nocookie.com`), Loom and CodeSandbox. Write these URLs as
 string literals: `src={url}` can't be checked, so the workflow fails it too.
 
 ### Uploading
