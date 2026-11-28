@@ -1827,6 +1827,9 @@ Object {
       "type": "string",
     },
   },
+  "directCubes": Array [
+    "orders",
+  ],
   "evaluatedHierarchies": Array [
     Object {
       "aliasMember": "orders.hello",

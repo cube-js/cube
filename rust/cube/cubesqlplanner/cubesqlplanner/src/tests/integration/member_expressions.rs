@@ -418,8 +418,8 @@ fn test_expr_measure_count_star_no_hints_beside_other_view_dimension() {
 // view. `customer_overview.returns_count` pulls in `customers` and `returns`,
 // neither of which `orders_view` is built on, so those hints must not be
 // borrowed - counting rows of `customers` joined to `returns` would answer a
-// question nobody asked. Nothing is left to resolve from, so the query is
-// rejected.
+// question nobody asked. The count reads `orders`, the cube `orders_view`
+// includes, in a join of its own.
 #[test]
 fn test_expr_measure_count_star_no_hints_beside_other_view_measure() {
     let schema = MockSchema::from_yaml_file("common/integration_views.yaml");
@@ -439,13 +439,10 @@ fn test_expr_measure_count_star_no_hints_beside_other_view_measure() {
             .build(),
     );
 
-    let err = ctx
-        .build_sql_from_options(options)
-        .expect_err("a view member expression must not borrow the join of an unrelated view");
+    let sql = normalize_sql(&ctx.build_sql_from_options(options).unwrap());
     assert!(
-        err.message.contains("Can't resolve the cube to query"),
-        "expected a clear unresolvable-cube error, got: {}",
-        err.message
+        sql.contains("SELECT COUNT(*) \"total_count\" FROM orders AS \"orders\")"),
+        "expected the count to read `orders` alone, not the other view's join, got: {sql}"
     );
 }
 
@@ -512,22 +509,12 @@ fn test_expr_measure_count_star_only_member_on_view_with_cyclic_join_map() {
     );
 }
 
-// A hint-less `COUNT(*)` member expression on a view as the *only* query member:
-// the view is not a joinable cube, nothing else seeds the join, and the view has
-// no join map to fall back to, because a view over a single directly joinable cube
-// records no path. So there is no cube to query.
-//
-// This is a known limitation, not the desired end state: a one-cube view is the
-// most common shape, and the cube is knowable - the view does record `orders` as
-// an included cube, it is just dropped from the join map as "no path needed".
-// Lifting it means either exposing the view's included cubes on the cube bridge or
-// keeping single-element paths in the join map, and the latter turns every root
-// cube hint from `Single` into `Vector` across both planners - too wide to carry
-// here. The legacy planner fails on this query too, so nothing regresses; what
-// this test locks in is a clear error instead of a bridge deserialization failure
-// on the null join tree.
-#[test]
-fn test_expr_measure_count_star_only_member_on_view() {
+// A hint-less `COUNT(*)` member expression on a view as the *only* query member,
+// where the view includes one cube directly and so has no join map: the cube it
+// includes is the one to query. This is what `SELECT COUNT(*) FROM orders_view`
+// sends through the SQL API.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_expr_measure_count_star_only_member_on_view() {
     let schema = MockSchema::from_yaml_file("common/integration_views.yaml");
     let ctx = TestContext::new(schema).unwrap();
 
@@ -543,14 +530,52 @@ fn test_expr_measure_count_star_only_member_on_view() {
             .build(),
     );
 
-    let err = ctx
-        .build_sql_from_options(options)
-        .expect_err("a view member expression with nothing to join from should be rejected");
+    let sql = normalize_sql(&ctx.build_sql_from_options(options.clone()).unwrap());
     assert!(
-        err.message.contains("Can't resolve the cube to query"),
-        "expected a clear unresolvable-cube error, got: {}",
-        err.message
+        sql.contains("FROM orders AS") && !sql.contains("JOIN"),
+        "expected the count to read `orders` alone, got: {sql}"
     );
+
+    if let Some(result) = ctx
+        .try_execute_pg_from_options(options, "integration_multi_fact_tables.sql")
+        .await
+    {
+        insta::assert_snapshot!(result);
+    }
+}
+
+// Two roots of a view, whether both cubes are included directly or one heads a
+// join path: which one gets counted would come down to the order the view
+// lists them, so the query is rejected instead.
+#[test]
+fn test_expr_measure_count_star_only_member_on_view_with_two_roots() {
+    let schema = MockSchema::from_yaml_file("common/integration_views.yaml");
+    let ctx = TestContext::new(schema).unwrap();
+
+    for view in ["two_direct_cubes_view", "direct_cube_and_path_view"] {
+        let total_count = make_measure_expression("total_count", view, "COUNT(*)");
+
+        let options = Rc::new(
+            MockBaseQueryOptions::builder()
+                .cube_evaluator(ctx.query_tools().cube_evaluator().clone())
+                .base_tools(ctx.query_tools().base_tools().clone())
+                .join_graph(ctx.query_tools().join_graph().clone())
+                .security_context(ctx.security_context().clone())
+                .measures(Some(vec![total_count]))
+                .build(),
+        );
+
+        let err = ctx
+            .build_sql_from_options(options)
+            .expect_err("a view with two roots has no single root");
+        assert!(
+            err.message.contains("don't share a single root")
+                && err.message.contains("orders")
+                && err.message.contains("returns"),
+            "{view}: expected a no-single-root error naming both roots, got: {}",
+            err.message
+        );
+    }
 }
 
 // Multiplied dim-only ME: a measure expression evaluating to a

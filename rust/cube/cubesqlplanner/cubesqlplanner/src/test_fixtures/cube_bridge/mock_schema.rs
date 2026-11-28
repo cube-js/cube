@@ -5,6 +5,7 @@ use crate::test_fixtures::cube_bridge::{
     MockPreAggregationDescription, MockSegmentDefinition, MockViewFilterDefinition,
 };
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -718,7 +719,7 @@ impl MockViewBuilder {
         // does differently is evaluate the join path as a reference instead of
         // splitting the raw string, so a fixture would only diverge with a join
         // path that is not a literal.
-        let join_map = self
+        let (join_map, direct_paths): (Vec<_>, Vec<_>) = self
             .view_cubes
             .iter()
             .map(|view_cube| {
@@ -728,13 +729,14 @@ impl MockViewBuilder {
                     .map(|part| part.to_string())
                     .collect::<Vec<_>>()
             })
-            .filter(|path| path.len() > 1)
-            .collect::<Vec<_>>();
+            .partition(|path| path.len() > 1);
+        let direct_cubes = direct_paths.into_iter().flatten().unique().collect_vec();
 
         let view_def = MockCubeDefinition::builder()
             .name(self.view_name.clone())
             .is_view(Some(true))
             .join_map(Some(join_map))
+            .direct_cubes(Some(direct_cubes))
             .default_filters(self.default_filters)
             .build();
 

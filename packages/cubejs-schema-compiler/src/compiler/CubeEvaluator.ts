@@ -299,6 +299,7 @@ export type EvaluatedCube = {
   defaultFilters?: ViewDefaultValueFilter[];
   refreshKey?: CubeRefreshKey;
   joinMap?: string[][];
+  directCubes?: string[];
   rewriteQueries?: boolean;
   sqlAlias?: string;
 };
