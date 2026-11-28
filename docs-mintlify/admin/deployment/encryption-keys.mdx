@@ -19,17 +19,17 @@ your own customer-managed keys (CMK) for Cube Store.
 On the **Encryption keys** page, you can see all previously provided keys:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/deployment/encryption-keys/48038ac1.png" />
+  <img src="https://static.cube.dev/docs/admin/deployment/encryption-keys/encryption-keys.png" alt="Encryption keys page with two keys and the Create encryption key button" />
 </Frame>
 
 ### Add a key
 
-To add an encryption key, click **Create** to open a modal window.
+To add an encryption key, click **Create encryption key** to open a modal window.
 Provide the key name and the key value: an 256-bit AES encryption key, encoded
 in [standard Base64][link-base64] in its canonical representation.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/deployment/encryption-keys/9338679e.png" />
+  <img src="https://static.cube.dev/docs/admin/deployment/encryption-keys/create-encryption-key.png" alt="Create encryption key dialog with the Name and Value fields" />
 </Frame>
 
 **Once the first encryption key is added, Cube Store will assume that data-at-rest
@@ -61,9 +61,15 @@ You can check which encryption key is used by any pre-aggregation partition by
 querying `system.tables` in Cube Store via [source SQL in Explore][ref-explore-source-sql]
 or [SQL Runner][ref-sql-runner]:
 
-<Frame>
-  <img src="https://static.cube.dev/docs/admin/deployment/encryption-keys/017ca9d6.png" />
-</Frame>
+```sql
+SELECT table_name, extension
+FROM system.tables;
+```
+
+For a partition encrypted with a customer-managed key, the `extension` column
+holds the key's ID, e.g., `{"parquet_key":{"mode":"encrypted","key_id":"8",...}}`,
+where `8` is the **ID** shown on the **Encryption keys** page. For a partition
+that isn't encrypted, `extension` is `null`.
 
 <Warning>
 
