@@ -34,6 +34,8 @@ purchases products) before they leave equals one session.
 
 ```mermaid actions={false}
 flowchart LR
+  accTitle: Sessions split by inactivity
+  accDescr: In session 1, the user visits the landing page and downloads an ebook. After more than 30 minutes of inactivity, session 2 starts, in which the user signs up and visits the dashboard.
   S1["<b>Session 1</b><br/>Visit landing page,<br/>download ebook"]:::tile
   S2["<b>Session 2</b><br/>Sign up,<br/>visit dashboard"]:::tile
   S1 -.->|Inactivity<br/>over 30 min| S2

@@ -29,6 +29,8 @@ data source.
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: Lambda pre-aggregation with a data source
+  accDescr: The data source feeds a pre-aggregation built on schedule and a real-time query at query time. Cube unions both during query processing and serves embedded analytics, BI tools, and data apps and notebooks.
   DS["<img src='https://static.cube.dev/icons/bigquery.svg' /><img src='https://static.cube.dev/icons/snowflake.svg' /><img src='https://static.cube.dev/icons/redshift.svg' /><br/><b>Data source</b>"]:::tile
   PA["<b>Pre-aggregation</b>"]:::tile
   RT["<b>Real-time query</b>"]:::tile
@@ -137,6 +139,8 @@ data comes from a [streaming pre-aggregation][streaming-pre-agg].
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: Lambda pre-aggregation with batch and streaming data
+  accDescr: Batch data feeds a batch pre-aggregation. Streaming data from Kafka or Redpanda goes through ksqlDB into a streaming pre-aggregation. Cube unions both during query processing and serves embedded analytics, BI tools, and data apps and notebooks.
   BD["<img src='https://static.cube.dev/icons/bigquery.svg' /><img src='https://static.cube.dev/icons/snowflake.svg' /><img src='https://static.cube.dev/icons/redshift.svg' /><br/><b>Batch data</b>"]:::tile
   SD["<b>Streaming data</b><br/>Kafka, Redpanda"]:::tile
   K["<img src='https://static.cube.dev/icons/ksqldb.svg' /><b>ksqlDB</b>"]:::tile

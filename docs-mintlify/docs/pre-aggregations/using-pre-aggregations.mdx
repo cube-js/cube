@@ -1159,6 +1159,8 @@ or [Export Bucket][self-export-bucket] strategies instead.
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: Simple build strategy
+  accDescr: 1. Cube runs the pre-aggregation query against the source database and gets the results. 2. Cube sends the results to Cube Store. 3. Cube queries pre-aggregations in Cube Store.
   C["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Cube</b>"]:::tile
   DB["<b>Source database</b>"]:::tile
   CS["<b>Cube Store</b>"]:::tile
@@ -1174,6 +1176,8 @@ Store to ingest.
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: Batching build strategy
+  accDescr: 1. Cube runs the pre-aggregation query against the source database and gets the results. 2. Cube sends the results to Cube Store in batches. 3. Cube queries pre-aggregations in Cube Store.
   C["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Cube</b>"]:::tile
   DB["<b>Source database</b>"]:::tile
   CS["<b>Cube Store</b>"]:::tile
@@ -1208,6 +1212,8 @@ Cube Store in parallel:
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: Export bucket build strategy
+  accDescr: 1. Cube runs an UNLOAD query against the source database. 2. The database materializes the query's data into an export bucket in cloud storage. 3. Cube Store loads the materialized data. 4. Cube queries pre-aggregations in Cube Store.
   C["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Cube</b>"]:::tile
   DB["<b>Source database</b>"]:::tile
   B["<b>Export bucket</b><br/>cloud storage"]:::tile

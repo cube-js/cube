@@ -208,6 +208,8 @@ In our example, as illustrated below, we are using `team` property of the securi
 
 ```mermaid actions={false}
 flowchart LR
+  accTitle: Security contexts mapped to app IDs
+  accDescr: Users 1 and 2 have team sales in their security contexts, and users 3 and 4 have team exec. context_to_app_id maps them to two data models, sales and exec, each compiled with its own COMPILE_CONTEXT.
   U1["<code>#quot;user_id#quot;: 1</code><br/><code>#quot;team#quot;: #quot;sales#quot;</code>"]:::tile
   U2["<code>#quot;user_id#quot;: 2</code><br/><code>#quot;team#quot;: #quot;sales#quot;</code>"]:::tile
   U3["<code>#quot;user_id#quot;: 3</code><br/><code>#quot;team#quot;: #quot;exec#quot;</code>"]:::tile

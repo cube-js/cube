@@ -305,6 +305,8 @@ the cache are supported:
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: Cache control flowchart
+  accDescr: With no-cache, the query goes to the data source. Otherwise, a cached value with up-to-date refresh keys is returned. If there is none, stale-while-revalidate returns a cached value, if there is one, and refreshes it in the background. In every other case, the query goes to the data source. If it doesn't hit Continue wait, the fresh value is returned. If it does, stale-if-slow returns a cached value, if there is one. Otherwise, Continue wait is returned for the client to retry.
   A(["<b>A query arrives</b>"]):::start
   Q1{{"Is the cache mode<br/><code>no-cache</code>?"}}:::ask
   Q2{{"Is there a cached value,<br/>with refresh keys up to date?"}}:::ask

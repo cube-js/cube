@@ -31,6 +31,8 @@ inside:
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: How the security context is used
+  accDescr: A request carries a JWT, which is verified and decoded into the security context. query_rewrite runs for every query and adds filters to the SQL query. context_to_app_id maps the security context to an app ID, and the data model is compiled once per app ID with COMPILE_CONTEXT.
   T(["<b>Request with a JWT</b>"]):::start
   SC["<b>Security context</b><br/>verified claims from the JWT"]:::tile
   QR["<code>query_rewrite</code><br/>runs for every query"]:::tile
@@ -221,6 +223,8 @@ In our example, as illustrated below, we are using `team` property of the securi
 
 ```mermaid actions={false}
 flowchart LR
+  accTitle: Security contexts mapped to app IDs
+  accDescr: Users 1 and 2 have team sales in their security contexts, and users 3 and 4 have team exec. context_to_app_id maps them to two data models, sales and exec, each compiled with its own COMPILE_CONTEXT.
   U1["<code>#quot;user_id#quot;: 1</code><br/><code>#quot;team#quot;: #quot;sales#quot;</code>"]:::tile
   U2["<code>#quot;user_id#quot;: 2</code><br/><code>#quot;team#quot;: #quot;sales#quot;</code>"]:::tile
   U3["<code>#quot;user_id#quot;: 3</code><br/><code>#quot;team#quot;: #quot;exec#quot;</code>"]:::tile

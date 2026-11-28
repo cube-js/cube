@@ -49,6 +49,8 @@ Semantic SQL gives agents the full expressiveness of SQL to build ad-hoc derived
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: How an agent queries the semantic layer
+  accDescr: The semantic layer gives the agent definitions to generate Semantic SQL. The agent sends Semantic SQL to the semantic layer runtime, which sends warehouse SQL to the data warehouse.
   L["<b>Semantic layer</b>"]:::tile
   A["<b>Agent</b>"]:::tile
   R["<b>Semantic layer runtime</b>"]:::tile

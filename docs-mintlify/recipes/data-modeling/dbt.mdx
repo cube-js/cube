@@ -19,6 +19,8 @@ semantic layer.
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: dbt and Cube
+  accDescr: Tables in the data source feed dbt, where staging and intermediate models become data marts, written in .sql and described in .yml, without metrics. dbt models map to cubes and their columns to dimensions. In Cube, cubes feed views, and measures and joins are defined in each cube. Cube feeds datasets in the BI tool.
   T["<b>Tables</b><br/>in the data source"]:::tile
   D["<img src='https://static.cube.dev/icons/dbt.svg' /><b>dbt</b><br/>Staging and intermediate<br/>models → data marts<br/>Models in <code>.sql</code>, described in <code>.yml</code><br/>Don't define metrics"]:::hub
   C["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Cube</b><br/>Cubes → views<br/>Measures and joins<br/>defined in each cube"]:::hub

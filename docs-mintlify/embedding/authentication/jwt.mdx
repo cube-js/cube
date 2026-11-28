@@ -11,6 +11,8 @@ The diagram below shows how it works during the request processing in Cube:
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: JWT authentication flow
+  accDescr: Your auth service issues a JWT with security context claims to your app. Your app sends a query to Cube with the JWT in the Authorization header. Cube validates and decodes the JWT into the security context, applies access control rules, and queries the data sources.
   AS["<b>Your auth service</b>"]:::tile
   APP["<b>Your app</b>"]:::tile
   C["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Cube</b><br/>validates and decodes the JWT<br/>into the security context, e.g.,<br/><code>{ #quot;user_id#quot;: 1234, #quot;exp#quot;: 111 }</code>,<br/>then applies access control rules"]:::hub

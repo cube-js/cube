@@ -41,6 +41,8 @@ particular eligible pre-aggregation:
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: Pre-aggregation matching flowchart
+  accDescr: If the query is leaf-measure additive, every query member exists in the pre-aggregation, and no query measure is multiplied, the pre-aggregation is used. Otherwise, it is used only if the query specifies a granularity for its time dimension, its filter dimensions are among its own dimensions, and the pre-aggregation has exactly the query's dimensions and every query measure. If any of these checks fails, the pre-aggregation is not used.
   A(["<b>A query arrives</b>"]):::start
   Q1{{"Is query leaf-measure<br/>additive?"}}:::ask
   Q2{{"Does every member of the query<br/>exist in the pre-aggregation?"}}:::ask

@@ -11,6 +11,8 @@ pre-aggregations.
 
 ```mermaid actions={false}
 flowchart TB
+  accTitle: Cube in the data stack
+  accDescr: Data sources feed data replication, which loads the data warehouse. The warehouse feeds the semantic layer, Cube, which serves data applications. Data orchestration follows data replication, runs data transformation, which loads the warehouse, and pushes changes to the semantic layer.
   S["<b>Data sources</b>"]:::tile
   R["<b>Data replication</b>"]:::tile
   W["<b>Data warehouse</b>"]:::tile
