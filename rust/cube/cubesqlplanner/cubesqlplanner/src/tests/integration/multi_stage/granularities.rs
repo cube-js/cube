@@ -100,3 +100,122 @@ async fn test_quarter_granularity() {
         insta::assert_snapshot!(result);
     }
 }
+
+fn assert_unique_columns(result: &str) {
+    let header = result.lines().next().unwrap();
+    let columns = header.split('|').map(str::trim).collect::<Vec<_>>();
+    let unique = columns.iter().collect::<std::collections::HashSet<_>>();
+    assert_eq!(unique.len(), columns.len(), "duplicate columns: {header}");
+}
+
+// `created_at.month` selected as a dimension is the same member as `created_at`
+// at granularity month, so it must be projected once.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_granularity_dimension_and_time_dimension_project_once() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+        dimensions:
+          - orders.created_at.month
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+        order:
+          - id: orders.created_at.month
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_unique_columns(&result);
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_granularity_dimension_and_time_dimension_with_keys_subquery() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.amount_grain_and_filter_exclude_status
+          - orders.total_amount
+        dimensions:
+          - orders.category
+          - orders.status
+          - orders.created_at.month
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+        order:
+          - id: orders.created_at.month
+          - id: orders.category
+          - id: orders.status
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_unique_columns(&result);
+        insta::assert_snapshot!(result);
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_granularity_dimension_and_time_dimension_with_time_shift_and_rolling() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+          - orders.amount_prev_month
+          - orders.rolling_amount_exclude_status
+        dimensions:
+          - orders.created_at.month
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+            dateRange:
+              - "2024-01-01"
+              - "2024-03-31"
+        order:
+          - id: orders.created_at.month
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_unique_columns(&result);
+        insta::assert_snapshot!(result);
+    }
+}
+
+// The SQL API can alias the time dimension on its own; the dimension then keeps
+// its default alias and both columns are read back, so both stay projected.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_granularity_dimension_kept_when_time_dimension_alias_differs() {
+    let ctx = create_context();
+
+    let query = indoc! {r#"
+        measures:
+          - orders.total_amount
+        dimensions:
+          - orders.created_at.month
+        time_dimensions:
+          - dimension: orders.created_at
+            granularity: month
+        memberToAlias:
+          orders.created_at.month: td_month
+        order:
+          - id: orders.created_at.month
+    "#};
+
+    ctx.build_sql(query).unwrap();
+
+    if let Some(result) = ctx.try_execute_pg(query, SEED).await {
+        assert_unique_columns(&result);
+        insta::assert_snapshot!(result);
+    }
+}
