@@ -11,7 +11,12 @@ In Cube, you build a bullet chart from a [bar chart](/docs/explore-analyze/chart
 the target is a second measure drawn as points, or a reference line, and the ranges are
 [reference bands](/docs/explore-analyze/charts/configuration/axes#reference-bands).
 
-{/* TODO screenshot: horizontal bullet chart — revenue by region as bars, the revenue target as points, and three bands named Poor, Satisfactory and Good. Place directly below this paragraph, full width. (hidden — replace this comment with <Frame><img src="..." /></Frame> when image is ready) */}
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/charts/chart-types/bullet/bullet-chart.png"
+    alt="Horizontal bullet chart with revenue by region as bars, the revenue target as orange points, and three gray bands behind each bar, shaded light to dark"
+  />
+</Frame>
 
 ## Build a bullet chart
 
@@ -40,12 +45,13 @@ the target is a second measure drawn as points, or a reference line, and the ran
    **Computed from** switches to the target measure. Set the percentages to 0–60% for *Poor*,
    60–80% for *Satisfactory* and 80–100% for *Good*. The bars get narrower, so the ranges show
    around them.
-6. In **Band options**, set each band's **Label**, for example *Poor*, *Satisfactory* and *Good*.
-   Click each band's color swatch to give the bands shades from dark to light.
+6. Click each band's color swatch to give the bands shades from light to dark. Optionally, set
+   each band's **Label** in **Band options**, for example *Poor*, *Satisfactory* and *Good*. The
+   label prints next to its band rather than inside it.
 
 To use the same ranges for every category, type the **From** and **To** values in each band row
 instead, for example 0–8,000, 8,000–14,000 and 14,000–22,000, and click each band's color swatch
-to give the bands shades from dark to light.
+to give the bands shades from light to dark.
 
 If every category has the same target, leave the target measure out of the query, skip step 3,
 and add a [reference line](/docs/explore-analyze/charts/configuration/axes#reference-lines) at the
@@ -57,14 +63,14 @@ chart draws one bar.
 
 <Tip>
 Each band draws a line on its edges and prints its range in its label. For a cleaner chart, turn
-off **Show edges** and **Show value** in **Band options**, so only the shading and the band names
-mark the ranges.
+off **Show edges** and **Show value** in **Band options**, so only the shading marks the ranges.
 </Tip>
 
 ## Limitations
 
 - There is no single control for several ranges. Each range is a band of its own, with its own
   label and color.
+- A band's label prints outside the band, past one of its edges, not inside the range it names.
 - Ranges set as a percentage of each category's target need a chart without a breakdown.
 - The target marker is a point: a circle, a square, or a triangle. There is no thin tick mark.
 - With ranges set as numbers, the bars keep their usual width, so the bands show around the bars
