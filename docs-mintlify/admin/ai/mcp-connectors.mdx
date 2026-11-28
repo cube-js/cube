@@ -72,14 +72,22 @@ The connector directory includes vetted, first-party integrations with streamlin
 
 Any service that exposes a remote MCP endpoint can be connected as a custom connector.
 
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/admin/ai/mcp-connectors/add-custom-connector-no-auth.png"
+    alt="Add custom MCP connector dialog with the Connection name, Server URL and Authentication fields, set to No authentication"
+  />
+</Frame>
+
 <Steps>
   <Step title="Add a custom connector">
-    Select **Add custom connector** and provide a name and the server's HTTPS endpoint URL
-    (for example, `https://mcp.example.com/mcp`).
+    Select **Add custom connector**, then enter a **Connection name** and the server's HTTPS
+    endpoint as the **Server URL** (for example, `https://mcp.example.com/mcp`).
   </Step>
   <Step title="Authenticate">
-    Choose the authentication method the server requires — OAuth or a user-provided
-    credential such as an API key or token.
+    Under **Authentication**, choose the method the server requires: **OAuth 2.0**,
+    **API key**, **Basic Auth**, **Custom header**, or **No authentication** for a server
+    that needs no credential. See [Authentication](#authentication) for how each one works.
   </Step>
   <Step title="Enable tools">
     Once connected, the server's tools are discovered automatically. Choose which ones the
@@ -89,16 +97,18 @@ Any service that exposes a remote MCP endpoint can be connected as a custom conn
 
 ## Authentication
 
-Connectors authenticate to the external service in one of two ways, depending on what the
-service supports:
+Connectors authenticate to the external service in one of the following ways, depending
+on what the service supports. Prefer OAuth 2.0 when the service offers it.
 
 | Method | How it works |
 |--------|--------------|
-| **OAuth** | You authorize Cube with the provider through a standard OAuth flow. The connector stores the resulting tokens and refreshes them as needed. Used by most directory connectors. |
-| **User-provided credential** | You supply a credential — such as an API key or access token — that the connector uses to authenticate. Used when a service does not offer OAuth. |
+| **OAuth 2.0** | You authorize Cube with the provider through a standard OAuth flow. The connector stores the resulting tokens and refreshes them as needed. Used by most directory connectors. |
+| **API key** | You supply an API key or access token. Cube sends it to the server as a Bearer token in the `Authorization` header. A value that already starts with a scheme, such as `Token <key>`, is sent as is. |
+| **Basic Auth** | You supply a username and password. Cube sends them to the server in an HTTP Basic `Authorization` header. |
+| **Custom header** | You supply a header name and value, such as `X-Api-Key`. Cube sends the value to the server in that header. |
+| **No authentication** | Cube connects to the server directly and sends no `Authorization` header. If Cube can't discover the server's tools, the connector stays **Not connected**, and you can select **Connect** to try again. |
 
-A connector's status indicator in the connectors list shows whether it is connected and
-authenticated.
+A connector's status indicator in the connectors list shows whether it is connected.
 
 ## Choosing which tools are available
 
