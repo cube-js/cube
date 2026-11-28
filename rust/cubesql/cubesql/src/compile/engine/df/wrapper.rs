@@ -1189,6 +1189,7 @@ impl CubeScanWrapperNode {
         node: &CubeScanNode,
         transport: &dyn TransportService,
         load_request_meta: &LoadRequestMeta,
+        keep_column_order: bool,
     ) -> result::Result<SqlGenerationResult, CubeError> {
         // A scan over a pre-aggregation reads Cube Store whatever data sources its members
         // reach (a rollup can join cubes across them), so only a scan over its data
@@ -1281,7 +1282,7 @@ impl CubeScanWrapperNode {
         let pre_aggregations = sql.pre_aggregations;
 
         // TODO is this check necessary?
-        let sql = if has_literal_members || has_duplicated_members {
+        let sql = if has_literal_members || has_duplicated_members || keep_column_order {
             // Need to generate wrapper SELECT with literal columns
             // Generated columns need to have same aliases as targets in `remapper`
             // Because that's what plans higher up would use in generated SQL
@@ -1404,6 +1405,9 @@ impl CubeScanWrapperNode {
                         node,
                         transport.as_ref(),
                         &load_request_meta,
+                        // Only a union keeps names, and it reads its queries' columns by
+                        // position, while Cube orders them its own way
+                        !can_rename_columns,
                     )
                     .await
                 } else if let Some(wrapped_select_node) =

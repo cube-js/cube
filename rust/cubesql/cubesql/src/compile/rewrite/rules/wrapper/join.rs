@@ -7,10 +7,10 @@ use crate::{
         wrapped_select_group_expr_empty_tail, wrapped_select_having_expr_empty_tail,
         wrapped_select_join, wrapped_select_joins, wrapped_select_order_expr_empty_tail,
         wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
-        wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        wrapper_replacer_context, BinaryExprOp, ColumnExprColumn, CubeEGraph, JoinLeftOn,
-        JoinRightOn, ListType, LogicalPlanLanguage, WrappedSelectJoinJoinType,
-        WrappedSelectPushToCube, WrapperReplacerContextAliasToCube,
+        wrapped_select_window_expr_empty_tail, wrapper_nested_query_replacer,
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, wrapper_replacer_context, BinaryExprOp,
+        ColumnExprColumn, CubeEGraph, JoinLeftOn, JoinRightOn, ListType, LogicalPlanLanguage,
+        WrappedSelectJoinJoinType, WrappedSelectPushToCube, WrapperReplacerContextAliasToCube,
         WrapperReplacerContextGroupedSubqueries,
     },
     transport::MetaContext,
@@ -44,16 +44,20 @@ impl WrapperRules {
             ),
             "CubeScanWrapperFinalized:false",
         );
+        // The side's class also holds forms over other data sources, so the join reads it
+        // through its forms reaching the join's data source (`wrapper-nested-query`)
+        let right_join_side =
+            wrapper_nested_query_replacer(&right_join_input, "?input_data_source");
         rules.extend(vec![
             rewrite(
                 "wrapper-pull-up-single-select-join",
                 wrapped_select_join(
-                    wrapper_pullup_replacer("?input", "?context"),
+                    "?joined_side",
                     wrapper_pullup_replacer("?join_expr", "?context"),
                     "?out_join_type",
                 ),
                 wrapper_pullup_replacer(
-                    wrapped_select_join("?input", "?join_expr", "?out_join_type"),
+                    wrapped_select_join("?joined_side", "?join_expr", "?out_join_type"),
                     "?context",
                 ),
             ),
@@ -194,18 +198,7 @@ impl WrapperRules {
                         ),
                         // We don't want to use list rules here, because ?right_input is already done
                         wrapped_select_joins(vec![wrapped_select_join(
-                            wrapper_pullup_replacer(
-                                &right_join_input,
-                                wrapper_replacer_context(
-                                    "?left_alias_to_cube",
-                                    "WrapperReplacerContextPushToCube:true",
-                                    "WrapperReplacerContextInProjection:false",
-                                    "?left_cube_members",
-                                    "?out_grouped_subqueries",
-                                    "WrapperReplacerContextUngroupedScan:true",
-                                    "?input_data_source",
-                                ),
-                            ),
+                            &right_join_side,
                             wrapper_pushdown_replacer(
                                 "?out_join_expr",
                                 wrapper_replacer_context(
@@ -404,18 +397,7 @@ impl WrapperRules {
                         ),
                         // We don't want to use list rules here, because ?right_input is already done
                         wrapped_select_joins(vec![wrapped_select_join(
-                            wrapper_pullup_replacer(
-                                &right_join_input,
-                                wrapper_replacer_context(
-                                    "?left_alias_to_cube",
-                                    "?left_push_to_cube",
-                                    "WrapperReplacerContextInProjection:false",
-                                    "?left_cube_members",
-                                    "?out_grouped_subqueries",
-                                    "WrapperReplacerContextUngroupedScan:false",
-                                    "?input_data_source",
-                                ),
-                            ),
+                            &right_join_side,
                             wrapper_pushdown_replacer(
                                 "?out_join_expr",
                                 wrapper_replacer_context(
@@ -667,18 +649,7 @@ impl WrapperRules {
                         ),
                         // We don't want to use list rules here, because ?right_input is already done
                         wrapped_select_joins(vec![wrapped_select_join(
-                            wrapper_pullup_replacer(
-                                &right_join_input,
-                                wrapper_replacer_context(
-                                    "?left_alias_to_cube",
-                                    "WrapperReplacerContextPushToCube:true",
-                                    "WrapperReplacerContextInProjection:false",
-                                    "?left_cube_members",
-                                    "?out_grouped_subqueries",
-                                    "WrapperReplacerContextUngroupedScan:true",
-                                    "?input_data_source",
-                                ),
-                            ),
+                            &right_join_side,
                             wrapper_pushdown_replacer(
                                 "?join_expr",
                                 wrapper_replacer_context(

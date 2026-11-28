@@ -2317,7 +2317,9 @@ impl LanguageToLogicalPlanConverter {
 
                 LogicalPlan::Extension(Extension { node })
             }
-            LogicalPlanLanguage::CubeScanWrapper(params) => {
+            // A nested query renders as the wrapper of the plan it holds
+            LogicalPlanLanguage::CubeScanWrapper(params)
+            | LogicalPlanLanguage::WrappedNestedQuery(params) => {
                 let input = Arc::new(self.to_logical_plan(params[0])?);
                 LogicalPlan::Extension(Extension {
                     node: Arc::new(CubeScanWrapperNode::new(

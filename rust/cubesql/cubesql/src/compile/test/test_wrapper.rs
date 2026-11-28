@@ -7856,7 +7856,7 @@ async fn test_wrapper_cube_store_pre_aggregation_push_to_cube_refused_sibling() 
     .await;
     let plan = context
         .convert_sql_to_cube_query(
-            "SELECT customer_gender, SUM(sumPrice) AS s FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY 1 UNION ALL SELECT customer_gender, SUM(CASE WHEN has_subscription THEN sumPrice END) AS s FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY 1",
+            "(SELECT customer_gender, SUM(sumPrice) AS s FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY 1 LIMIT 100) UNION ALL (SELECT customer_gender, SUM(CASE WHEN has_subscription THEN sumPrice END) AS s FROM KibanaSampleDataEcommerce WHERE customer_gender ILIKE '%fe%ale%' GROUP BY 1 LIMIT 100)",
         )
         .await
         .unwrap()
@@ -7903,6 +7903,123 @@ async fn test_wrapper_cube_store_pre_aggregation_grouped_join() {
     assert_eq!(
         wrapped_sql.pre_aggregations,
         vec![pre_aggregation_description()]
+    );
+}
+
+/// A join or union of grouped queries Cube Store can't run, for its join type or a side no
+/// rollup serves, is one query over the data source, as without pre-aggregations: a side a
+/// rollup serves is read from the data source too, not combined in memory
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_join_over_data_source() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let both = ["customer_gender", "count", "sumPrice"].as_slice();
+    let join = |join_type: &str| {
+        format!("SELECT a.customer_gender, a.v, b.v FROM a {join_type} JOIN b ON a.customer_gender = b.customer_gender")
+    };
+    // Without a LIMIT, as a union of limited queries is still combined in memory
+    let union = "SELECT customer_gender, MEASURE(count) FROM KibanaSampleDataEcommerce GROUP BY 1 \
+                 UNION ALL SELECT customer_gender, MEASURE(sumPrice) FROM KibanaSampleDataEcommerce GROUP BY 1"
+        .to_string();
+    for (rollup, select, external) in [
+        (both, join("FULL OUTER"), false),
+        (both, join("RIGHT"), false),
+        (both, join("INNER"), true),
+        (both, join("LEFT"), true),
+        (&["customer_gender", "count"], join("FULL OUTER"), false),
+        (&["customer_gender", "sumPrice"], join("FULL OUTER"), false),
+        (&["customer_gender", "sumPrice"], join("INNER"), false),
+        (&["customer_gender", "count"], union.clone(), false),
+        (both, union, true),
+        // An ungrouped scan joined to a grouped query
+        (
+            &["customer_gender", "sumPrice"],
+            "SELECT k.customer_gender, SUM(k.sumPrice) s, MAX(g.v) m FROM KibanaSampleDataEcommerce k \
+             JOIN (SELECT customer_gender, MEASURE(sumPrice) v FROM KibanaSampleDataEcommerce GROUP BY 1) g \
+             ON k.customer_gender = g.customer_gender GROUP BY 1"
+                .to_string(),
+            false,
+        ),
+    ] {
+        let mut config = ConfigObjImpl::default();
+        config.sql_push_down_pre_aggregations = true;
+        let context = TestContext::with_config_and_meta(
+            DatabaseProtocol::PostgreSQL,
+            Arc::new(config),
+            get_test_tenant_ctx_with_cube_store_rollups(
+                vec![],
+                // Cube Store has no right or full joins
+                vec![
+                    ("join_types/full".to_string(), "".to_string()),
+                    ("join_types/right".to_string(), "".to_string()),
+                ],
+                vec![rollup
+                    .iter()
+                    .map(|member| format!("KibanaSampleDataEcommerce.{member}"))
+                    .collect()],
+            ),
+        )
+        .await;
+        context
+            .add_cube_store_pre_aggregation_mock_for_any_query(pre_aggregation_description())
+            .await;
+
+        let query = format!(
+            "WITH a AS (SELECT customer_gender, MEASURE(count) v FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 100), \
+             b AS (SELECT customer_gender, MEASURE(sumPrice) v FROM KibanaSampleDataEcommerce GROUP BY 1 LIMIT 100) \
+             {select}"
+        );
+        let wrapped_sql = context
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
+            .as_logical_plan()
+            .find_cube_scan_wrapped_sql()
+            .wrapped_sql;
+        assert_eq!(
+            wrapped_sql.external, external,
+            "{rollup:?} {select}: {}",
+            wrapped_sql.sql
+        );
+        assert_eq!(
+            wrapped_sql.pre_aggregations.is_empty(),
+            !external,
+            "{rollup:?} {select}"
+        );
+    }
+}
+
+/// A union reads its queries' columns by position, so a query read straight from Cube, which
+/// orders members its own way, is selected in the union's order
+#[tokio::test]
+async fn test_wrapper_cube_store_pre_aggregation_union_column_order() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let context = pre_aggregation_test_context_with_rollup(&[
+        "order_date",
+        "customer_gender",
+        "count",
+        "sumPrice",
+    ])
+    .await;
+    let wrapped_sql = self::wrapped_sql(
+        &context,
+        "SELECT DATE_TRUNC('month', order_date) m, customer_gender g, MEASURE(count) v FROM KibanaSampleDataEcommerce GROUP BY 1, 2 \
+         UNION ALL \
+         SELECT DATE_TRUNC('month', order_date) m, customer_gender g, MEASURE(sumPrice) v FROM KibanaSampleDataEcommerce GROUP BY 1, 2",
+    )
+    .await;
+    assert!(wrapped_sql.external);
+    assert!(
+        wrapped_sql.sql.contains(r#""m" "m", "g" "g", "v" "v""#),
+        "{}",
+        wrapped_sql.sql
     );
 }
 
@@ -8257,7 +8374,7 @@ async fn test_wrapper_in_subquery_next_to_pre_aggregation_query() {
                  SELECT notes FROM KibanaSampleDataEcommerce \
                  GROUP BY 1 ORDER BY SUM(sumPrice) DESC LIMIT 5\
                ) \
-               GROUP BY 1\
+               GROUP BY 1 LIMIT 10\
              ) y",
         )
         .await

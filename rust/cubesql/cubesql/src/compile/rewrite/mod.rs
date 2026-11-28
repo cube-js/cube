@@ -342,6 +342,13 @@ crate::plan_to_language! {
             input: Arc<LogicalPlan>,
             input_data_source: Arc<LogicalPlan>,
         },
+        // A pulled up form of a query nested in another one, like a joined side, rendered as
+        // the wrapper of the plan it holds. Like `WrappedSubquery`, the forms are kept apart
+        // from the nested query's class, one class per data source they reach
+        WrappedNestedQuery {
+            input: Arc<LogicalPlan>,
+            input_data_source: Arc<LogicalPlan>,
+        },
         AllMembers {
             cube: String,
             alias: String,
@@ -532,6 +539,12 @@ crate::plan_to_language! {
             // Context be passed from top, by the rule that starts wrapping new logical plan node,
             // and should make roundtrip from top to bottom and back.
             context: Arc<LogicalPlan>,
+        },
+        // A pulled up query nested in another one, still to be read as its forms reaching
+        // `input_data_source`: its class gets the `WrappedNestedQuery` of each of them
+        WrapperNestedQueryReplacer {
+            input: Arc<LogicalPlan>,
+            input_data_source: Arc<LogicalPlan>,
         },
         FlattenPushdownReplacer {
             expr: Arc<Expr>,
@@ -2448,6 +2461,10 @@ fn wrapper_pullup_replacer(members: impl Display, context: impl Display) -> Stri
     format!("(WrapperPullupReplacer {members} {context})",)
 }
 
+fn wrapper_nested_query_replacer(input: impl Display, input_data_source: impl Display) -> String {
+    format!("(WrapperNestedQueryReplacer {input} {input_data_source})",)
+}
+
 fn flatten_pushdown_replacer(
     expr: impl Display,
     inner_expr: impl Display,
@@ -2605,6 +2622,10 @@ fn cube_scan_wrapper(input: impl Display, finalized: impl Display) -> String {
 
 fn wrapped_subquery(input: impl Display, input_data_source: impl Display) -> String {
     format!("(WrappedSubquery {} {})", input, input_data_source)
+}
+
+fn wrapped_nested_query(input: impl Display, input_data_source: impl Display) -> String {
+    format!("(WrappedNestedQuery {} {})", input, input_data_source)
 }
 
 fn multi_fact_join_wrapper(input: impl Display, join_members: impl Display) -> String {
