@@ -34,14 +34,15 @@ warm-ups before it takes requests:
 ```mermaid actions={false}
 flowchart TB
   accTitle: Warm-up order
-  accDescr: When a new build is ready, pre-aggregations are built and refreshed if pre-aggregation warm-up is enabled, and cancelled after 24 hours. Then new API instances start. If data model warm-up is enabled, the data model is compiled, and rolled back after 15 minutes. Then the deployment takes requests.
+  accDescr: When a new build is ready, pre-aggregations are built and refreshed if pre-aggregation warm-up is enabled, and cancelled after 24 hours. Then new API instances start. If data model warm-up is enabled, the data model is compiled: if that takes up to 15 minutes, the deployment takes requests; if it takes longer, the deployment is rolled back.
   A(["<b>A new build is ready</b>"]):::start
   Q1{{"Is pre-aggregation<br/>warm-up enabled?"}}:::ask
   P["<b>Build and refresh pre-aggregations</b><br/>cancelled after 24 hours"]:::tile
   I["<b>New API instances start</b>"]:::tile
   Q2{{"Is data model<br/>warm-up enabled?"}}:::ask
-  M["<b>Compile the data model</b><br/>rolled back after 15 minutes"]:::tile
+  M["<b>Compile the data model</b>"]:::tile
   R["<b>The deployment takes requests</b>"]:::out
+  X["<b>The deployment is rolled back</b>"]:::tile
   A -.-> Q1
   Q1 -.->|<b class=yes>Yes</b>| P
   Q1 -.->|<b class=no>No</b>| I
@@ -49,7 +50,8 @@ flowchart TB
   I -.-> Q2
   Q2 -.->|<b class=yes>Yes</b>| M
   Q2 -.->|<b class=no>No</b>| R
-  M -.-> R
+  M -.->|within 15 minutes| R
+  M -.->|over 15 minutes| X
 ```
 
 ## Data model warm-up
