@@ -341,7 +341,8 @@ The panel has two tabs:
   A blocked resource has a hint, for example "Apps can't load files from the
   internet". See [Governed data access](#governed-data-access) for how to
   include such files in the app. In **Files**, each file that has a problem
-  shows an error mark.
+  shows an error mark. A [blocked navigation](#blocked-navigations) also shows
+  here.
 - **Console** shows what the app writes to the browser console.
 
 Click the copy button to copy the contents of the open tab.
@@ -354,10 +355,32 @@ If the app starts without errors but shows nothing, the preview shows **The app
 rendered nothing**. Click **Open code** to see the code and the **Problems**
 panel. Make sure that the entry file renders the app into the page.
 
-After you fix the code, click **Run**. The problems that are fixed go away.
+After you fix the code, click **Run**. The problems that are fixed go away,
+except for a flagged navigation, which stays until an admin clears it.
 
 Only people who can edit the app see problems. Viewers of a published app do
 not.
+
+### Blocked navigations
+
+An app can't open other sites. When its code tries to navigate to another site,
+for example with `location.href`, Cube blocks the navigation and flags the app:
+
+- The **Problems** panel shows **Blocked navigation to** and the site, linked to
+  the line of code that names it. Cube shows only the site's address, never the
+  rest of the URL, because the rest can hold the data the app tried to send.
+- The flag is saved on the app, so the row shows to everyone who edits the app,
+  in later sessions too. After you remove the navigation from the code and click
+  **Run**, the row turns into a warning, and it stays until an admin clears the
+  flag.
+- Each admin gets an inbox notification when the app is blocked from a new
+  site, for up to three flagged sites per app. The notification opens the app.
+- An admin clears the flag with the **Clear flag** button on the row. If the
+  code still navigates, the next run flags the app again.
+
+Cube flags a blocked navigation from any page in Cube that shows the app,
+including when a viewer opens it. Apps in embedded analytics don't flag
+navigations.
 
 ## Publish the app
 
@@ -419,6 +442,8 @@ Apps run in a sandbox, isolated from the Cube interface:
 - An app cannot load external scripts, stylesheets, images, or fonts. Put
   everything the app needs in its files. Images and fonts can be embedded as
   `data:` URLs.
+- An app cannot open other sites. Cube blocks the navigation and flags the app
+  for admins. See [Blocked navigations](#blocked-navigations).
 - An app cannot read Cube cookies, storage, or the page around it.
 
 ## Apps in embedded analytics
