@@ -183,11 +183,12 @@ impl<'a> RollingWindowStagePlanner<'a> {
                 if time_dimensions.is_empty() {
                     let base_state =
                         self.replace_date_range_for_rolling_window(&rolling_window, state.clone())?;
+                    // No stage merges on top of this leaf, so it must return
+                    // the final value, not a mergeable state.
                     let rolling_base = if !measure.is_multi_stage() {
-                        LeafStagePlanner::new(self.planner).plan_rolling_window_base(
+                        LeafStagePlanner::new(self.planner).plan(
                             base_member,
                             base_state,
-                            false,
                             registry,
                             scope,
                         )?

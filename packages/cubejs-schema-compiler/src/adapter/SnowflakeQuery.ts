@@ -127,6 +127,10 @@ export class SnowflakeQuery extends BaseQuery {
     return `HLL_ESTIMATE(HLL_COMBINE(HLL_IMPORT(${sql})))`;
   }
 
+  public hllMergeOnly(sql: string) {
+    return `HLL_EXPORT(HLL_COMBINE(HLL_IMPORT(${sql})))`;
+  }
+
   public countDistinctApprox(sql: string) {
     return `APPROX_COUNT_DISTINCT(${sql})`;
   }

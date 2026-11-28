@@ -168,6 +168,10 @@ export class PrestodbQuery extends BaseQuery {
     return `cardinality(merge(cast(${sql} as HyperLogLog)))`;
   }
 
+  public hllMergeOnly(sql: string) {
+    return `cast(merge(cast(${sql} as HyperLogLog)) as varbinary)`;
+  }
+
   public countDistinctApprox(sql: string) {
     return `approx_distinct(${sql})`;
   }
