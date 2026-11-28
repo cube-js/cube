@@ -356,6 +356,8 @@ A filter on a [`switch` dimension][ref-switch-dimensions] lists the values the d
 
 Time granularity switchers let viewers change the granularity of time-based dimensions on the dashboard — for example, switching a revenue chart from daily to weekly or monthly. The widget targets a single time dimension and applies the chosen [granularity][ref-granularities] to every chart that groups by that dimension.
 
+{/* TODO: video — custom time granularities on dashboards (GTM-344) */}
+
 In the [dashboard builder][ref-workbooks], open the **Controls** menu in the toolbar and choose **Time granularity**. The new switcher is added in an unconfigured state — open its settings to pick a semantic view and a time dimension.
 
 ### Allowed granularities
@@ -366,11 +368,25 @@ For time dimensions backed by a `TIMESTAMP` or `DATETIME` column, sub-day granul
 
 [Custom granularities][ref-custom-granularities] that the data model defines on the time dimension, such as a fiscal year, are listed too. They come first, by their titles in the data model and in the model's order, followed by the built-in granularities, shortest first. A new switcher starts with **Day** through **Year** checked and every custom granularity unchecked: check the ones viewers should get. Pointing the switcher at another time dimension keeps the checked granularities that dimension offers, so a custom granularity it doesn't define is unchecked, and switching back offers it again, unchecked. A granularity the data model defines under a built-in name, such as a calendar cube's `month`, is listed once, as the built-in. A viewer [adding their own](#adding-a-dynamic-control) time granularity switcher gets the same list.
 
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/controls/time-granularity-allowed-granularities.png"
+    alt="Allowed granularities list in the time granularity switcher's settings, with Fiscal Year listed first and checked, Second, Minute and Hour unchecked, and Day through Year checked"
+  />
+</Frame>
+
 Viewers see a custom granularity by its title, such as **Fiscal Year**, in the switcher's dropdown, and picking it re-buckets every chart on the dimension by that granularity. Wherever a chart names the granularity, it uses the same title: a table's column header, an axis, legend or tooltip title, and the header of a CSV or Excel download read, for example, **Created at (Fiscal Year)**. So do a [parent control](#parent)'s **Set to**, a [dashboard delivery][ref-schedule-control-values]'s **Control values**, and the dashboard's [print version][ref-print-version].
 
 #### Granularities the data model no longer defines {#granularities-no-longer-defined}
 
 A switcher keeps the granularities it was saved with, even after the data model stops defining one of them, for example once `fiscal_year` is removed from the dimension. Cube never removes such a granularity from the switcher for you. The switcher's dropdown lists it under its name, **Fiscal_year**, greyed out, with "This time granularity is no longer defined in the data model." under it, and it can't be picked. The same holds in a [parent control](#parent)'s and a [dashboard delivery][ref-schedule-control-values]'s **Set to**. A switcher whose [default granularity](#default-granularity) is such a granularity still opens on it, and its charts show the error the data source returns for it instead of data.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/dashboards/widgets/controls/time-granularity-granularities-no-longer-defined.png"
+    alt="Time granularity switcher's dropdown on a published dashboard, with Fiscal_year greyed out above Month, Quarter and Year, and the line This time granularity is no longer defined in the data model under it"
+  />
+</Frame>
 
 The switcher's settings list such a granularity after the dimension's own custom granularities, checked, with the same line under it. Uncheck it and **Save** to remove it from the switcher; if it was the default granularity, the switcher then has none.
 
