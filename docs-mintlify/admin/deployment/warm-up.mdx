@@ -27,6 +27,28 @@ populates data model compilation cache ahead of time.
 * [Pre-aggregation warm-up](#pre-aggregation-warm-up) — builds and refreshes
 pre-aggregations ahead of time.
 
+A new build goes through the enabled warm-ups in this order before it takes
+requests:
+
+```mermaid actions={false}
+flowchart TB
+  A(["<b>A new build is ready</b>"]):::start
+  Q1{{"Is pre-aggregation<br/>warm-up enabled?"}}:::ask
+  P["<b>Build and refresh pre-aggregations</b><br/>cancelled after 24 hours"]:::tile
+  I["<b>New API instances start</b>"]:::tile
+  Q2{{"Is data model<br/>warm-up enabled?"}}:::ask
+  M["<b>Compile the data model</b><br/>rolled back after 15 minutes"]:::tile
+  R["<b>The deployment takes requests</b>"]:::out
+  A -.-> Q1
+  Q1 -.->|<b class=yes>Yes</b>| P
+  Q1 -.->|<b class=no>No</b>| I
+  P -.-> I
+  I -.-> Q2
+  Q2 -.->|<b class=yes>Yes</b>| M
+  Q2 -.->|<b class=no>No</b>| R
+  M -.-> R
+```
+
 ## Data model warm-up
 
 By default, an API instance compiles the [data model][ref-data-model] and

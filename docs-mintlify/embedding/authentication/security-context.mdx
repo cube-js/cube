@@ -29,6 +29,19 @@ inside:
 - the [`COMPILE_CONTEXT`][ref-cubes-compile-ctx] global, which is used to
   support [multi-tenant deployments][link-multitenancy].
 
+```mermaid actions={false}
+flowchart TB
+  T(["<b>Request with a JWT</b>"]):::start
+  SC["<b>Security context</b><br/>verified claims from the JWT"]:::tile
+  QR["<code>query_rewrite</code><br/>runs for every query"]:::tile
+  AID["<code>context_to_app_id</code><br/>maps it to an app ID"]:::tile
+  SQL["<b>SQL query</b><br/>with the added filters"]:::out
+  DM["<b>Data model</b><br/>compiled once per app ID,<br/>with <code>COMPILE_CONTEXT</code>"]:::out
+  T -->|verified and decoded| SC
+  SC --> QR --> SQL
+  SC --> AID --> DM
+```
+
 ## Contents
 
 By convention, the contents of the security context should be an object (dictionary)
@@ -206,9 +219,22 @@ def context_to_app_id(ctx: dict) -> str:
 It is common to use some field from the incoming security context as an id for your data model. 
 In our example, as illustrated below, we are using `team` property of the security context as a data model id.
 
-<Frame caption="COMPILE_CONTEXT mapping">
-  <img src="https://static.cube.dev/docs/shared/7b6a2257.png" alt="COMPILE_CONTEXT mapping" />
-</Frame>
+```mermaid actions={false}
+flowchart LR
+  U1["<code>#quot;user_id#quot;: 1</code><br/><code>#quot;team#quot;: #quot;sales#quot;</code>"]:::tile
+  U2["<code>#quot;user_id#quot;: 2</code><br/><code>#quot;team#quot;: #quot;sales#quot;</code>"]:::tile
+  U3["<code>#quot;user_id#quot;: 3</code><br/><code>#quot;team#quot;: #quot;exec#quot;</code>"]:::tile
+  U4["<code>#quot;user_id#quot;: 4</code><br/><code>#quot;team#quot;: #quot;exec#quot;</code>"]:::tile
+  F["<code>context_to_app_id</code>"]:::tile
+  S["<b>Data model</b> <code>sales</code><br/>with its <code>COMPILE_CONTEXT</code>"]:::out
+  E["<b>Data model</b> <code>exec</code><br/>with its <code>COMPILE_CONTEXT</code>"]:::out
+  U1 --> F
+  U2 --> F
+  U3 --> F
+  U4 --> F
+  F --> S
+  F --> E
+```
 
 Once you have this mapping, you can use `COMPILE_CONTEXT` inside your data model. 
 In the example below we are passing it as a variable into `masked` helper function.

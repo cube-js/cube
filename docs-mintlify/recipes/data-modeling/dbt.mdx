@@ -17,9 +17,16 @@ ready-made pipelines in [dbt pull with the Cube CLI](/recipes/data-modeling/dbt-
 users to transform the data in the data warehouse before bringing it to the
 semantic layer.
 
-<Frame>
-  <img src="https://static.cube.dev/docs/recipes/data-modeling/dbt/f8613c74.png" />
-</Frame>
+```mermaid actions={false}
+flowchart TB
+  T["<b>Tables</b><br/>in the data source"]:::tile
+  D["<img src='https://static.cube.dev/icons/dbt.svg' /><b>dbt</b><br/>Staging and intermediate<br/>models → data marts<br/>Models in <code>.sql</code>, described in <code>.yml</code><br/>Don't define metrics"]:::hub
+  C["<img src='https://static.cube.dev/icons/cube.svg' /><b>Cube</b><br/>Cubes → views<br/>Measures and joins<br/>defined in each cube"]:::hub
+  B["<b>Datasets</b><br/>in the BI tool"]:::tile
+  T --> D
+  D -->|Models map to cubes,<br/>columns to dimensions| C
+  C --> B
+```
 
 Usually, dbt projects are [focused][link-dbt-docs-structure] on creating
 staging and intermediate models and finally using them to define normalized

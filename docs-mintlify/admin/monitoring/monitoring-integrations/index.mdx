@@ -26,9 +26,20 @@ Under the hood, Cube Cloud uses [Vector][vector], an open-source tool for
 collecting and delivering monitoring data. It supports a [wide range of
 destinations][vector-docs-sinks], also known as _sinks_.
 
-<Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/monitoring-integrations/index/17dbc263.png" />
-</Frame>
+```mermaid actions={false}
+flowchart LR
+  C["<img src='https://static.cube.dev/icons/cube.svg' /><b>Cube</b>"]:::hub
+  V["<img src='https://static.cube.dev/icons/vector.svg' /><b>Vector</b>"]:::hub
+  P["<img src='https://static.cube.dev/icons/prometheus.svg' /><b>Prometheus</b>"]:::tile
+  G["<img src='https://static.cube.dev/icons/grafana.svg' /><b>Grafana Cloud</b>"]:::tile
+  D["<img src='https://static.cube.dev/icons/datadog.svg' /><b>Datadog</b>"]:::tile
+  O["<b>Other sinks</b>"]:::tile
+  C -->|Logs and metrics| V
+  V --> P
+  V --> G
+  V --> D
+  V --> O
+```
 
 <iframe
   width="100%"

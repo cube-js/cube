@@ -47,9 +47,16 @@ Cube AI agents don't query the warehouse directly. They query the semantic layer
 
 Semantic SQL gives agents the full expressiveness of SQL to build ad-hoc derived calculations on top of governed metrics — flexibility on a stable foundation, instead of one or the other.
 
-<Frame>
-  <img src="https://static.cube.dev/docs/introduction/97dd04e5.png" />
-</Frame>
+```mermaid actions={false}
+flowchart TB
+  L["<b>Semantic layer</b>"]:::tile
+  A["<b>Agent</b>"]:::tile
+  R["<b>Semantic layer runtime</b>"]:::tile
+  W[("<b>Data warehouse</b>")]:::tile
+  L -->|Definitions to generate Semantic SQL| A
+  A -->|Semantic SQL| R
+  R -->|Warehouse SQL| W
+```
 
 ### Semantic layer architecture
 

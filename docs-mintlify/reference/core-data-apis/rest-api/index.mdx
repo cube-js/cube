@@ -303,6 +303,34 @@ the cache are supported:
 | `must-revalidate`       | If [refresh keys][ref-refresh-keys] are up-to-date, returns cached value. If expired, always waits for fresh value from the data source, even if slow (hits one or more [`Continue wait`](#continue-wait) intervals). |
 | `no-cache`              | Skips [refresh key][ref-refresh-keys] checks. Always returns fresh data from the data source, regardless of cache or query performance. |
 
+```mermaid actions={false}
+flowchart TB
+  A(["<b>A query arrives</b>"]):::start
+  Q1{{"Is the cache mode<br/><code>no-cache</code>?"}}:::ask
+  Q2{{"Is there a cached value,<br/>with refresh keys up to date?"}}:::ask
+  Q3{{"Is the cache mode<br/><code>stale-while-revalidate</code>,<br/>with a cached value?"}}:::ask
+  R1["<b>Return the cached value</b>"]:::out
+  R2["<b>Return the stale value,<br/>refresh it in the background</b>"]:::out
+  RUN["Query the data source"]:::tile
+  Q4{{"Does the query hit<br/><code>Continue wait</code>?"}}:::ask
+  R3["<b>Return the fresh value</b>"]:::out
+  Q5{{"Is the cache mode<br/><code>stale-if-slow</code>,<br/>with a cached value?"}}:::ask
+  R4["<b>Return the stale value</b>"]:::out
+  R5["<b>Return <code>Continue wait</code></b><br/>for the client to retry"]:::out
+  A -.-> Q1
+  Q1 -.->|<b class=yes>Yes</b>| RUN
+  Q1 -.->|<b class=no>No</b>| Q2
+  Q2 -.->|<b class=yes>Yes</b>| R1
+  Q2 -.->|<b class=no>No</b>| Q3
+  Q3 -.->|<b class=yes>Yes</b>| R2
+  Q3 -.->|<b class=no>No</b>| RUN
+  RUN -.-> Q4
+  Q4 -.->|<b class=no>No</b>| R3
+  Q4 -.->|<b class=yes>Yes</b>| Q5
+  Q5 -.->|<b class=yes>Yes</b>| R4
+  Q5 -.->|<b class=no>No</b>| R5
+```
+
 ## `Continue wait`
 
 If the request takes too long to be processed, the REST (JSON) API responds with

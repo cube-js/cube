@@ -27,14 +27,23 @@ pre-aggregations.
 Batch data is coming from pre-aggregation and real-time data is coming from the
 data source.
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Lambda pre-aggregation batch and source diagram"
-    src="https://static.cube.dev/docs/pre-aggregations/lambda-pre-aggregations/a304a8a3.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+```mermaid actions={false}
+flowchart TB
+  DS["<img src='https://static.cube.dev/icons/bigquery.svg' /><img src='https://static.cube.dev/icons/snowflake.svg' /><img src='https://static.cube.dev/icons/redshift.svg' /><br/><b>Data source</b>"]:::tile
+  PA["<b>Pre-aggregation</b>"]:::tile
+  RT["<b>Real-time query</b>"]:::tile
+  U["<img src='https://static.cube.dev/icons/cube.svg' /><b>Cube</b><br/>unions both during<br/>query processing"]:::hub
+  DS -->|built on schedule| PA
+  DS -->|at query time| RT
+  PA --> U
+  RT --> U
+  E["<b>Embedded analytics</b>"]:::tile
+  BI["<b>BI tools</b>"]:::tile
+  DA["<b>Data apps & notebooks</b>"]:::tile
+  U --> E
+  U --> BI
+  U --> DA
+```
 
 First, you need to create pre-aggregations that will contain your batch data. In
 the following example, we call it `batch`. Please note, it must have a
@@ -126,14 +135,25 @@ the batch rollup.
 In this scenario, batch data is comes from one pre-aggregation and real-time
 data comes from a [streaming pre-aggregation][streaming-pre-agg].
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Lambda pre-aggregation batch and streaming diagram"
-    src="https://static.cube.dev/docs/pre-aggregations/lambda-pre-aggregations/88b1be0f.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+```mermaid actions={false}
+flowchart TB
+  BD["<img src='https://static.cube.dev/icons/bigquery.svg' /><img src='https://static.cube.dev/icons/snowflake.svg' /><img src='https://static.cube.dev/icons/redshift.svg' /><br/><b>Batch data</b>"]:::tile
+  SD["<b>Streaming data</b><br/>Kafka, Redpanda"]:::tile
+  K["<img src='https://static.cube.dev/icons/ksqldb.svg' /><b>ksqlDB</b>"]:::tile
+  BP["<b>Batch pre-aggregation</b>"]:::tile
+  SP["<b>Streaming pre-aggregation</b>"]:::tile
+  U["<img src='https://static.cube.dev/icons/cube.svg' /><b>Cube</b><br/>unions both during<br/>query processing"]:::hub
+  BD --> BP
+  SD --> K --> SP
+  BP --> U
+  SP --> U
+  E["<b>Embedded analytics</b>"]:::tile
+  BI["<b>BI tools</b>"]:::tile
+  DA["<b>Data apps & notebooks</b>"]:::tile
+  U --> E
+  U --> BI
+  U --> DA
+```
 
 You can use lambda pre-aggregations to combine data from multiple
 pre-aggregations, where one pre-aggregation can have batch data and another

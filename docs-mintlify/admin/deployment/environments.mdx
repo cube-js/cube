@@ -9,6 +9,21 @@ Every Cube Cloud deployment provides a number of environments:
 - Multiple [staging environments](#staging-environments).
 - Per-user [development environments](#development-environments).
 
+```mermaid actions={false}
+flowchart TB
+  D(["<b>Cube Cloud deployment</b>"]):::start
+  P["<b>Production</b><br/>main branch<br/>Shared or Dedicated<br/>version from update channel<br/>always available"]:::tile
+  S["<b>Staging</b><br/>one per branch<br/>Shared<br/>latest version<br/>active while viewed"]:::tile
+  V["<b>Development</b><br/>one per user<br/>Shared<br/>latest version<br/>active in development mode"]:::tile
+  C["<b>Cube Store</b><br/>shared pre-aggregations schema"]:::tile
+  D --> P
+  D --> S
+  D --> V
+  P --> C
+  S --> C
+  V --> C
+```
+
 ## Production environment
 
 This is the main environment. It runs the data model from the _main branch_.
