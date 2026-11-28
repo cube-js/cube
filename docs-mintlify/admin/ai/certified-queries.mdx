@@ -5,7 +5,7 @@ description: Provide a library of trusted SQL queries that the agent uses as ref
 
 Certified queries are pre-approved SQL queries that the agent treats as a **library of trusted examples**. They guide the agent toward correct business logic and well-formed query patterns without restricting it to a fixed set of queries.
 
-Certified queries are configured as code in your [data model repository](/admin/ai#agent-configuration), alongside your cubes and views.
+Certified queries are configured as code in your [data model repository](/admin/ai#agent-configuration), alongside your cubes and views, or [added in the UI](#adding-certified-queries-in-the-ui).
 
 <Note>
 The agent is not limited to running only certified queries. When answering a user request, the agent may:
@@ -75,6 +75,28 @@ Inline certified queries accept the same properties as Markdown ones — `name`,
 
 <Note>
 Certified queries inlined at the root of `agents/config.yml` are attached to the implicit `auto` space and applied to the default agent in a [single-agent setup](/admin/ai). In a [multi-agent setup](/admin/ai/multi-agent), attach certified queries to a specific space by inlining them under that space's `certified_queries` key (or by placing Markdown files under `agents/certified_queries/<space-name>/`).
+</Note>
+
+## Adding certified queries in the UI
+
+You can add certified queries to a space without changing the data model repository. Go to **Admin → Spaces**, open a space, and click **Certified queries**. The page lists the certified queries of the space. Click a query to edit it, unless the space is configured in YAML (see below).
+
+To add a query, click **Create certified query** and fill in the fields:
+
+- **Description** — what the query returns. Optional.
+- **User request** — the user request the query answers.
+- **SQL query** — the query itself.
+
+While **Description** is empty, the agent suggests a one-sentence description once you stop typing the SQL query. Text you type is never replaced, and editing a saved query doesn't suggest a new description. Review the suggestion before you click **Create**: the agent matches certified queries on the user request and the description, so an accurate description helps it pick the right query.
+
+<Frame>
+  ![Create certified query dialog with a suggested description, a user request, and an SQL query](https://static.cube.dev/docs/admin/ai/certified-queries/create-certified-query-dialog.png)
+</Frame>
+
+The suggestion needs AI to be enabled for your account, and the space must be scoped to a deployment or used by an agent on one.
+
+<Note>
+If a space is configured in `agents/config.yml`, its **Certified queries** page has no **Create certified query** button. The agent uses the certified queries from the YAML configuration. Queries added in the UI stay listed, and you can view or delete them, but the agent doesn't use them.
 </Note>
 
 ## Writing effective certified queries
