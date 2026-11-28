@@ -69,7 +69,7 @@ New notifications appear as they arrive. You don't need to reload the page.
 | dbt sync ready to review | A [dbt sync][ref-dbt-review] that a webhook started produces a branch that's ready to review, and the dbt project has no notification list | Admins. They get it alongside the **Model sync** notification for the same sync. With a notification list, nobody gets this notification. Every address on the list gets an email instead, and users on the list still get **Model sync** | The changes on the sync's branch in the [IDE][ref-ide] |
 | AI tokens | The account runs out of [AI tokens][ref-ai-tokens], or an automatic AI tokens top-up fails | Admins | The **Billing** page |
 | Invite accepted | A user [accepts your invite][ref-invites] and joins the account | The admin who sent the invite | The new user's page |
-| Report delivery | A [report delivery][ref-report-deliveries] fails or starts working again | The owner of the delivery, if the delivery has **Inbox** notifications on. While the owner's Google account can't open the spreadsheet, also admins, at most once a day, whatever the delivery's settings | The delivery |
+| Report delivery | A [report delivery][ref-report-deliveries] fails or starts working again | The owner of the delivery, if the delivery has **Inbox** or **Email** notifications on. While the owner's Google account can't open the spreadsheet, also admins, at most once a day, whatever the delivery's settings | The delivery |
 | Changelog | Cube publishes a new changelog entry | All users | Usually no **Open** button, since the entry shows in full in the right pane. If the entry is no longer in Cube, **Open** goes to the public Cube changelog. |
 
 A scheduled task run notification has the task name in the title, for
@@ -92,18 +92,20 @@ delivered**, or the same partial titles ending in "did not get the alert". For
 a refresh, it reads **Sales refresh failed**.
 
 [Monitoring alerts][ref-alerts] and budgets, mentions and replies in comments,
-shared items, access requests, dashboard reviews, dbt syncs ready to review, and
-the first failure in a row of a webhook dbt sync
+report deliveries (for the owner, when the delivery has **Email**
+notifications on, and for admins, while the owner's Google account can't open
+the spreadsheet), shared items, access requests, dashboard reviews, dbt syncs
+ready to review, and the first failure in a row of a webhook dbt sync
 also arrive by email, unless you turn that off under
 [Notifications][ref-preferences-notifications] on the **Preferences** page.
 Cube waits 5 minutes before sending a mention, reply, share or access-request
 email and skips it if you read or delete the notification in the inbox by then.
 To get it at once, turn off [Skip email if already read][ref-preferences-skip-email].
+Other emails, report deliveries included, go out at once.
 The inbox does not send other notifications by email or Slack. End-of-support
 notices come with their own email. A scheduled task can also
 notify by email or Slack, as set up on the task. A report
-delivery can also notify its owner by email or Slack, and emails admins while
-the owner's Google account can't open the spreadsheet.
+delivery can also post to Slack, as set up on the delivery.
 
 ## Read and unread
 
