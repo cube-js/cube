@@ -221,6 +221,11 @@ export class PrestodbQuery extends BaseQuery {
     templates.expressions.binary = '{% if op == \'||\' %}' +
       '(CAST({{ left }} AS VARCHAR) || CAST({{ right }} AS VARCHAR))' +
       '{% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
+    // Trino plans both `a = b OR (a IS NULL AND b IS NULL)` and IS NOT DISTINCT FROM as
+    // nested-loop joins; two equalities of one-sided expressions hash-join. The IS NULL
+    // equality keeps NULL apart from a value that casts to ''.
+    templates.expressions.is_not_distinct_from = '(COALESCE(CAST({{ left }} AS VARCHAR), \'\') = COALESCE(CAST({{ right }} AS VARCHAR), \'\') ' +
+      'AND ({{ left }} IS NULL) = ({{ right }} IS NULL))';
     templates.expressions.like = '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}{% if default_escape %} ESCAPE \'\\\'{% endif %}';
     delete templates.expressions.ilike;
     templates.types.string = 'VARCHAR';
