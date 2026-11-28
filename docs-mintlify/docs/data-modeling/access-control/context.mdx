@@ -206,9 +206,24 @@ def context_to_app_id(ctx: dict) -> str:
 It is common to use some field from the incoming security context as an id for your data model. 
 In our example, as illustrated below, we are using `team` property of the security context as a data model id.
 
-<Frame caption="COMPILE_CONTEXT mapping">
-  <img src="https://static.cube.dev/docs/shared/7b6a2257.png" alt="COMPILE_CONTEXT mapping" />
-</Frame>
+```mermaid actions={false}
+flowchart LR
+  accTitle: Security contexts mapped to app IDs
+  accDescr: Users 1 and 2 have team sales in their security contexts, and users 3 and 4 have team exec. context_to_app_id maps them to two data models, sales and exec, each compiled with its own COMPILE_CONTEXT.
+  U1["<code>#quot;user_id#quot;: 1</code><br/><code>#quot;team#quot;: #quot;sales#quot;</code>"]:::tile
+  U2["<code>#quot;user_id#quot;: 2</code><br/><code>#quot;team#quot;: #quot;sales#quot;</code>"]:::tile
+  U3["<code>#quot;user_id#quot;: 3</code><br/><code>#quot;team#quot;: #quot;exec#quot;</code>"]:::tile
+  U4["<code>#quot;user_id#quot;: 4</code><br/><code>#quot;team#quot;: #quot;exec#quot;</code>"]:::tile
+  F["<code>context_to_app_id</code>"]:::tile
+  S["<b>Data model</b> <code>sales</code><br/>with its <code>COMPILE_CONTEXT</code>"]:::out
+  E["<b>Data model</b> <code>exec</code><br/>with its <code>COMPILE_CONTEXT</code>"]:::out
+  U1 --> F
+  U2 --> F
+  U3 --> F
+  U4 --> F
+  F --> S
+  F --> E
+```
 
 Once you have this mapping, you can use `COMPILE_CONTEXT` inside your data model. 
 In the example below we are passing it as a variable into `masked` helper function.

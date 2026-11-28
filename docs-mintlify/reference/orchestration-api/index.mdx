@@ -9,9 +9,22 @@ Cube _pull_ changes from upstream data sources via the
 [`scheduledRefresh`][ref-scheduled-refresh] configration option of
 pre-aggregations.
 
-<Frame>
-  <img src="https://static.cube.dev/docs/reference/orchestration-api/index/edfc0423.png" />
-</Frame>
+```mermaid actions={false}
+flowchart TB
+  accTitle: Cube in the data stack
+  accDescr: Data sources feed data replication, which loads the data warehouse. The warehouse feeds the semantic layer, Cube, which serves data applications. Data orchestration follows data replication, runs data transformation, which loads the warehouse, and pushes changes to the semantic layer.
+  S["<b>Data sources</b>"]:::tile
+  R["<b>Data replication</b>"]:::tile
+  W["<b>Data warehouse</b>"]:::tile
+  L["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Semantic layer</b><br/>Cube"]:::hub
+  A["<b>Data applications</b>"]:::tile
+  O["<b>Data orchestration</b>"]:::tile
+  T["<b>Data transformation</b>"]:::tile
+  S --> R --> W --> L --> A
+  R --> O
+  O --> T --> W
+  O --> L
+```
 
 Orchestration API can be used to implement both [embedded analytics][cube-ea]
 and internal or self-serve [business intelligence][cube-issbi] use cases. When

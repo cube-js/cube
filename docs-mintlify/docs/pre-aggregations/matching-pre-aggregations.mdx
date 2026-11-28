@@ -39,9 +39,33 @@ pre-aggregations.
 Cube goes through the following steps to determine whether a query matches a
 particular eligible pre-aggregation:
 
-<Frame>
-  <img src="https://static.cube.dev/docs/pre-aggregations/matching-pre-aggregations/f986b0cb.png" />
-</Frame>
+```mermaid actions={false}
+flowchart TB
+  accTitle: Pre-aggregation matching flowchart
+  accDescr: If the query is leaf-measure additive, every query member exists in the pre-aggregation, and no query measure is multiplied, the pre-aggregation is used. Otherwise, it is used only if the query specifies a granularity for its time dimension, its filter dimensions are among its own dimensions, and the pre-aggregation has exactly the query's dimensions and every query measure. If any of these checks fails, the pre-aggregation is not used.
+  A(["<b>A query arrives</b>"]):::start
+  Q1{{"Is query leaf-measure<br/>additive?"}}:::ask
+  Q2{{"Does every member of the query<br/>exist in the pre-aggregation?"}}:::ask
+  Q3{{"Are any query measures<br/>multiplied in the cube's<br/>data model?"}}:::ask
+  Q4{{"Does the query specify<br/>granularity for its<br/>time dimension?"}}:::ask
+  Q5{{"Are query filter dimensions<br/>included in its own<br/>dimensions?"}}:::ask
+  Q6{{"Does the pre-aggregation have exactly<br/>the query's dimensions and<br/>every query measure?"}}:::ask
+  Y["<b>Use the pre-aggregation</b>"]:::out
+  N["<b>Don't use the pre-aggregation</b>"]:::out
+  A -.-> Q1
+  Q1 -.->|<b class=yes>Yes</b>| Q2
+  Q1 -.->|<b class=no>No</b>| Q4
+  Q2 -.->|<b class=yes>Yes</b>| Q3
+  Q2 -.->|<b class=no>No</b>| Q4
+  Q3 -.->|<b class=no>No</b>| Y
+  Q3 -.->|<b class=yes>Yes</b>| Q4
+  Q4 -.->|<b class=yes>Yes</b>| Q5
+  Q4 -.->|<b class=no>No</b>| N
+  Q5 -.->|<b class=yes>Yes</b>| Q6
+  Q5 -.->|<b class=no>No</b>| N
+  Q6 -.->|<b class=yes>Yes</b>| Y
+  Q6 -.->|<b class=no>No</b>| N
+```
 
 See the details for each step:
 
@@ -61,6 +85,10 @@ relationship][ref-schema-joins-rel] between cubes in the query.
 that the time dimension granularity is set in the query.
 - **Are query filter dimensions included in its own dimensions?** Cube checks
 that all filter dimensions are also included as dimensions in the query.
+- **Does the pre-aggregation have exactly the query's dimensions and every
+query measure?** Unlike the leaf-measure check, the pre-aggregation's dimensions
+must equal the query's dimensions, not just include them. It must contain the
+query's measures, or all of their leaf measures.
 
 ### Matching time dimensions
 

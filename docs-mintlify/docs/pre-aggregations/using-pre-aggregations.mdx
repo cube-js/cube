@@ -1157,28 +1157,34 @@ or [Export Bucket][self-export-bucket] strategies instead.
 
 </Info>
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Internal vs External vs External with Cube Store diagram"
-    src="https://static.cube.dev/docs/pre-aggregations/using-pre-aggregations/9aee19aa.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+```mermaid actions={false}
+flowchart TB
+  accTitle: Simple build strategy
+  accDescr: 1. Cube runs the pre-aggregation query against the source database and gets the results. 2. Cube sends the results to Cube Store. 3. Cube queries pre-aggregations in Cube Store.
+  C["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Cube</b>"]:::tile
+  DB["<b>Source database</b>"]:::tile
+  CS["<b>Cube Store</b>"]:::tile
+  C <-->|"1. Run pre-aggregation<br/>query, get results"| DB
+  C -->|"2. Send<br/>results"| CS
+  C <-->|"3. Query<br/>pre-aggregations"| CS
+```
 
 ### Batching
 
 Batching is a more performant strategy where Cube sends compressed CSVs for Cube
 Store to ingest.
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Internal vs External vs External with Cube Store diagram"
-    src="https://static.cube.dev/docs/pre-aggregations/using-pre-aggregations/deb0194a.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+```mermaid actions={false}
+flowchart TB
+  accTitle: Batching build strategy
+  accDescr: 1. Cube runs the pre-aggregation query against the source database and gets the results. 2. Cube sends the results to Cube Store in batches. 3. Cube queries pre-aggregations in Cube Store.
+  C["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Cube</b>"]:::tile
+  DB["<b>Source database</b>"]:::tile
+  CS["<b>Cube Store</b>"]:::tile
+  C <-->|"1. Run pre-aggregation<br/>query, get results"| DB
+  C -->|"2. Send results<br/>in batches"| CS
+  C <-->|"3. Query<br/>pre-aggregations"| CS
+```
 
 The performance scales to the amount of memory available on the Cube instance.
 Batching is automatically enabled for any databases that can support it.
@@ -1204,14 +1210,19 @@ be significantly improved by using an export bucket. This allows the source
 database to temporarily materialize the data locally, which is then loaded into
 Cube Store in parallel:
 
-<div style={{ textAlign: "center" }}>
-  <img
-    alt="Internal vs External vs External with Cube Store diagram"
-    src="https://static.cube.dev/docs/pre-aggregations/using-pre-aggregations/f43999c4.png"
-    style={{ border: "none" }}
-    width="100%"
-  />
-</div>
+```mermaid actions={false}
+flowchart TB
+  accTitle: Export bucket build strategy
+  accDescr: 1. Cube runs an UNLOAD query against the source database. 2. The database materializes the query's data into an export bucket in cloud storage. 3. Cube Store loads the materialized data. 4. Cube queries pre-aggregations in Cube Store.
+  C["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Cube</b>"]:::tile
+  DB["<b>Source database</b>"]:::tile
+  B["<b>Export bucket</b><br/>cloud storage"]:::tile
+  CS["<b>Cube Store</b>"]:::tile
+  C -->|"1. Run <code>UNLOAD</code> query"| DB
+  DB -->|"2. Materialize data<br/>from query"| B
+  B -->|"3. Load materialized data"| CS
+  C <-->|"4. Query<br/>pre-aggregations"| CS
+```
 
 Enabling the export bucket functionality requires extra configuration and is 
 not available for all data sources. Please

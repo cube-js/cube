@@ -22,6 +22,28 @@ repository](#deploy-with-github) to the deployment. Non-production branches
 already added to Cube sync when pushed to GitHub. Production deployment follows
 the deploy mode: it auto-deploys in Git mode and stays manual in CLI mode.
 
+```mermaid actions={false}
+flowchart TB
+  accTitle: Continuous deployment triggers
+  accDescr: A push or UI merge to the production branch builds and deploys production if the deploy mode is Deploy with Git. Otherwise, production is unchanged. Running cube deploy in CLI mode builds from the uploaded project and deploys production. A push to another branch already added to Cube syncs that branch and leaves production unchanged.
+  P(["<b>Push or UI merge to<br/>the production branch</b>"]):::start
+  B(["<b>Push to another branch<br/>already added to Cube</b>"]):::start
+  C(["<b>Run <code>cube deploy</code></b><br/>in CLI mode"]):::start
+  Q{{"Is the deploy mode<br/>Deploy with Git?"}}:::ask
+  G["<b>Build from the<br/>production branch</b>"]:::tile
+  U["<b>Build from the<br/>uploaded project</b>"]:::tile
+  N["<b>Production is unchanged</b>"]:::out
+  D["<b>Production is deployed</b>"]:::out
+  S["<b>The branch syncs,<br/>production is unchanged</b>"]:::out
+  P -.-> Q
+  Q -.->|<b class=yes>Yes</b>| G
+  Q -.->|<b class=no>No</b>| N
+  C -.-> U
+  G -.-> D
+  U -.-> D
+  B -.-> S
+```
+
 ## Deploy with Git
 
 Continuous deployment works by connecting a Git repository to a Cube Cloud

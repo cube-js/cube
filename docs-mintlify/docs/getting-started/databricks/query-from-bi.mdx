@@ -14,9 +14,18 @@ Semantic Layer Sync programmatically connects a BI tool to Cube and creates or
 updates BI-specific entities that correspond to entities within the data model
 in Cube, such as cubes, views, measures, and dimensions.
 
-<Frame>
-  <img src="https://static.cube.dev/docs/shared/c270ae45.svg" />
-</Frame>
+```mermaid actions={false}
+flowchart LR
+  accTitle: Cube syncing to BI tools
+  accDescr: Cube, the semantic layer, syncs to three BI tools, each with its own data model and visualizations.
+  C["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Cube</b><br/>Semantic layer"]:::hub
+  B1["<b>BI tool 1</b><br/>Data model, visualizations"]:::tile
+  B2["<b>BI tool 2</b><br/>Data model, visualizations"]:::tile
+  B3["<b>BI tool 3</b><br/>Data model, visualizations"]:::tile
+  C -->|Sync| B1
+  C -->|Sync| B2
+  C -->|Sync| B3
+```
 
 Semantic Layer Sync will synchronize all public cubes and views with connected
 BI tools. We recommend making your cubes private and only exposing views. Both
