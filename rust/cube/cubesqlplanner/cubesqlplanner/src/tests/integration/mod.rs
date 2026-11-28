@@ -10,6 +10,7 @@ mod combinations;
 mod cubestore;
 mod custom_granularities;
 mod filter_member_operand;
+mod filtered_aggregates;
 mod filtered_measures;
 mod filters_segments;
 mod join_aliases;

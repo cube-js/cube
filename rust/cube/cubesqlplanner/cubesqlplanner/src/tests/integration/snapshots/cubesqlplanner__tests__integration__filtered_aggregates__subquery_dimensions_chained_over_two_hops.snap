@@ -1,0 +1,9 @@
+---
+source: cubesqlplanner/cubesqlplanner/src/tests/integration/filtered_aggregates.rs
+expression: result
+---
+retailer__name | retailer__sales | retailer__sales_for_goal | retailer__sales_goal | retailer__sales_goal_achieved
+---------------+-----------------+--------------------------+----------------------+------------------------------
+Retailer 1     | 6               | 3                        | 10                   | 0.30000000000000000000       
+Retailer 2     | 18              | 9                        | 10                   | 0.90000000000000000000       
+Retailer 3     | 30              | 15                       | 10                   | 1.5000000000000000
