@@ -22,7 +22,7 @@ To create a new sync, choose either **Tableau Cloud**, **Tableau Desktop**,
 or **Tableau Server**:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/shared/36c23111.png" />
+  <img src="https://static.cube.dev/docs/integrations/semantic-layer-sync/create-sync-dialog.png" alt="Create sync dialog on the BI step with Preset, Apache Superset, Tableau Server, Tableau Cloud, Tableau Desktop and ThoughtSpot" />
 </Frame>
 
 For Tableau Cloud and Tableau Server,
@@ -181,8 +181,9 @@ or `process.env.CUBEJS_TABLEAU_PAT_SECRET` in JavaScript.
 </Tip>
 
 When connecting a Cube data source to your Tableau workbook, you will be prompted
-to enter the user name and password for Cube. You can find them at the&nbsp;**SQL
-API Connection** tab on the&nbsp;**IDE → Integrations** page in Cube.
+to enter the user name and password for Cube. To find them, go to the
+[Integrations][ref-integrations-apis] page in Cube, click **API credentials**,
+and choose the **SQL API** tab.
 
 ### Least-privilege mode
 
@@ -250,7 +251,7 @@ Alternatively, you can download a `.tds` file to get the data model into
 Tableau Desktop. Click **Download .tds** to download a Tableau [data source][tds] file:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/integrations/semantic-layer-sync/tableau/4b93196e.png" />
+  <img src="https://static.cube.dev/docs/integrations/semantic-layer-sync/tableau/download-tds.png" alt="Semantic Layer Sync dialog listing a Tableau Desktop sync with the Download .tds button" />
 </Frame>
 
 In the modal window, select one or more cubes or views and click **Download
@@ -271,3 +272,4 @@ per cube or view. You can open these files in Tableau to create data sources.
 [tableau-api]: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api.htm
 [tableau-api-authentication]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm#create-personal-access-tokens
 [tableau-pat]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm
+[ref-integrations-apis]: /admin/connect-to-data/visualization-tools
