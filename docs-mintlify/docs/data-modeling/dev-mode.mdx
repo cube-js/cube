@@ -99,16 +99,21 @@ saved since your last commit.
 
 When there are changes in the parent branch, you can update your active branch by pulling changes from the parent branch.
 If your active branch got updated in the connected repository, you can update it by pulling changes from the remote.
+In both cases, click **Pull from \<branch\>** above the editor.
+
 <Frame>
-  <img src="https://static.cube.dev/docs/data-modeling/dev-mode/a3f498ba.png" alt="Pull from Parent branch button" />
+  <img src="https://static.cube.dev/docs/data-modeling/dev-mode/pull-from-parent.png" alt="IDE in dev mode with the Pull from button above the editor" />
 </Frame>
 
 ### Resolving conflicts
+
 In some cases, you may encounter conflicts when merging or pulling changes from the parent branch or remote.
-If this happens, you'll see a warning about conflicts in the actions bar.
-You'll then be able to either resolve them manually or discard the changes.
+If this happens, you'll see **Merge conflict** above the editor, and each conflicting file will
+show conflict markers. Edit the files and click **Commit & resolve**, or click **Don't resolve**
+to discard the merge.
+
 <Frame>
-  <img src="https://static.cube.dev/docs/data-modeling/dev-mode/4834bbf0.png" alt="Conflict Resolution UI" />
+  <img src="https://static.cube.dev/docs/data-modeling/dev-mode/merge-conflict.png" alt="IDE with a merge conflict, conflict markers in the file, and the Don't resolve and Commit & resolve buttons" />
 </Frame>
 
 ## Deep-link into development mode
