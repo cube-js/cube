@@ -1,12 +1,12 @@
 ---
-title: Visual Modeler
-description: Walks through Cube Cloud’s browser-based Visual Modeler for no-code modeling, including setup, workflow, and known limitations versus the code editor.
+title: Visual Model
+description: Walks through Cube’s browser-based Visual Model for no-code modeling, including setup, workflow, and known limitations versus the code editor.
 ---
 
-Visual Modeler editor provides the visual, no-code experience for building and enhancing
+Visual Model editor provides the visual, no-code experience for building and enhancing
 the [data model][ref-data-modeling] of your semantic layer from within your web browser.
 
-Unlike the code-first [data model][ref-data-model] editor, Visual Modeler allows non-technical
+Unlike the code-first [data model][ref-data-model] editor, Visual Model allows non-technical
 users to participate in data modeling without writing code. However, it does not support
 some advanced data modeling features listed as known [limitations](#limitations).
 
@@ -18,18 +18,19 @@ Available on [Premium and above plans](https://cube.dev/pricing).
 
 <Info>
 
-Visual Modeler extends and replaces the [Data Graph](https://cube.dev/blog/introducing-data-graph)
+Visual Model extends and replaces the [Data Graph](https://cube.dev/blog/introducing-data-graph)
 feature.
 
 </Info>
 
 ## Prerequisites
 
-Visual Modeler integrates with the [development mode][ref-dev-mode],
-[environments][ref-environments], and [continuous deployment][ref-continuous-deployment]
-in Cube Cloud.
+Visual Model integrates with the [development mode][ref-dev-mode],
+[environments][ref-environments], and [continuous deployment][ref-continuous-deployment].
 
-Once you start editing the data model in Visual Modeler editor, you will automatically
+To open it, go to **Model › Visual Model**.
+
+Once you start editing the data model in the Visual Model editor, you will automatically
 enter the development mode, so you can safely make changes and test them in
 [Playground][ref-playground] without affecting your production deployment.
 
@@ -38,7 +39,7 @@ which should be reviewed before merging to the production environment.
 
 ## Working with cubes
 
-You can see [cubes][ref-cubes] on the **Cubes** tab of Visual Modeler.
+You can see [cubes][ref-cubes] on the **Cubes** tab of Visual Model.
 
 Cubes are represented as rectangles on the canvas with [joins][ref-joins] between them as
 an [entity-relationship diagram][wiki-erd] (ERD). You can pan and zoom the canvas and
@@ -46,14 +47,14 @@ search cubes using the input box.
 
 ### Adding cubes
 
-To add a cube from scratch, click the **+ Add Cube** button.
+To add a cube from scratch, click the **Add Cube** button.
 
 You can also generate the data model for a new cube based on the database schema.
-To do so, click the **+ Generate Cube** button. It will bring up the
+To do so, click the **Generate Cube** button. It will bring up the
 modal window where you can select a table from your data source:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/data-modeling/visual-modeler/5738b483.png" />
+  <img src="https://static.cube.dev/docs/data-modeling/visual-model/generate-cube-dialog.png" alt="Add Cube dialog with a table selected on the Tables step" />
 </Frame>
 
 ### Editing cubes
@@ -62,11 +63,11 @@ To edit a cube, click it on the canvas. Then, in the sidebar, click the **Edit**
 button. This will bring up the modal window where you can edit the cube's details:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/data-modeling/visual-modeler/09c12fc2.png" alt="Edit cube dialog" />
+  <img src="https://static.cube.dev/docs/data-modeling/visual-model/edit-cube-dialog.png" alt="Cube dialog on the Dimensions tab" />
 </Frame>
 
-Yu can also click **+ Add → Dimension**, **+ Add → Measure**, or
-**+ Add → Access Policy** to quickly add respective members to the cube.
+You can also click **Add → Dimension**, **Add → Measure**, or
+**Add → Access Policy** to quickly add respective members to the cube.
 
 ### Working with joins
 
@@ -88,23 +89,23 @@ dimension to another:
 
 ## Working with views
 
-You can see views on the **Views** tab of Visual Modeler.
+You can see views on the **Views** tab of Visual Model.
 
 Views are represented as rectangles on the canvas. Cubes that are involved in a view
 and provide members for it, are shown to the left of the view.
 
 ### Adding views
 
-To add a view, click the **+ Add View** button. It will bring up a dialog where you
+To add a view, click the **Add view** button. It will bring up a dialog where you
 can choose the base cube, set the view details such as name and title, and add join paths.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/data-modeling/visual-modeler/ce5e9014.png" alt="Adding a view" />
+  <img src="https://static.cube.dev/docs/data-modeling/visual-model/add-view-dialog.png" alt="View dialog with the base cube, view name, title and description" />
 </Frame>
 
 ### Editing views
 
-To edit a views, click it on the canvas. Then, in the sidebar, click the **Edit**
+To edit a view, click it on the canvas. Then, in the sidebar, click the **Edit**
 button.
 
 ## YAML mode
@@ -114,19 +115,19 @@ entered by clicking the **Edit with YAML** button.
 
 In this mode, you can see and edit the data model represented using the [YAML syntax][ref-yaml-syntax].
 That allows you to work around known [limitations](#limitations) and use all data modeling
-features while staying in Visual Modeler editor.
+features while staying in the Visual Model editor.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/data-modeling/visual-modeler/d8c15304.png" alt="YAML mode" />
+  <img src="https://static.cube.dev/docs/data-modeling/visual-model/yaml-mode.png" alt="View dialog in YAML mode with the Reset and exit YAML mode button" />
 </Frame>
 
 ## Limitations
 
-Visual Modeler does not intend to support all available data modeling features.
-You always have options to use the [YAML mode](#yaml-mode) in Visual Modeler or switch the
+Visual Model does not intend to support all available data modeling features.
+You always have options to use the [YAML mode](#yaml-mode) in Visual Model or switch the
 code-first [data model editor][ref-data-model].
 
-Currently, Visual Modeler does not support the following features in its UI:
+Currently, Visual Model does not support the following features in its UI:
 
 * Editing of [meta information][ref-meta] for cubes, views, and their members.
 * Editing [segments][ref-segments], [hierarchies][ref-hierarchies], and [refresh keys][ref-refresh-keys] in cubes.
@@ -137,10 +138,10 @@ Currently, Visual Modeler does not support the following features in its UI:
 * Removing cubes and views.
 
 Cubes and views using these data modeling features will still be displayed in
-Visual Modeler. However, those features can only be edited via the [YAML mode](#yaml-mode)
-or in the code-forst data model editor.
+Visual Model. However, those features can only be edited via the [YAML mode](#yaml-mode)
+or in the code-first data model editor.
 
-Additionally, Visual Modeler only allows editing of cubes and views that are
+Additionally, Visual Model only allows editing of cubes and views that are
 defined using the [YAML syntax][ref-yaml-syntax] (not JavaScript). Also, it does not
 allow editing of [dynamic data models][ref-dynamic-data-models] or models which use
 [Jinja][ref-jinja].
