@@ -48,6 +48,9 @@ impl TraversalVisitor for SubQueryDimensionsCollector {
                         )));
                     }
                     self.sub_query_dimensions.push(node.clone());
+                    // Its own subquery plans the sub_query dimensions its SQL reads,
+                    // over a join that has their cubes; the query reading it may not.
+                    return Ok(None);
                 }
                 Ok(Some(()))
             }

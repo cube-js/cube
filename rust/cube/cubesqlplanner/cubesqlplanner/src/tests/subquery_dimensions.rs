@@ -1,3 +1,4 @@
+use crate::planner::collectors::collect_sub_query_dimensions;
 use crate::test_fixtures::cube_bridge::MockSchema;
 use crate::test_fixtures::test_utils::TestContext;
 use indoc::indoc;
@@ -115,4 +116,25 @@ async fn test_subquery_dimension_of_a_missing_owner_is_null() {
     {
         insta::assert_snapshot!(result);
     }
+}
+
+// A sub_query dimension reading another one is collected alone: the nested
+// one is planned inside its subquery, whose join has the nested cube.
+#[test]
+fn test_nested_subquery_dimension_is_not_collected() {
+    let schema = MockSchema::from_yaml_file("common/integration_filtered_aggregates.yaml");
+    let test_context = TestContext::new(schema).unwrap();
+
+    let dimension = test_context
+        .create_dimension("retailer.sales_for_goal")
+        .unwrap();
+    let collected = collect_sub_query_dimensions(&dimension).unwrap();
+
+    assert_eq!(
+        collected
+            .iter()
+            .map(|dim| dim.full_name())
+            .collect::<Vec<_>>(),
+        vec!["retailer.sales_for_goal".to_string()]
+    );
 }
