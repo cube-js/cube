@@ -56,6 +56,7 @@ impl CubeConfigPy {
             "context_to_pre_aggregation_orchestrator_id",
             "context_to_groups",
             "driver_factory",
+            "driver_version",
             "extend_context",
             "external_driver_factory",
             "logger",
