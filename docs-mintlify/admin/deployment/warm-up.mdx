@@ -42,7 +42,7 @@ flowchart TB
   Q2{{"Is data model<br/>warm-up enabled?"}}:::ask
   M["<b>Compile the data model</b>"]:::tile
   R["<b>The deployment takes requests</b>"]:::out
-  X["<b>The deployment is rolled back</b>"]:::tile
+  X["<b>The deployment is rolled back</b>"]:::out
   A -.-> Q1
   Q1 -.->|<b class=yes>Yes</b>| P
   Q1 -.->|<b class=no>No</b>| I

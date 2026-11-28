@@ -32,12 +32,12 @@ inside:
 ```mermaid actions={false}
 flowchart TB
   accTitle: How the security context is used
-  accDescr: A request carries a JWT, which is verified and decoded into the security context. query_rewrite runs for every query and adds filters to the SQL query. context_to_app_id maps the security context to an app ID, and the data model is compiled once per app ID with COMPILE_CONTEXT.
+  accDescr: A request carries a JWT, which is verified and decoded into the security context. query_rewrite runs for every query and adds filters to the query, which Cube then compiles to SQL. context_to_app_id maps the security context to an app ID, and the data model is compiled once per app ID with COMPILE_CONTEXT.
   T(["<b>Request with a JWT</b>"]):::start
   SC["<b>Security context</b><br/>verified claims from the JWT"]:::tile
   QR["<code>query_rewrite</code><br/>runs for every query"]:::tile
   AID["<code>context_to_app_id</code><br/>maps it to an app ID"]:::tile
-  SQL["<b>SQL query</b><br/>with the added filters"]:::out
+  SQL["<b>Rewritten query</b><br/>with the added filters"]:::out
   DM["<b>Data model</b><br/>compiled once per app ID,<br/>with <code>COMPILE_CONTEXT</code>"]:::out
   T -->|verified and decoded| SC
   SC --> QR --> SQL
