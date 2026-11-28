@@ -39,14 +39,15 @@ You can navigate throughout the query history by using the date picker in the
 top right corner of the page and selecting a time period:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/393dfa47.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/time-range.png"
+    alt="Query History time range picker with a timeline and presets from Last 15 minutes to Last 24 hours"
+  />
 </Frame>
 
-To go back to live mode, click **▶**:
-
-<Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/393dfa47.png" />
-</Frame>
+Use the **Move back** and **Move forward** buttons next to the date picker to step
+through time periods.
+To go back to live mode, click **▶**.
 
 ## Exploring queries
 
@@ -55,7 +56,10 @@ You can switch between [queries made to the API](#inspecting-api-queries) and
 switching between the **API** and **Database** tabs.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/951a2a64.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/api-queries.png"
+    alt="Query History page with the API and Database tabs, request charts, the list of API queries, and filters"
+  />
 </Frame>
 
 ### All queries and top queries
@@ -64,7 +68,10 @@ Clicking **All queries** will show all queries in order of recency,
 while **Top queries** will show the queries with the largest total duration (hits * avg duration) in the selected time frame. Both results are limited to 100 unique queries. 
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/951a2a64.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/top-queries.png"
+    alt="Query History page with Top queries selected, showing queries by requests, average and total response time"
+  />
 </Frame>
 
 ### Filtering
@@ -93,7 +100,10 @@ The **Source** filter shows the product that sent the query:
 The request details page also shows the source of the query.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/951a2a64.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/filters.png"
+    alt="Query History filters with the Source filter open, listing Cube, Embedding, Cube for Excel, AI agents and other sources"
+  />
 </Frame>
 
 ## Inspecting API queries
@@ -103,7 +113,10 @@ To see an expanded view of a query, click on the&nbsp;**❯** button
 to the left of any query.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/fe755749.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/expanded-query.png"
+    alt="Query History list with an expanded query showing its measures, group by and time zone"
+  />
 </Frame>
 
 Check the columns to see the details:
@@ -125,54 +138,60 @@ The **Query** tab shows the raw JSON query sent to the Cube Cloud
 deployment.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/3c0490be.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/preagg-query.png"
+    alt="Query tab of a request in Query History showing the JSON query"
+  />
 </Frame>
 
-### Errors
+### Error
 
-If the query failed, the **Errors** tab will show you the error message
-and stacktrace:
+If the query failed, the **Error** tab will show you the error message:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/858633a0.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/err-error.png"
+    alt="Error tab of a failed request in Query History showing the database error message"
+  />
 </Frame>
 
-### SQL
+### Generated SQL
 
-The **SQL** tab shows the generated SQL query sent by Cube to either your
+The **Generated SQL** tab shows the generated SQL query sent by Cube to either your
 data source **or** Cube Store if the query was accelerated with a
 pre-aggregation:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/537f7269.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/preagg-generated-sql.png"
+    alt="Generated SQL tab of a request in Query History showing the SQL query executed in Cube Store"
+  />
 </Frame>
 
-You can also run the SQL query directly against your data source using the [SQL
-Runner][ref-workspace-sqlrunner] by clicking **▶️**:
+To query the same data in [Explore][ref-explore], click **Open in Explore** below
+the copy button.
 
-<Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/537f7269.png" />
-</Frame>
+### Pre-aggregation
 
-### Pre-aggregations
-
-The **Pre-Aggregations** tab shows the
+The **Pre-Aggregation** tab shows the
 [pre-aggregation][ref-caching-gs-preaggs] used to accelerate this query, if one
 was used:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/e0a8d722.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/preagg-pre-aggregation.png"
+    alt="Pre-Aggregation tab of a request in Query History showing the pre-aggregation that served the query"
+  />
 </Frame>
 
-If no pre-aggregations were used for this query, you should see the following
-screen:
+If no pre-aggregations were used for this query, the tab says so:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/b5cadb89.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/nopa-pre-aggregation.png"
+    alt="Pre-Aggregation tab of a request in Query History saying the query was not accelerated with a pre-aggregation"
+  />
 </Frame>
-
-Clicking **Accelerate** allows you to add a pre-aggregation to
-accelerate similar queries in the future.
 
 ### Security context
 
@@ -180,7 +199,10 @@ The **Security context** tab shows the [security context][ref-security-context]
 that was used to process this query:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/4ea5f5b6.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/security-context.png"
+    alt="Security context tab of a request in Query History showing the security context JSON with a tenant_id"
+  />
 </Frame>
 
 This is helpful in case [multitenancy][ref-multitenancy] is configured.
@@ -192,7 +214,10 @@ processing the query. This may include other queries that were being processed
 or were waiting in the queue by Cube Cloud at the same time as this query:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/dbac27fa.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/nopa-queue-graph.png"
+    alt="Queue graph tab of a request in Query History showing queries in the query queue over time"
+  />
 </Frame>
 
 A large number of queries in the queue may indicate that your deployment is
@@ -206,10 +231,23 @@ extremely useful for diagnosing where time is being spent in a query, and can
 help identify bottlenecks in your Cube deployment or data source.
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/56188be4.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/preagg-flame-graph.png"
+    alt="Flame graph tab of a request in Query History showing where the request spent its time"
+  />
 </Frame>
 
 ## Inspecting database queries
+
+The **Database** tab lists the SQL queries that Cube sent to connected data sources.
+To drill down on a specific query, click it.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/database-queries.png"
+    alt="Database tab of Query History with SQL query charts and the list of SQL queries"
+  />
+</Frame>
 
 ### Query
 
@@ -217,19 +255,24 @@ For Database requests, the **Query** tab shows the SQL query compiled by
 Cube that is executed on the data source:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/5a5779f6.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/dbok-query.png"
+    alt="Query tab of a database query in Query History showing the SQL executed on the data source"
+  />
 </Frame>
 
 This can be useful for debugging queries that are failing or taking a long time,
 as you can copy the query and run it directly against your data source.
 
-### Errors
+### Error
 
-If the query failed, the **Errors** tab will show you the error message
-and stacktrace:
+If the query failed, the **Error** tab will show you the error message:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/efd45e3a.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/dberr-error.png"
+    alt="Error tab of a failed database query in Query History showing the error message"
+  />
 </Frame>
 
 Errors here generally indicate a problem with querying the data source. The
@@ -242,7 +285,10 @@ The **Events** tab shows all data source-related events that occurred
 while the query is in the query execution queue:
 
 <Frame>
-  <img src="https://static.cube.dev/docs/admin/monitoring/query-history/24eb11a1.png" />
+  <img
+    src="https://static.cube.dev/docs/admin/monitoring/query-history/dbok-events.png"
+    alt="Events tab of a database query in Query History listing query queue events with their timestamps"
+  />
 </Frame>
 
 ## Reading Query History programmatically
@@ -281,6 +327,7 @@ period returns `400`, and a request older than it returns `404`.
 [ref-excel]: /docs/integrations/microsoft-excel
 [ref-sheets]: /docs/integrations/google-sheets
 [ref-playground]: /docs/explore-analyze/playground
+[ref-explore]: /docs/explore-analyze/explore
 [ref-platform-api]: /api-reference/introduction#platform-api
 [ref-cli-query-history]: /reference/cli#query-history-commands
 [ref-api-list-requests]: /api-reference/query-history/list-query-history-requests
