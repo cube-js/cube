@@ -21,7 +21,7 @@ semantic layer.
 flowchart TB
   T["<b>Tables</b><br/>in the data source"]:::tile
   D["<img src='https://static.cube.dev/icons/dbt.svg' /><b>dbt</b><br/>Staging and intermediate<br/>models → data marts<br/>Models in <code>.sql</code>, described in <code>.yml</code><br/>Don't define metrics"]:::hub
-  C["<img src='https://static.cube.dev/icons/cube.svg' /><b>Cube</b><br/>Cubes → views<br/>Measures and joins<br/>defined in each cube"]:::hub
+  C["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Cube</b><br/>Cubes → views<br/>Measures and joins<br/>defined in each cube"]:::hub
   B["<b>Datasets</b><br/>in the BI tool"]:::tile
   T --> D
   D -->|Models map to cubes,<br/>columns to dimensions| C

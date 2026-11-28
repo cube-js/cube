@@ -32,7 +32,7 @@ flowchart TB
   DS["<img src='https://static.cube.dev/icons/bigquery.svg' /><img src='https://static.cube.dev/icons/snowflake.svg' /><img src='https://static.cube.dev/icons/redshift.svg' /><br/><b>Data source</b>"]:::tile
   PA["<b>Pre-aggregation</b>"]:::tile
   RT["<b>Real-time query</b>"]:::tile
-  U["<img src='https://static.cube.dev/icons/cube.svg' /><b>Cube</b><br/>unions both during<br/>query processing"]:::hub
+  U["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Cube</b><br/>unions both during<br/>query processing"]:::hub
   DS -->|built on schedule| PA
   DS -->|at query time| RT
   PA --> U
@@ -142,7 +142,7 @@ flowchart TB
   K["<img src='https://static.cube.dev/icons/ksqldb.svg' /><b>ksqlDB</b>"]:::tile
   BP["<b>Batch pre-aggregation</b>"]:::tile
   SP["<b>Streaming pre-aggregation</b>"]:::tile
-  U["<img src='https://static.cube.dev/icons/cube.svg' /><b>Cube</b><br/>unions both during<br/>query processing"]:::hub
+  U["<img class=on-light src='https://static.cube.dev/icons/cube-icon-light.svg' /><img class=on-dark src='https://static.cube.dev/icons/cube-icon-dark.svg' /><b>Cube</b><br/>unions both during<br/>query processing"]:::hub
   BD --> BP
   SD --> K --> SP
   BP --> U
