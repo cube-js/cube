@@ -1,6 +1,4 @@
-import crypto from 'crypto';
-
-import { getProcessUid } from '@cubejs-backend/shared';
+import { getProcessUid, createKeyHash } from '@cubejs-backend/shared';
 import { QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
 import { CacheKey, LocalRefreshKeyDescriptor } from './QueryCache';
 
@@ -19,14 +17,12 @@ export function getCacheHash(queryKey: QueryKey | CacheKey, processUid?: string)
   }
 
   if (typeof queryKey === 'object' && 'persistent' in queryKey && queryKey.persistent) {
-    return `${crypto
-      .createHash('md5')
+    return `${createKeyHash()
       .update(JSON.stringify(queryKey))
       .digest('hex')
     }@${processUid}` as QueryKeyHash;
   } else {
-    return crypto
-      .createHash('md5')
+    return createKeyHash()
       .update(JSON.stringify(queryKey))
       .digest('hex') as QueryKeyHash;
   }

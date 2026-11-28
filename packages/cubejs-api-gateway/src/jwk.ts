@@ -1,10 +1,10 @@
 /* eslint-disable no-restricted-syntax */
-import crypto from 'crypto';
 import {
   asyncMemoizeBackground,
   asyncRetry,
   BackgroundMemoizeOptions,
-  getHttpAgentForProxySettings
+  getHttpAgentForProxySettings,
+  createKeyHash,
 } from '@cubejs-backend/shared';
 import fetch from 'node-fetch';
 import jwkToPem from 'jwk-to-pem';
@@ -91,7 +91,7 @@ export const createJWKsFetcher = (jwtOptions: JWTOptions, options: JWKsFetcherOp
       result,
     };
   }, {
-    extractKey: (url) => crypto.createHash('md5').update(url).digest('hex'),
+    extractKey: (url) => createKeyHash().update(url).digest('hex'),
     extractCacheLifetime: ({ lifeTime }) => {
       if (lifeTime) {
         return lifeTime;

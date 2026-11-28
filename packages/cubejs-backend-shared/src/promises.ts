@@ -1,7 +1,7 @@
 /* eslint-disable arrow-body-style,no-restricted-syntax */
-import crypto from 'crypto';
 import { LRUCache } from 'lru-cache';
 
+import { createKeyHash } from './hash';
 import { Optional } from './type-helpers';
 
 export type PromiseLock = {
@@ -282,7 +282,7 @@ export const asyncDebounceFn = <Ret, Arguments>(
   });
 
   return async (...args: Arguments[]) => {
-    const key = crypto.createHash('md5')
+    const key = createKeyHash()
       .update(args.map((v) => JSON.stringify(v)).join(','))
       .digest('hex');
 

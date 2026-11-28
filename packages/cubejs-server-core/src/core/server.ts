@@ -1,5 +1,4 @@
 /* eslint-disable global-require,no-return-assign */
-import crypto from 'crypto';
 import fs from 'fs-extra';
 import { LRUCache } from 'lru-cache';
 import isDocker from 'is-docker';
@@ -28,6 +27,7 @@ import {
   FileRepository,
   SchemaFileRepository,
   withLogRedaction,
+  createKeyHash,
 } from '@cubejs-backend/shared';
 
 import type { Application as ExpressApplication, Response as ExpressResponse, NextFunction as ExpressNextFunction } from 'express';
@@ -278,7 +278,7 @@ export class CubejsServerCore {
 
       if (!this.projectFingerprint) {
         try {
-          this.projectFingerprint = crypto.createHash('md5')
+          this.projectFingerprint = createKeyHash()
             .update(JSON.stringify(fs.readJsonSync('package.json')))
             .digest('hex');
         } catch (e) {
