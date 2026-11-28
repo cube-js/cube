@@ -19,11 +19,11 @@ RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLV
     && update-alternatives --install /usr/bin/cc cc /usr/bin/clang-$LLVM_VERSION 100 \
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-$LLVM_VERSION 100;
 
-# https://openssl-library.org/source/old/1.1.1/
-ARG OPENSSL_VERSION=1.1.1w
-RUN cd tmp && wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz \
+# OpenSSL 3.5 LTS: https://openssl-library.org/source/
+ARG OPENSSL_VERSION=3.5.9
+RUN cd tmp && wget https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz \
     && cd openssl-${OPENSSL_VERSION} \
-    && ./Configure no-shared no-async --prefix=/openssl --openssldir=/openssl/ssl linux-x86_64-clang \
+    && ./Configure --libdir=lib no-shared no-async --prefix=/openssl --openssldir=/openssl/ssl linux-x86_64-clang \
     && make depend \
     && make -j $(nproc) \
     && make install_sw \

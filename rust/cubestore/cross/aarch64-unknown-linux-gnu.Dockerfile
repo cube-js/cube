@@ -45,11 +45,11 @@ RUN wget https://github.com/madler/zlib/releases/download/v${ZLIB_VERSION}/zlib-
     make install && \
     cd .. && rm -rf zlib-${ZLIB_VERSION};
 
-# https://openssl-library.org/source/old/1.1.1/
-ENV OPENSSL_VERSION=1.1.1w
-RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz \
+# OpenSSL 3.5 LTS: https://openssl-library.org/source/
+ENV OPENSSL_VERSION=3.5.9
+RUN wget https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz \
     && cd openssl-${OPENSSL_VERSION} \
-    && ./Configure --prefix=/usr/aarch64-linux-gnu --openssldir=/usr/aarch64-linux-gnu/lib linux-aarch64 \
+    && ./Configure --libdir=lib --prefix=/usr/aarch64-linux-gnu --openssldir=/usr/aarch64-linux-gnu/lib linux-aarch64 \
     && make depend \
     && make -j $(nproc) \
     && make install_sw \
