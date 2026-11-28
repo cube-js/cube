@@ -98,7 +98,7 @@ Any service that exposes a remote MCP endpoint can be connected as a custom conn
 ## Authentication
 
 Connectors authenticate to the external service in one of the following ways, depending
-on what the service supports:
+on what the service supports. Prefer OAuth 2.0 when the service offers it.
 
 | Method | How it works |
 |--------|--------------|
@@ -108,8 +108,7 @@ on what the service supports:
 | **Custom header** | You supply a header name and value, such as `X-Api-Key`. Cube sends the value to the server in that header. |
 | **No authentication** | Cube connects to the server directly and sends no `Authorization` header. If Cube can't discover the server's tools, the connector stays **Not connected**, and you can select **Connect** to try again. |
 
-A connector's status indicator in the connectors list shows whether it is connected and
-authenticated.
+A connector's status indicator in the connectors list shows whether it is connected.
 
 ## Choosing which tools are available
 
