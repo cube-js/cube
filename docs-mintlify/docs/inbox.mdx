@@ -70,6 +70,7 @@ New notifications appear as they arrive. You don't need to reload the page.
 | AI tokens | The account runs out of [AI tokens][ref-ai-tokens], or an automatic AI tokens top-up fails | Admins | The **Billing** page |
 | Invite accepted | A user [accepts your invite][ref-invites] and joins the account | The admin who sent the invite | The new user's page |
 | Report delivery | A [report delivery][ref-report-deliveries] fails or starts working again | The owner of the delivery, if the delivery has **Inbox** or **Email** notifications on. While the owner's Google account can't open the spreadsheet, also admins, at most once a day, whatever the delivery's settings | The delivery |
+| App navigation blocked | An [app][ref-apps-blocked] is blocked from opening another site. You get one for each of up to 3 sites per app, until an admin clears the app's flags | Admins | The app |
 | Changelog | Cube publishes a new changelog entry | All users | Usually no **Open** button, since the entry shows in full in the right pane. If the entry is no longer in Cube, **Open** goes to the public Cube changelog. |
 
 A scheduled task run notification has the task name in the title, for
@@ -81,6 +82,9 @@ long it took. For a failed run, it shows the error. For a run that a
 **Daily signups: condition met**, and it shows the change the check found
 instead of the answer. Only the creator's notification shows the figures;
 everyone else's says that the condition started to hold.
+
+An app navigation blocked notification names the app and the site in its
+title, for example **"Sales" was blocked from opening example.com**.
 
 A dashboard schedule failed notification names the schedule's kind in its
 title. For a dashboard delivery on a dashboard called Sales, it reads **Sales
@@ -185,3 +189,4 @@ stay.
 [ref-reviews]: /docs/explore-analyze/dashboards/reviews
 [ref-report-deliveries]: /docs/explore-analyze/report-deliveries#notifications
 [ref-request-access]: /docs/organize-content/sharing#requesting-access
+[ref-apps-blocked]: /docs/explore-analyze/apps#blocked-navigations
