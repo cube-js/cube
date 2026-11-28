@@ -35,6 +35,21 @@ both the default source and any named sources added under
 Newly added sources show up immediately; you don't have to wire them into
 a cube first.
 
+The list ends with **Cube Store**, marked **Pre-aggregation storage**. Query
+it to check what your [pre-aggregations](/docs/pre-aggregations) contain. Its
+schemas and tables show only the pre-aggregations that are built. With none
+built, you can still query it, for example with
+[`EXPLAIN`](/reference/cubestore/sql-commands#diagnostics). Cube Store takes
+read-only statements only. The tab remembers the source you pick, Cube Store
+included.
+
+<Frame>
+  <img
+    src="https://static.cube.dev/docs/explore-analyze/workbooks/source-sql-tabs/data-sources-cube-store.png"
+    alt="Source schemas pane listing the default data source and Cube Store, marked Pre-aggregation storage"
+  />
+</Frame>
+
 Expand a source to browse its schemas, tables, and columns. Click **Query
 table** to select the first 100 rows of a table and run the query.
 
