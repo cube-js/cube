@@ -166,4 +166,8 @@ svg[id^="mermaid-"] .node .label div { max-width: 360px !important; }
 svg[id^="mermaid-"] .node.tile img { display: inline-block !important; width: 26px !important; height: 26px !important; margin: 0 10px 0 0; vertical-align: middle; }
 svg[id^="mermaid-"] .node.hub img { display: block !important; width: 44px !important; height: 44px !important; margin: 4px auto 6px; }
 svg[id^="mermaid-"] .node.hub rect { fill: var(--d-tile) !important; }
+/* Logos with separate light and dark artwork: <img class=on-light ...><img class=on-dark ...> */
+svg[id^="mermaid-"] .node img.on-dark, html.dark svg[id^="mermaid-"] .node img.on-light { display: none !important; }
+html.dark svg[id^="mermaid-"] .node.hub img.on-dark { display: block !important; }
+html.dark svg[id^="mermaid-"] .node.tile img.on-dark { display: inline-block !important; }
 svg[id^="mermaid-"] .node.hub .nodeLabel { display: block; padding: 14px 18px; }
