@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { getEnv, getProcessUid, LoggerFn, extractRequestUUID } from '@cubejs-backend/shared';
 import {
   QueueDriverInterface,
+  QueueDriverConnectionInterface,
   QueryKey,
   QueryKeyHash,
   QueueId,
@@ -63,6 +64,11 @@ export type QueryQueueOptions = {
   executionTimeout?: number,
   orphanedTimeout?: number,
   heartBeatInterval?: number,
+  /**
+   * Cancel a query that is already executing once no waiter has asked for its result for
+   * `continueWaitTimeout` + `orphanedTimeout` seconds. Without it only pending queries are orphaned.
+   */
+  cancelOrphanedRunningQueries?: boolean,
   redisPool?: unknown,
   cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
   queueDriverFactory?: (cacheAndQueueDriver: string, queueDriverOptions: QueueDriverFactoryOptions) => QueueDriverInterface,
@@ -97,6 +103,8 @@ export class QueryQueue {
   protected orphanedTimeout: number;
 
   protected heartBeatInterval: number;
+
+  protected readonly cancelOrphanedRunningQueries: boolean;
 
   protected readonly sendProcessMessageFn: SendProcessMessageFn;
 
@@ -135,6 +143,7 @@ export class QueryQueue {
     this.executionTimeout = options.executionTimeout || getEnv('dbQueryTimeout');
     this.orphanedTimeout = options.orphanedTimeout || 120;
     this.heartBeatInterval = options.heartBeatInterval || 30;
+    this.cancelOrphanedRunningQueries = options.cancelOrphanedRunningQueries ?? false;
 
     this.sendProcessMessageFn = options.sendProcessMessageFn || (
       (queryKeyHash, queueId, retrieved) => { this.executeQuery(queryKeyHash, queueId, retrieved); }
@@ -281,8 +290,10 @@ export class QueryQueue {
 
       options.orphanedTimeout = query.orphanedTimeout;
 
+      // Waiters keep an item alive only on a node with the flag on, so only an item such a node added may be cancelled
+      const queuedQuery = this.cancelOrphanedRunningQueries ? { ...query, waitersKeepAlive: true } : query;
       const [added, queueId, queueSize, addedToQueueTime, retrieved] = await queueConnection.addToQueue(
-        queryKey, queryHandler, query, priority, options
+        queryKey, queryHandler, queuedQuery, priority, options
       );
 
       if (added > 0) {
@@ -355,6 +366,12 @@ export class QueryQueue {
         fastTrack: !!retrieved,
       });
 
+      // A waiter that added the item started waiting before the query did, which the start already counts for
+      if (this.cancelOrphanedRunningQueries && !added && queryHandler !== 'stream' && !query.isJob) {
+        // Off the wait's critical path: it logs its own errors and only has to land inside the orphaned window
+        this.markWaiting(queueConnection, queryKeyHash, queueId, options.requestId).catch((): undefined => undefined);
+      }
+
       if (streamWait) {
         result = await streamWait.promise;
       } else {
@@ -378,6 +395,58 @@ export class QueryQueue {
       streamWait?.dispose();
       this.queueDriver.release(queueConnection);
     }
+  }
+
+  /**
+   * Records that a waiter is still asking for the query's result, which keeps a running query from
+   * being orphaned. The local driver only records it while the query is active, which is the only
+   * time it is read.
+   */
+  protected async markWaiting(
+    queueConnection: QueueDriverConnectionInterface,
+    queryKeyHash: QueryKeyHash,
+    queueId: QueueId | null,
+    requestId: string,
+  ): Promise<void> {
+    if (queueId === null) {
+      return;
+    }
+
+    try {
+      await queueConnection.optimisticQueryUpdate(queryKeyHash, { lastWaitTime: Date.now() }, queueId);
+    } catch (e: any) {
+      this.logger('Error marking query as waited for', {
+        queueId,
+        queryKeyHash,
+        queuePrefix: this.redisQueuePrefix,
+        requestId,
+        error: (e.stack || e).toString(),
+      });
+    }
+  }
+
+  /**
+   * Orphaned once nobody has waited for a full wait plus the orphaned timeout. The start counts as a wait,
+   * since a waiter seen while pending may still be blocked on it. Only API-request queries qualify.
+   */
+  protected isOrphanedWhileRunning(def: QueryDef, startQueryTime: number): boolean {
+    if (!this.cancelOrphanedRunningQueries || !def.query?.waitersKeepAlive || !QueryQueue.isApiRequestQuery(def)) {
+      return false;
+    }
+
+    const lastWaitTime = Math.max(def.lastWaitTime ?? 0, startQueryTime);
+    const orphanedTimeout = def.query?.orphanedTimeout ?? this.orphanedTimeout;
+
+    return Date.now() - lastWaitTime > (this.continueWaitTimeout + orphanedTimeout) * 1000;
+  }
+
+  protected static isApiRequestQuery(def: QueryDef): boolean {
+    const { query } = def;
+
+    return !!query?.primaryQuery &&
+      !query.renewCycle &&
+      !query.background &&
+      !(typeof def.requestId === 'string' && def.requestId.startsWith('scheduler-'));
   }
 
   /**
@@ -950,6 +1019,20 @@ export class QueryQueue {
                   preAggregation: query.query?.preAggregation,
                   addedToQueueTime: query.addedToQueueTime,
                 });
+                const cancelQuery = { ...query, cancelHandler: localCancelHandler };
+                await this.processCancel(cancelQuery, queueId);
+              } else if (currentDef && !queryExecutionFinished && this.isOrphanedWhileRunning(currentDef, startQueryTime)) {
+                this.logger('Cancelling orphaned running query', {
+                  queueId,
+                  queryKey: query.queryKey,
+                  queuePrefix: this.redisQueuePrefix,
+                  requestId: query.requestId,
+                  metadata: query.query?.metadata,
+                  addedToQueueTime: query.addedToQueueTime,
+                  lastWaitTime: currentDef.lastWaitTime,
+                });
+                // Removed first, so a waiter arriving now adds a fresh item instead of waiting on this one
+                await queueConnection.getQueryAndRemove(queryKeyHashed, queueId);
                 const cancelQuery = { ...query, cancelHandler: localCancelHandler };
                 await this.processCancel(cancelQuery, queueId);
               }
